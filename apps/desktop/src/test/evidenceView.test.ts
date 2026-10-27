@@ -57,7 +57,7 @@ describe("one page of a view of the evidence section", () => {
   });
 
   it("asks for a folder, the top level or the whole ledger, and reads the total", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(answer([{ id: "a1" }], 61));
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async () => answer([{ id: "a1" }], 61));
     const inFolder = await querySharedArtifactPage("token", "w1", { query: "", folderId: "f1", ledgerOnly: true, limit: 24, offset: 48 });
     const topLevel = await querySharedArtifactPage("token", "w1", { query: "", folderId: null, ledgerOnly: true, limit: 24, offset: 0 });
     const everywhere = await querySharedArtifactPage("token", "w1", { query: "plan", kinds: [categoryKind("word")], folderId: undefined, limit: 24, offset: 0 });

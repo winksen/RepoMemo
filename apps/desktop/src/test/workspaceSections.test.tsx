@@ -114,12 +114,12 @@ describe("the command palette's sections", () => {
   const labels = (entries: ReturnType<typeof paletteEntries>) => entries.filter((entry) => entry.group === "This workspace").map((entry) => entry.label);
 
   it("lists them in the usual order without a template", () => {
-    expect(labels(paletteEntries(input("owner")))).toEqual(["Overview", "Evidence", "Documents", "Repositories", "Retrieval", "Map", "Health", "Review queue", "Memory", "Tasks", "People", "Workspace settings"]);
+    expect(labels(paletteEntries(input("owner")))).toEqual(["New note", "Overview", "Evidence", "Documents", "Repositories", "Retrieval", "Map", "Health", "Review queue", "Memory", "Tasks", "People", "Workspace settings"]);
   });
 
   it("lists the tabs in the template's order and the sections kept under More after them", () => {
-    expect(labels(paletteEntries(input("owner", knowledgeBase)))).toEqual(["Overview", "Documents", "Retrieval", "Evidence", "Review queue", "Health", "Memory", "Tasks", "People", "Workspace settings", "Map", "Repositories"]);
-    expect(labels(paletteEntries(input("member", knowledgeBase)))).toEqual(["Overview", "Documents", "Retrieval", "Evidence", "Review queue", "Health", "Memory", "Tasks", "Map", "Repositories"]);
+    expect(labels(paletteEntries(input("owner", knowledgeBase)))).toEqual(["New note", "Overview", "Documents", "Retrieval", "Evidence", "Review queue", "Health", "Memory", "Tasks", "People", "Workspace settings", "Map", "Repositories"]);
+    expect(labels(paletteEntries(input("member", knowledgeBase)))).toEqual(["New note", "Overview", "Documents", "Retrieval", "Evidence", "Review queue", "Health", "Memory", "Tasks", "Map", "Repositories"]);
   });
 
   it("opens a workspace from the palette on its landing section", () => {

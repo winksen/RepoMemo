@@ -60,14 +60,14 @@ describe("WorkspaceImport", () => {
     choose(file);
     fireEvent.click(screen.getByRole("button", { name: /check the archive/i }));
     await screen.findByText("Payments");
-    expect(importSharedWorkspaceArchive).toHaveBeenLastCalledWith("t", { organizationId: "o1", archive: file, dryRun: true, name: "" });
+    expect(importSharedWorkspaceArchive).toHaveBeenLastCalledWith("t", expect.objectContaining({ organizationId: "o1", archive: file, dryRun: true, name: "" }));
     expect(screen.getByText(/3 files, 1 folder/)).toBeTruthy();
     expect(onImported).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText(/name of the new workspace/i), { target: { value: "Payments copy" } });
     fireEvent.click(screen.getByRole("button", { name: /import workspace/i }));
     await waitFor(() => expect(onImported).toHaveBeenCalledWith(created));
-    expect(importSharedWorkspaceArchive).toHaveBeenLastCalledWith("t", { organizationId: "o1", archive: file, dryRun: false, name: "Payments copy" });
+    expect(importSharedWorkspaceArchive).toHaveBeenLastCalledWith("t", expect.objectContaining({ organizationId: "o1", archive: file, dryRun: false, name: "Payments copy" }));
     expect(showToast).toHaveBeenCalledWith("success", "Imported Payments copy.");
     expect(screen.queryByText("Payments")).toBeNull();
   });

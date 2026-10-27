@@ -99,11 +99,12 @@ describe("web session", () => {
     expect(window.localStorage.getItem(LEGACY)).toBeNull();
   });
 
-  it("signs out on the server and forgets everything locally", () => {
+  it("signs out on the server and forgets everything locally", async () => {
     window.localStorage.setItem(MARKER, "1");
     window.sessionStorage.setItem(SHARED_SESSION_STORAGE_KEY, "access-1");
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 204 }));
     clearSharedSession();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(String(fetchMock.mock.calls[0][0])).toContain("/v1/auth/logout");
     expect(window.localStorage.getItem(MARKER)).toBeNull();
     expect(window.sessionStorage.getItem(SHARED_SESSION_STORAGE_KEY)).toBeNull();

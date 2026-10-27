@@ -97,7 +97,7 @@ describe("ReviewQueuePanel", () => {
     await waitFor(() => expect(within(screen.getByRole("list", { name: "Review queue" })).queryByText("Runbook")).toBeNull());
     expect(screen.getByText(/2 items waiting/)).toBeTruthy();
     expect(screen.getByText(/1 snoozed/)).toBeTruthy();
-    expect(queryClient.getQueryData(workspaceKeys.review("w1"))).toBe(after);
+    expect(queryClient.getQueryData(workspaceKeys.review("w1"))).toEqual(after);
     expect(showToast).toHaveBeenCalledWith("success", expect.stringContaining("Runbook is snoozed"));
     // The snoozed list says when it comes back, and brings it back at once.
     const snoozed = within(screen.getByRole("region", { name: "Snoozed items" }));

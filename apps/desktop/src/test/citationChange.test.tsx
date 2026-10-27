@@ -30,6 +30,6 @@ describe("evidence used by an answer", () => {
   it("shows the last author and date of a repository file beside its citation, and nothing for a note", () => {
     render(<EvidenceUsed citations={[cite({ last_author: "Ada", last_changed_at: "2026-10-01T09:30:00Z" }), cite({ artifact_id: "a2", chunk_id: "c2", title: "Runbook", path: "runbook.md" })]} onOpenArtifact={() => undefined} />);
     expect(screen.getAllByText(/changed by Ada/)).toHaveLength(1);
-    expect(screen.getByText("Runbook · runbook.md")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Runbook · runbook\.md/ })).toBeTruthy();
   });
 });

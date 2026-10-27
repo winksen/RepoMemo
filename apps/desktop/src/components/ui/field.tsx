@@ -50,7 +50,9 @@ export function Field({ children, className, hint, htmlFor, invalid: forcedInval
     // Replaces the browser's bubble, which would also move focus to the first refused control.
     event.preventDefault();
     setChecked(fieldMessage(target, label));
-    if (target.form?.querySelector(":is(input, select, textarea):invalid") === target) target.focus();
+    const firstInvalid = Array.from(target.form?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea") ?? [])
+      .find((control) => !control.validity.valid);
+    if (firstInvalid === target) target.focus();
   }
   function clearWhenValid(event: FormEvent<HTMLElement>) {
     if (checked !== null && (event.target as CheckedControl).validity?.valid !== false) setChecked(null);

@@ -1,13 +1,18 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// The browser tsconfig intentionally omits Node types; these imports run in Vitest only.
+// @ts-expect-error Node type declarations are outside the browser bundle.
+import { readFileSync } from "node:fs";
+// @ts-expect-error Node type declarations are outside the browser bundle.
+import { resolve } from "node:path";
 
 vi.mock("../components/AssistantPanel", () => ({ AssistantPanel: ({ workspaceId }: { workspaceId: string }) => <div data-testid="panel">assistant for {workspaceId}<button type="button">inside</button></div> }));
 
 import { AssistantDock } from "../components/AssistantDock";
 import { SharedLayout } from "../components/SharedLayout";
 import { NARROW_QUERY } from "../lib/useMediaQuery";
-import css from "../styles/13-narrow-screens.css?raw";
-import index from "../styles/index.ts?raw";
+const css = readFileSync(resolve("src/styles/13-narrow-screens.css"), "utf8");
+const index = readFileSync(resolve("src/styles/index.ts"), "utf8");
 import type { SharedSession } from "../types";
 
 function screenIs(width: "narrow" | "wide") {
@@ -103,11 +108,11 @@ describe("the rail on a narrow screen", () => {
 });
 
 describe("the narrow-screen stylesheet", () => {
-  it("uses the width the code uses, and is the last file of the cascade", () => {
+  it("uses the width the code uses, before the final building-block rules", () => {
     expect(NARROW_QUERY).toBe("(max-width: 900px)");
     expect(css).toContain(`@media ${NARROW_QUERY}`);
     const imports = [...index.matchAll(/import "\.\/([^"]+)";/g)].map((match) => match[1]);
-    expect(imports[imports.length - 1]).toBe("13-narrow-screens.css");
+    expect(imports.slice(-2)).toEqual(["13-narrow-screens.css", "14-building-blocks.css"]);
   });
 
   it("lets the page scroll and stops it from growing sideways on a tablet", () => {

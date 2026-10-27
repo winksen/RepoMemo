@@ -21,7 +21,7 @@ describe("System pages and the query cache", () => {
     expect(result.current[0]).toBeNull();
     await waitFor(() => expect(result.current[0]).toEqual({ users: 1 }));
     await act(async () => { await result.current[2](); });
-    expect(result.current[0]).toEqual({ users: 2 });
+    await waitFor(() => expect(result.current[0]).toEqual({ users: 2 }));
     expect(queryClient.getQueryData(systemKeys.overview())).toEqual({ users: 2 });
   });
 

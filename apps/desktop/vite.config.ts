@@ -84,6 +84,7 @@ export default defineConfig(({ mode }) => {
     envPrefix: ["VITE_", "TAURI_ENV_"],
     test: {
       environment: "jsdom",
+      setupFiles: ["src/test/setup.ts"],
       include: ["src/**/*.test.{ts,tsx}"],
       // Vitest 4 restores only `vi.spyOn` spies; the reset also clears the calls and implementations of `vi.fn()` mocks, as each test expects.
       restoreMocks: true,

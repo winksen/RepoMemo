@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.69 (2026-10-27)
+
+The web test suite completes locally: 88 files and 476 tests pass.
+
+### Fixed
+- Form validation finds the first invalid control through its `validity` state instead of a recursive `:invalid` selector, removing the jsdom stack overflow and preserving focus on the first refused field.
+- The Vitest setup supplies browser layout APIs absent from jsdom (`ResizeObserver`, `scrollIntoView`). Test fixtures and assertions now use fresh response bodies, account for asynchronous cache and navigation updates, and match the current citation, palette, import, template and stylesheet behavior. No test was skipped or removed.
+
+### Changed
+- Set the version to `0.4.69` everywhere. Updated the [test-debt record](mindmap/technical/web-test-debt.md), roadmap and release index.
+
+### Checks
+- **Pass:** `npm run test:web` (88 files, 476 tests), `npm run typecheck`, `npm run version:check`, `npm run docs:check`. CI is not run for this unpushed commit.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.68 (2026-10-27)
 
 The web test failures are inventoried for repair in V0.4.69.

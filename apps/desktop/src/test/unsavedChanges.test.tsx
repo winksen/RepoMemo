@@ -12,10 +12,10 @@ function Form({ dirty, keepsOn }: { dirty: boolean; keepsOn?: (to: string) => bo
 }
 
 describe("unsaved changes", () => {
-  it("moves at once when nothing is unsaved", () => {
+  it("moves without confirmation when nothing is unsaved", async () => {
     render(<ConfirmProvider><Form dirty={false} /></ConfirmProvider>);
     navigate("/dashboard");
-    expect(currentLocation()).toBe("/dashboard");
+    await waitFor(() => expect(currentLocation()).toBe("/dashboard"));
   });
 
   it("asks before leaving and stays when the person keeps editing", async () => {

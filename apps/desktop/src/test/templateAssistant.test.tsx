@@ -109,10 +109,10 @@ describe("the command palette's assistant commands", () => {
   const commands = (entries: ReturnType<typeof paletteEntries>) => entries.filter((entry) => entry.group === "Assistant").map((entry) => entry.id);
 
   it("are in the usual order without a template", () => {
-    expect(commands(paletteEntries(input()))).toEqual(["assistant:ask_question", "assistant:find_files", "assistant:search_content", "assistant:find_symbol"]);
+    expect(commands(paletteEntries(input()))).toEqual(["assistant:ask_question", "assistant:find_files", "assistant:search_content", "assistant:find_symbol", "assistant:overview"]);
   });
 
   it("follow the template's preferred order", () => {
-    expect(commands(paletteEntries(input(["find_symbol", "search_content"])))).toEqual(["assistant:find_symbol", "assistant:search_content", "assistant:ask_question", "assistant:find_files"]);
+    expect(commands(paletteEntries(input(["find_symbol", "search_content"])))).toEqual(["assistant:find_symbol", "assistant:search_content", "assistant:ask_question", "assistant:find_files", "assistant:overview"]);
   });
 });

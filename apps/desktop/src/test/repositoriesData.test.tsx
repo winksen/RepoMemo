@@ -29,7 +29,7 @@ describe("repositories through the query cache", () => {
     expect(result.current.repositories).toBeNull();
     await waitFor(() => expect(result.current.repositories).toHaveLength(1));
     await act(async () => { await result.current.load(); });
-    expect(result.current.repositories).toHaveLength(2);
+    await waitFor(() => expect(result.current.repositories).toHaveLength(2));
     expect(queryClient.getQueryData(workspaceKeys.repositories("w1"))).toHaveLength(2);
   });
 

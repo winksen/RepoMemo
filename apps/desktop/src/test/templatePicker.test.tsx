@@ -56,7 +56,7 @@ describe("TemplatePicker", () => {
     expect(onChange).toHaveBeenCalledWith("operations");
     rerender(<TemplatePicker disabled name="t" onChange={onChange} templates={[general, operations]} value="operations" />);
     expect((screen.getByRole("radio", { name: /Operations and incidents/ }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole("radio", { name: /General/ }) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByRole("radio", { name: /General/ }).matches(":disabled")).toBe(true);
   });
 });
 
