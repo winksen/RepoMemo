@@ -558,6 +558,21 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   if (!existsSync("docs/DESKTOP_FILES.md") || /tauri[-_]plugin[-_]log/.test(read("apps/desktop/src-tauri/Cargo.toml"))) problems.push("the app links a logging plugin, so docs/DESKTOP_FILES.md is wrong to say it writes no log");
 }
 
+// The deployment guide (V0.4.62): one page that chooses, sizes, walks the first hour, and covers backups and upgrades, with the
+// commands the repository really has.
+{
+  const guide = read("docs/DEPLOYMENT.md");
+  for (const needle of ["QUICK_START.md", "DIRECT_UPGRADE.md", "FRONT_DOORS.md", "VERIFYING_IMAGES.md", "DESKTOP_FILES.md", "deploy/init.sh", "deploy/upgrade.sh", "deploy/backup-volumes.sh", "deploy/restore-volumes.sh", "service/install.sh", "install.ps1", "REPOMEMO_BACKUP_COPY_DIR", "REPOMEMO_BACKUP_KEY", "REPOMEMO_DISK_FLOOR_MB", "docker compose pull && docker compose up -d --wait"]) {
+    if (!guide.includes(needle)) problems.push(`docs/DEPLOYMENT.md does not mention ${needle}`);
+  }
+  for (const heading of ["## 1. Choose", "## 2. Size it", "## 3. The first hour", "## 4. Backups", "## 5. Upgrading"]) {
+    if (!guide.includes(heading)) problems.push(`docs/DEPLOYMENT.md lacks the section "${heading}"`);
+  }
+  for (const script of ["deploy/init.sh", "deploy/upgrade.sh", "deploy/backup-volumes.sh", "deploy/restore-volumes.sh", "deploy/direct/service/install.sh", "deploy/direct/service/install.ps1"]) {
+    if (!existsSync(script)) problems.push(`docs/DEPLOYMENT.md names ${script}, which is not there`);
+  }
+}
+
 // The parity check of the desktop app (V0.4.58) runs in CI with its tests, and its list exists.
 {
   if (!/node scripts\/check-desktop\.mjs/.test(ci) || !/check-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop parity check and its tests");

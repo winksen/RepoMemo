@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.62 (2026-10-27)
+
+One page takes a new administrator from a machine to a running, backed-up, upgradable server.
+
+### Added
+- **`docs/DEPLOYMENT.md`:** *1. Choose* containers or a direct install (a table: what you need, what you get, how it is installed and upgraded, when to choose it; containers when in doubt); *2. Size it* (memory, disk with the backups counted, CPU, network, and the limits that protect the disk); *3. The first hour* (the quick start and `init.sh` for containers, the archive, its installer and a front door for a direct install, then for both the first-run setup, a look at *System › Overview* and `/health`, the first backup before anyone depends on the server, the optional pieces and the desktop app); *4. Backups* (the server's own, the second copy it checks, the volumes' scripts, sealing, trying a restore); *5. Upgrading* (back up, read the changelog, `deploy/upgrade.sh` or the direct guide, look, and what going back means); *6. When something is wrong*.
+- It names only what the repository has: the commands and files are the ones that exist, and the figures (memory, disk floor, upload and workspace limits, backups kept) are the defaults of the production guide.
+
+### Changed
+- **`container:check`** requires the page's five sections, its links to the quick start, the direct upgrade guide, the front doors, the image verification and the desktop files, the commands it gives, and that every script it names is there. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.62` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the page was not followed on a clean machine; V0.4.66 gives the maintainer the steps to do that and a sheet to record it.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.61 (2026-10-26)
 
 An administrator can find, change and remove everything the app keeps on a computer, on Windows, macOS and Linux.
