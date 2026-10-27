@@ -279,6 +279,58 @@ async fn folders_move_files_are_handled_in_bulk_and_files_take_new_versions() {
     )
     .await;
     assert_eq!(lifecycle["status"], "verified");
+    let history = response_json(
+        app.clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/artifacts/{}/lifecycle/history", ids[2]),
+                &owner,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(history.as_array().is_some_and(|events| !events.is_empty()));
+    let other_workspace = create_workspace(&app, &owner).await;
+    let other_id = response_json(
+        call(
+            &app,
+            "POST",
+            &format!("/v1/workspaces/{other_workspace}/artifacts/text"),
+            &owner,
+            json!({"title": "Other workspace", "content": "Private evidence"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let scoped = response_json(
+        call(
+            &app,
+            "POST",
+            &bulk_uri,
+            &owner,
+            json!({"action": "lifecycle", "artifact_ids": [ids[2], other_id], "status": "outdated"}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(scoped["done"][0], ids[2]);
+    assert_eq!(scoped["failed"][0]["artifact_id"], other_id);
+    let untouched = response_json(
+        app.clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/artifacts/{other_id}/lifecycle"),
+                &owner,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(untouched["status"], "active");
     let partial = response_json(
         call(
             &app,

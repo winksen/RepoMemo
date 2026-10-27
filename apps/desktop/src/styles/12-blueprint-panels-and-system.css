@@ -409,6 +409,15 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .rm-platform code, .rm-environment-card code { font-family: var(--font-mono); font-size: 12px; }
 .shared-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
 .shared-bulk-bar > span { color: var(--color-text-muted); font-size: 13px; }
+.shared-bulk-review-list { display: grid; gap: 8px; max-height: 280px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.shared-bulk-review-list li { display: grid; min-width: 0; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--color-border); }
+.shared-bulk-review-list strong, .shared-bulk-review-list span { overflow-wrap: anywhere; }
+.shared-bulk-review-list span { color: var(--color-text-muted); font-size: 12px; }
+.shared-bulk-review-results { display: grid; gap: 8px; margin-bottom: 12px; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px; }
+.shared-bulk-review-results > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.shared-bulk-review-results ul { display: grid; gap: 5px; max-height: 240px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.shared-bulk-review-results li { display: flex; justify-content: space-between; gap: 12px; overflow-wrap: anywhere; font-size: 12px; }
+.shared-bulk-review-results li span:last-child { color: var(--color-text-muted); }
 .shared-select-box { margin-bottom: 6px; }
 
 /* A citation that names a commit: the open button and "View at <commit>" side by side. */

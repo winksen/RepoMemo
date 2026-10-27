@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const artifacts = vi.hoisted(() => ({ list: [] as unknown[] }));
@@ -26,6 +26,7 @@ vi.mock("../web/lazy", () => ({
 }));
 
 import { ConfirmProvider } from "../components/ui/confirm-dialog";
+import { bulkSharedArtifacts } from "../lib/sharedApi";
 import { EvidenceSection } from "../web/workspace/EvidenceSection";
 import { makePage } from "./workspacePage";
 
@@ -56,6 +57,23 @@ describe("the evidence section on the shared pieces", () => {
     expect(box.getAttribute("aria-checked")).toBe("false");
     fireEvent.click(box);
     expect(screen.getByRole("checkbox", { name: "Select Runbook" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("1 selected")).toBeTruthy();
+  });
+
+  it("previews a bulk review and reports each result", async () => {
+    artifacts.list = [file, { ...file, id: "a2", title: "Design", path: "docs/design.md" }];
+    vi.mocked(bulkSharedArtifacts).mockResolvedValue({ done: ["a1"], failed: [{ artifact_id: "a2", message: "Artifact was not found." }] });
+    render(<ConfirmProvider><EvidenceSection page={makePage()} /></ConfirmProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Select files" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Runbook" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Design" }));
+    fireEvent.click(screen.getByRole("button", { name: "Mark verified" }));
+    expect(screen.getByRole("dialog", { name: "Review selected evidence" })).toBeTruthy();
+    expect(bulkSharedArtifacts).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Mark 2 items verified" }));
+    await waitFor(() => expect(bulkSharedArtifacts).toHaveBeenCalledWith("t", "w1", { action: "lifecycle", status: "verified", artifactIds: ["a1", "a2"] }));
+    expect(await screen.findByText("Failed: Artifact was not found.")).toBeTruthy();
+    expect(screen.getByText("Updated")).toBeTruthy();
     expect(screen.getByText("1 selected")).toBeTruthy();
   });
 });

@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.75 (2026-10-27)
+
+Bulk evidence review now previews the selected files and reports each result.
+
+### Changed
+- The selection toolbar opens a review preview before changing lifecycle state. The result names each updated item and each failure; failed items stay selected for another attempt.
+- The existing bulk API keeps the item's review history and rejects an item from another workspace while processing eligible items.
+
+### Checks
+- Web typecheck, styles check, focused evidence UI tests and the bulk API regression test pass.
+
+### Upgrading
+- Nothing to do. The bulk endpoint and stored schema are unchanged.
+
 ## V0.4.74 (2026-10-27)
 
 Evidence detail now shows provenance and freshness in one place.
