@@ -1386,6 +1386,7 @@ impl From<SearchResultRow> for SearchResult {
             end_line: row.end_line,
             score: row.score,
             source_name: row.source_name,
+            match_kind: "keyword".to_owned(),
             commit: None,
             last_author: None,
             last_changed_at: None,

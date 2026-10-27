@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../../components/SafeMarkdown";
 import { IconBook2 as Book, IconBrain as Brain, IconCode as Code, IconSearch as Search, IconShieldLock as Shield, IconTrash as Trash } from "@tabler/icons-react";
 import { askSharedWorkspace, createSharedSavedSearch, deleteSharedSavedSearch, searchSharedSymbols, searchSharedWorkspace } from "../../lib/sharedApi";
@@ -27,19 +27,22 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
   const { accessToken, workspace, workspaceId, canWrite, isSubmitting, setIsSubmitting, setError, onOpenArtifact, draftMemoryFromAnswer } = page;
   const { section } = page;
   const useS = sectionState(page.store, "retrieval");
+  const urlFilters = new URLSearchParams(window.location.search);
+  const initialUrlSearch = useRef(urlFilters.has("q"));
+  const [semanticAvailable, setSemanticAvailable] = useState<boolean | null>(null);
   const [resultsPage, setResultsPage] = useS("resultsPage", 0);
   const [results, setResults] = useS<SearchResult[]>("results", []);
-  const [query, setQuery] = useS("query", "");
-  const [retrievalArtifactType, setRetrievalArtifactType] = useS<ArtifactType | "all">("retrievalArtifactType", "all");
-  const [retrievalLanguage, setRetrievalLanguage] = useS("retrievalLanguage", "all");
-  const [retrievalSourceId, setRetrievalSourceId] = useS("retrievalSourceId", "all");
-  const [retrievalState, setRetrievalState] = useS<RetrievalState>("retrievalState", "current");
-  const [retrievalFolderId, setRetrievalFolderId] = useS("retrievalFolderId", "all");
-  const [retrievalAfter, setRetrievalAfter] = useS("retrievalAfter", "");
-  const [retrievalBefore, setRetrievalBefore] = useS("retrievalBefore", "");
+  const [query, setQuery] = useS("query", urlFilters.get("q") ?? "");
+  const [retrievalArtifactType, setRetrievalArtifactType] = useS<ArtifactType | "all">("retrievalArtifactType", (urlFilters.get("type") ?? "all") as ArtifactType | "all");
+  const [retrievalLanguage, setRetrievalLanguage] = useS("retrievalLanguage", urlFilters.get("language") ?? "all");
+  const [retrievalSourceId, setRetrievalSourceId] = useS("retrievalSourceId", urlFilters.get("source") ?? "all");
+  const [retrievalState, setRetrievalState] = useS<RetrievalState>("retrievalState", (Object.prototype.hasOwnProperty.call(RETRIEVAL_STATES, urlFilters.get("state") ?? "") ? urlFilters.get("state") : "current") as RetrievalState);
+  const [retrievalFolderId, setRetrievalFolderId] = useS("retrievalFolderId", urlFilters.get("folder") ?? "all");
+  const [retrievalAfter, setRetrievalAfter] = useS("retrievalAfter", urlFilters.get("after") ?? "");
+  const [retrievalBefore, setRetrievalBefore] = useS("retrievalBefore", urlFilters.get("before") ?? "");
   const [symbolQuery, setSymbolQuery] = useS("symbolQuery", "");
   const [symbolResults, setSymbolResults] = useS<SymbolSearchResult[] | null>("symbolResults", null);
-  const [retrievalLimit, setRetrievalLimit] = useS("retrievalLimit", "20");
+  const [retrievalLimit, setRetrievalLimit] = useS("retrievalLimit", ["10", "20", "50"].includes(urlFilters.get("limit") ?? "") ? urlFilters.get("limit")! : "20");
   const [savedSearchName, setSavedSearchName] = useS("savedSearchName", "");
   const [askQuestion, setAskQuestion] = useS("askQuestion", "");
   const [askAnswer, setAskAnswer] = useS<AskAnswer | null>("askAnswer", null);
@@ -52,12 +55,27 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
   const [savedSearches, setSavedSearches] = useSavedSearches(accessToken, workspaceId, true);
   // A new search, filter, folder or section starts again from the first page.
   useEffect(() => { setResultsPage(0); }, [results]);
-  async function runSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    for (const key of ["q", "type", "language", "source", "state", "folder", "after", "before", "limit"]) url.searchParams.delete(key);
+    if (query.trim()) url.searchParams.set("q", query.trim());
+    if (retrievalArtifactType !== "all") url.searchParams.set("type", retrievalArtifactType);
+    if (retrievalLanguage !== "all") url.searchParams.set("language", retrievalLanguage);
+    if (retrievalSourceId !== "all") url.searchParams.set("source", retrievalSourceId);
+    if (retrievalState !== "current") url.searchParams.set("state", retrievalState);
+    if (retrievalFolderId !== "all") url.searchParams.set("folder", retrievalFolderId);
+    if (retrievalAfter) url.searchParams.set("after", retrievalAfter);
+    if (retrievalBefore) url.searchParams.set("before", retrievalBefore);
+    if (retrievalLimit !== "20") url.searchParams.set("limit", retrievalLimit);
+    window.history.replaceState(window.history.state, "", url);
+  }, [query, retrievalArtifactType, retrievalLanguage, retrievalSourceId, retrievalState, retrievalFolderId, retrievalAfter, retrievalBefore, retrievalLimit]);
+  useEffect(() => { if (initialUrlSearch.current) { initialUrlSearch.current = false; void performSearch(); } }, []);
+
+  async function performSearch() {
     if (!query.trim()) return;
     setIsSubmitting(true); setError(null);
     try {
-      setResults(await searchSharedWorkspace(accessToken, workspace.workspace.id, {
+      const found = await searchSharedWorkspace(accessToken, workspace.workspace.id, {
         query,
         artifactTypes: retrievalArtifactType === "all" ? [] : [retrievalArtifactType],
         languages: retrievalLanguage === "all" ? [] : [retrievalLanguage],
@@ -67,9 +85,12 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
         folderId: retrievalFolderId === "all" ? null : retrievalFolderId,
         modifiedAfter: retrievalAfter || null,
         modifiedBefore: retrievalBefore || null,
-      }));
+      });
+      setResults(found.results);
+      setSemanticAvailable(found.semanticAvailable);
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
+  function runSearch(event: FormEvent<HTMLFormElement>) { event.preventDefault(); void performSearch(); }
 
   function clearRetrievalFilters() {
     setRetrievalArtifactType("all");
@@ -81,6 +102,7 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
     setRetrievalAfter("");
     setRetrievalBefore("");
     setResults([]);
+    setSemanticAvailable(null);
   }
 
   async function runSymbolSearch(event: FormEvent<HTMLFormElement>) {
@@ -138,10 +160,10 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
             </form>
             <section className="shared-symbol-search"><PanelHeading icon={Code} level={3} title="Code symbols" />
               <form className="shared-retrieval-search" onSubmit={runSymbolSearch}><SearchField aria-label="Function, class or method name" onValueChange={setSymbolQuery} placeholder="Function, class or method name" value={symbolQuery} /><Button busy={isSubmitting} type="submit" variant="secondary">Find definition</Button></form>
-              {symbolResults ? (symbolResults.length ? <div className="shared-search-results">{symbolResults.map((hit) => <article key={hit.symbol.id}><Button className="shared-search-result" onClick={() => onOpenArtifact(hit.symbol.artifact_id)} type="button" variant="secondary"><span><strong>{hit.symbol.name}</strong> · {hit.symbol.kind}</span><span>{hit.path}{hit.symbol.start_line ? `:${hit.symbol.start_line}` : ""}</span></Button></article>)}</div> : <EmptyState description="No indexed code defines a symbol named like that." title="No symbol found" />) : null}
+              {symbolResults ? (symbolResults.length ? <div className="shared-search-results">{symbolResults.map((hit) => <article key={hit.symbol.id}><Button className="shared-search-result" onClick={() => onOpenArtifact(hit.symbol.artifact_id)} type="button" variant="secondary"><span><strong>{hit.symbol.name}</strong> · {hit.symbol.kind} · Symbol match: “{symbolQuery.trim()}”</span><span>{hit.path}{hit.symbol.start_line ? `:${hit.symbol.start_line}` : ""}</span></Button></article>)}</div> : <EmptyState description="No indexed code defines a symbol named like that." title="No symbol found" />) : null}
             </section>
             <section className="shared-saved-searches"><PanelHeading description={savedSearches.length} icon={Book} level={3} title="Saved searches" />{savedSearches.length ? <div className="shared-saved-search-list">{savedSearches.map((saved) => <article key={saved.id}><Button onClick={() => applySavedSearch(saved)} type="button" variant="secondary"><span><strong>{saved.name}</strong><small>{saved.query}</small></span></Button>{canWrite ? <IconButton disabled={isSubmitting} label={`Delete ${saved.name}`} onClick={() => void removeSavedSearch(saved)}><Trash size={ICON_SIZE.sm} /></IconButton> : null}</article>)}</div> : <EmptyState description="Save a query and its filters for recurring investigations." title="No saved searches" />}{canWrite ? <form className="shared-save-search-form" onSubmit={saveCurrentSearch}><Field label="Name for this search" required><Input onChange={(event) => setSavedSearchName(event.target.value)} placeholder="Search name" value={savedSearchName} /></Field><Button busy={isSubmitting} disabled={!query.trim()} type="submit" variant="secondary">Save current search</Button></form> : null}</section>
-            <div>{results.length ? <div className="shared-search-results"><p className="shared-search-result-count">{results.length} matching evidence {results.length === 1 ? "result" : "results"}</p>{paginate(results, resultsPage).map((result) => <article key={result.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(result.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{result.title}</strong><span>{artifactTypeLabel(result.artifact_type, typeLabels)} · {result.language ?? "Unspecified"} · {result.source_name}</span></span><p>{renderHighlightedSnippet(result.snippet)}</p><span className="shared-search-result-path">{result.path}{citationLines(result)}{result.last_author ? ` · last changed by ${lastChangeLabel(result.last_author, result.last_changed_at)}` : ""}</span></Button></article>)}<Pagination onPageChange={setResultsPage} page={resultsPage} total={results.length} /></div> : <EmptyState description="Index one or more artifacts, then search the evidence base from here. Use filters to narrow large workspaces." title="Search the evidence base" />}
+            <div>{semanticAvailable === false ? <p className="shared-muted-copy" role="status">Semantic search is unavailable for this query. Results use keyword matches only.</p> : null}{results.length ? <div className="shared-search-results"><p className="shared-search-result-count">{results.length} matching evidence {results.length === 1 ? "result" : "results"}</p>{paginate(results, resultsPage).map((result) => <article key={result.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(result.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{result.title}</strong><span>{artifactTypeLabel(result.artifact_type, typeLabels)} · {result.language ?? "Unspecified"} · {result.source_name}</span></span><p>{renderHighlightedSnippet(result.snippet)}</p><span className="shared-search-result-path">{result.match_kind === "keyword_and_semantic" ? "Keyword and semantic match" : result.match_kind === "semantic" ? "Semantic match" : result.match_kind === "keyword" ? `Keyword match: “${query.trim()}”` : "Match type unavailable"} · {result.path}{citationLines(result)}{result.last_author ? ` · last changed by ${lastChangeLabel(result.last_author, result.last_changed_at)}` : ""}</span></Button></article>)}<Pagination onPageChange={setResultsPage} page={resultsPage} total={results.length} /></div> : <EmptyState description="Index one or more artifacts, then search the evidence base from here. Use filters to narrow large workspaces." title="Search the evidence base" />}
               <section className="shared-ask-evidence" aria-live="polite"><div><Brain size={ICON_SIZE.lg} /><h3>Ask your evidence</h3></div><p>Get a citation-backed answer from the indexed workspace context.</p><form onSubmit={askEvidence}><Field hint={submitHint("asks")} label="Question about the evidence" required><Textarea onChange={(event) => setAskQuestion(event.target.value)} placeholder="What do we know about the current implementation?" value={askQuestion} /></Field><Button busy={isSubmitting} type="submit" variant="secondary"><Brain size={ICON_SIZE.md} /> Ask</Button></form>{askAnswer ? <div className="shared-ask-answer"><p className="shared-ai-generated-note">AI-generated from the cited passages · verify against the sources</p><div className="shared-markdown shared-ai-answer"><SafeMarkdown>{askAnswer.answer_markdown}</SafeMarkdown></div>{askAnswer.warnings.length ? <div className="shared-ai-overview-warning">{askAnswer.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}{askAnswer.citations.length ? <EvidenceUsed accessToken={accessToken} citations={askAnswer.citations} numbered onOpenArtifact={onOpenArtifact} /> : null}{canWrite && askAnswer.citations.length ? <div className="shared-ai-actions"><Button disabled={isSubmitting} onClick={() => draftMemoryFromAnswer(askedQuestion || "Answer from workspace evidence", askAnswer.answer_markdown, "Ask your evidence", askAnswer.citations)} type="button" variant="secondary"><Shield size={ICON_SIZE.md} /> Save as memory</Button></div> : null}</div> : null}</section>
             </div></>
   );

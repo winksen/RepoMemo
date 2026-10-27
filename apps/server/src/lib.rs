@@ -565,6 +565,7 @@ fn cors_layer(config: &ServerConfig) -> CorsLayer {
             .expose_headers([
                 HeaderName::from_static("x-total-count"),
                 HeaderName::from_static("x-repomemo-truncated"),
+                HeaderName::from_static("x-repomemo-semantic-search"),
                 header::RETRY_AFTER,
             ])
             // The web app's refresh cookie crosses ports of the same site.

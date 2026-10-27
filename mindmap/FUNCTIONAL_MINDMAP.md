@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.76` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.77` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -409,6 +409,7 @@ Re-indexing keeps every passage whose text did not change, so memory cards and a
 - When the workspace has an embedding provider, search also finds passages **by meaning** and merges both result lists, so a question phrased differently from the text still finds it. If the provider fails, search falls back to keywords.
 - Filters: **file type**, **language**, **source**, and **10 / 20 / 50 results**. Filter options are built from what has actually been indexed. Further filters: the **evidence state** (current by default, so outdated and superseded files are left out; verified only, needing review, outdated and superseded, or every state), a **folder** (with the folders below it) and an **updated between** date range. Verified evidence ranks a little higher. A **Code symbols** box finds where a function, class or method is defined, and the assistant answers the same question.
 - Each result shows the title, type, language, source, a snippet with the **matched words highlighted**, the path, and the line range. Clicking a result opens the artifact.
+- Results say whether a passage matched keywords, meaning, or both; code definitions say they matched a symbol. A keyword-only fallback is named when semantic search could not run. The query and filters stay in the URL so the same search can be opened again.
 - Keyword search does **not** use AI and works offline.
 
 ### Search all workspaces

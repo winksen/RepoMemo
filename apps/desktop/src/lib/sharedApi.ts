@@ -328,6 +328,7 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
   accessToken?: string,
+  onResponse?: (response: Response) => void,
 ): Promise<T> {
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
@@ -341,6 +342,7 @@ async function request<T>(
 
   // Credentials: the session cookie travels to the API, which may sit on another port of the same site.
   const response = await authFetch(`${API_URL}${path}`, { ...options, headers, credentials: "include" });
+  onResponse?.(response);
   const payload = await response.json().catch(() => null) as { error?: { message?: string } } | T | null;
   if (!response.ok) {
     const message = payload && typeof payload === "object" && "error" in payload
@@ -1303,7 +1305,8 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
   /** `YYYY-MM-DD` */
   modifiedAfter?: string | null;
   modifiedBefore?: string | null;
-}): Promise<SearchResult[]> {
+}): Promise<{ results: SearchResult[]; semanticAvailable: boolean | null }> {
+  let semanticAvailable: boolean | null = null;
   return request<SearchResult[]>(`/v1/workspaces/${workspaceId}/search`, {
     method: "POST",
     body: JSON.stringify({
@@ -1317,7 +1320,10 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
       modified_after: input.modifiedAfter || null,
       modified_before: input.modifiedBefore || null,
     }),
-  }, accessToken);
+  }, accessToken, (response) => {
+    const state = response.headers.get("x-repomemo-semantic-search");
+    semanticAvailable = state === "available" ? true : state === "unavailable" ? false : null;
+  }).then((results) => ({ results, semanticAvailable }));
 }
 
 /** Searches every workspace the account can read; results are merged by score and name their workspace. */

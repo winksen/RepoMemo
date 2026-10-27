@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.77 (2026-10-27)
+
+Search results now state how a passage matched, and retrieval filters survive a shared URL.
+
+### Added
+- Results identify keyword, semantic or combined matches; code definition results identify symbol matches.
+- Retrieval query, type, language, source, lifecycle, folder, dates and limit are reflected in the URL. Opening a URL with a query runs that search with its filters.
+- The search response signals when semantic search was unavailable; the page then names the keyword-only fallback.
+
+### Checks
+- Retrieval fusion tests, focused web search tests, web typecheck, and semantic endpoint regression pass.
+
+### Upgrading
+- Nothing to do. The search result adds `match_kind` and the endpoint adds an exposed response header.
+
 ## V0.4.76 (2026-10-27)
 
 Failed evidence indexing can be retried from its item and workspace Health.

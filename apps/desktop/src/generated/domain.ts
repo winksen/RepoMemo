@@ -1109,6 +1109,8 @@ export interface SearchResult {
   end_line: number | null;
   score: number;
   source_name: string;
+  /** `keyword`, `semantic`, or `keyword_and_semantic` for this passage. */
+  match_kind: string;
   /** For a file of a git repository: the commit its text is from. */
   commit: string | null;
   /** For a file of a git repository: who last changed it. */

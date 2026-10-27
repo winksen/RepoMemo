@@ -435,15 +435,15 @@ async fn embeddings_power_semantic_search_and_ask_gets_full_passages() {
     assert!(pair.contains(&artifact_ids[0].as_str()) && pair.contains(&artifact_ids[2].as_str()));
 
     // "shipping" appears in no file, but means the same as "deploy".
-    let results = read(
-        call(
-            "POST",
-            format!("/v1/workspaces/{workspace_id}/search"),
-            json!({"query": "shipping", "limit": 5}),
-        )
-        .await,
+    let response = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/search"),
+        json!({"query": "shipping", "limit": 5}),
     )
     .await;
+    assert_eq!(response.headers()["x-repomemo-semantic-search"], "available");
+    let results = read(response).await;
+    assert_eq!(results[0]["match_kind"], "semantic");
     let top_two = [
         results[0]["title"].as_str().unwrap(),
         results[1]["title"].as_str().unwrap(),

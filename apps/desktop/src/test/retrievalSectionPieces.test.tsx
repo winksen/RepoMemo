@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const saved = vi.hoisted(() => ({ list: [] as unknown[] }));
@@ -19,9 +19,10 @@ vi.mock("../web/workspace/data", () => ({
 vi.mock("../web/common", () => ({ EvidenceUsed: () => null, renderHighlightedSnippet: (text: string) => text }));
 
 import { RetrievalSection } from "../web/workspace/RetrievalSection";
+import { searchSharedWorkspace } from "../lib/sharedApi";
 import { makePage } from "./workspacePage";
 
-afterEach(() => { cleanup(); saved.list = []; });
+afterEach(() => { cleanup(); saved.list = []; window.history.replaceState(null, "", "/"); vi.clearAllMocks(); });
 
 describe("retrieval on the shared pieces", () => {
   it("labels every filter, with the dropdowns tied to their labels and the dates as fields", () => {
@@ -56,5 +57,19 @@ describe("retrieval on the shared pieces", () => {
     saved.list = [{ id: "s1", name: "Auth flow", query: "login", artifact_types: [], languages: [], source_ids: [], result_limit: 20 }];
     render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
     expect(screen.getByRole("button", { name: "Delete Auth flow" }).className).toContain("rm-icon-button");
+  });
+
+  it("reopens URL filters and labels match provenance and keyword fallback", async () => {
+    window.history.replaceState(null, "", "/workspaces/w1/retrieval?q=login&limit=10");
+    vi.mocked(searchSharedWorkspace).mockResolvedValue({
+      semanticAvailable: false,
+      results: [{ artifact_id: "a1", chunk_id: "c1", title: "Login", path: "auth.md", artifact_type: "markdown_doc", language: null, snippet: "login", start_line: 3, end_line: 3, score: 1, source_name: "Docs", match_kind: "keyword", commit: null, last_author: null, last_changed_at: null }],
+    });
+    render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
+    await waitFor(() => expect(searchSharedWorkspace).toHaveBeenCalled());
+    expect((screen.getByLabelText("Search indexed evidence") as HTMLInputElement).value).toBe("login");
+    expect(window.location.search).toContain("limit=10");
+    expect(await screen.findByText(/Keyword match: “login” · auth.md/)).toBeTruthy();
+    expect(screen.getByText(/Semantic search is unavailable/)).toBeTruthy();
   });
 });

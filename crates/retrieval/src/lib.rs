@@ -349,7 +349,10 @@ pub fn fuse_by_rank(keyword: Vec<SearchResult>, semantic: Vec<SearchResult>) -> 
         for (rank, mut result) in list.into_iter().enumerate() {
             let contribution = 1.0 / (RRF_K + rank as f64 + 1.0);
             match fused.iter_mut().find(|item| item.chunk_id == result.chunk_id) {
-                Some(existing) => existing.score += contribution,
+                Some(existing) => {
+                    existing.score += contribution;
+                    existing.match_kind = "keyword_and_semantic".to_owned();
+                }
                 None => {
                     result.score = contribution;
                     fused.push(result);
@@ -453,6 +456,7 @@ mod tests {
             end_line: None,
             score: 99.0,
             source_name: "s".to_owned(),
+            match_kind: "keyword".to_owned(),
             commit: None,
             last_author: None,
             last_changed_at: None,
@@ -463,11 +467,23 @@ mod tests {
     fn fusion_prefers_passages_found_by_both_lists() {
         let fused = fuse_by_rank(
             vec![hit("keyword-only"), hit("both")],
-            vec![hit("semantic-only"), hit("both")],
+            vec![
+                SearchResult {
+                    match_kind: "semantic".to_owned(),
+                    ..hit("semantic-only")
+                },
+                SearchResult {
+                    match_kind: "semantic".to_owned(),
+                    ..hit("both")
+                },
+            ],
         );
         let order = fused.iter().map(|result| result.chunk_id.as_str()).collect::<Vec<_>>();
         assert_eq!(order[0], "both");
         assert_eq!(order.len(), 3);
+        assert_eq!(fused[0].match_kind, "keyword_and_semantic");
+        assert_eq!(fused[1].match_kind, "keyword");
+        assert_eq!(fused[2].match_kind, "semantic");
         assert!(fused.iter().all(|result| (0.0..=1.0).contains(&result.score)));
     }
 

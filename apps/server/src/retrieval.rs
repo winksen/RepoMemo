@@ -217,7 +217,7 @@ pub(crate) async fn search_workspace(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(request): Json<SearchWorkspaceRequest>,
-) -> Result<Json<Vec<SearchResult>>, ApiError> {
+) -> Result<(HeaderMap, Json<Vec<SearchResult>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
     consume_heavy_quota(&state, &subject)?;
     check_lifecycle_statuses(&request.lifecycle_statuses)?;
@@ -231,24 +231,32 @@ pub(crate) async fn search_workspace(
         }
     }
     let started = std::time::Instant::now();
-    let result = state
+    let (result, semantic_available) = state
         .core
-        .search_workspace(SearchRequest {
-            workspace_id: workspace_id.clone(),
-            query: request.query,
-            artifact_types: request.artifact_types,
-            languages: request.languages,
-            source_ids: request.source_ids,
-            limit: request.limit,
-            lifecycle_statuses: request.lifecycle_statuses,
-            folder_id: request.folder_id,
-            modified_after: request.modified_after,
-            modified_before: request.modified_before,
-        })
+        .search_workspace_detailed(
+            SearchRequest {
+                workspace_id: workspace_id.clone(),
+                query: request.query,
+                artifact_types: request.artifact_types,
+                languages: request.languages,
+                source_ids: request.source_ids,
+                limit: request.limit,
+                lifecycle_statuses: request.lifecycle_statuses,
+                folder_id: request.folder_id,
+                modified_after: request.modified_after,
+                modified_before: request.modified_before,
+            },
+            true,
+        )
         .await
         .map_err(map_core_error)?;
     record_timing("search", &workspace_id, started, result.len());
-    Ok(Json(result))
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        HeaderName::from_static("x-repomemo-semantic-search"),
+        HeaderValue::from_static(if semantic_available { "available" } else { "unavailable" }),
+    );
+    Ok((headers, Json(result)))
 }
 
 #[derive(Debug, Deserialize)]

@@ -1250,6 +1250,8 @@ pub struct SearchResult {
     pub end_line: Option<i64>,
     pub score: f64,
     pub source_name: String,
+    /// `keyword`, `semantic`, or `keyword_and_semantic` for this passage.
+    pub match_kind: String,
     /// For a file of a git repository: the commit its text is from.
     #[serde(default)]
     pub commit: Option<String>,
