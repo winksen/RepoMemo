@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.63 (2026-10-27)
+
+One page takes an administrator from "I want my team on the desktop app" to a working install, an update path and a way to remove it.
+
+### Added
+- **`docs/DESKTOP_ADMIN.md`:** *1. What you hand out* (the program per system and the artifacts CI keeps, the configuration file, optionally the authority's certificate); *2. Package it for your server* (`desktop:package` with its flags, and a table of building with Rust, where the address is compiled in, against taking the CI artifact and adding the file, which can be deleted); *3. Hand it to a team* (silent install, where the file goes, what people see, the warnings of an unsigned app, the notices and links, the release-line rule); *4. Keep it current* (your own signed feed, the person's choice for the project's releases, or installing over the old one; the server first); *5. Take it away* (one person, the sign-in only, the app, the data, and why ending an account is done on the server).
+- It names only what exists: the flags, the files and the three artifacts are checked against the repository.
+
+### Changed
+- **`container:check`** requires the five sections, the commands, flags, files and artifacts it names, and that the scripts and workflows it relies on are there. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.63` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the page was not followed to hand a team a working app; V0.4.66 gives the maintainer the steps and a record sheet.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.62 (2026-10-27)
 
 One page takes a new administrator from a machine to a running, backed-up, upgradable server.

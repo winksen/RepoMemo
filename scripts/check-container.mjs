@@ -573,6 +573,21 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// The desktop administrator's guide (V0.4.63): packaging, handing out, updating and removing, with the commands, flags and files the
+// app and the repository really have.
+{
+  const guide = read("docs/DESKTOP_ADMIN.md");
+  for (const heading of ["## 1. What you hand out", "## 2. Package it", "## 3. Hand it to a team", "## 4. Keep it current", "## 5. Take it away"]) {
+    if (!guide.includes(heading)) problems.push(`docs/DESKTOP_ADMIN.md lacks the section "${heading}"`);
+  }
+  for (const needle of ["npm run desktop:package", "--certificate", "--from", "--open", "REPOMEMO_PRESET_SERVER", "repomemo-desktop.json", "/S", "--forget-session", "update-feed.mjs", "DESKTOP_FILES.md", "DEPLOYMENT.md", "desktop-windows-x64", "desktop-macos-universal", "desktop-linux-x64"]) {
+    if (!guide.includes(needle)) problems.push(`docs/DESKTOP_ADMIN.md does not mention ${needle}`);
+  }
+  for (const file of ["scripts/package-desktop.mjs", "scripts/update-feed.mjs", ".github/workflows/desktop-windows.yml", ".github/workflows/desktop-macos.yml", ".github/workflows/desktop-linux.yml"]) {
+    if (!existsSync(file)) problems.push(`docs/DESKTOP_ADMIN.md relies on ${file}, which is not there`);
+  }
+}
+
 // The parity check of the desktop app (V0.4.58) runs in CI with its tests, and its list exists.
 {
   if (!/node scripts\/check-desktop\.mjs/.test(ci) || !/check-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop parity check and its tests");
