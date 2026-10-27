@@ -664,6 +664,8 @@ pub struct ArtifactSummary {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArtifactDetail {
     pub summary: ArtifactSummary,
+    pub index_version: i64,
+    pub source_synced_at: Option<String>,
     pub metadata: Value,
     pub content_preview: Option<String>,
     pub content_truncated: bool,

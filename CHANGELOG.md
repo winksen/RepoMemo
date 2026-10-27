@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.74 (2026-10-27)
+
+Evidence detail now shows provenance and freshness in one place.
+
+### Added
+- Source name and identifier, import or latest source sync time, current content time, last successful index, index version, and lifecycle review state appear together on the evidence page.
+- The detail API reads the stored index version and source sync timestamp; a changed item without a current index says so explicitly.
+
+### Checks
+- Storage tests, web typecheck, styles check and provenance component tests pass.
+
+### Upgrading
+- Nothing to do. The API response adds two fields; stored data needs no migration.
+
 ## V0.4.73 (2026-10-27)
 
 Added a release evidence matrix before the daily-workflow releases.

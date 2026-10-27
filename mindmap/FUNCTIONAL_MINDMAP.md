@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.73` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.74` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -328,6 +328,7 @@ Office files, PDFs and emails are previewed in the browser: text and tables for 
 - **Browse**: filter by name or path and by type, and switch between grid and list views.
 - **Artifact page** (`/workspaces/:id/artifacts/:artifactId`) shows:
   - metadata: type, language, and whether it is indexed
+  - **provenance** in one place: source name and identifier, import or latest source sync time, current content time, last successful index and index version, and review state; an item whose current content has no index says so
   - **stored content** as a text preview; Word files are converted to text
   - **indexing status**: *Indexing…* right after saving, then *Indexed*
   - for owners and admins only, an **Indexed chunks** button that opens a dialog with the stored passages, their line ranges, and a **Re-index** action

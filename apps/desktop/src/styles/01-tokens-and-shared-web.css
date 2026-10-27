@@ -611,6 +611,11 @@ input[type="file"] {
 .shared-record-subtitle { overflow-wrap: anywhere; }
 .shared-record-panel { padding-top: 20px; border-top: 1px solid var(--color-border); }
 .shared-record-panel h2 { margin: 0 0 12px; font-size: 15px; }
+.shared-provenance-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; margin: 0; }
+.shared-provenance-list > div { min-width: 0; }
+.shared-provenance-list dt { margin-bottom: 3px; color: var(--color-text-muted); font-size: 11px; }
+.shared-provenance-list dd { margin: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.5; }
+@media (max-width: 640px) { .shared-provenance-list { grid-template-columns: minmax(0, 1fr); } }
 .shared-lifecycle-panel { display: grid; gap: 14px; }
 .shared-lifecycle-status { text-transform: capitalize; }
 .shared-lifecycle-summary { display: grid; align-items: start; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; }

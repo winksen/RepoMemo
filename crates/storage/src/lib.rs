@@ -563,6 +563,8 @@ struct ArtifactDetailRow {
     created_at: String,
     updated_at: String,
     indexed_at: Option<String>,
+    index_version: i64,
+    source_metadata_json: String,
     metadata_json: String,
 }
 

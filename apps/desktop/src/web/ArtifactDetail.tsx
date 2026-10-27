@@ -257,6 +257,7 @@ export function SharedArtifactDetail({
       <Toast kind="error" message={error} />
       <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : indexingStalled ? "Not indexed" : "Indexing…"}</span>{artifact ? <CopyButton label="Copy the file path" value={artifact.summary.path} /> : null}</div>
       {isEditing ? <form className="shared-record-edit-form" onSubmit={saveArtifact}><Field label="Evidence title" required><Input onChange={(event) => setTitle(event.target.value)} value={title} /></Field><Button busy={isMutating} type="submit" variant="main"><Pencil size={ICON_SIZE.md} /> Save evidence</Button></form> : null}
+      {artifact ? <EvidenceProvenance artifact={artifact} lifecycle={lifecycle} /> : null}
       {artifact?.summary.artifact_type === "pr" ? <PullReviewSummary metadata={artifact.metadata} /> : null}
       {artifact && (isRepositoryFile || artifact.summary.artifact_type === "issue" || artifact.summary.artifact_type === "pr") ? <ArtifactMentionsPanel accessToken={accessToken} artifactId={artifactId} onOpenArtifact={onOpenArtifact} /> : null}
       <section className="shared-record-panel shared-lifecycle-panel"><PanelHeading actions={<Badge className="shared-lifecycle-status" tone={lifecycleTone(lifecycle?.status)}>{lifecycle?.status?.replace(/_/g, " ") ?? "Active"}</Badge>} icon={Shield} title="Evidence lifecycle" />{isEditingLifecycle ? <form className="shared-lifecycle-form" onSubmit={saveLifecycle}><Field label="Status">{(control) => <Dropdown id={control.id} onValueChange={(value) => setLifecycleStatus(value as ArtifactLifecycleStatus)} options={[{ label: "Active", value: "active" }, { label: "Needs review", value: "needs_review" }, { label: "Verified", value: "verified" }, { label: "Outdated", value: "outdated" }, { label: "Superseded", value: "superseded" }]} value={lifecycleStatus} />}</Field><Field label="Review owner">{(control) => <Dropdown id={control.id} onValueChange={(value) => setLifecycleOwnerId(value === "__unassigned__" ? "" : value)} options={[{ label: "Unassigned", value: "__unassigned__" }, ...workspaceMembers.map((member) => ({ label: member.user.display_name, value: member.user.id }))]} value={lifecycleOwnerId || "__unassigned__"} />}</Field>{lifecycleStatus === "superseded" ? <Field label="Replacement evidence">{(control) => <Combobox aria-label="Replacement evidence" emptyLabel="No file matches" id={control.id} onSearch={picker.search} onValueChange={setSupersededByArtifactId} options={picker.files.filter((entry) => entry.id !== artifactId).map((entry) => ({ label: entry.title, value: entry.id }))} placeholder="Choose replacement evidence" value={supersededByArtifactId} />}</Field> : null}<Field className="shared-lifecycle-note" label="Review note"><Textarea onChange={(event) => setLifecycleNote(event.target.value)} placeholder="What should the team know about this evidence?" value={lifecycleNote} /></Field><div className="shared-lifecycle-actions"><Button busy={isMutating} type="submit" variant="main"><Shield size={ICON_SIZE.md} /> Save lifecycle</Button><Button disabled={isMutating} onClick={() => setIsEditingLifecycle(false)} variant="secondary">Cancel</Button></div></form> : <div className="shared-lifecycle-summary"><div><strong>{lifecycle?.owner ? `Owned by ${lifecycle.owner.display_name}` : "No review owner"}</strong><span>{lifecycle?.reviewed_at ? `Last updated ${formatTime(lifecycle.reviewed_at)} by ${lifecycle.reviewed_by?.display_name ?? "a member"}` : "No lifecycle review recorded yet."}</span></div>{lifecycle?.review_note ? <p>{lifecycle.review_note}</p> : <p className="shared-muted-copy">Add a review note so the evidence can be trusted in context.</p>}{lifecycle?.superseded_by_artifact_id ? <span className="shared-lifecycle-replacement">Replaced by evidence {lifecycle.superseded_by_artifact_id.slice(0, 8)}</span> : null}{canWrite ? <Button onClick={() => setIsEditingLifecycle(true)} variant="secondary"><Pencil size={ICON_SIZE.sm} /> Update lifecycle</Button> : null}</div>}<div className="shared-lifecycle-history"><strong>History</strong>{lifecycleEvents.length ? lifecycleEvents.map((event) => <p key={event.id}><span>{event.detail}</span><time dateTime={event.created_at}>{event.actor?.display_name ?? "System"} · {formatTime(event.created_at)}</time></p>) : <p className="shared-muted-copy">Lifecycle changes will be recorded here.</p>}</div></section>
@@ -268,6 +269,22 @@ export function SharedArtifactDetail({
     </SharedRecordLayout>
     </LiveEventsContext.Provider>
   );
+}
+
+export function EvidenceProvenance({ artifact, lifecycle }: { artifact: ArtifactDetail; lifecycle: ArtifactLifecycle | null }) {
+  const { summary } = artifact;
+  const sourceTime = artifact.source_synced_at;
+  return <section aria-label="Evidence provenance" className="shared-record-panel shared-provenance-panel">
+    <h2>Evidence provenance</h2>
+    <dl className="shared-provenance-list">
+      <div><dt>Source</dt><dd>{summary.source_name} <span className="shared-muted-copy">({summary.source_id})</span></dd></div>
+      <div><dt>{sourceTime ? "Source last synced" : "Imported"}</dt><dd><time dateTime={sourceTime ?? summary.created_at}>{formatTime(sourceTime ?? summary.created_at)}</time></dd></div>
+      <div><dt>Current content</dt><dd><time dateTime={summary.updated_at}>{formatTime(summary.updated_at)}</time></dd></div>
+      <div><dt>Last successful index</dt><dd>{summary.indexed_at ? <time dateTime={summary.indexed_at}>{formatTime(summary.indexed_at)}</time> : "No index for current content"}</dd></div>
+      <div><dt>Index version</dt><dd>{summary.indexed_at ? artifact.index_version : "Not indexed"}</dd></div>
+      <div><dt>Review state</dt><dd>{lifecycle ? lifecycle.status.replace(/_/g, " ") : "Unavailable"}{lifecycle?.reviewed_at ? <> · reviewed <time dateTime={lifecycle.reviewed_at}>{formatTime(lifecycle.reviewed_at)}</time></> : null}</dd></div>
+    </dl>
+  </section>;
 }
 
 /** Administrator-only inspection of the chunks stored for one artifact. */

@@ -464,6 +464,8 @@ impl StorageEngine {
               artifacts.created_at,
               artifacts.updated_at,
               artifacts.indexed_at,
+              artifacts.index_version,
+              sources.metadata_json AS source_metadata_json,
               artifacts.metadata_json
             FROM artifacts
             JOIN sources ON sources.id = artifacts.source_id
@@ -476,6 +478,9 @@ impl StorageEngine {
 
         let summary = ArtifactSummary::from(row.summary_row());
         let metadata = serde_json::from_str(&row.metadata_json).unwrap_or_else(|_| Value::Object(Default::default()));
+        let source_synced_at = serde_json::from_str::<Value>(&row.source_metadata_json)
+            .ok()
+            .and_then(|source| source.get("last_synced_at").and_then(Value::as_str).map(str::to_owned));
         // Only the start of the file is wanted: the page never shows more, and a
         // large upload is not read whole to show a few thousand characters.
         let preview_limit = 120_000;
@@ -501,6 +506,8 @@ impl StorageEngine {
 
         Ok(ArtifactDetail {
             summary,
+            index_version: row.index_version,
+            source_synced_at,
             metadata,
             content_preview,
             content_truncated,

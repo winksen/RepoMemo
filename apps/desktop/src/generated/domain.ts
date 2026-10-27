@@ -570,6 +570,8 @@ export interface ArtifactSummary {
 
 export interface ArtifactDetail {
   summary: ArtifactSummary;
+  index_version: number;
+  source_synced_at: string | null;
   metadata: unknown;
   content_preview: string | null;
   content_truncated: boolean;
