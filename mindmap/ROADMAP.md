@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.4.66` (2026-10-27), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [the 0.4.x line, preparation for deployment](#-the-04x-line-preparation-for-deployment), `V0.4.67` onward (the 0.3.x line, [Road to V0.4.0](#-road-to-v040), is built and closed; the [plan](plans/2026-10-25-deployment.md) and [RELEASES_0.4.md](RELEASES_0.4.md) are written) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after the 0.4.x line:** its theme to be chosen (single sign-on is the candidate)
+> **Current version:** `V0.4.67` (2026-10-27), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [the 0.5.x line, single sign-on](plans/2026-10-27-0.5-single-sign-on.md) (proposed; waits for the maintainer's decision and for the 0.4 clean-install run); the 0.4.x line, [preparation for deployment](#-the-04x-line-preparation-for-deployment), is built and closed (V0.4.0–V0.4.67, [RELEASES_0.4.md](RELEASES_0.4.md)) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after the 0.4.x line:** single sign-on, proposed (decision 41)
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -79,7 +79,7 @@ timeline
 | Track N: workspace templates (V0.2.163–V0.2.193) | ✅ V0.2.163–V0.2.193 built; decisions 24–28 taken as proposed; [plan](plans/2026-10-22-workspace-templates.md) · [format](technical/workspace-templates.md) |
 | **V0.3.0 *Connected*** | ✅ Released 2026-10-24: the version set to `0.3.0` and tagged `v0.3.0` after tracks K to N and the clean-machine install |
 | Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | ✅ Built and closed on 2026-10-24 at V0.3.27: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass and release checks; decisions 29–32 taken as proposed, 33 recorded as a proposal |
-| The 0.4.x line: preparation for deployment, server and client, containers first (V0.4.0–V0.4.67) | 🔄 Opened on 2026-10-25 by V0.4.0: 67 releases planned in eight tracks (configuration, the server image, the web image, compose and tests, direct install, registry, the desktop app on the web client, documents and security); [plan](plans/2026-10-25-deployment.md), [index](RELEASES_0.4.md); decisions 33–40 proposed |
+| The 0.4.x line: preparation for deployment, server and client, containers first (V0.4.0–V0.4.67) | ✅ Closed on 2026-10-27 by V0.4.67 (opened on 2026-10-25 by V0.4.0; 67 releases planned in eight tracks (configuration, the server image, the web image, compose and tests, direct install, registry, the desktop app on the web client, documents and security); [plan](plans/2026-10-25-deployment.md), [index](RELEASES_0.4.md); decisions 33–40 proposed, then 41–44 for the next line); the maintainer's clean-install run is what is left |
 | Single sign-on (OIDC) | 💭 Set aside on 2026-10-25, kept as the candidate for the line after; [plan](plans/2026-10-24-single-sign-on.md) |
 | After the 0.4.x line: single sign-on, scale-out, hosted | 💭 Direction (the theme is not chosen; single sign-on is the candidate) |
 
@@ -1214,6 +1214,10 @@ The brief of each release (change, files, done when, commit line) is in the [pla
 | 38 | **Registry and tags** | V0.4.0 | GitHub's container registry, `X.Y.Z`, `X.Y` and `latest`, multi-architecture, pushed by a tag only, with an SBOM and an attestation. *Proposed* |
 | 39 | **One desktop client** | V0.4.0 | The desktop app is the web client in a window: no desktop-only screen except the window's chrome and the connect screen, which uses the web client's components. *Proposed* |
 | 40 | **How an administrator gives a team the app** | V0.4.0 | The same executable plus `repomemo-desktop.json`, or an installer packaged for one server; signing and updates are later releases that need the maintainer's certificates and keys. *Proposed* |
+| 41 | **The theme of the 0.5.x line** | V0.4.67 | Single sign-on with OpenID Connect first; SAML, SCIM and several providers at once stay later. Plan: [plans/2026-10-27-0.5-single-sign-on.md](plans/2026-10-27-0.5-single-sign-on.md). *Proposed* |
+| 42 | **Passwords once single sign-on is on** | V0.4.67 | They stay for break-glass accounts and for servers that do not turn it on; turning them off is a setting guarded by an administrator having signed in through the provider first. *Proposed* |
+| 43 | **The desktop app and the provider** | V0.4.67 | The sign-in goes through the system browser with a one-time code back to the app, never an embedded page. *Proposed* |
+| 44 | **Numbering of the 0.5.x line** | V0.4.67 | `V0.5.0` opens the line after the 0.4 clean-install record is filled; `V0.5.1`–`V0.5.10` are built one by one. *Proposed* |
 
 ---
 
@@ -1490,7 +1494,7 @@ One box per release, added as each release is built. Say what was built and what
 
 ## 🎯 The 0.4.x line: preparation for deployment
 
-> **Status:** proposed and opened on 2026-10-25 by `V0.4.0`, replacing the theme recorded in V0.3.27 (single sign-on, which stays the candidate for a later line). The maintainer chose it: RepoMemo should be deployable from this repository **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app** resumed as the web client's own UI and components, talking to the API directly, installable, **Windows first**, then Linux and macOS. The plan is [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md); every release is in [RELEASES_0.4.md](RELEASES_0.4.md). Decisions 33–40 are proposed there and in the table above; built one by one from `V0.4.1`, 66 of 67 so far.
+> **Status:** proposed and opened on 2026-10-25 by `V0.4.0`, replacing the theme recorded in V0.3.27 (single sign-on, which stays the candidate for a later line). The maintainer chose it: RepoMemo should be deployable from this repository **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app** resumed as the web client's own UI and components, talking to the API directly, installable, **Windows first**, then Linux and macOS. The plan is [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md); every release is in [RELEASES_0.4.md](RELEASES_0.4.md). Decisions 33–40 are proposed there and in the table above; built one by one from `V0.4.1`, 67 of 67: **closed on 2026-10-27 by `V0.4.67`**, awaiting the maintainer's clean-install run ([clean-install.md § 6](technical/clean-install.md#6-the-04-run-containers-and-the-desktop-app-v0466)).
 
 ### What this line is
 
@@ -1609,7 +1613,7 @@ One box per release, added as each release is built. Say what was built and what
 | **V0.4.64** ✅ | 📘 | Documents | Troubleshooting and FAQ: the log lines, the health checks and the usual errors, each with its cause and its remedy | D64 | Every error the checks and the first-run setup can raise is listed |
 | **V0.4.65** ✅ | 🔒 | Security | A security pass over the deployment surface: cross-origin cookies, the web image and `config.json`, the desktop configuration file and the installers, `_FILE` secrets, the release pipeline and the images | D65 | No high or medium finding open |
 | **V0.4.66** ✅ | 📘 | Release record | The clean-install page gets the container steps (the ones the maintainer runs) and the desktop steps, with a record sheet | D66 | The maintainer can run and record a container install from the page |
-| **V0.4.67** | 📘 | Release | Release checks repeated; the line closed; the next theme is chosen (single sign-on stays the candidate) | D67 | Every check passes; the next plan is written |
+| **V0.4.67** ✅ | 📘 | Release | Release checks repeated; the line closed; the next theme is chosen (single sign-on stays the candidate) | D67 | Every check passes; the next plan is written |
 
 ### Release checklists (0.4.x)
 
@@ -1682,12 +1686,13 @@ One box per release, added as each release is built. Say what was built and what
 - [x] **V0.4.64** troubleshooting and the FAQ (D64). Done: `docs/TROUBLESHOOTING.md`, `scripts/check-troubleshooting.mjs` and `check-troubleshooting.test.mjs` (4 passed), the CI steps, `container:check` rules. **Not run:** each error was not provoked on a running server; the check sees errors by the shape of the Rust that raises them
 - [x] **V0.4.65** a security pass over the deployment surface (D65). Done: `mindmap/security/2026-10-27-deployment-security-review.md` (0 high, 1 medium, 2 low, 5 info), the three fixes with a Rust test and a CI check, the troubleshooting page extended (47 errors), `container:check` rules; clippy on the server crate. **Not run:** the new Rust test (compiled), the web image, the workflow; nothing against a live system
 - [x] **V0.4.66** the clean-install record (D66). Done: section 6 of `clean-install.md` (C1–C9, D1–D10, the record sheet), `container:check` rules. **Not run:** the steps; the sheet is empty until the maintainer runs them
+- [x] **V0.4.67** the release checks repeated and the line closed (D67). Done: every light check run and passing (the web suite has the same 22 failures as at V0.4.43), `plans/2026-10-27-0.5-single-sign-on.md`, decisions 41–44 proposed, the roadmap and the index closed. **Still the maintainer's:** `cargo test`, the workflows, the images, installers and packages, the app, and the nineteen steps of the clean-install run
 
 ---
 
 ## 💭 Later: after the 0.4.x line
 
-What the 0.3.x and 0.4.x lines leave out. Single sign-on is the candidate for the line after 0.4.x (its [plan](plans/2026-10-24-single-sign-on.md) is written and set aside); the order is not decided.
+What the 0.3.x and 0.4.x lines leave out. Single sign-on is proposed as the line after 0.4.x ([the plan for 0.5.x](plans/2026-10-27-0.5-single-sign-on.md), built on [the earlier plan](plans/2026-10-24-single-sign-on.md)); the other directions below have no order.
 
 | Direction | Scope |
 |---|---|

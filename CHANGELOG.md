@@ -2,6 +2,32 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.67 (2026-10-27)
+
+The 0.4.x line is closed: preparation for deployment, on the server and on the client. The next theme is proposed.
+
+### What the line made (V0.4.1–V0.4.66)
+- **Configuration and the server image:** a checked configuration (`--check-config`), build details in `/health`, a check of the folders, split data folders, a clean stop, a locked-down image with a health check and a clear version; one server release line with the app.
+- **The web image and compose:** the web client as its own image with runtime configuration, an optional TLS edge, a converter for Office previews, health checks, logs in JSON, an example Prometheus, backups and restores of the volumes, an upgrade script that falls back, tests in CI that start the stack and upgrade it from the previous release.
+- **Direct install:** a server archive for Linux and Windows, a hardened systemd unit and a Windows service, front doors, archives built natively in CI and attached to the release, and a start that refuses a database written by a newer release.
+- **Registry and release pipeline:** four images on GHCR for two architectures with signed provenance and an SBOM, a release page written from the changelog, compose on the released images, a quick start with a checksum, and pinning rules enforced by a test.
+- **The desktop app on the web client:** one transport and one look, a preset server and a configuration file, an administrator's packaging command, Windows installers (per person, silent, an uninstaller that offers to forget the session), identity (icons, one window, remembered place), a native save dialog, notices and a badge, `repomemo://` links, a private certificate authority, signed updates, code signing, a parity check, and builds for Linux and macOS.
+- **Documents and security:** the deployment guide, the desktop administrator's guide, where the app keeps its files, a troubleshooting page that CI keeps true to the code (47 errors), a security pass (0 high, 1 medium, 2 low, all fixed) and the clean-install run with a record sheet.
+
+### Added
+- **[The plan for the next line](mindmap/plans/2026-10-27-0.5-single-sign-on.md):** single sign-on with OpenID Connect proposed as the theme of 0.5.x, with the ten releases of the earlier plan renumbered `V0.5.1`–`V0.5.10` after a `V0.5.0` that opens the line, four decisions to confirm (41–44), what 0.4 leaves to the maintainer (the record sheet, the first tag, the keys and certificates, Linux arm64 and updates for Linux and macOS, the Rust tests that were compiled and not run), and how the line is tested.
+
+### Changed
+- **The roadmap and the release index** close the line (67 of 67) and point to the next plan; decisions 41–44 are proposed. **The earlier single sign-on plan** says it is proposed again. **The version** is `0.4.67` everywhere.
+
+### Checks (repeated for the closing release)
+- **Pass:** `version:check`, `container:check`, `docs:check`, `migrations:check`, `templates:check` and `templates:test`, `types:check`, `styles:check`, `a11y:check`, `typecheck`, `package:test`, `notes:test`, `pins:test`, `desktop:test`, `feed:test`, `desktop:parity:test`, `desktop:check`, `troubleshooting:check` and its tests, `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo deny check` (with the maintainer-approved zip ignores), `npm audit --omit=dev`.
+- **Same as the baseline:** the web suite has 22 failing tests on this machine (`ResizeObserver` and the like); they are the same 22 as at V0.4.43, before the desktop work began, and none is new.
+- **Not run, and still the maintainer's:** `cargo test`, every workflow, every image, installer and package, the app, and the nineteen steps of the clean-install run (`mindmap/technical/clean-install.md` § 6). The line is closed as written and checked, not as tried.
+
+### Upgrading
+- Nothing to do. The next minor waits for the maintainer's decision on the theme and for the clean-install run.
+
 ## V0.4.66 (2026-10-27)
 
 The clean-install page has the 0.4 run: what the maintainer does on a clean machine and on the desktop systems, and a sheet to record it.
