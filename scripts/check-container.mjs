@@ -610,7 +610,9 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   for (const id of ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"]) {
     const lines = section.split("\n");
     const asStep = lines.some((line) => line.startsWith(`| ${id} | **`));
-    const asRecord = lines.some((line) => line.startsWith(`| ${id} `) && !line.startsWith(`| ${id} | **`) && /\|\s*\|\s*\|\s*\|\s*\|\s*\|$/.test(line));
+    const asRecord = lines.some((line) =>
+      line.startsWith(`| ${id} `) && !line.startsWith(`| ${id} | **`) && line.split("|").slice(1, -1).length === 6,
+    );
     if (!asStep) problems.push(`the 0.4 run has no step ${id}`);
     if (!asRecord) problems.push(`the 0.4 run's record sheet has no row for ${id}`);
   }

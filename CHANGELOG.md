@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.73 (2026-10-27)
+
+Added a release evidence matrix before the daily-workflow releases.
+
+### Added
+- [The matrix](mindmap/technical/release-evidence-0.4.73.md) links local web, Rust and desktop checks; image-scan configuration; container and desktop install records; unresolved risks; and maintainer sign-off. It lists built, tested and released status separately for each distribution path.
+
+### Fixed
+- `container:check` now accepts completed six-column clean-install record rows instead of requiring the rows to remain blank. It still requires C1–C9 and D1–D10 to exist.
+
+### Checks
+- `version:check`, `container:check` and `docs:check` pass. Exact-commit GitHub Actions runs, image-scan reports and tag-based release artifacts remain unavailable because these commits have not been pushed.
+
+### Upgrading
+- Nothing to do. This release changes the evidence record and its local check.
+
 ## V0.4.72 (2026-10-27)
 
 Recorded Windows desktop build and handout evidence, with explicit status for D1–D10.
