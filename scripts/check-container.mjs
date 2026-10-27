@@ -588,6 +588,23 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// The clean-install page has the 0.4 run (V0.4.66): the container steps C1-C9, the desktop steps D1-D10, and a record sheet with a row for each.
+{
+  const page = read("mindmap/technical/clean-install.md");
+  const section = page.slice(page.indexOf("## 6. The 0.4 run"));
+  if (!section.startsWith("## 6. The 0.4 run")) problems.push("mindmap/technical/clean-install.md lacks the 0.4 run (section 6)");
+  for (const id of ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10"]) {
+    const lines = section.split("\n");
+    const asStep = lines.some((line) => line.startsWith(`| ${id} | **`));
+    const asRecord = lines.some((line) => line.startsWith(`| ${id} `) && !line.startsWith(`| ${id} | **`) && /\|\s*\|\s*\|\s*\|\s*\|\s*\|$/.test(line));
+    if (!asStep) problems.push(`the 0.4 run has no step ${id}`);
+    if (!asRecord) problems.push(`the 0.4 run's record sheet has no row for ${id}`);
+  }
+  for (const guide of ["DEPLOYMENT.md", "QUICK_START.md", "DESKTOP_ADMIN.md", "TROUBLESHOOTING.md", "VERIFYING_IMAGES.md", "DESKTOP_FILES.md"]) {
+    if (!section.includes(guide)) problems.push(`the 0.4 run does not follow ${guide}`);
+  }
+}
+
 // The deployment security pass (V0.4.65) and what it fixed stays fixed: the update signing key is a step's, the web image checks the
 // product name, a secret file has a limit, and the review is written down with none open at medium or above.
 {

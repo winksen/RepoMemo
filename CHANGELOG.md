@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.66 (2026-10-27)
+
+The clean-install page has the 0.4 run: what the maintainer does on a clean machine and on the desktop systems, and a sheet to record it.
+
+### Added
+- **§ 6 of `mindmap/technical/clean-install.md`, *The 0.4 run*:** what to have (Docker with Compose v2; before the first tag, the local route for the quick start; each workflow run once by hand; a Windows, a Linux and a macOS computer), then **nine container steps** (C1 fetch with the quick start and its checksum, C2 initialise and start, C3 first-run setup and the smoke test, C4 verify the four images, C5 backups and the volumes' scripts into a second stack, C6 upgrade and fall back, C7 previews and monitoring, C8 a direct install on Linux and Windows, C9 the release page of a tag) and **ten desktop steps** (D1 the Windows installer, D2 a handout, D3 a bad configuration file, D4 a private authority, D5 everyday use, saving and one window, D6 notices and links, D7 updates, D8 removal, D9 Linux, D10 macOS). Each names the guide it follows and what should be seen.
+- **A record sheet** with a row for each of the nineteen steps (date, machine, result, workaround, fixed in), and the rule of § 1: anything done that the guide does not say is a workaround, written down, and a release fixes it. When every row is `ok` with none, the next minor can be cut.
+
+### Changed
+- **`container:check`** requires the section, a step and a record row for each of the nineteen, and that the run follows the deployment guide, the quick start, the administrator's guide, the troubleshooting page, the image verification and the desktop files. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.66` everywhere.
+
+### Checks
+- **Run:** `container:check`, `version:check`, `docs:check`.
+- **Not run:** the steps themselves. This release gives the maintainer the page to run them from; it is not their result.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.65 (2026-10-27)
 
 A security pass over what 0.4.x added around the server and the client: one medium and two low findings, all fixed; none open.

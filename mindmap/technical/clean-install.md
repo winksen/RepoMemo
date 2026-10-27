@@ -132,3 +132,68 @@ A draft for the entry; the [fifth review](../security/2026-10-21-security-review
 - Links that leave the site say so; Office files that can carry macros are not opened in their application; a job is stopped by whoever started it or an administrator.
 
 **Not done:** none of this was run as tests, built or seen while it was written; §3 lists what to try, and the performance runs (before and after, [performance.md](performance.md)) are the maintainer's.
+
+---
+
+## 6. The 0.4 run: containers and the desktop app (V0.4.66)
+
+The 0.4 line was written and checked without starting a server, a container, an installer or the app (see each release's *Not run*). Before the next minor is cut, the maintainer runs the steps below on a clean machine and on the desktop systems, and writes one line per step in the record sheet. The guides followed are [DEPLOYMENT.md](../../docs/DEPLOYMENT.md), [QUICK_START.md](../../docs/QUICK_START.md), [DESKTOP_ADMIN.md](../../docs/DESKTOP_ADMIN.md) and [TROUBLESHOOTING.md](../../docs/TROUBLESHOOTING.md). The rule is the one of §1: anything done that the guide does not say is a **workaround**, written down, and a release fixes it.
+
+**What you need, besides §1:** Docker with Compose v2 on the clean machine; before the first tag, the local route for the quick start (`sh deploy/package-compose.sh X.Y.Z dist`, a `SHA256SUMS` made with `sha256sum`, then `sh deploy/quickstart.sh --version X.Y.Z --base-url file:///…`); GitHub Actions run once by hand for each of *Release images*, *Server archives*, *Desktop Windows*, *Desktop Linux* and *Desktop macOS* (started by hand they only keep artifacts); a Windows, a Linux and a macOS computer for the desktop steps.
+
+### The container steps
+
+| # | Step | The guide says | You should see |
+|---|---|---|---|
+| C1 | **Fetch** the container files with the quick start and read what it checked | [QUICK_START.md](../../docs/QUICK_START.md) | `checksum ok`, the folder unpacked, `REPOMEMO_VERSION` pinned; a tampered archive refused with nothing unpacked |
+| C2 | **Initialise and start**: `sh deploy/init.sh --host …`, `docker compose pull && docker compose up -d --wait` | [DEPLOYMENT.md](../../docs/DEPLOYMENT.md) § 3 | every service healthy (`docker compose ps`), `/health` naming the version and the image |
+| C3 | **First-run setup** through the edge, with the setup code from `docker compose logs server`, then `REPOMEMO_SMOKE_SETUP_CODE=… node scripts/smoke-test.mjs https://…` | steps 4–5 of §2 | no red check; every smoke line `ok` (a workspace, an upload, indexing, a search, a backup, an export, an import) |
+| C4 | **Verify the images**: `gh attestation verify oci://ghcr.io/…/repomemo-server:X.Y.Z --repo …` for the four images, and the SBOM | [VERIFYING_IMAGES.md](../../docs/VERIFYING_IMAGES.md) | the repository, workflow and commit named; a made-up digest fails |
+| C5 | **Backups**: the server's own, `deploy/backup-volumes.sh`, then `deploy/restore-volumes.sh` into a second stack | [DEPLOYMENT.md](../../docs/DEPLOYMENT.md) § 4 | the second stack signs the same account in and finds its data |
+| C6 | **Upgrade** from the previous release with `deploy/upgrade.sh --version X.Y.Z`, then with a tag that does not exist | [DEPLOYMENT.md](../../docs/DEPLOYMENT.md) § 5 | the data is there; the broken tag ends on the old version, running |
+| C7 | **The optional pieces**: `COMPOSE_PROFILES=previews` (an Office preview), `monitoring` (Prometheus shows `repomemo_users`) | [the production guide](operations.md) | each works; the server stays healthy |
+| C8 | **A direct install**: the Linux archive and `sudo sh service/install.sh --generate-secrets --start` (again, to see it change nothing) with a front door ([FRONT_DOORS.md](../../docs/FRONT_DOORS.md)); the Windows archive and `.\service\install.ps1 -GenerateSecrets -Start` | [DEPLOYMENT.md](../../docs/DEPLOYMENT.md) § 3, [DIRECT_UPGRADE.md](../../docs/DIRECT_UPGRADE.md) | a working `https://` address on each; the service restarts after a reboot; an older binary on a newer database stops with the reason |
+| C9 | **The release page** of a tag | the changelog | written from the changelog, with the images, the archives and the sums; no hand editing |
+
+### The desktop steps
+
+| # | Step | The guide says | You should see |
+|---|---|---|---|
+| D1 | **Windows installer**: `RepoMemo_<v>_x64-setup.exe`, then `/S` for a second user; SmartScreen as described | [DESKTOP_ADMIN.md](../../docs/DESKTOP_ADMIN.md) § 3 | per person, no administrator prompt, Start menu and desktop shortcuts, the entry in *Apps* |
+| D2 | **A handout**: `npm run desktop:package -- --server … --name …` (with Rust, and with `--from` the CI artifact) | [DESKTOP_ADMIN.md](../../docs/DESKTOP_ADMIN.md) § 2 | the app opens on the server's sign-in page with no address field; the title bar shows the name |
+| D3 | **A bad file**: a typo in `repomemo-desktop.json` | [DESKTOP_FILES.md](../../docs/DESKTOP_FILES.md) | the file and the reason are shown, nothing connects, no address can be typed |
+| D4 | **A private authority**: a server behind a CA of your own, `desktop:package --certificate`; the same bundle against another site | [DESKTOP_ADMIN.md](../../docs/DESKTOP_ADMIN.md) | the server works through the relay (uploads, downloads, live events); the other site is not trusted |
+| D5 | **Everyday**: sign in, restart (no password), open a PDF, **save** an archive, a memory card and a document (the save dialog; a cancel says nothing), a second launch focuses the first, the window returns where it was | [USER_GUIDE.md](../../docs/USER_GUIDE.md) § 13 | each as described |
+| D6 | **Notices and links**: a notice while the window is behind (a system notification), the badge, *Open in the app* from a browser, a link with a foreign path | [USER_GUIDE.md](../../docs/USER_GUIDE.md) § 13 | the notification arrives; the link opens the page; the foreign path is refused with a sentence |
+| D7 | **Updates**: an older app against your own signed feed (`updates`), then against an unsigned or wrongly signed feed | [DESKTOP_ADMIN.md](../../docs/DESKTOP_ADMIN.md) § 4 | the new version is offered and installed with the person's yes; the bad feed is refused |
+| D8 | **Removal**: the uninstaller's question, `--forget-session`, *Change server* | [DESKTOP_FILES.md](../../docs/DESKTOP_FILES.md) | the sign-in is gone from the credential store when asked, and kept when not |
+| D9 | **Linux**: the AppImage (with FUSE 2) and the `.deb` on Ubuntu 22.04 or later | [DEVELOPMENT_COMMANDS.md](../../docs/DEVELOPMENT_COMMANDS.md) | the app opens; `repomemo://` links work; the session is in the Secret Service |
+| D10 | **macOS**: the `.dmg` on an Apple-silicon and an Intel Mac; Gatekeeper as described | [DEVELOPMENT_COMMANDS.md](../../docs/DEVELOPMENT_COMMANDS.md) | one app for both; opens after the one Gatekeeper question; the session is in the Keychain |
+
+### Record sheet
+
+One row per step, one mark per cell: `ok`, or the finding (a finding that needs a release takes the next number of the line).
+
+| Step | Date | Machine | Result | Workaround | Fixed in |
+|---|---|---|---|---|---|
+| C1 Fetch | | | | | |
+| C2 Initialise and start | | | | | |
+| C3 First-run setup and smoke test | | | | | |
+| C4 Verify the images | | | | | |
+| C5 Backups and volumes | | | | | |
+| C6 Upgrade and fall back | | | | | |
+| C7 Previews and monitoring | | | | | |
+| C8 Direct install, Linux and Windows | | | | | |
+| C9 The release page | | | | | |
+| D1 Windows installer | | | | | |
+| D2 A handout | | | | | |
+| D3 A bad file | | | | | |
+| D4 A private authority | | | | | |
+| D5 Everyday, saving, one window | | | | | |
+| D6 Notices and links | | | | | |
+| D7 Updates | | | | | |
+| D8 Removal | | | | | |
+| D9 Linux | | | | | |
+| D10 macOS | | | | | |
+
+When every row is `ok` with no workaround, record it in §4, tick the 0.4 boxes of the roadmap's checklist, and the next minor can be cut.
