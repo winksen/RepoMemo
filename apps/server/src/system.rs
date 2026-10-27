@@ -1018,7 +1018,11 @@ struct OfficePreviewsView {
 #[derive(Debug, Serialize)]
 struct BackgroundView {
     indexing_queued: usize,
+    indexing_oldest_queue_seconds: Option<u64>,
+    indexing_retries_waiting: usize,
+    indexing_retries_scheduled: u64,
     embedding_workspaces_waiting: usize,
+    embedding_oldest_queue_seconds: Option<u64>,
     repository_syncs_running: usize,
     preview_conversions_running: usize,
     /// Office previews through LibreOffice (review M10).
@@ -1061,6 +1065,8 @@ pub(crate) async fn overview(
     let remote_clones = state.core.remote_clone_sizes(None).await.map_err(map_storage_error)?;
     let (event_channels, event_subscribers) = state.event_bus.stats();
     let (tracked_rate_limit_keys, locked_sign_in_keys) = state.guards.stats();
+    let (indexing_oldest_queue_seconds, indexing_retries_waiting, indexing_retries_scheduled) =
+        state.index_queue.queue_metrics();
     Ok(Json(OverviewResponse {
         instance: InstanceView {
             info: (*state.instance).clone(),
@@ -1091,7 +1097,11 @@ pub(crate) async fn overview(
         statistics,
         background: BackgroundView {
             indexing_queued: state.index_queue.queued_count(),
+            indexing_oldest_queue_seconds,
+            indexing_retries_waiting,
+            indexing_retries_scheduled,
             embedding_workspaces_waiting: state.embedding_queue.waiting_count(),
+            embedding_oldest_queue_seconds: state.embedding_queue.oldest_waiting_seconds(),
             repository_syncs_running: state.repo_sync.running_count(),
             preview_conversions_running: state.converter.running_count(),
             office_previews: OfficePreviewsView {

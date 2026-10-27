@@ -25,6 +25,8 @@ pub enum EmbeddingRun {
     /// Every chunk already had a vector from the current model.
     UpToDate,
     Embedded(usize),
+    /// This workspace used its fair turn; more chunks remain for the next pass.
+    Yielded(usize),
     Cancelled(usize),
     /// The workspace used up its daily allowance of background AI calls; the
     /// rest is embedded after midnight UTC.
@@ -110,6 +112,15 @@ impl RepoMemoCore {
     /// keep their vector across re-indexing, so after the first pass only new
     /// or edited passages are sent.
     pub async fn embed_missing_chunks(&self, workspace_id: &str) -> Result<EmbeddingRun> {
+        self.embed_missing_chunks_limited(workspace_id, None).await
+    }
+
+    /// Limit one pass so another workspace can use the embedding worker next.
+    pub async fn embed_missing_chunks_limited(
+        &self,
+        workspace_id: &str,
+        max_batches: Option<usize>,
+    ) -> Result<EmbeddingRun> {
         let Some(settings) = self.embedding_provider_for_workspace(workspace_id).await? else {
             return Ok(EmbeddingRun::NotConfigured);
         };
@@ -125,6 +136,7 @@ impl RepoMemoCore {
             .create_job(workspace_id, None, "embedding", "embedding_chunks", Some(missing))
             .await?;
         let mut completed = 0_usize;
+        let mut batches = 0_usize;
         loop {
             if self.storage.is_job_cancel_requested(&job.id).await? {
                 self.storage
@@ -179,9 +191,22 @@ impl RepoMemoCore {
                 )
                 .await?;
             completed += count;
+            batches += 1;
             self.storage
                 .update_indexing_job(&job.id, "running", "embedding_chunks", completed as i64, None)
                 .await?;
+            if max_batches.is_some_and(|limit| batches >= limit.max(1)) && completed < missing as usize {
+                self.storage
+                    .update_indexing_job(
+                        &job.id,
+                        "completed",
+                        "yielded_to_other_workspace",
+                        completed as i64,
+                        None,
+                    )
+                    .await?;
+                return Ok(EmbeddingRun::Yielded(completed));
+            }
         }
         self.storage
             .update_indexing_job(&job.id, "completed", "embedded_chunks", completed as i64, None)

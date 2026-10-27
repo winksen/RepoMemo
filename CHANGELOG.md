@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.82 (2026-10-27)
+
+Background indexing and embedding now give waiting workspaces turns.
+
+### Changed
+- Index requests run round-robin across workspace queues; retries rejoin the same fair queue.
+- Embedding yields after two 32-chunk batches and resumes behind other workspaces.
+- System Overview shows oldest queue waits and current-process index retry counts.
+
+### Checks
+- Queue, embedding, server and web checks pass.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.81 (2026-10-27)
 
 Broad search requests now have a bounded response time and an explicit timeout state.

@@ -109,6 +109,10 @@ async fn system_administrators_see_every_workspace_and_run_the_server() {
     let overview = response_json(get("/v1/system/overview".to_owned(), &admin).await).await;
     assert_eq!(overview["statistics"]["user_count"], 3);
     assert_eq!(overview["statistics"]["workspace_count"], 2);
+    assert!(overview["background"]["indexing_retries_scheduled"].is_number());
+    assert!(overview["background"]["indexing_retries_waiting"].is_number());
+    assert!(overview["background"].get("indexing_oldest_queue_seconds").is_some());
+    assert!(overview["background"].get("embedding_oldest_queue_seconds").is_some());
     assert_eq!(overview["instance"]["system_admin_count"], 1);
     assert!(overview["traffic"]["requests"].as_u64().unwrap() > 0);
     let usage = response_json(get("/v1/system/usage?days=7".to_owned(), &admin).await).await;

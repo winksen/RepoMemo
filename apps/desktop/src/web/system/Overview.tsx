@@ -104,7 +104,11 @@ export function OverviewSection({ accessToken }: { accessToken: string }) {
         <PanelHeading description={background.indexing_queued + background.repository_syncs_running ? "busy" : "idle"} icon={Activity} title="Background work" />
         <Facts items={[
           ["Files waiting for indexing", count(background.indexing_queued)],
+          ["Oldest indexing wait", background.indexing_oldest_queue_seconds === null ? "—" : `${count(background.indexing_oldest_queue_seconds)} seconds`],
+          ["Index retries waiting", count(background.indexing_retries_waiting)],
+          ["Index retries since start", count(background.indexing_retries_scheduled)],
           ["Workspaces waiting for vectors", count(background.embedding_workspaces_waiting)],
+          ["Oldest vector wait", background.embedding_oldest_queue_seconds === null ? "—" : `${count(background.embedding_oldest_queue_seconds)} seconds`],
           ["Repository syncs", count(background.repository_syncs_running)],
           ["Preview conversions", count(background.preview_conversions_running)],
           ["LibreOffice", officePreviewsText(background.office_previews)],

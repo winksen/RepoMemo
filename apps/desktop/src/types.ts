@@ -708,7 +708,11 @@ export interface SystemOverview {
   };
   background: {
     indexing_queued: number;
+    indexing_oldest_queue_seconds: number | null;
+    indexing_retries_waiting: number;
+    indexing_retries_scheduled: number;
     embedding_workspaces_waiting: number;
+    embedding_oldest_queue_seconds: number | null;
     repository_syncs_running: number;
     preview_conversions_running: number;
     office_previews: { available: boolean; installed: boolean; requested: boolean; refused: string | null; version: string | null; sandboxed: boolean };
