@@ -135,5 +135,15 @@ describe("the narrow-screen stylesheet", () => {
   it("lets the page scroll and stops it from growing sideways on a tablet", () => {
     const tablet = css.slice(css.indexOf("@media (max-width: 900px)"), css.indexOf("@media (max-width: 640px)"));
     expect(tablet).toMatch(/html, body, #root \{[^}]*overflow: visible; overflow-x: clip/);
+    expect(tablet).toMatch(/\.shared-home-content \{[^}]*overflow: visible/);
+  });
+
+  it("keeps navigation, result metadata and dialog actions available at 320 CSS pixels", () => {
+    const small = css.slice(css.indexOf("@media (max-width: 420px)"));
+    expect(small).toMatch(/\.shared-home \{ grid-template-rows: auto/);
+    expect(small).toMatch(/\.shared-home-header \{ flex-wrap: wrap/);
+    expect(small).toMatch(/\.shared-search-result-heading \{ flex-wrap: wrap/);
+    expect(small).toMatch(/\.rm-dialog-footer \{ flex-wrap: wrap/);
+    expect(small).toMatch(/\.rm-feedback-notice \{ flex-wrap: wrap/);
   });
 });

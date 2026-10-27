@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.4 → next
 
-> **Line:** `V0.4.0` to `V0.4.90` committed; `V0.4.91` onward proposed · **Current:** `V0.4.90` (2026-10-27) · **Next:** the planned 0.4.x continuation below, before the proposed [0.5.x single sign-on plan](plans/2026-10-27-0.5-single-sign-on.md)
+> **Line:** `V0.4.0` to `V0.4.91` committed; `V0.4.92` onward proposed · **Current:** `V0.4.91` (2026-10-27) · **Next:** the planned 0.4.x continuation below, before the proposed [0.5.x single sign-on plan](plans/2026-10-27-0.5-single-sign-on.md)
 > **Previous line:** [Releases 0.3 → 0.4](RELEASES_0.3.md) · **Related:** [Roadmap, the 0.4.x line](ROADMAP.md#-the-04x-line-preparation-for-deployment) · [The plan](plans/2026-10-25-deployment.md) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.4 line, planned and later shipped, one row each. The theme is **preparation for deployment, on the server and on the client**: the API with its database and files, and the web client, as containers first and as a direct install second, and the desktop app brought back as the same client, installable, starting with Windows. It was chosen on 2026-10-25 (decision 33) and is planned in [the deployment plan](plans/2026-10-25-deployment.md). The rules are those of 0.3.x: **one change per release**, each shippable alone, committed as `Update V0.4.N` with a short list. Containers are what the tests focus on.
@@ -139,7 +139,7 @@ The row above remains the record of V0.4.67. The 22 failing web tests, unrun Rus
 | **V0.4.88** | ✅ 2026-10-27 | AF. Frontend experience | 🔧 Enhancement | Dense views | Standardize table widths, wrapping, sorting, selection and action placement for evidence, jobs, users and tasks | Long paths and identifiers remain readable without hiding critical actions or forcing horizontal scrolling at desktop widths |
 | **V0.4.89** | ✅ 2026-10-27 | AF. Frontend experience | 🔧 Enhancement | Feedback | Make empty, loading, partial and error states task-specific, with a direct recovery action and consistent toast behavior | Every primary workspace screen explains what happened and what the user can do next |
 | **V0.4.90** | ✅ 2026-10-27 | AF. Frontend experience | 🔧 Enhancement | Accessibility | Audit keyboard paths, focus return, names, contrast and reduced motion for search, dialogs, review and the assistant; fix the findings | Automated keyboard and contrast checks pass for both themes; browser and screen reader validation awaits a reachable local preview |
-| **V0.4.91** | 🔜 planned | AF. Frontend experience | 🔧 Enhancement | Layout | Adapt navigation, result cards and dialogs for narrow windows and zoom while retaining access to the same actions | Core flows work at 320 CSS pixels and 200% zoom without clipped controls |
+| **V0.4.91** | ✅ 2026-10-27 | AF. Frontend experience | 🔧 Enhancement | Layout | Adapt navigation, result cards and dialogs for narrow windows and zoom while retaining access to the same actions | 320 CSS px rules and focused checks cover scrolling and control wrapping; live zoom validation remains open |
 
 
 ### Documentation commits (V0.4.92–V0.4.104)

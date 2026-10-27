@@ -3,7 +3,7 @@
  * below the widths named here (the 900px of `NARROW_QUERY` in lib/useMediaQuery.ts for tablets,
  * 640px for phones), so the wide layout is whatever the files before it say.
  *
- * What it settles, down to 375px:
+ * What it settles, down to 320 CSS px (including a 640px window at 200% zoom):
  *  - the page scrolls (the earlier files clip the page to the window, which suits the wide
  *    layout where each pane scrolls on its own, and leaves a stacked page unreachable);
  *  - nothing makes the page wider than the window: grids fall to one column, long names and
@@ -24,7 +24,7 @@
   body, .shared-home { min-width: 0; }
   .shared-home { height: auto; min-height: 100dvh; overflow: visible; overflow-x: clip; }
   .shared-home-content, .shared-layout-content, .shared-layout-body { min-width: 0; max-width: 100%; }
-  .shared-home-content { --shared-content-inset: 20px; }
+  .shared-home-content { --shared-content-inset: 20px; overflow: visible; }
 
   .shared-home-rail { padding: 8px 12px; }
   .shared-rail-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 700; }
@@ -82,4 +82,22 @@
   .rm-dialog { padding: 16px; max-height: calc(100dvh - 24px); }
   .shared-palette { top: 8vh; }
   .rm-toast-viewport { right: 12px; bottom: 76px; left: 12px; width: auto; }
+}
+
+/* Small windows and 200% zoom: keep header actions, results and dialog controls reachable. */
+@media (max-width: 420px) {
+  .shared-home { grid-template-rows: auto minmax(0, 1fr); }
+  .shared-home-header { flex-wrap: wrap; min-height: 46px; padding: 6px 8px; }
+  .shared-header-actions { width: 100%; justify-content: flex-end; }
+  .shared-brand-full { max-width: min(128px, 100%); }
+  .shared-page-content, .shared-detail-shell { min-width: 0; }
+  .shared-search-result { min-width: 0; }
+  .shared-search-result-heading { flex-wrap: wrap; min-width: 0; gap: 4px 8px; }
+  .shared-search-result-heading > span { max-width: 100%; overflow-wrap: anywhere; }
+  .rm-feedback-notice { flex-wrap: wrap; }
+  .rm-feedback-notice .rm-button { max-width: 100%; }
+  .rm-dialog { max-width: calc(100vw - 16px); padding: 12px; }
+  .rm-dialog-footer { flex-wrap: wrap; }
+  .shared-palette { top: 12px; }
+  .shared-palette-list { max-height: min(52dvh, 420px); }
 }

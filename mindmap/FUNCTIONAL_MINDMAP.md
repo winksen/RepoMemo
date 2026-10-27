@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.90` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.91` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -688,3 +688,9 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 - The narrow assistant opens as a named modal sheet. Tab stays inside it, and closing it returns focus to the opener.
 - Review loading and failed refreshes are announced inline with a retry action.
 - Reduced motion removes decorative transitions and animations while keeping state changes immediate. Automated contrast and keyboard checks cover light and dark themes; manual screen reader validation remains open because the local preview was unreachable.
+
+## V0.4.91 — Small windows and zoom
+
+- At 320 CSS pixels, including a 640 pixel window at 200% zoom, the header puts account actions on their own row rather than hiding them.
+- Search result metadata, notices and dialog actions wrap inside the available width. The narrow page keeps vertical scrolling available.
+- Focused layout checks cover those rules; live zoom validation remains open because the local preview was unreachable.
