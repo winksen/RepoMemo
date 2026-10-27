@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.76 (2026-10-27)
+
+Failed evidence indexing can be retried from its item and workspace Health.
+
+### Added
+- An item with a recorded index failure shows the reason and offers a scoped retry to a writer. Health offers the same action for each failed item to an owner or administrator.
+- The retry shows its accepted job ID and status, then its terminal result or server refusal. Completed retries refresh the evidence and Health views.
+
+### Checks
+- Focused retry tests, web typecheck, styles check, version and documentation checks pass.
+
+### Upgrading
+- Nothing to do. The existing per-item indexing endpoint and job queue are reused.
+
 ## V0.4.75 (2026-10-27)
 
 Bulk evidence review now previews the selected files and reports each result.

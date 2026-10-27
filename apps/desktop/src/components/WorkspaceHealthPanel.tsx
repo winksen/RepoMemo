@@ -19,6 +19,7 @@ import { useLiveRefresh } from "../lib/liveEvents";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage, formatTime } from "../web/format";
+import { RetryIndexButton } from "./RetryIndexButton";
 
 const DETECTORS: Record<HealthDetector, { label: string; looksFor: string; icon: ReactNode }> = {
   older_version_active: { label: "Older versions", looksFor: "An earlier upload of a file still active next to the latest one.", icon: <Versions size={ICON_SIZE.md} /> },
@@ -126,14 +127,14 @@ export function WorkspaceHealthPanel({
     <section className="rm-map-section" aria-labelledby="rm-health-findings-title">
       <PanelHeading icon={Stethoscope} id="rm-health-findings-title" title="Needs attention" />
       {warnings.length
-        ? <ul className="rm-health-list">{warnings.map((finding) => <FindingCard busy={pending === finding.fingerprint} canAct={canAct} finding={finding} key={finding.fingerprint} onAct={act} onOpenArtifact={onOpenArtifact} />)}</ul>
+        ? <ul className="rm-health-list">{warnings.map((finding) => <FindingCard accessToken={accessToken} busy={pending === finding.fingerprint} canAct={canAct} finding={finding} key={finding.fingerprint} onAct={act} onOpenArtifact={onOpenArtifact} onRetryFinished={() => void load()} />)}</ul>
         : <p className="shared-muted-copy">Nothing needs attention. Findings you act on or dismiss stay hidden until the files change.</p>}
     </section>
 
     {info.length ? <section className="rm-map-section" aria-labelledby="rm-health-info-title">
       <PanelHeading icon={Unconnected} id="rm-health-info-title" title="For information" />
       <p className="rm-map-intro">A weak signal: a file unlike the rest can be the most valuable one here. Check that it belongs; nothing is suggested for removal.</p>
-      <ul className="rm-health-list">{info.map((finding) => <FindingCard busy={pending === finding.fingerprint} canAct={canAct} finding={finding} key={finding.fingerprint} onAct={act} onOpenArtifact={onOpenArtifact} />)}</ul>
+      <ul className="rm-health-list">{info.map((finding) => <FindingCard accessToken={accessToken} busy={pending === finding.fingerprint} canAct={canAct} finding={finding} key={finding.fingerprint} onAct={act} onOpenArtifact={onOpenArtifact} onRetryFinished={() => void load()} />)}</ul>
     </section> : null}
 
     <section className="rm-map-section" aria-labelledby="rm-health-checks-title">
@@ -155,17 +156,21 @@ export function WorkspaceHealthPanel({
 }
 
 function FindingCard({
+  accessToken,
   busy,
   canAct,
   finding,
   onAct,
   onOpenArtifact,
+  onRetryFinished,
 }: {
+  accessToken: string;
   busy: boolean;
   canAct: boolean;
   finding: HealthFinding;
   onAct: (finding: HealthFinding, action: HealthAction, keepArtifactId?: string) => Promise<void>;
   onOpenArtifact: (artifactId: string) => void;
+  onRetryFinished: () => void;
 }) {
   const [keep, setKeep] = useState(finding.keep_artifact_id ?? "");
   const choosesKeeper = finding.actions.includes("supersede");
@@ -191,6 +196,7 @@ function FindingCard({
       {finding.files.map((file) => <li key={file.artifact_id}>
         <button className="rm-map-link" onClick={() => onOpenArtifact(file.artifact_id)} type="button">{file.title}</button>
         {file.path !== file.title || showDates ? <span className="rm-map-muted">{file.path}</span> : null}
+        {canAct && finding.detector === "index_failed" ? <RetryIndexButton accessToken={accessToken} artifactId={file.artifact_id} onFinished={onRetryFinished} /> : null}
       </li>)}
     </ul>}
 

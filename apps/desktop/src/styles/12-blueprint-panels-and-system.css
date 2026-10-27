@@ -418,6 +418,8 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .shared-bulk-review-results ul { display: grid; gap: 5px; max-height: 240px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
 .shared-bulk-review-results li { display: flex; justify-content: space-between; gap: 12px; overflow-wrap: anywhere; font-size: 12px; }
 .shared-bulk-review-results li span:last-child { color: var(--color-text-muted); }
+.shared-index-retry { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.shared-index-retry span { color: var(--color-text-muted); font-size: 12px; overflow-wrap: anywhere; }
 .shared-select-box { margin-bottom: 6px; }
 
 /* A citation that names a commit: the open button and "View at <commit>" side by side. */

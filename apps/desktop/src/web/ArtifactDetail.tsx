@@ -33,6 +33,8 @@ import { PullReviewSummary } from "./PullReview";
 import { SharedRecordLayout } from "./MemoryCardDetail";
 import { ICON_SIZE } from "../components/ui/icon";
 import { submitHint } from "../lib/submitShortcut";
+import { useIndexFailures } from "./workspace/data";
+import { RetryIndexButton } from "../components/RetryIndexButton";
 
 /** The tone of the lifecycle badge: evidence that needs a look, or is outdated, shows the warning dot. */
 function lifecycleTone(status: ArtifactLifecycleStatus | undefined): BadgeTone {
@@ -82,6 +84,7 @@ export function SharedArtifactDetail({
     key: workspaceKeys.artifactLifecycleEvents(workspaceId, artifactId), fetch: () => listSharedArtifactLifecycleEvents(accessToken, artifactId), initial: [], staleTime: 0,
   });
   const [workspaceMembers, , membersQuery] = useMembers(accessToken, workspaceId, true);
+  const [indexFailures] = useIndexFailures(accessToken, workspaceId);
   const picker = useArtifactPicker(accessToken, workspaceId);
   const workspaceArtifactsQuery = picker.query;
   const pageQueries = [artifactQuery, commentsQuery, lifecycleQuery, lifecycleEventsQuery, membersQuery, workspaceArtifactsQuery];
@@ -135,6 +138,7 @@ export function SharedArtifactDetail({
         workspaceKeys.artifactLifecycleEvents(workspaceId, artifactId),
         workspaceKeys.members(workspaceId),
         workspaceKeys.artifacts(workspaceId),
+        workspaceKeys.indexFailures(workspaceId),
       ]);
     } finally { setIsReloading(false); }
   }
@@ -258,6 +262,7 @@ export function SharedArtifactDetail({
       <div className="shared-record-meta"><span>{artifact?.summary.artifact_type ?? "artifact"}</span><span>{artifact?.summary.language ?? "Unspecified language"}</span><span>{artifact?.summary.indexed_at ? "Indexed" : indexingStalled ? "Not indexed" : "Indexing…"}</span>{artifact ? <CopyButton label="Copy the file path" value={artifact.summary.path} /> : null}</div>
       {isEditing ? <form className="shared-record-edit-form" onSubmit={saveArtifact}><Field label="Evidence title" required><Input onChange={(event) => setTitle(event.target.value)} value={title} /></Field><Button busy={isMutating} type="submit" variant="main"><Pencil size={ICON_SIZE.md} /> Save evidence</Button></form> : null}
       {artifact ? <EvidenceProvenance artifact={artifact} lifecycle={lifecycle} /> : null}
+      {artifact && indexFailures[artifactId] ? <section className="shared-record-panel"><h2>Indexing failed</h2><p>{indexFailures[artifactId].message}</p>{canWrite ? <RetryIndexButton accessToken={accessToken} artifactId={artifactId} onFinished={() => void load()} /> : <p className="shared-muted-copy">A workspace writer can retry this item.</p>}</section> : null}
       {artifact?.summary.artifact_type === "pr" ? <PullReviewSummary metadata={artifact.metadata} /> : null}
       {artifact && (isRepositoryFile || artifact.summary.artifact_type === "issue" || artifact.summary.artifact_type === "pr") ? <ArtifactMentionsPanel accessToken={accessToken} artifactId={artifactId} onOpenArtifact={onOpenArtifact} /> : null}
       <section className="shared-record-panel shared-lifecycle-panel"><PanelHeading actions={<Badge className="shared-lifecycle-status" tone={lifecycleTone(lifecycle?.status)}>{lifecycle?.status?.replace(/_/g, " ") ?? "Active"}</Badge>} icon={Shield} title="Evidence lifecycle" />{isEditingLifecycle ? <form className="shared-lifecycle-form" onSubmit={saveLifecycle}><Field label="Status">{(control) => <Dropdown id={control.id} onValueChange={(value) => setLifecycleStatus(value as ArtifactLifecycleStatus)} options={[{ label: "Active", value: "active" }, { label: "Needs review", value: "needs_review" }, { label: "Verified", value: "verified" }, { label: "Outdated", value: "outdated" }, { label: "Superseded", value: "superseded" }]} value={lifecycleStatus} />}</Field><Field label="Review owner">{(control) => <Dropdown id={control.id} onValueChange={(value) => setLifecycleOwnerId(value === "__unassigned__" ? "" : value)} options={[{ label: "Unassigned", value: "__unassigned__" }, ...workspaceMembers.map((member) => ({ label: member.user.display_name, value: member.user.id }))]} value={lifecycleOwnerId || "__unassigned__"} />}</Field>{lifecycleStatus === "superseded" ? <Field label="Replacement evidence">{(control) => <Combobox aria-label="Replacement evidence" emptyLabel="No file matches" id={control.id} onSearch={picker.search} onValueChange={setSupersededByArtifactId} options={picker.files.filter((entry) => entry.id !== artifactId).map((entry) => ({ label: entry.title, value: entry.id }))} placeholder="Choose replacement evidence" value={supersededByArtifactId} />}</Field> : null}<Field className="shared-lifecycle-note" label="Review note"><Textarea onChange={(event) => setLifecycleNote(event.target.value)} placeholder="What should the team know about this evidence?" value={lifecycleNote} /></Field><div className="shared-lifecycle-actions"><Button busy={isMutating} type="submit" variant="main"><Shield size={ICON_SIZE.md} /> Save lifecycle</Button><Button disabled={isMutating} onClick={() => setIsEditingLifecycle(false)} variant="secondary">Cancel</Button></div></form> : <div className="shared-lifecycle-summary"><div><strong>{lifecycle?.owner ? `Owned by ${lifecycle.owner.display_name}` : "No review owner"}</strong><span>{lifecycle?.reviewed_at ? `Last updated ${formatTime(lifecycle.reviewed_at)} by ${lifecycle.reviewed_by?.display_name ?? "a member"}` : "No lifecycle review recorded yet."}</span></div>{lifecycle?.review_note ? <p>{lifecycle.review_note}</p> : <p className="shared-muted-copy">Add a review note so the evidence can be trusted in context.</p>}{lifecycle?.superseded_by_artifact_id ? <span className="shared-lifecycle-replacement">Replaced by evidence {lifecycle.superseded_by_artifact_id.slice(0, 8)}</span> : null}{canWrite ? <Button onClick={() => setIsEditingLifecycle(true)} variant="secondary"><Pencil size={ICON_SIZE.sm} /> Update lifecycle</Button> : null}</div>}<div className="shared-lifecycle-history"><strong>History</strong>{lifecycleEvents.length ? lifecycleEvents.map((event) => <p key={event.id}><span>{event.detail}</span><time dateTime={event.created_at}>{event.actor?.display_name ?? "System"} · {formatTime(event.created_at)}</time></p>) : <p className="shared-muted-copy">Lifecycle changes will be recorded here.</p>}</div></section>
