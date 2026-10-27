@@ -419,8 +419,8 @@ mod folder_tests {
 
     #[test]
     fn a_windows_network_path_is_a_share() {
-        assert!(network_file_system("", Path::new(r"\nas\memo")).is_some());
-        assert!(network_file_system("", Path::new(r"\?\C:\memo")).is_none());
+        assert!(network_file_system("", Path::new(r"\\nas\memo")).is_some());
+        assert!(network_file_system("", Path::new(r"\\?\C:\memo")).is_none());
     }
 
     #[test]

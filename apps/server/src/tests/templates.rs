@@ -587,7 +587,7 @@ async fn templates_are_listed_read_by_members_and_changed_only_by_administrators
     assert_eq!(listed[0]["name"], "General");
     assert!(listed[0]["version"].is_u64() && listed[0]["summary"].is_string() && listed[0]["icon"].is_string());
     assert!(
-        listed[0].as_object().unwrap().len() == 5,
+        listed[0].as_object().unwrap().len() == 6 && listed[0]["custom"] == false,
         "no block is listed: {}",
         listed[0]
     );

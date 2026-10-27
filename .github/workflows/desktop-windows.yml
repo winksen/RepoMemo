@@ -23,8 +23,13 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  release-tests:
+    name: Release tests
+    uses: ./.github/workflows/release-tests.yml
+
   windows:
     name: Windows x64
+    needs: release-tests
     runs-on: windows-latest
     timeout-minutes: 90
     env:
@@ -180,6 +185,15 @@ jobs:
           name: desktop-windows-x64
           path: dist-desktop-ci/*
           if-no-files-found: error
+      - name: Build evidence
+        if: always()
+        shell: pwsh
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "### desktop-windows-x64: $env:JOB_STATUS"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Commit: $env:GITHUB_SHA; ref: $env:GITHUB_REF_NAME"
+          if (Test-Path dist-desktop-ci/SHA256SUMS) { Get-Content dist-desktop-ci/SHA256SUMS | Add-Content $env:GITHUB_STEP_SUMMARY } else { Add-Content $env:GITHUB_STEP_SUMMARY "Artifact unavailable" }
 
   # The update feed (V0.4.56): on a tag, and only when the repository has the signing key, the signed installer and a latest.json that
   # names it are attached to the release, which the app's updater reads. The only job here that writes, and it writes nothing else.

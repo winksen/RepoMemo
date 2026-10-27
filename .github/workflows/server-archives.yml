@@ -16,6 +16,10 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  release-tests:
+    name: Release tests
+    uses: ./.github/workflows/release-tests.yml
+
   build:
     name: ${{ matrix.os }} ${{ matrix.arch }}
     strategy:
@@ -25,6 +29,7 @@ jobs:
           - { os: linux, arch: x64, runner: ubuntu-latest, binary: repomemo-server }
           - { os: linux, arch: arm64, runner: ubuntu-24.04-arm, binary: repomemo-server }
           - { os: windows, arch: x64, runner: windows-latest, binary: repomemo-server.exe }
+    needs: release-tests
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     steps:
@@ -67,6 +72,17 @@ jobs:
           name: server-${{ matrix.os }}-${{ matrix.arch }}
           path: dist-server/repomemo-server-*
           if-no-files-found: error
+      - name: Build evidence
+        if: always()
+        shell: bash
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          echo "### server-${{ matrix.os }}-${{ matrix.arch }}: ${JOB_STATUS}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: ${GITHUB_SHA}; ref: ${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          shopt -s nullglob
+          files=(dist-server/repomemo-server-*)
+          if (( ${#files[@]} )); then sha256sum "${files[@]}" >> "$GITHUB_STEP_SUMMARY"; else echo "Artifact unavailable" >> "$GITHUB_STEP_SUMMARY"; fi
 
   release:
     name: Attach to the release

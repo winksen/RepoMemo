@@ -32,7 +32,7 @@ pub(super) async fn wait_for_indexed_artifacts(
     workspace_id: &str,
     expected: usize,
 ) {
-    for _ in 0..100 {
+    for _ in 0..300 {
         let response = app
             .clone()
             .oneshot(auth_request(

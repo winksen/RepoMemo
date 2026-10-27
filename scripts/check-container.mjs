@@ -63,6 +63,20 @@ for (const ecosystem of ["github-actions", "docker", "docker-compose"]) {
 if (!/node --test scripts\/pins\.test\.mjs/.test(workflows.find(([name]) => name === "ci.yml")?.[1] ?? "")) problems.push("CI does not run the pinning rules' tests (scripts/pins.test.mjs)");
 const workflowFiles = readdirSync(".github/workflows").filter((name) => /\.ya?ml$/.test(name));
 if (workflowFiles.length < 3) problems.push("the workflows folder lost a workflow (ci, server-archives and release-images are expected)");
+// A tag bypasses CI's main/PR trigger. Each distribution workflow must test
+// its own commit before it can build or publish, and name that commit and
+// artifact in the job summary (V0.4.70).
+const releaseTests = read(".github/workflows/release-tests.yml");
+for (const command of ["npm run test:web", "cargo test --workspace --exclude repomemo-desktop --locked"]) {
+  if (!releaseTests.includes(command)) problems.push(`release-tests.yml does not run ${command}`);
+}
+for (const name of ["release-images.yml", "server-archives.yml", "desktop-windows.yml", "desktop-linux.yml", "desktop-macos.yml"]) {
+  const workflow = workflows.find(([file]) => file === name)?.[1] ?? "";
+  if (!/^  release-tests:\s*\n\s+name: Release tests\s*\n\s+uses: \.\/\.github\/workflows\/release-tests\.yml/m.test(workflow)) problems.push(`${name} does not call the release tests gate`);
+  if (!/^    needs: (?:release-tests|\[checks, release-tests\])/m.test(workflow)) problems.push(`${name} does not require release tests before its build`);
+  if (!/name: Build evidence[\s\S]*?if: always\(\)[\s\S]*?GITHUB_STEP_SUMMARY/.test(workflow)) problems.push(`${name} does not report build evidence`);
+  if (!workflow.includes("GITHUB_SHA") || !workflow.includes("SHA256SUMS") && name !== "release-images.yml") problems.push(`${name} does not name the tested commit and artifact sums`);
+}
 
 // The server image's git must be one the remote-clone check accepts (S5-7): Debian 12 ships 2.39.5, which
 // `is_patched_git` refuses, so remote repositories could not be cloned in the image.

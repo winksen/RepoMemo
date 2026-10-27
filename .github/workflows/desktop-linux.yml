@@ -22,8 +22,13 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
+  release-tests:
+    name: Release tests
+    uses: ./.github/workflows/release-tests.yml
+
   linux:
     name: Linux x64
+    needs: release-tests
     runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
@@ -95,3 +100,11 @@ jobs:
           name: desktop-linux-x64
           path: dist-desktop-ci/*
           if-no-files-found: error
+      - name: Build evidence
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          echo "### desktop-linux-x64: ${JOB_STATUS}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: ${GITHUB_SHA}; ref: ${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f dist-desktop-ci/SHA256SUMS ]; then cat dist-desktop-ci/SHA256SUMS >> "$GITHUB_STEP_SUMMARY"; else echo "Artifact unavailable" >> "$GITHUB_STEP_SUMMARY"; fi

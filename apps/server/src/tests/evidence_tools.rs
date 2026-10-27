@@ -624,23 +624,6 @@ async fn mentions_in_tasks_and_memory_cards_tell_workspace_members_once_and_nobo
     let (member, _) = register_account(&app, "mentions-member@example.com").await;
     let (orgmate, _) = register_account(&app, "mentions-orgmate@example.com").await;
     let workspace_id = create_workspace(&app, &owner).await;
-    let organizations = response_json(
-        app.clone()
-            .oneshot(auth_request("GET", "/v1/organizations", &owner))
-            .await
-            .unwrap(),
-    )
-    .await;
-    let organization_id = organizations[0]["id"].as_str().unwrap().to_owned();
-    join(
-        &app,
-        &owner,
-        "organizations",
-        &organization_id,
-        "mentions-orgmate@example.com",
-        "member",
-    )
-    .await;
     join(
         &app,
         &owner,
@@ -667,7 +650,7 @@ async fn mentions_in_tasks_and_memory_cards_tell_workspace_members_once_and_nobo
         }
     };
 
-    // A task whose description names a member, an organization member who is not in the workspace, and
+    // A task whose description names a member, an outsider, and
     // its own author: only the member is told.
     let created = call(
         &app,

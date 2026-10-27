@@ -615,12 +615,14 @@ async fn each_backup_is_copied_to_a_second_place_and_checked() {
     // A destination that cannot be used is a failure to see, and the backup stays.
     let blocked = temp_data_dir("backup-copy-blocked");
     let blocker = blocked.join("not-a-folder");
-    std::fs::write(&blocker, b"a file").unwrap();
+    std::fs::create_dir_all(&blocker).unwrap();
     let broken_data = temp_data_dir("backup-copy-broken");
     let mut broken = ServerConfig::for_test(broken_data.clone());
     broken.backup_copy_dir = Some(blocker.join("share"));
     let broken_app = router(broken).await.unwrap();
     let (broken_admin, _) = register_account(&broken_app, "copy-broken@example.com").await;
+    std::fs::remove_dir(&blocker).unwrap();
+    std::fs::write(&blocker, b"a file").unwrap();
     broken_app
         .clone()
         .oneshot(json_request("POST", "/v1/system/backups", &broken_admin, json!({})))

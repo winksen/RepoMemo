@@ -136,11 +136,11 @@ async fn the_artifact_query_filters_and_pages_in_the_database() {
 
     let (total, all) = query(base.clone(), json!({"query": ""})).await;
     assert_eq!(all.as_array().unwrap().len(), 3);
-    assert_eq!(total, None, "an unpaged answer has no total");
+    assert_eq!(total.as_deref(), Some("3"));
 
     let (total, filtered) = query(base.clone(), json!({"query": "PLAN"})).await;
     assert_eq!(filtered.as_array().unwrap().len(), 2, "the match ignores case");
-    assert_eq!(total, None);
+    assert_eq!(total.as_deref(), Some("2"));
 
     let (total, page) = query(format!("{base}?limit=2&offset=0"), json!({"query": ""})).await;
     assert_eq!(page.as_array().unwrap().len(), 2);

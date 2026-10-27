@@ -193,6 +193,14 @@ fn check_provider_url_for(base_url: &str, provider_path: &str, policy: &Endpoint
         }
     }
     if policy.provider_paths_only {
+        // The built-in list contains both Ollama and OpenRouter. A permitted
+        // host alone does not make it the host of the requested provider.
+        if policy.public_hostnames_only
+            && ((provider_path == "/api/v1" && host != "openrouter.ai")
+                || (provider_path.is_empty() && host == "openrouter.ai"))
+        {
+            bail!("The provider base URL is not the built-in host for this provider.")
+        }
         if url.query().is_some() || url.fragment().is_some() {
             bail!("The provider base URL must not carry a query or a fragment.")
         }

@@ -352,7 +352,7 @@ fn a_file_that_cannot_be_used_is_left_out_and_named_and_the_others_stay() {
         ("twin.json", second.as_str()),
         ("general.json", shadow.as_str()),
     ]);
-    assert_eq!(ids(&catalogue), ["general", "good", "twin"]);
+    assert_eq!(ids(&catalogue), ["general", "twin", "good"]);
     assert_eq!(catalogue.get("twin").unwrap().meta.name, "First twin");
     assert_eq!(catalogue.get(GENERAL_ID), Some(&general()));
 
@@ -1217,7 +1217,7 @@ fn search_ranks_as_it_always_has_unless_a_template_chooses() {
     let chosen = parse(&with_ranking(r#"{ "verified": 1.15 }"#)).unwrap();
     assert_eq!(chosen.ranking().verified, 1.15);
     assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
-    assert!(!serde_json::to_string(&general()).unwrap().contains("ranking"));
+    assert!(serde_json::to_value(&general()).unwrap().get("ranking").is_none());
 }
 
 #[test]

@@ -1173,7 +1173,9 @@ async fn organizations_and_local_links_are_for_administrators_until_the_settings
     // What a fresh server starts with (the tests of everything else start more open).
     config.organization_creators = "administrators".to_owned();
     config.local_repository_linkers = "system_admins".to_owned();
-    config.repo_roots = vec![data_dir.join("repos")];
+    let repo_root = temp_data_dir("creators-linkers-repos");
+    std::fs::create_dir_all(&repo_root).unwrap();
+    config.repo_roots = vec![repo_root.clone()];
     let app = router(config).await.unwrap();
     let send = |method: &'static str, uri: String, who: &str, body: Value| {
         let app = app.clone();
@@ -1241,7 +1243,7 @@ async fn organizations_and_local_links_are_for_administrators_until_the_settings
         "admin",
     )
     .await;
-    let link = json!({"link": data_dir.join("repos").join("anything").to_string_lossy()});
+    let link = json!({"link": repo_root.join("anything").to_string_lossy()});
     for route in ["repositories/check", "repositories"] {
         let refused = send(
             "POST",

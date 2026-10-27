@@ -1,0 +1,43 @@
+# Reusable gate for tag and manual distribution workflows. It tests the exact
+# commit those workflows build; a failing test blocks their build and publish jobs.
+name: Release tests
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:web
+      - name: Tested commit
+        if: always()
+        run: echo "Web tests for ${GITHUB_SHA}: ${JOB_STATUS}" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          JOB_STATUS: ${{ job.status }}
+
+  rust:
+    name: Rust tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo test --workspace --exclude repomemo-desktop --locked
+      - name: Tested commit
+        if: always()
+        run: echo "Rust tests for ${GITHUB_SHA}: ${JOB_STATUS}" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          JOB_STATUS: ${{ job.status }}

@@ -666,12 +666,12 @@ pub(crate) async fn upload_artifact(
         .ensure_upload_allowed(&workspace_id, &filename)
         .await
         .map_err(map_core_error)?;
-    // Room and the hourly count are checked against what the request says it holds, before any of it
-    // is read; the room again, against what arrived, once it has.
+    // Check room against the declared length before reading, then count the upload only after the
+    // actual bytes also fit. A rejected upload must not use up the hourly allowance.
     let declared = declared_length(&headers).unwrap_or(0);
-    quotas::check_incoming(&state, &subject, &workspace_id, declared, true).await?;
+    quotas::check_incoming(&state, &subject, &workspace_id, declared, false).await?;
     let received = receive_upload(&state, &headers, body).await?;
-    quotas::check_incoming(&state, &subject, &workspace_id, received.staged.size_bytes, false).await?;
+    quotas::check_incoming(&state, &subject, &workspace_id, received.staged.size_bytes, true).await?;
     let artifact = state
         .core
         .import_staged_upload(workspace_id.clone(), filename, received.staged)
@@ -1287,9 +1287,9 @@ pub(crate) async fn upload_artifact_version(
         ));
     }
     let declared = declared_length(&headers).unwrap_or(0);
-    quotas::check_incoming(&state, &subject, &workspace_id, declared, true).await?;
+    quotas::check_incoming(&state, &subject, &workspace_id, declared, false).await?;
     let received = receive_upload(&state, &headers, body).await?;
-    quotas::check_incoming(&state, &subject, &workspace_id, received.staged.size_bytes, false).await?;
+    quotas::check_incoming(&state, &subject, &workspace_id, received.staged.size_bytes, true).await?;
     let artifact = state
         .core
         .replace_artifact_version_staged(&artifact_id, &filename, received.staged, Some(&subject.user_id))

@@ -1084,7 +1084,7 @@ async fn anonymous_endpoints_take_small_bodies_whatever_the_upload_limit_is() {
         "/v1/auth/refresh",
         "/v1/auth/forgot-password",
         "/v1/auth/password-reset",
-        "/v1/invitations/accept",
+        "/v1/invitations/preview",
         "/v1/setup/verify-code",
     ] {
         let response = app
@@ -1258,7 +1258,7 @@ async fn the_routes_that_grant_access_or_remove_things_need_a_session_or_an_admi
         }
     }
     assert_eq!(
-        send("GET", format!("/v1/workspaces/{workspace}"), owner.clone(), json!(null))
+        send("GET", "/v1/workspaces".to_owned(), owner.clone(), json!(null))
             .await
             .status(),
         200,

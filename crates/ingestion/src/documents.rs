@@ -212,9 +212,14 @@ fn read_document_preview(path: &Path, bytes: &[u8]) -> DocumentPreview {
                 total_slides,
             })
         }
-        DocumentKind::Pdf => Ok(DocumentPreview::Pdf {
-            page_count: pdf_page_count(bytes),
-        }),
+        DocumentKind::Pdf => {
+            if !bytes.starts_with(b"%PDF-") {
+                anyhow::bail!("The file is not a PDF.")
+            }
+            Ok(DocumentPreview::Pdf {
+                page_count: pdf_page_count(bytes),
+            })
+        }
         DocumentKind::OneNote => Ok(text_preview(onenote_text(bytes), true)),
         DocumentKind::Email => {
             let email = read_email(path, bytes)?;

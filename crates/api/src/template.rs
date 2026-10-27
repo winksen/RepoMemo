@@ -799,8 +799,9 @@ mod tests {
             (exported.id(), exported.meta.version, exported.meta.name.as_str()),
             ("night-shift", 1, "Night shift")
         );
-        // Nothing but a template is in it: no workspace id, no name of the workspace, no setting but the blocks.
-        assert!(!text.contains(&workspace.id) && !text.contains("Runbooks"), "{text}");
+        // Nothing but a template is in it: no workspace id or workspace field.
+        // A legitimate starter-folder name may happen to equal the workspace name.
+        assert!(!text.contains(&workspace.id), "{text}");
         let keys: Vec<String> = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&text)
             .unwrap()
             .keys()
@@ -826,6 +827,7 @@ mod tests {
             .contains(&key.as_str())),
             "{keys:?}"
         );
+        assert!(!keys.iter().any(|key| key.starts_with("workspace")));
 
         // Loaded by a server that has it, the file gives the arrangement the workspace had, adjustments included.
         let (catalogue, problems) = Catalogue::builtin().extended([("night-shift.json", text.as_str())]);

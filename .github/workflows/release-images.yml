@@ -18,6 +18,10 @@ env:
   TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
 
 jobs:
+  release-tests:
+    name: Release tests
+    uses: ./.github/workflows/release-tests.yml
+
   checks:
     name: Checks
     runs-on: ubuntu-latest
@@ -37,7 +41,7 @@ jobs:
 
   build:
     name: ${{ matrix.image.name }} ${{ matrix.arch.name }}
-    needs: checks
+    needs: [checks, release-tests]
     strategy:
       fail-fast: false
       matrix:
@@ -73,6 +77,14 @@ jobs:
             printf '%s' "${REGISTRY_TOKEN}" | docker login "${REGISTRY}" --username "${GITHUB_ACTOR_NAME}" --password-stdin
             docker push "${reference}"
           fi
+      - name: Build evidence
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          echo "### ${{ matrix.image.name }} ${{ matrix.arch.name }}: ${JOB_STATUS}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: ${GITHUB_SHA}; ref: ${GITHUB_REF_NAME}" >> "$GITHUB_STEP_SUMMARY"
+          docker image ls --format '{{.Repository}}:{{.Tag}} {{.ID}}' | grep "repomemo-${{ matrix.image.name }}" >> "$GITHUB_STEP_SUMMARY" || echo "Image unavailable" >> "$GITHUB_STEP_SUMMARY"
 
   manifest:
     name: ${{ matrix.image }} tags

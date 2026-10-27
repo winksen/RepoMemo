@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.70 (2026-10-27)
+
+Distribution workflows now run web and Rust tests on the exact commit before they build or publish.
+
+### Added
+- A reusable `release-tests.yml` gate runs `npm run test:web` and `cargo test --workspace --exclude repomemo-desktop --locked`. The image, archive, Windows, Linux and macOS workflows require it before their build jobs. Each test job reports the commit and result in its GitHub summary.
+- Each platform build reports its job result, commit and artifact name with its checksum list (or image ID), or says the artifact is unavailable. The build jobs report failures as well as passes.
+
+### Fixed
+- The local Rust gate found an AI endpoint policy mismatch, an incorrect PDF preview for invalid files, and upload attempts that counted against the hourly quota even when storage limits refused them. Those paths now enforce the intended behavior.
+- Updated server tests whose fixtures or assertions no longer matched the current API, configuration validation, and inherited organization access.
+
+### Changed
+- `container:check` verifies that the five distribution workflows still call the gate before building and produce an evidence summary. Set the version to `0.4.70` everywhere. Updated the roadmap and release index.
+
+### Checks
+- **Pass:** `container:check`, `version:check`, `docs:check`, `pins:test`, `cargo fmt --all --check`, `npm run test:web` (88 files, 476 tests), and `cargo test --workspace --exclude repomemo-desktop --locked` with incremental compilation disabled. The workflow runs themselves require a pushed ref and have not run here.
+
+### Upgrading
+- Nothing to do. The release workflows perform more tests before producing artifacts.
+
 ## V0.4.69 (2026-10-27)
 
 The web test suite completes locally: 88 files and 476 tests pass.
