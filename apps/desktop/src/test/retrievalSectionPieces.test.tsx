@@ -64,7 +64,7 @@ describe("retrieval on the shared pieces", () => {
     const search = { id: "s1", name: "Auth flow", query: "login", artifact_types: [], languages: [], source_ids: [], result_limit: 20, shared: false, created_by: { id: "u1" } };
     saved.list = [search];
     vi.mocked(setSharedSavedSearchSharing).mockResolvedValue({ ...search, shared: true } as never);
-    vi.mocked(searchSharedWorkspace).mockResolvedValue({ results: [], semanticAvailable: false });
+    vi.mocked(searchSharedWorkspace).mockResolvedValue({ results: [], semanticAvailable: false, timedOut: false });
     render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
     await waitFor(() => expect(setSharedSavedSearchSharing).toHaveBeenCalledWith("t", "s1", true));
@@ -76,6 +76,7 @@ describe("retrieval on the shared pieces", () => {
     window.history.replaceState(null, "", "/workspaces/w1/retrieval?q=login&limit=10");
     vi.mocked(searchSharedWorkspace).mockResolvedValue({
       semanticAvailable: false,
+      timedOut: false,
       results: [{ artifact_id: "a1", chunk_id: "c1", title: "Login", path: "auth.md", artifact_type: "markdown_doc", language: null, snippet: "login", start_line: 3, end_line: 3, score: 1, source_name: "Docs", match_kind: "keyword", commit: null, last_author: null, last_changed_at: null }],
     });
     render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
@@ -84,5 +85,13 @@ describe("retrieval on the shared pieces", () => {
     expect(window.location.search).toContain("limit=10");
     expect(await screen.findByText(/Keyword match: “login” · auth.md/)).toBeTruthy();
     expect(screen.getByText(/Semantic search is unavailable/)).toBeTruthy();
+  });
+
+  it("explains a timed-out search without presenting an empty result as complete", async () => {
+    window.history.replaceState(null, "", "/workspaces/w1/retrieval?q=broad");
+    vi.mocked(searchSharedWorkspace).mockResolvedValue({ results: [], semanticAvailable: false, timedOut: true });
+    render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
+    expect(await screen.findByText(/Search timed out after five seconds/)).toBeTruthy();
+    expect(screen.queryByText("Search the evidence base")).toBeNull();
   });
 });

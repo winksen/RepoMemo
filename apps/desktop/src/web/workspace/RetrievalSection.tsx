@@ -32,6 +32,9 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
   const urlFilters = new URLSearchParams(window.location.search);
   const initialUrlSearch = useRef(urlFilters.has("q"));
   const [semanticAvailable, setSemanticAvailable] = useState<boolean | null>(null);
+  const [searchTimedOut, setSearchTimedOut] = useState(false);
+  const searchAbort = useRef<AbortController | null>(null);
+  useEffect(() => () => searchAbort.current?.abort(), []);
   const [resultsPage, setResultsPage] = useS("resultsPage", 0);
   const [results, setResults] = useS<SearchResult[]>("results", []);
   const [query, setQuery] = useS("query", urlFilters.get("q") ?? "");
@@ -75,10 +78,14 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
 
   async function performSearch() {
     if (!query.trim()) return;
+    searchAbort.current?.abort();
+    const controller = new AbortController();
+    searchAbort.current = controller;
     setIsSubmitting(true); setError(null);
     try {
       const found = await searchSharedWorkspace(accessToken, workspace.workspace.id, {
         query,
+        signal: controller.signal,
         artifactTypes: retrievalArtifactType === "all" ? [] : [retrievalArtifactType],
         languages: retrievalLanguage === "all" ? [] : [retrievalLanguage],
         sourceIds: retrievalSourceId === "all" ? [] : [retrievalSourceId],
@@ -88,9 +95,11 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
         modifiedAfter: retrievalAfter || null,
         modifiedBefore: retrievalBefore || null,
       });
+      if (searchAbort.current !== controller) return;
       setResults(found.results);
       setSemanticAvailable(found.semanticAvailable);
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+      setSearchTimedOut(found.timedOut);
+    } catch (requestError) { if (!controller.signal.aborted) setError(apiMessage(requestError)); } finally { if (searchAbort.current === controller) { searchAbort.current = null; setIsSubmitting(false); } }
   }
   function runSearch(event: FormEvent<HTMLFormElement>) { event.preventDefault(); void performSearch(); }
 
@@ -105,6 +114,7 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
     setRetrievalBefore("");
     setResults([]);
     setSemanticAvailable(null);
+    setSearchTimedOut(false);
   }
 
   async function runSymbolSearch(event: FormEvent<HTMLFormElement>) {
@@ -126,11 +136,13 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
   }
 
   async function applySavedSearch(saved: SavedSearch) {
+    searchAbort.current?.abort();
+    searchAbort.current = null;
     setQuery(saved.query); setRetrievalArtifactType(saved.artifact_types[0] ?? "all"); setRetrievalLanguage(saved.languages[0] ?? "all"); setRetrievalSourceId(saved.source_ids[0] ?? "all"); setRetrievalLimit(String(saved.result_limit)); setResults([]);
     setIsSubmitting(true); setError(null);
     try {
       const found = await searchSharedWorkspace(accessToken, workspaceId, { query: saved.query, artifactTypes: saved.artifact_types, languages: saved.languages, sourceIds: saved.source_ids, limit: saved.result_limit });
-      setResults(found.results); setSemanticAvailable(found.semanticAvailable);
+      setResults(found.results); setSemanticAvailable(found.semanticAvailable); setSearchTimedOut(found.timedOut);
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
@@ -204,7 +216,7 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
               </article>)}</div> : <EmptyState description="Save a private query and its filters for recurring investigations. An owner can share it with the workspace." title="No saved searches" />}
               {canWrite ? <form className="shared-save-search-form" onSubmit={saveCurrentSearch}><Field label="Name for this search" required><Input onChange={(event) => setSavedSearchName(event.target.value)} placeholder="Search name" value={savedSearchName} /></Field><Button busy={isSubmitting} disabled={!query.trim()} type="submit" variant="secondary">Save private search</Button></form> : null}
             </section>
-            <div>{semanticAvailable === false ? <p className="shared-muted-copy" role="status">Semantic search is unavailable for this query. Results use keyword matches only.</p> : null}{results.length ? <div className="shared-search-results"><p className="shared-search-result-count">{results.length} matching evidence {results.length === 1 ? "result" : "results"}</p>{paginate(results, resultsPage).map((result) => <article key={result.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(result.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{result.title}</strong><span>{artifactTypeLabel(result.artifact_type, typeLabels)} · {result.language ?? "Unspecified"} · {result.source_name}</span></span><p>{renderHighlightedSnippet(result.snippet)}</p><span className="shared-search-result-path">{result.match_kind === "keyword_and_semantic" ? "Keyword and semantic match" : result.match_kind === "semantic" ? "Semantic match" : result.match_kind === "keyword" ? `Keyword match: “${query.trim()}”` : "Match type unavailable"} · {result.path}{citationLines(result)}{result.last_author ? ` · last changed by ${lastChangeLabel(result.last_author, result.last_changed_at)}` : ""}</span></Button></article>)}<Pagination onPageChange={setResultsPage} page={resultsPage} total={results.length} /></div> : <EmptyState description="Index one or more artifacts, then search the evidence base from here. Use filters to narrow large workspaces." title="Search the evidence base" />}
+            <div>{searchTimedOut ? <p className="shared-muted-copy" role="status">Search timed out after five seconds. Results are incomplete; narrow the query or filters and try again.</p> : semanticAvailable === false ? <p className="shared-muted-copy" role="status">Semantic search is unavailable for this query. Results use keyword matches only.</p> : null}{results.length ? <div className="shared-search-results"><p className="shared-search-result-count">{results.length} matching evidence {results.length === 1 ? "result" : "results"}</p>{paginate(results, resultsPage).map((result) => <article key={result.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(result.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{result.title}</strong><span>{artifactTypeLabel(result.artifact_type, typeLabels)} · {result.language ?? "Unspecified"} · {result.source_name}</span></span><p>{renderHighlightedSnippet(result.snippet)}</p><span className="shared-search-result-path">{result.match_kind === "keyword_and_semantic" ? "Keyword and semantic match" : result.match_kind === "semantic" ? "Semantic match" : result.match_kind === "keyword" ? `Keyword match: “${query.trim()}”` : "Match type unavailable"} · {result.path}{citationLines(result)}{result.last_author ? ` · last changed by ${lastChangeLabel(result.last_author, result.last_changed_at)}` : ""}</span></Button></article>)}<Pagination onPageChange={setResultsPage} page={resultsPage} total={results.length} /></div> : searchTimedOut ? null : <EmptyState description="Index one or more artifacts, then search the evidence base from here. Use filters to narrow large workspaces." title="Search the evidence base" />}
               <section className="shared-ask-evidence" aria-live="polite"><div><Brain size={ICON_SIZE.lg} /><h3>Ask your evidence</h3></div><p>Get a citation-backed answer from the indexed workspace context.</p><form onSubmit={askEvidence}><Field hint={submitHint("asks")} label="Question about the evidence" required><Textarea onChange={(event) => setAskQuestion(event.target.value)} placeholder="What do we know about the current implementation?" value={askQuestion} /></Field><Button busy={isSubmitting} type="submit" variant="secondary"><Brain size={ICON_SIZE.md} /> Ask</Button></form>{askAnswer ? <div className="shared-ask-answer"><p className="shared-ai-generated-note">AI-generated from the cited passages · verify against the sources</p><div className="shared-markdown shared-ai-answer"><SafeMarkdown>{askAnswer.answer_markdown}</SafeMarkdown></div>{askAnswer.warnings.length ? <div className="shared-ai-overview-warning">{askAnswer.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}{askAnswer.citations.length ? <EvidenceUsed accessToken={accessToken} citations={askAnswer.citations} numbered onOpenArtifact={onOpenArtifact} /> : null}<div className="shared-ai-actions"><Button disabled={isSubmitting} onClick={() => void exportAnswer()} type="button" variant="secondary">Export answer</Button>{canWrite && askAnswer.citations.length ? <Button disabled={isSubmitting} onClick={() => draftMemoryFromAnswer(askedQuestion || "Answer from workspace evidence", askAnswer.answer_markdown, "Ask your evidence", askAnswer.citations)} type="button" variant="secondary"><Shield size={ICON_SIZE.md} /> Save as memory</Button> : null}</div></div> : null}</section>
             </div></>
   );

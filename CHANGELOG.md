@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.81 (2026-10-27)
+
+Broad search requests now have a bounded response time and an explicit timeout state.
+
+### Changed
+- Workspace search has a five-second budget; cross-workspace search has ten seconds. Timed-out responses identify incomplete results.
+- Queries over 512 characters are refused; existing term and result limits remain in force.
+- The web client cancels superseded searches and suggests narrowing a timed-out query.
+
+### Checks
+- Server and web type checks, focused search UI/API tests, formatting and release checks pass.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.80 (2026-10-27)
 
 Large evidence and jobs lists now offer bounded cursor pages.

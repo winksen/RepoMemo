@@ -442,6 +442,7 @@ async fn embeddings_power_semantic_search_and_ask_gets_full_passages() {
     )
     .await;
     assert_eq!(response.headers()["x-repomemo-semantic-search"], "available");
+    assert_eq!(response.headers()["x-repomemo-query-state"], "complete");
     let results = read(response).await;
     assert_eq!(results[0]["match_kind"], "semantic");
     let top_two = [

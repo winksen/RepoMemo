@@ -112,6 +112,17 @@ async fn memory_cards_say_when_their_evidence_changed_and_citations_can_be_edite
         .status(),
         400
     );
+    assert_eq!(
+        send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/search"),
+            &owner,
+            json!({"query": "x".repeat(513)})
+        )
+        .await
+        .status(),
+        400,
+    );
     // Date and folder filters.
     assert!(search(json!({"query": "parcels", "modified_after": "2999-01-01"}))
         .await

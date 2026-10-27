@@ -1312,10 +1312,13 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
   /** `YYYY-MM-DD` */
   modifiedAfter?: string | null;
   modifiedBefore?: string | null;
-}): Promise<{ results: SearchResult[]; semanticAvailable: boolean | null }> {
+  signal?: AbortSignal;
+}): Promise<{ results: SearchResult[]; semanticAvailable: boolean | null; timedOut: boolean }> {
   let semanticAvailable: boolean | null = null;
+  let timedOut = false;
   return request<SearchResult[]>(`/v1/workspaces/${workspaceId}/search`, {
     method: "POST",
+    signal: input.signal,
     body: JSON.stringify({
       query: input.query,
       artifact_types: input.artifactTypes ?? [],
@@ -1330,7 +1333,8 @@ export function searchSharedWorkspace(accessToken: string, workspaceId: string, 
   }, accessToken, (response) => {
     const state = response.headers.get("x-repomemo-semantic-search");
     semanticAvailable = state === "available" ? true : state === "unavailable" ? false : null;
-  }).then((results) => ({ results, semanticAvailable }));
+    timedOut = response.headers.get("x-repomemo-query-state") === "timed_out";
+  }).then((results) => ({ results, semanticAvailable, timedOut }));
 }
 
 /** Searches every workspace the account can read; results are merged by score and name their workspace. */

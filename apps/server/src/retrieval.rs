@@ -9,6 +9,10 @@ const CROSS_SEARCH_DEFAULT_LIMIT: i64 = 20;
 const CROSS_SEARCH_MAX_LIMIT: i64 = 50;
 /// Memory cards in one search across workspaces.
 const CROSS_SEARCH_MEMORY_LIMIT: usize = 10;
+/// The HTTP search budget includes embedding, keyword, semantic and ranking work.
+const SEARCH_BUDGET: std::time::Duration = std::time::Duration::from_secs(5);
+const CROSS_SEARCH_BUDGET: std::time::Duration = std::time::Duration::from_secs(10);
+const SEARCH_MAX_QUERY_CHARS: usize = 512;
 
 /// A day filter written `YYYY-MM-DD`, or empty.
 fn check_day(day: &Option<String>) -> Result<(), ApiError> {
@@ -53,8 +57,13 @@ pub(crate) async fn search_all_workspaces(
     ReadingSubject(subject): ReadingSubject,
     State(state): State<AppState>,
     Json(request): Json<SearchAllRequest>,
-) -> Result<Json<CrossSearchResponse>, ApiError> {
+) -> Result<(HeaderMap, Json<CrossSearchResponse>), ApiError> {
     consume_heavy_quota(&state, &subject)?;
+    if request.query.chars().count() > SEARCH_MAX_QUERY_CHARS {
+        return Err(ApiError::bad_request(
+            "Search queries may contain at most 512 characters.",
+        ));
+    }
     check_lifecycle_statuses(&request.lifecycle_statuses)?;
     check_day(&request.modified_after)?;
     check_day(&request.modified_before)?;
@@ -69,7 +78,12 @@ pub(crate) async fn search_all_workspaces(
         request.memory_cards.unwrap_or(true) && request.artifact_types.is_empty() && request.languages.is_empty();
     let query = request.query.trim().to_owned();
     if query.is_empty() {
-        return Ok(Json(response));
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-repomemo-query-state"),
+            HeaderValue::from_static("complete"),
+        );
+        return Ok((headers, Json(response)));
     }
     let limit = request
         .limit
@@ -122,10 +136,23 @@ pub(crate) async fn search_all_workspaces(
         ));
         chosen.push((workspace, by_meaning_allowed));
     }
-    let outcomes = state
-        .core
-        .search_workspaces_detailed(inputs, CROSS_SEARCH_PARALLEL)
-        .await;
+    let outcomes = match tokio::time::timeout(
+        CROSS_SEARCH_BUDGET,
+        state.core.search_workspaces_detailed(inputs, CROSS_SEARCH_PARALLEL),
+    )
+    .await
+    {
+        Ok(outcomes) => outcomes,
+        Err(_) => {
+            response.not_searched += chosen.len() as i64;
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                HeaderName::from_static("x-repomemo-query-state"),
+                HeaderValue::from_static("timed_out"),
+            );
+            return Ok((headers, Json(response)));
+        }
+    };
     // (score, rank in its workspace, workspace name) order the merged list.
     let mut merged: Vec<(f64, usize, String, CrossSearchResult)> = Vec::new();
     for ((workspace, by_meaning_allowed), searched) in chosen.into_iter().zip(outcomes) {
@@ -209,7 +236,12 @@ pub(crate) async fn search_all_workspaces(
         .map(|(_, _, _, result)| result)
         .collect();
     record_timing("search_all", "all", started, response.results.len());
-    Ok(Json(response))
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        HeaderName::from_static("x-repomemo-query-state"),
+        HeaderValue::from_static("complete"),
+    );
+    Ok((headers, Json(response)))
 }
 
 pub(crate) async fn search_workspace(
@@ -220,6 +252,11 @@ pub(crate) async fn search_workspace(
 ) -> Result<(HeaderMap, Json<Vec<SearchResult>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
     consume_heavy_quota(&state, &subject)?;
+    if request.query.chars().count() > SEARCH_MAX_QUERY_CHARS {
+        return Err(ApiError::bad_request(
+            "Search queries may contain at most 512 characters.",
+        ));
+    }
     check_lifecycle_statuses(&request.lifecycle_statuses)?;
     for day in [&request.modified_after, &request.modified_before]
         .into_iter()
@@ -231,9 +268,9 @@ pub(crate) async fn search_workspace(
         }
     }
     let started = std::time::Instant::now();
-    let (result, semantic_available) = state
-        .core
-        .search_workspace_detailed(
+    let searched = tokio::time::timeout(
+        SEARCH_BUDGET,
+        state.core.search_workspace_detailed(
             SearchRequest {
                 workspace_id: workspace_id.clone(),
                 query: request.query,
@@ -247,14 +284,23 @@ pub(crate) async fn search_workspace(
                 modified_before: request.modified_before,
             },
             true,
-        )
-        .await
-        .map_err(map_core_error)?;
+        ),
+    )
+    .await;
+    let (result, semantic_available, timed_out) = match searched {
+        Ok(Ok((result, semantic_available))) => (result, semantic_available, false),
+        Ok(Err(error)) => return Err(map_core_error(error)),
+        Err(_) => (Vec::new(), false, true),
+    };
     record_timing("search", &workspace_id, started, result.len());
     let mut headers = HeaderMap::new();
     headers.insert(
         HeaderName::from_static("x-repomemo-semantic-search"),
         HeaderValue::from_static(if semantic_available { "available" } else { "unavailable" }),
+    );
+    headers.insert(
+        HeaderName::from_static("x-repomemo-query-state"),
+        HeaderValue::from_static(if timed_out { "timed_out" } else { "complete" }),
     );
     Ok((headers, Json(result)))
 }
