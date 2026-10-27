@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.86 (2026-10-27)
+
+Workspace navigation now leads with the sections used most often.
+
+### Changed
+- A persistent, keyboard accessible workspace switcher replaces the long rail list.
+- Search, evidence and review stay visible in the default workspace tabs; other sections remain in More, with the open section promoted.
+- The workspace bar names the current workspace and section.
+
+### Checks
+- Focused workspace navigation tests, type, style, version and documentation checks pass.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.85 (2026-10-27)
 
 The desktop private-CA relay has an end-to-end TLS regression.

@@ -1,12 +1,13 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../web/workspace/data", () => ({ useTemplate: vi.fn(), useReviewQueue: vi.fn() }));
 vi.mock("../web/router", async (original) => ({ ...(await original<typeof import("../web/router")>()), navigate: vi.fn() }));
 
-import type { SharedWorkspace, WorkspaceTemplateView } from "../types";
+import type { Organization, SharedWorkspace, WorkspaceTemplateView } from "../types";
 import { WORKSPACE_SECTIONS } from "../web/constants";
-import { WorkspaceTopbar } from "../web/Organization";
+import { OrganizationRail, WorkspaceTopbar } from "../web/Organization";
+import { OrganizationNavigationContext } from "../web/navigation";
 import { artifactKindLabel, artifactTypeLabel } from "../web/format";
 import { pageTitle } from "../web/pageTitle";
 import { paletteEntries } from "../web/paletteEntries";
@@ -28,9 +29,10 @@ const knowledgeBase = {
 };
 
 describe("arrangeSections", () => {
-  it("is the usual twelve in the usual order without a template, and ten for someone who does not administer", () => {
-    expect(arrangeSections(null, "overview", true)).toEqual({ tabs: [...WORKSPACE_SECTIONS], more: [] });
-    expect(arrangeSections(undefined, "overview", false).tabs).toEqual(WORKSPACE_SECTIONS.filter((section) => section !== "people" && section !== "settings"));
+  it("keeps search, evidence and review visible without a template, including the current section", () => {
+    expect(arrangeSections(null, "overview", true).tabs).toEqual(["overview", "retrieval", "evidence", "review"]);
+    expect(arrangeSections(undefined, "overview", false).more).toEqual(WORKSPACE_SECTIONS.filter((section) => !["overview", "retrieval", "evidence", "review", "people", "settings"].includes(section)));
+    expect(arrangeSections(null, "tasks", true).tabs).toEqual(["overview", "retrieval", "evidence", "review", "tasks"]);
   });
 
   it("follows the template's order and keeps its lesser sections for the More menu", () => {
@@ -67,6 +69,16 @@ describe("arrangeSections", () => {
     expect(both.more).toEqual(["map"]);
     expect(both.tabs).not.toContain("map");
   });
+});
+
+it("keeps a labelled workspace switcher available and opens the selected workspace", () => {
+  const navigation = { activeOrganizationId: null, isCreatingOrganization: false, selectOrganization: vi.fn(), startCreatingOrganization: vi.fn(), cancelOrganizationCreation: vi.fn() };
+  const second = { ...workspace("owner"), workspace: { ...workspace("owner").workspace, id: "w2", name: "Research" } };
+  render(<OrganizationNavigationContext.Provider value={navigation}><OrganizationRail organizations={[] as Organization[]} workspaceId="w1" workspaces={[workspace("owner"), second]} /></OrganizationNavigationContext.Provider>);
+  const switcher = screen.getByRole("combobox", { name: "Switch workspace" });
+  expect((switcher as HTMLSelectElement).value).toBe("w1");
+  fireEvent.change(switcher, { target: { value: "w2" } });
+  expect(navigate).toHaveBeenCalledWith("/workspaces/w2");
 });
 
 describe("landingSection", () => {
@@ -114,7 +126,7 @@ describe("the command palette's sections", () => {
   const labels = (entries: ReturnType<typeof paletteEntries>) => entries.filter((entry) => entry.group === "This workspace").map((entry) => entry.label);
 
   it("lists them in the usual order without a template", () => {
-    expect(labels(paletteEntries(input("owner")))).toEqual(["New note", "Overview", "Evidence", "Documents", "Repositories", "Retrieval", "Map", "Health", "Review queue", "Memory", "Tasks", "People", "Workspace settings"]);
+    expect(labels(paletteEntries(input("owner")))).toEqual(["New note", "Overview", "Retrieval", "Evidence", "Review queue", "Documents", "Repositories", "Map", "Health", "Memory", "Tasks", "People", "Workspace settings"]);
   });
 
   it("lists the tabs in the template's order and the sections kept under More after them", () => {
@@ -188,10 +200,10 @@ describe("the names a template gives", () => {
 describe("the workspace tabs", () => {
   const tabNames = () => screen.getAllByRole("button").map((button) => button.textContent?.replace("Admin", "").trim());
 
-  it("are in the usual order, with no More menu, while the workspace has no template", () => {
+  it("shows the high-use sections first while the workspace has no template", () => {
     vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), {} as never]);
     render(<WorkspaceTopbar accessToken="t" onNavigate={vi.fn()} workspace={workspace("owner")} />);
-    expect(tabNames()).toEqual(["Overview", "Evidence", "Documents", "Repositories", "Retrieval", "Map", "Health", "Review", "Memory", "Tasks", "People & Activity", "Settings"]);
+    expect(tabNames()).toEqual(["Overview", "Retrieval", "Evidence", "Review", "More"]);
   });
 
   it("follow the template and end with a More menu for what it keeps out of the row", () => {

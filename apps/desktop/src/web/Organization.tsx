@@ -22,7 +22,6 @@ import { apiMessage } from "./format";
 import { navigate, workspaceHomePath } from "./router";
 import { useOrganizationNavigation } from "./navigation";
 import { ICON_SIZE } from "../components/ui/icon";
-import { WorkspaceIcon } from "./workspaceIcons";
 
 export function OrganizationAdministration({
   accessToken,
@@ -124,13 +123,14 @@ export function OrganizationRail({
 
   return <div className="shared-rail-navigation">
     {workspaces ? <section className="shared-rail-workspaces" aria-label="Workspaces">
-      <p className="shared-eyebrow">Workspaces</p>
-      {workspaces.length ? <div className="shared-rail-list">{workspaces.map((workspace) => {
+      <label className="shared-eyebrow" htmlFor="shared-workspace-switcher">Workspace</label>
+      {workspaces.length ? <select aria-label="Switch workspace" className="shared-workspace-switcher" id="shared-workspace-switcher" onChange={(event) => navigate(workspaceHomePath(event.target.value))} value={workspaceId ?? ""}>
+        {!workspaceId ? <option value="">Choose a workspace</option> : null}
+        {workspaces.map((workspace) => {
         const organization = organizations.find((entry) => entry.id === workspace.organization_id);
         const label = organizations.length > 1 ? `${organization?.name ?? "Organization"} / ${workspace.workspace.name}` : workspace.workspace.name;
-        const isCurrent = workspace.workspace.id === workspaceId;
-        return <Button aria-current={isCurrent ? "page" : undefined} className={`shared-rail-workspace${isCurrent ? " active" : ""}`} key={workspace.workspace.id} onClick={() => navigate(workspaceHomePath(workspace.workspace.id))} type="button" variant="secondary"><WorkspaceIcon size={ICON_SIZE.md} workspace={workspace.workspace} /><span>{label}</span></Button>;
-      })}</div> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
+        return <option key={workspace.workspace.id} value={workspace.workspace.id}>{label}</option>;
+      })}</select> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
     </section> : null}
     {canManageOrganizations ? <section className="shared-rail-organizations" aria-label="Organization management">
       <p className="shared-eyebrow">Organizations</p>
@@ -189,6 +189,7 @@ export function WorkspaceTopbar({
   };
 
   return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
+    <span className="shared-workspace-location" title={workspace.workspace.name}>{workspace.workspace.name}<span aria-hidden="true"> / </span>{nameOf(activeSection)}</span>
     <div className="shared-workspace-tabs">
       {tabs.map(workspaceTab)}
       {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: section === "review" && waiting > 0 ? `${nameOf(section)} (${waiting})` : nameOf(section), onSelect: () => onNavigate(section), section }))} /> : null}

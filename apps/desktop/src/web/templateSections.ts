@@ -16,10 +16,16 @@ export function landingSection(sections: Pick<TemplateSections, "landing"> | nul
  * Arranges the sections as the workspace's template asks. The template is only an order: a section it does not
  * name still has a tab, one this client has no page for is ignored, the administrators' sections stay for
  * administrators, and the section that is open is always a tab even when the template keeps it under *More*.
- * Without a template (not loaded yet, or an older server) it is the usual twelve in the usual order.
+ * Without a template, keep the highest-use destinations visible and group the rest under More.
  */
 export function arrangeSections(sections: TemplateSections | null | undefined, activeSection: WorkspaceSection, isWorkspaceAdmin: boolean): SectionArrangement {
   const allowed = (section: WorkspaceSection) => isWorkspaceAdmin || !ADMIN_WORKSPACE_SECTIONS.has(section);
+  if (!sections) {
+    const tabs: WorkspaceSection[] = ["overview", "retrieval", "evidence", "review"];
+    const more = WORKSPACE_SECTIONS.filter((section) => allowed(section) && !tabs.includes(section));
+    if (more.includes(activeSection)) return { tabs: [...tabs, activeSection], more: more.filter((section) => section !== activeSection) };
+    return { tabs, more };
+  }
   let primary = (sections?.primary ?? []).filter(isSection).filter(allowed);
   let more = (sections?.more ?? []).filter(isSection).filter(allowed);
   primary = primary.filter((section, index) => primary.indexOf(section) === index && !more.includes(section));
