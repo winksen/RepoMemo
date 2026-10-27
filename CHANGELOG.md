@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.64 (2026-10-27)
+
+Every error a start and the first-run setup can raise has a sentence, a cause and a remedy, and CI keeps it so.
+
+### Added
+- **`docs/TROUBLESHOOTING.md`:** *The three checks* (`repomemo-server --check-config` and its exit codes, `/health` and `/health/ready`, *System › Overview* and *Logs*, `docker compose ps` and the JSON log); *The server will not start: settings* (every refused setting: the secrets, the files, the web folder, plain HTTP, the public address and origins, the proxies, the cookie, the product name, the document reader, the split folders, the absolute-path, yes/no and value rules, the backup keys); *folders* (a missing or misplaced folder, not writable, full, under the disk floor, on a network file system); *the database* (a database written by a newer release, by marker or by migration, and a failed migration); *The first-run setup* (the six sentences the setup answers with); and *Questions* (sign-in lost after a restart, provider keys missing, which version runs, the desktop app's configuration error, a private authority, checking a download, going back).
+- **`npm run troubleshooting:check`** (`scripts/check-troubleshooting.mjs`, four tests, in CI): reads the places the errors are raised (`config.rs`, `setup.rs`, `check_config.rs` and the storage crate's `newer.rs`: what `bail!`, `with_context`, `anyhow!`, `ApiError` and the folder check's errors and warnings are given) and **fails when a sentence is not quoted on the page**, so a new error cannot ship without its cause and remedy. It finds 40 today and all are quoted.
+
+### Changed
+- **`container:check`** requires CI to run the check and its tests, the script, and the page's six sections. **The documents:** the operations guide, the technical mindmap, the roadmap and the release index. **The version** is `0.4.64` everywhere.
+
+### Checks
+- **Run:** `troubleshooting:check` (40 errors, all listed), its tests (4 passed), `container:check`, `version:check`, `docs:check`.
+- **Not run:** each error was not provoked on a running server; the causes and remedies are read from the code and the guides. The check finds errors by the shape of the Rust that raises them, so an error raised another way is not seen by it.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.4.63 (2026-10-27)
 
 One page takes an administrator from "I want my team on the desktop app" to a working install, an update path and a way to remove it.

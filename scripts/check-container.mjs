@@ -588,6 +588,15 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// Troubleshooting (V0.4.64): the page lists every error a start and the first-run setup raise; CI runs the check and its tests.
+{
+  if (!ci.includes("node scripts/check-troubleshooting.mjs") || !ci.includes("check-troubleshooting.test.mjs")) problems.push("CI does not run the troubleshooting check and its tests");
+  if (!/"troubleshooting:check":/.test(read("package.json"))) problems.push("package.json has no troubleshooting:check script");
+  for (const heading of ["## The three checks", "## The server will not start: settings", "## The server will not start: folders", "## The server will not start: the database", "## The first-run setup", "## Questions"]) {
+    if (!read("docs/TROUBLESHOOTING.md").includes(heading)) problems.push(`docs/TROUBLESHOOTING.md lacks the section "${heading}"`);
+  }
+}
+
 // The parity check of the desktop app (V0.4.58) runs in CI with its tests, and its list exists.
 {
   if (!/node scripts\/check-desktop\.mjs/.test(ci) || !/check-desktop\.test\.mjs/.test(ci)) problems.push("CI does not run the desktop parity check and its tests");

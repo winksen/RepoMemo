@@ -61,6 +61,10 @@ jobs:
         run: node --test scripts/release-notes.test.mjs
       - name: The pinning rules refuse what they should
         run: node --test scripts/pins.test.mjs
+      - name: Every error of a start and the first-run setup is in the troubleshooting page
+        run: node scripts/check-troubleshooting.mjs
+      - name: The troubleshooting check finds what it should
+        run: node --test scripts/check-troubleshooting.test.mjs
       - name: The desktop app is still the web client (nothing for the desktop alone is unlisted)
         run: node scripts/check-desktop.mjs
       - name: The parity check refuses what it should
