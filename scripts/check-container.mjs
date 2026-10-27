@@ -588,6 +588,19 @@ if (!/\{\$REPOMEMO_HOST/.test(caddyfile)) problems.push("docker/Caddyfile.edge d
   }
 }
 
+// The deployment security pass (V0.4.65) and what it fixed stays fixed: the update signing key is a step's, the web image checks the
+// product name, a secret file has a limit, and the review is written down with none open at medium or above.
+{
+  const windows = workflows.find(([name]) => name === "desktop-windows.yml")?.[1] ?? "";
+  const jobEnv = windows.slice(0, windows.indexOf("    steps:")).replace(/HAS_SIGNING_KEY[^\n]*/g, "");
+  if (/TAURI_SIGNING_PRIVATE_KEY/.test(jobEnv)) problems.push("the update signing key is given to the whole Windows job; give it to the step that signs");
+  if (!read("docker/web-entrypoint.sh").includes("REPOMEMO_PRODUCT_NAME must be one line of 60 characters")) problems.push("the web image does not check the product name it puts into config.json");
+  if (!/MAX_SECRET_FILE_BYTES/.test(read("apps/server/src/config.rs"))) problems.push("a file given as a secret has no size limit");
+  const review = read("mindmap/security/2026-10-27-deployment-security-review.md");
+  const openRow = /^\| X\d+ \| (?:Critical|High|Medium) \|.*\| (?:Open|Not fixed)\b/im;
+  if (openRow.test(review) || !review.includes("**0 high, 1 medium, 2 low, 5 info:**")) problems.push("the deployment security review has a high or medium finding open, or its count is wrong");
+}
+
 // Troubleshooting (V0.4.64): the page lists every error a start and the first-run setup raise; CI runs the check and its tests.
 {
   if (!ci.includes("node scripts/check-troubleshooting.mjs") || !ci.includes("check-troubleshooting.test.mjs")) problems.push("CI does not run the troubleshooting check and its tests");

@@ -593,6 +593,9 @@ pub(crate) fn env_secret(name: &str) -> Result<Option<String>> {
     secret_from(name, env_text(name), env_text(&format!("{name}_FILE")))
 }
 
+/// The most a file given as a secret may hold.
+const MAX_SECRET_FILE_BYTES: u64 = 64 * 1024;
+
 fn secret_from(name: &str, value: Option<String>, file: Option<String>) -> Result<Option<String>> {
     let Some(path) = file else {
         return Ok(value);
@@ -600,7 +603,17 @@ fn secret_from(name: &str, value: Option<String>, file: Option<String>) -> Resul
     if value.is_some() {
         bail!("{name} and {name}_FILE are both set; give the secret one way only");
     }
-    let text = std::fs::read_to_string(&path).with_context(|| format!("{name}_FILE ({path}) could not be read"))?;
+    // A secret is a few lines: read at most a little more than the limit, so a path that names something huge (or endless) is
+    // refused instead of read whole into memory (V0.4.65).
+    let mut text = String::new();
+    std::fs::File::open(&path)
+        .and_then(|file| {
+            std::io::Read::read_to_string(&mut std::io::Read::take(file, MAX_SECRET_FILE_BYTES + 1), &mut text)
+        })
+        .with_context(|| format!("{name}_FILE ({path}) could not be read"))?;
+    if text.len() as u64 > MAX_SECRET_FILE_BYTES {
+        bail!("{name}_FILE ({path}) is larger than 64 KiB; a secret is a few lines");
+    }
     let text = text.trim();
     if text.is_empty() {
         bail!("{name}_FILE ({path}) is empty");
@@ -646,6 +659,24 @@ mod secret_tests {
             .to_string()
             .contains("REPOMEMO_BACKUP_KEY and REPOMEMO_BACKUP_KEY_FILE are both set"));
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn a_file_far_bigger_than_a_secret_is_refused_unread() {
+        let path = secret_file(&"x".repeat(70 * 1024));
+        let error = secret_from("REPOMEMO_BACKUP_KEY", None, Some(path.display().to_string())).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("is larger than 64 KiB; a secret is a few lines"));
+        std::fs::remove_file(path).unwrap();
+        let small = secret_file(&"y".repeat(60 * 1024));
+        assert_eq!(
+            secret_from("REPOMEMO_BACKUP_KEY", None, Some(small.display().to_string()))
+                .unwrap()
+                .map(|text| text.len()),
+            Some(60 * 1024)
+        );
+        std::fs::remove_file(small).unwrap();
     }
 
     #[test]

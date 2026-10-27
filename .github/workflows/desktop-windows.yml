@@ -32,8 +32,6 @@ jobs:
       HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
       # Updates (V0.4.56) are signed only when the repository has the signing key; the app carries the matching public key.
       HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       REPOMEMO_UPDATE_PUBKEY: ${{ vars.REPOMEMO_UPDATE_PUBKEY }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -66,6 +64,10 @@ jobs:
       - name: Build the app and the per-person installer (WebView2 is fetched when it is missing)
         working-directory: apps/desktop
         shell: pwsh
+        # The update signing key is given to this step alone (V0.4.65): not to `npm ci`, whose install scripts run code of other people.
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           $extra = @()
           if ($env:HAS_SIGNING_KEY -eq 'true') { $extra += @('--config', 'src-tauri/tauri.updater.conf.json') }

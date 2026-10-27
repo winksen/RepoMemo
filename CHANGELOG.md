@@ -2,6 +2,31 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.65 (2026-10-27)
+
+A security pass over what 0.4.x added around the server and the client: one medium and two low findings, all fixed; none open.
+
+### Added
+- **[The review](mindmap/security/2026-10-27-deployment-security-review.md)** (the eighth pass): the cross-origin cookie, the web image and `config.json`, `_FILE` secrets, the release pipeline and the images, and the desktop app's configuration file, installers, links, relay, updates, signing and save dialog; by a static reading of the code and the workflows, with the existing checks read as part of it. **0 high, 1 medium, 2 low, 5 info.**
+
+### Fixed
+- **X1, medium:** the Windows workflow gave the update **signing private key** to every step of the job, `npm ci` (whose dependencies run install scripts) included. It is now given to the one build step that signs; `container:check` refuses it at job level. What remains (the Rust dependencies' build scripts run inside that step) is written down as accepted.
+- **X2, low:** the web image put `REPOMEMO_PRODUCT_NAME` into `/config.json` unchecked, and Caddy reads `{placeholders}` in a response at request time, so a name with `{env.…}` would have been answered to anyone. The entrypoint now refuses a quote, backslash, brace, dollar sign, backtick, control character, second line or more than 60 characters, and CI starts the image with three bad names and requires the refusal.
+- **X3, low:** a `NAME_FILE` secret was read whole with no limit. At most 64 KiB is read now and a larger file is refused by name; a test covers both sides.
+
+### Changed
+- **The troubleshooting page** lists the new refusals, and `troubleshooting:check` now also reads the web image's entrypoint (47 errors, all listed). **`container:check`** keeps the three fixes fixed and the review's count honest. **The documents:** the roadmap's list of reviews, the operations guide, the technical mindmap and the release index. **The version** is `0.4.65` everywhere.
+
+### Accepted and written down
+- X4 the signing key during the dependencies' build scripts; X5 a cookie request with no `Origin` (protected by the custom header and the preflight); X6 `locked` and the compiled-in address are policy, not a barrier against the person at the keyboard; X7 the tag holder can change the publishing workflow (protect the `v*` tags); X8 `curl | sh` for the quick start (the careful way is given first-class).
+
+### Checks
+- **Run:** `cargo clippy -p repomemo-server --all-targets -- -D warnings`, `cargo fmt --all`, `troubleshooting:check` and its tests, `container:check`, `version:check`, `docs:check`; the web image's name rule was exercised in a shell against nine names.
+- **Not run:** the new Rust test (compiled with clippy, not run), the web image itself, the workflow. Nothing was run against a live system.
+
+### Upgrading
+- Nothing to do. A web image given a product name with a quote, brace, dollar sign or backtick now refuses to start and says why; remove the character.
+
 ## V0.4.64 (2026-10-27)
 
 Every error a start and the first-run setup can raise has a sentence, a cause and a remedy, and CI keeps it so.

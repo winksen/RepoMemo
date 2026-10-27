@@ -31,6 +31,24 @@ if [ -n "$api_url" ]; then
 fi
 export REPOMEMO_WEB_API_ORIGIN
 
+# The product name goes into /config.json as it is, and Caddy reads {placeholders} in a response at run time, so it must be one short
+# line with no quote, backslash, brace, dollar sign or backtick (the server holds its own copy of this rule, V0.4.65).
+product_name="${REPOMEMO_PRODUCT_NAME:-}"
+if [ -n "$product_name" ]; then
+  case "$product_name" in
+    *'"'*|*\\*|*'{'*|*'}'*|*'$'*|*'`'*)
+      echo "repomemo-web: REPOMEMO_PRODUCT_NAME must be one line of 60 characters or fewer, with no quote, backslash, brace, dollar sign or backtick" >&2
+      exit 1
+      ;;
+  esac
+  # 60 characters at most; a character is up to four bytes, and the shell here counts bytes. A control character or a second line is refused.
+  if [ "${#product_name}" -gt 240 ] || [ "$(printf '%s
+' "$product_name" | wc -l)" -ne 1 ] || printf '%s' "$product_name" | LC_ALL=C grep -q '[[:cntrl:]]'; then
+    echo "repomemo-web: REPOMEMO_PRODUCT_NAME must be one line of 60 characters or fewer, with no quote, backslash, brace, dollar sign or backtick" >&2
+    exit 1
+  fi
+fi
+
 if [ -n "$upstream" ]; then
   case "$upstream" in
     *[!]A-Za-z0-9.:/_[-]*)

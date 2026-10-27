@@ -15,6 +15,7 @@ export const SOURCES = [
   "apps/server/src/setup.rs",
   "apps/server/src/check_config.rs",
   "crates/storage/src/newer.rs",
+  "docker/web-entrypoint.sh",
 ];
 
 const MIN_FRAGMENT = 14;
@@ -24,7 +25,7 @@ const LITERAL = String.raw`"((?:[^"\\]|\\.)*)"`;
 function staticPart(literal) {
   const text = literal.replace(/\\"/g, '"').replace(/\\n/g, " ").replace(/\\\\/g, "\\");
   // The longest piece between placeholders (`{name}`, `{}`): the words that stay the same whatever the value.
-  return text.split(/\{[^}]*\}/).map((piece) => piece.trim()).sort((a, b) => b.length - a.length)[0] ?? "";
+  return text.split(/\{[^}]*\}|\$\{?\w+\}?/).map((piece) => piece.trim()).sort((a, b) => b.length - a.length)[0] ?? "";
 }
 
 /** The fragments of error messages in some Rust source: what `bail!`, `with_context`, `anyhow!` and `ApiError::...` are given. */
@@ -36,6 +37,8 @@ export function errorFragments(source, { allFormats = false } = {}) {
     new RegExp(String.raw`anyhow!\(\s*` + LITERAL, "g"),
     new RegExp(String.raw`ApiError::(?:conflict|not_found|bad_request|forbidden_because|unauthorized|too_many_requests)\(\s*` + LITERAL, "g"),
   ];
+  // The web image's entrypoint refuses a setting by saying so on standard error.
+  patterns.push(new RegExp(String.raw`echo\s+"repomemo-web:\s*` + String.raw`((?:[^"\\]|\\.)*)"\s*>&2\s*;?\s*exit 1`, "g"));
   // The folder check says what is wrong, or doubtful, by pushing a `format!` onto its errors or its warnings.
   if (allFormats) patterns.push(new RegExp(String.raw`(?:errors|warnings)\s*\.push\(\s*format!\(\s*` + LITERAL, "g"));
   for (const pattern of patterns) {

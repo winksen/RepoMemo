@@ -247,6 +247,13 @@ jobs:
           test "$(curl --fail --silent http://127.0.0.1:8080/config.json)" = '{"apiUrl":"https://api.example.com","productName":"Acme Memo"}'
       - name: Compression
         run: curl --fail --silent --header 'Accept-Encoding: gzip' --dump-header gz.headers --output /dev/null http://127.0.0.1:8080/ && grep -qi '^content-encoding: ' gz.headers
+      - name: A product name that could break the page's configuration is refused at start (V0.4.65)
+        run: |
+          for name in 'a"b' 'a{env.HOME}b' 'a$b'; do
+            status=0
+            timeout 30 docker run --rm --env "REPOMEMO_PRODUCT_NAME=$name" repomemo-web:ci || status=$?
+            test "$status" = "1" || { echo "the web image did not refuse the name $name (exit $status)" >&2; exit 1; }
+          done
       - name: What the web image logged
         if: failure()
         run: docker logs web-ci

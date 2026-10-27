@@ -27,6 +27,7 @@ Printed as the first line of the log and on standard error; `--check-config` pri
 | `REPOMEMO_SETUP_CODE must contain at least 12 letters or digits` | A setup code of your own is too short. | Use 12 or more letters or digits, or leave it unset to have one printed in the log. |
 | `_FILE are both set; give the secret one way only` | A secret is given both directly and through its `NAME_FILE`. | Keep one. |
 | `) could not be read` | A `NAME_FILE` secret (or another named file) cannot be read. | Check the path inside the container, the mount and the file's owner (the server runs as user `10001`). |
+| `) is larger than 64 KiB; a secret is a few lines` | A `NAME_FILE` secret points at something far bigger than a secret (a wrong path, a device). | Point it at the file that holds the secret. |
 | `REPOMEMO_SMTP_CA_FILE (` … `could not be read` | The certificate file for the mail server cannot be read. | Fix the path or its permissions, or unset it. |
 | `) has no index.html; build the web app (npm run build) and give the dist folder` | `REPOMEMO_WEB_DIR` names a folder that is not the built web app. | Point it at the `web` folder of the unpacked archive (or `apps/desktop/dist`). |
 | `) is reachable from other machines over plain HTTP. Put a TLS reverse proxy in front and set REPOMEMO_PUBLIC_URL=https://… (or REPOMEMO_TRUST_PROXY=true), or set REPOMEMO_ALLOW_INSECURE_HTTP=true for a trusted network only.` | The server listens on all interfaces without TLS. | Put a front door in front ([FRONT_DOORS.md](FRONT_DOORS.md)); or, on a network you trust, allow plain HTTP. |
@@ -45,6 +46,19 @@ Printed as the first line of the log and on standard error; `--check-config` pri
 | `REPOMEMO_BACKUP_KEY_PREVIOUS must contain at least` | The old backup key is too short to be one. | Give the key as it was, or leave it unset. |
 | `REPOMEMO_BACKUP_KEY_PREVIOUS is the key before a change, so REPOMEMO_BACKUP_KEY must be set to the new one` | The old key is set but the new one is not. | Set `REPOMEMO_BACKUP_KEY` to the new key. |
 | `REPOMEMO_BACKUP_KEY_PREVIOUS is the same as REPOMEMO_BACKUP_KEY; leave it unset until the key changes` | Both keys are the same. | Unset the previous key. |
+
+## The web image will not start
+
+The web image checks its settings before it starts Caddy and says which one is wrong on standard error (`docker compose logs web`).
+
+| You see | Cause | Remedy |
+| --- | --- | --- |
+| `) may hold only letters, digits and . : / _ - [ ]` (after `REPOMEMO_WEB_API_URL`) | The API address holds a character that could widen the content security policy. | Give a plain address, `https://api.example.com`. |
+| `) must start with http:// or https://` | The API address has no scheme. | Add it. |
+| `) may hold only letters, digits and . : / _ - [ ] (host:port or http(s)://host:port)` (after `REPOMEMO_API_UPSTREAM`) | The upstream is not a host and port. | Give `server:3020`. |
+| `) has a path; give host:port or http(s)://host:port` | The upstream has a path in it. | Remove the path. |
+| `) has no port; give host:port` | The upstream has no port. | Add `:3020`. |
+| `REPOMEMO_PRODUCT_NAME must be one line of 60 characters or fewer, with no quote, backslash, brace, dollar sign or backtick` | The name shown in the browser tab would break the page's configuration (V0.4.65). | Use a plain one-line name. |
 
 ## The server will not start: folders
 
