@@ -7,7 +7,7 @@ import {
 import { DEFAULT_PAGE_SIZE } from "../../components/ui/pagination";
 import { categoryKind, documentCategory, DOCUMENT_KIND } from "../../lib/evidenceView";
 import { type FileCategory } from "../constants";
-import { useCallback, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import { serverKeys, workspaceKeys } from "../../lib/queryClient";
 import { useServerState } from "../../lib/useServerState";
 import {
@@ -75,7 +75,7 @@ export function useMetrics(accessToken: string, workspaceId: string) {
 }
 
 /** The newest files of the workspace (one page) and how many files it has in all. */
-export type ArtifactWindow = { items: ArtifactSummary[]; total: number };
+export type ArtifactWindow = { items: ArtifactSummary[]; total: number; nextCursor?: string | null };
 
 /**
  * The files a workspace page holds: the newest `ARTIFACT_WINDOW`, one request, which a live event
@@ -109,15 +109,29 @@ export function useEvidencePage(accessToken: string, workspaceId: string, view: 
   const empty = view.documentsOnly && view.categories.length > 0 && documentCategories.length === 0;
   const chosen = view.documentsOnly ? documentCategories : view.categories;
   const kinds = chosen.length ? chosen.map(categoryKind) : view.documentsOnly ? [DOCUMENT_KIND] : [];
-  return useServerState<ArtifactWindow>({
+  const filterKey = JSON.stringify([workspaceId, view.query, chosen, view.folderId, view.documentsOnly]);
+  const [cursorState, setCursorState] = useState<{ key: string; values: (string | null)[] }>({ key: filterKey, values: [null] });
+  const cursor = cursorState.key === filterKey ? cursorState.values[view.page] ?? null : null;
+  const response = useServerState<ArtifactWindow>({
     key: [...workspaceKeys.artifacts(workspaceId), "evidence", { ...view, categories: chosen }],
     fetch: () => querySharedArtifactPage(accessToken, workspaceId, {
-      query: view.query, kinds, folderId: view.folderId, ledgerOnly: true, limit: DEFAULT_PAGE_SIZE, offset: view.page * DEFAULT_PAGE_SIZE,
+      query: view.query, kinds, folderId: view.folderId, ledgerOnly: true, limit: DEFAULT_PAGE_SIZE, offset: cursor ? 0 : view.page * DEFAULT_PAGE_SIZE, cursor,
     }),
     initial: { items: [], total: 0 },
     enabled: !empty,
-    keepPrevious: true,
   });
+  useEffect(() => {
+    const nextCursor = response[0].nextCursor;
+    if (!nextCursor) return;
+    setCursorState((current) => {
+      const values = current.key === filterKey ? current.values : [null];
+      if (values[view.page + 1] === nextCursor) return current;
+      const updated = values.slice(0, view.page + 1);
+      updated[view.page + 1] = nextCursor;
+      return { key: filterKey, values: updated };
+    });
+  }, [filterKey, response[0].nextCursor, view.page]);
+  return response;
 }
 
 /** The files whose name or path holds `text`, from the server, newest first: how a workspace with more files than a page is searched. */

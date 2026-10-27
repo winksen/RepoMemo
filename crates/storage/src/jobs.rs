@@ -294,8 +294,44 @@ impl StorageEngine {
             builder.push(" AND status = ").push_bind(status.to_owned());
         }
         builder.push(" ORDER BY created_at DESC, id DESC LIMIT ");
-        builder.push_bind(limit.clamp(1, 200));
+        builder.push_bind(limit.clamp(1, 201));
 
+        let rows = builder
+            .build_query_as::<IndexingJobRow>()
+            .fetch_all(self.reader())
+            .await?;
+        Ok(rows.into_iter().map(IndexingJobStatus::from).collect())
+    }
+
+    /// A stable page of filtered jobs after the supplied job ID.
+    pub async fn list_workspace_jobs_after(
+        &self,
+        workspace_id: &str,
+        kind: Option<&str>,
+        status: Option<&str>,
+        after_id: &str,
+        limit: i64,
+    ) -> Result<Vec<IndexingJobStatus>> {
+        let mut builder = QueryBuilder::<Sqlite>::new(
+            "SELECT id, workspace_id, source_id, kind, status, stage, progress_current, progress_total, error_message, cancel_requested, created_at, updated_at FROM indexing_jobs WHERE workspace_id = ",
+        );
+        builder.push_bind(workspace_id.to_owned());
+        if let Some(kind) = kind {
+            builder.push(" AND kind = ").push_bind(kind.to_owned());
+        }
+        if let Some(status) = status {
+            builder.push(" AND status = ").push_bind(status.to_owned());
+        }
+        builder
+            .push(" AND EXISTS (SELECT 1 FROM indexing_jobs cursor WHERE cursor.id = ")
+            .push_bind(after_id.to_owned());
+        builder
+            .push(" AND cursor.workspace_id = ")
+            .push_bind(workspace_id.to_owned());
+        builder.push(" AND (indexing_jobs.created_at < cursor.created_at OR (indexing_jobs.created_at = cursor.created_at AND indexing_jobs.id < cursor.id)))");
+        builder
+            .push(" ORDER BY created_at DESC, id DESC LIMIT ")
+            .push_bind(limit.clamp(1, 201));
         let rows = builder
             .build_query_as::<IndexingJobRow>()
             .fetch_all(self.reader())

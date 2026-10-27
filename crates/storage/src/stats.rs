@@ -27,6 +27,7 @@ pub struct ArtifactQuery {
     /// A page of this many files; `None` returns every match.
     pub limit: Option<i64>,
     pub offset: i64,
+    pub after_id: Option<String>,
 }
 
 /// One kind of file: all of these hold together. A web view of the evidence section (Word files,
@@ -220,7 +221,12 @@ impl StorageEngine {
                FROM artifacts JOIN sources ON sources.id = artifacts.source_id"#,
         );
         push_artifact_filters(&mut rows, request);
-        rows.push(" ORDER BY artifacts.updated_at DESC, artifacts.path ASC");
+        if let Some(after_id) = &request.after_id {
+            rows.push(" AND EXISTS (SELECT 1 FROM artifacts cursor WHERE cursor.id = ")
+                .push_bind(after_id.clone());
+            rows.push(" AND cursor.workspace_id = artifacts.workspace_id AND (artifacts.updated_at < cursor.updated_at OR (artifacts.updated_at = cursor.updated_at AND artifacts.path > cursor.path) OR (artifacts.updated_at = cursor.updated_at AND artifacts.path = cursor.path AND artifacts.id > cursor.id)))");
+        }
+        rows.push(" ORDER BY artifacts.updated_at DESC, artifacts.path ASC, artifacts.id ASC");
         if let Some(limit) = request.limit {
             rows.push(" LIMIT ");
             rows.push_bind(limit.max(1));

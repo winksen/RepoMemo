@@ -873,8 +873,11 @@ export async function querySharedArtifactPage(accessToken: string, workspaceId: 
   ledgerOnly?: boolean;
   limit: number;
   offset: number;
-}): Promise<{ items: ArtifactSummary[]; total: number }> {
-  const response = await authFetch(`${API_URL}/v1/workspaces/${workspaceId}/artifacts/query?limit=${input.limit}&offset=${input.offset}`, {
+  cursor?: string | null;
+}): Promise<{ items: ArtifactSummary[]; total: number; nextCursor: string | null }> {
+  const params = new URLSearchParams({ limit: String(input.limit), offset: String(input.offset) });
+  if (input.cursor) params.set("cursor", input.cursor);
+  const response = await authFetch(`${API_URL}/v1/workspaces/${workspaceId}/artifacts/query?${params}`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({
@@ -891,7 +894,7 @@ export async function querySharedArtifactPage(accessToken: string, workspaceId: 
   }
   const items = await response.json() as ArtifactSummary[];
   const header = response.headers.get("X-Total-Count");
-  return { items, total: header === null || !Number.isFinite(Number(header)) ? items.length : Number(header) };
+  return { items, total: header === null || !Number.isFinite(Number(header)) ? items.length : Number(header), nextCursor: response.headers.get("X-Next-Cursor") };
 }
 
 export function querySharedArtifacts(accessToken: string, workspaceId: string, input: {
@@ -1691,6 +1694,20 @@ export function listSystemAuditEvents(accessToken: string): Promise<SystemAuditE
 export function listSystemJobs(accessToken: string, status?: string): Promise<SystemJob[]> {
   const query = status ? `?status=${encodeURIComponent(status)}&limit=100` : "?limit=100";
   return request<SystemJob[]>(`/v1/system/jobs${query}`, {}, accessToken);
+}
+
+export async function listSystemJobsPage(accessToken: string, status: string | undefined, cursor: string | null, limit = 24): Promise<{ items: SystemJob[]; total: number; nextCursor: string | null }> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (status) params.set("status", status);
+  if (cursor) params.set("cursor", cursor);
+  const response = await authFetch(`${API_URL}/v1/system/jobs?${params}`, { headers: { Accept: "application/json", Authorization: `Bearer ${accessToken}` } });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new SharedApiError(response.status, payload?.error?.message ?? `The shared API returned ${response.status}.`);
+  }
+  const items = await response.json() as SystemJob[];
+  const total = Number(response.headers.get("X-Total-Count"));
+  return { items, total: Number.isFinite(total) ? total : items.length, nextCursor: response.headers.get("X-Next-Cursor") };
 }
 
 export function getSystemMaintenance(accessToken: string): Promise<MaintenanceStatus> {

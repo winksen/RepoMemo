@@ -398,6 +398,44 @@ impl StorageEngine {
             .collect())
     }
 
+    pub async fn list_all_jobs_page(
+        &self,
+        status: Option<&str>,
+        after_id: Option<&str>,
+        limit: i64,
+    ) -> Result<(Vec<IndexingJobStatus>, i64)> {
+        let mut builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "SELECT id, workspace_id, source_id, kind, status, stage, progress_current, progress_total, error_message, cancel_requested, created_at, updated_at FROM indexing_jobs WHERE 1=1",
+        );
+        if let Some(status) = status {
+            builder.push(" AND status = ").push_bind(status.to_owned());
+        }
+        if let Some(after_id) = after_id {
+            builder
+                .push(" AND EXISTS (SELECT 1 FROM indexing_jobs cursor WHERE cursor.id = ")
+                .push_bind(after_id.to_owned());
+            builder.push(" AND (indexing_jobs.created_at < cursor.created_at OR (indexing_jobs.created_at = cursor.created_at AND indexing_jobs.id < cursor.id)))");
+        }
+        builder
+            .push(" ORDER BY created_at DESC, id DESC LIMIT ")
+            .push_bind(limit.clamp(1, 101));
+        let rows = builder
+            .build_query_as::<IndexingJobRow>()
+            .fetch_all(self.reader())
+            .await?;
+        let total = if let Some(status) = status {
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM indexing_jobs WHERE status = ?1")
+                .bind(status)
+                .fetch_one(self.reader())
+                .await?
+        } else {
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM indexing_jobs")
+                .fetch_one(self.reader())
+                .await?
+        };
+        Ok((rows.into_iter().map(IndexingJobStatus::from).collect(), total))
+    }
+
     /// Workspace names by id, to label jobs and usage rows.
     pub async fn workspace_names(&self) -> Result<BTreeMap<String, String>> {
         Ok(sqlx::query_as::<_, (String, String)>("SELECT id, name FROM workspaces")

@@ -20,7 +20,7 @@ use std::{
 
 use axum::{
     extract::{ConnectInfo, Path, Query, Request, State},
-    http::{header, HeaderValue, StatusCode},
+    http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
     Json,
@@ -1881,6 +1881,7 @@ pub(crate) async fn audit_events(
 pub(crate) struct JobsQuery {
     status: Option<String>,
     limit: Option<i64>,
+    cursor: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1894,24 +1895,44 @@ pub(crate) async fn jobs(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Query(query): Query<JobsQuery>,
-) -> Result<Json<Vec<SystemJob>>, ApiError> {
+) -> Result<(HeaderMap, Json<Vec<SystemJob>>), ApiError> {
     require_system_admin(&subject)?;
     let names = state.storage.workspace_names().await.map_err(map_storage_error)?;
-    let jobs = state
+    let limit = query.limit.unwrap_or(100).clamp(1, 100);
+    let (mut jobs, total) = state
         .storage
-        .list_all_jobs(
+        .list_all_jobs_page(
             query.status.as_deref().filter(|status| !status.is_empty()),
-            query.limit.unwrap_or(100),
+            query.cursor.as_deref(),
+            limit + 1,
         )
         .await
         .map_err(map_storage_error)?;
-    Ok(Json(
-        jobs.into_iter()
-            .map(|job| SystemJob {
-                workspace_name: names.get(&job.workspace_id).cloned(),
-                job,
-            })
-            .collect(),
+    let more = jobs.len() as i64 > limit;
+    jobs.truncate(limit as usize);
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        HeaderName::from_static("x-total-count"),
+        HeaderValue::from(total.max(0) as u64),
+    );
+    if more {
+        if let Some(last) = jobs.last() {
+            headers.insert(
+                HeaderName::from_static("x-next-cursor"),
+                HeaderValue::try_from(&last.id).map_err(|_| ApiError::bad_request("Invalid cursor"))?,
+            );
+        }
+    }
+    Ok((
+        headers,
+        Json(
+            jobs.into_iter()
+                .map(|job| SystemJob {
+                    workspace_name: names.get(&job.workspace_id).cloned(),
+                    job,
+                })
+                .collect(),
+        ),
     ))
 }
 

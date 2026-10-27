@@ -783,10 +783,11 @@ async fn execute(
                 Query(JobsQuery {
                     status: status.clone(),
                     limit: Some(line.limit(50)?),
+                    cursor: None,
                 }),
             )
             .await?
-            .0;
+            .1.0;
             let summary = format!(
                 "{} {}job(s), newest first.",
                 jobs.len(),

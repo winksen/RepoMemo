@@ -524,6 +524,7 @@ pub(crate) struct TokenGrant {
 pub(crate) struct PageQuery {
     pub(crate) limit: Option<usize>,
     pub(crate) offset: Option<usize>,
+    pub(crate) cursor: Option<String>,
 }
 
 pub(crate) const MAX_PAGE_SIZE: usize = 500;
@@ -571,4 +572,5 @@ pub(crate) struct JobsQuery {
     pub(crate) kind: Option<String>,
     pub(crate) status: Option<String>,
     pub(crate) limit: Option<i64>,
+    pub(crate) cursor: Option<String>,
 }

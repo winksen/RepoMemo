@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.80 (2026-10-27)
+
+Large evidence and jobs lists now offer bounded cursor pages.
+
+### Changed
+- Artifact and job list endpoints return a next cursor for stable, filtered paging; offset artifact requests remain supported.
+- Evidence and System jobs views load one server page at a time and retain previous-page cursors.
+- Artifact ordering now breaks timestamp and path ties by ID.
+
+### Checks
+- Storage cursor regressions, server and web type checks, UI tests and release checks pass.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.79 (2026-10-27)
 
 Answer and memory card Markdown exports carry portable citation provenance.

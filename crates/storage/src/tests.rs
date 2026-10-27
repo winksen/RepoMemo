@@ -703,6 +703,17 @@ async fn a_page_of_files_is_read_in_sql_with_the_total() {
     let (nothing, total) = storage.list_artifacts_page(&workspace.id, 50, 5_000).await.unwrap();
     assert_eq!((nothing.len(), total), (0, 2_100));
 
+    let (first_cursor_page, _) = storage.list_artifacts_page(&workspace.id, 25, 0).await.unwrap();
+    let second_cursor_page = storage
+        .list_artifacts_after(&workspace.id, &first_cursor_page[24].id, 25)
+        .await
+        .unwrap();
+    assert_eq!(second_cursor_page.len(), 25);
+    assert_eq!(second_cursor_page[0].id, all[25].id);
+    assert!(first_cursor_page
+        .iter()
+        .all(|item| second_cursor_page.iter().all(|next| next.id != item.id)));
+
     // Folders and repositories are looked up for the ids of a page only.
     let folder = storage.create_folder(&workspace.id, None, "Plans", None).await.unwrap();
     storage.set_artifact_folder(&first.id, Some(&folder.id)).await.unwrap();
@@ -715,6 +726,49 @@ async fn a_page_of_files_is_read_in_sql_with_the_total() {
 
     storage.pool.close().await;
     drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn job_cursor_pages_keep_filters_and_order() {
+    let (storage, data_dir) = temp_storage("job-cursor-pages").await;
+    let workspace = storage.create_workspace("Job pages").await.unwrap();
+    let other = storage.create_workspace("Other jobs").await.unwrap();
+    for _ in 0..5 {
+        storage
+            .create_job(&workspace.id, None, "embedding", "queued", None)
+            .await
+            .unwrap();
+    }
+    storage
+        .create_job(&workspace.id, None, "indexing", "queued", None)
+        .await
+        .unwrap();
+    storage
+        .create_job(&other.id, None, "embedding", "queued", None)
+        .await
+        .unwrap();
+    let first = storage
+        .list_workspace_jobs(&workspace.id, Some("embedding"), None, 2)
+        .await
+        .unwrap();
+    let second = storage
+        .list_workspace_jobs_after(&workspace.id, Some("embedding"), None, &first[1].id, 2)
+        .await
+        .unwrap();
+    assert_eq!((first.len(), second.len()), (2, 2));
+    assert!(first.iter().all(|item| second.iter().all(|next| next.id != item.id)));
+    let (system_first, total) = storage.list_all_jobs_page(Some("running"), None, 3).await.unwrap();
+    assert_eq!(total, 7);
+    let (system_next, _) = storage
+        .list_all_jobs_page(Some("running"), Some(&system_first[2].id), 3)
+        .await
+        .unwrap();
+    assert_eq!(system_next.len(), 3);
+    assert!(system_first
+        .iter()
+        .all(|item| system_next.iter().all(|next| next.id != item.id)));
+    storage.pool.close().await;
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
@@ -865,6 +919,21 @@ async fn the_artifact_query_filters_by_folder_repository_and_kind_and_folders_co
         (titles(found), total),
         (vec!["notes.txt".to_owned(), "plan.docx".to_owned()], 2)
     );
+    let (first, _) = ask(super::ArtifactQuery {
+        in_folder: Some(folder.id.clone()),
+        limit: Some(1),
+        ..base()
+    })
+    .await;
+    let (next, total) = ask(super::ArtifactQuery {
+        in_folder: Some(folder.id.clone()),
+        after_id: Some(first[0].id.clone()),
+        limit: Some(1),
+        ..base()
+    })
+    .await;
+    assert_eq!((next.len(), total), (1, 2));
+    assert_ne!(first[0].id, next[0].id);
     let (found, _) = ask(super::ArtifactQuery {
         top_level_only: true,
         ledger_only: true,

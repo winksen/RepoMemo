@@ -35,11 +35,32 @@ pub(crate) async fn list_artifacts(
         Some(limit) => (limit.clamp(1, MAX_PAGE_SIZE) as i64, false),
         None => (UNPAGED_ARTIFACT_CAP, true),
     };
-    let (artifacts, total) = state
-        .storage
-        .list_artifacts_page(&workspace_id, limit, page.offset.unwrap_or(0) as i64)
-        .await
-        .map_err(map_storage_error)?;
+    let (artifacts, total, next_cursor) = if let Some(cursor) = page.cursor.as_deref() {
+        let mut artifacts = state
+            .storage
+            .list_artifacts_after(&workspace_id, cursor, limit + 1)
+            .await
+            .map_err(map_storage_error)?;
+        let more = artifacts.len() as i64 > limit;
+        artifacts.truncate(limit as usize);
+        let next = more.then(|| artifacts.last().map(|item| item.id.clone())).flatten();
+        let (_, total) = state
+            .storage
+            .list_artifacts_page(&workspace_id, 0, 0)
+            .await
+            .map_err(map_storage_error)?;
+        (artifacts, total, next)
+    } else {
+        let (mut artifacts, total) = state
+            .storage
+            .list_artifacts_page(&workspace_id, limit + 1, page.offset.unwrap_or(0) as i64)
+            .await
+            .map_err(map_storage_error)?;
+        let more = artifacts.len() as i64 > limit;
+        artifacts.truncate(limit as usize);
+        let next = more.then(|| artifacts.last().map(|item| item.id.clone())).flatten();
+        (artifacts, total, next)
+    };
     let ids: Vec<String> = artifacts.iter().map(|summary| summary.id.clone()).collect();
     let folder_ids = state
         .storage
@@ -56,6 +77,12 @@ pub(crate) async fn list_artifacts(
         HeaderName::from_static("x-total-count"),
         HeaderValue::from(total.max(0) as u64),
     );
+    if let Some(cursor) = next_cursor {
+        headers.insert(
+            HeaderName::from_static("x-next-cursor"),
+            HeaderValue::try_from(cursor).map_err(|_| ApiError::bad_request("Invalid cursor"))?,
+        );
+    }
     if capped && total > limit {
         headers.insert(
             HeaderName::from_static("x-repomemo-truncated"),
@@ -492,17 +519,33 @@ pub(crate) async fn query_artifacts(
                     not_extensions: kind.not_extensions.into_iter().take(MAX_KIND_EXTENSIONS).collect(),
                 })
                 .collect(),
-            limit: Some(limit),
-            offset: page.offset.unwrap_or(0) as i64,
+            limit: Some(limit + 1),
+            offset: if page.cursor.is_some() {
+                0
+            } else {
+                page.offset.unwrap_or(0) as i64
+            },
+            after_id: page.cursor.clone(),
         })
         .await
         .map_err(map_storage_error)?;
+    let mut artifacts = artifacts;
+    let more = artifacts.len() as i64 > limit;
+    artifacts.truncate(limit as usize);
     record_timing("artifact_query", &workspace_id, started, artifacts.len());
     let mut headers = HeaderMap::new();
     headers.insert(
         HeaderName::from_static("x-total-count"),
         HeaderValue::from(total.max(0) as u64),
     );
+    if more {
+        if let Some(last) = artifacts.last() {
+            headers.insert(
+                HeaderName::from_static("x-next-cursor"),
+                HeaderValue::try_from(&last.id).map_err(|_| ApiError::bad_request("Invalid cursor"))?,
+            );
+        }
+    }
     if page.limit.is_none() && total > limit {
         headers.insert(
             HeaderName::from_static("x-repomemo-truncated"),
@@ -1064,15 +1107,39 @@ pub(crate) async fn list_workspace_jobs(
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Query(query): Query<JobsQuery>,
-) -> Result<Json<Vec<IndexingJobStatus>>, ApiError> {
+) -> Result<(HeaderMap, Json<Vec<IndexingJobStatus>>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
-    let limit = query.limit.unwrap_or(50);
-    state
-        .storage
-        .list_workspace_jobs(&workspace_id, query.kind.as_deref(), query.status.as_deref(), limit)
-        .await
-        .map(Json)
-        .map_err(map_storage_error)
+    let limit = query.limit.unwrap_or(50).clamp(1, 200);
+    let mut jobs = if let Some(cursor) = query.cursor.as_deref() {
+        state
+            .storage
+            .list_workspace_jobs_after(
+                &workspace_id,
+                query.kind.as_deref(),
+                query.status.as_deref(),
+                cursor,
+                limit + 1,
+            )
+            .await
+    } else {
+        state
+            .storage
+            .list_workspace_jobs(&workspace_id, query.kind.as_deref(), query.status.as_deref(), limit + 1)
+            .await
+    }
+    .map_err(map_storage_error)?;
+    let more = jobs.len() as i64 > limit;
+    jobs.truncate(limit as usize);
+    let mut headers = HeaderMap::new();
+    if more {
+        if let Some(last) = jobs.last() {
+            headers.insert(
+                HeaderName::from_static("x-next-cursor"),
+                HeaderValue::try_from(&last.id).map_err(|_| ApiError::bad_request("Invalid cursor"))?,
+            );
+        }
+    }
+    Ok((headers, Json(jobs)))
 }
 
 pub(crate) async fn get_job(
