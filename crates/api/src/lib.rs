@@ -722,18 +722,27 @@ impl RepoMemoCore {
             for evidence in detail.evidence {
                 if evidence.exists {
                     let location = match (evidence.start_line, evidence.end_line) {
-                        (Some(start), Some(end)) if start != end => format!(" lines {start}-{end}"),
-                        (Some(line), _) => format!(" line {line}"),
-                        _ => String::new(),
+                        (Some(start), Some(end)) if start != end => format!("lines {start}-{end}"),
+                        (Some(line), _) => format!("line {line}"),
+                        _ => evidence
+                            .heading_path
+                            .map(|heading| format!("section {heading}"))
+                            .unwrap_or_else(|| "whole artifact".to_owned()),
                     };
                     markdown.push_str(&format!(
-                        "\n- [{}]({}){}\n",
+                        "\n- [{}]({}) — artifact `{}`; source `{}`; {}; review: {}\n",
                         evidence.title.unwrap_or_else(|| "Untitled evidence".to_owned()),
                         evidence.path.unwrap_or_else(|| evidence.target_id.clone()),
+                        evidence.artifact_id.unwrap_or_else(|| evidence.target_id.clone()),
+                        evidence.source_id.unwrap_or_else(|| "unavailable".to_owned()),
                         location,
+                        evidence.review_status.unwrap_or_else(|| "active".to_owned()),
                     ));
                 } else {
-                    markdown.push_str(&format!("\n- Missing evidence ({})\n", evidence.target_id));
+                    markdown.push_str(&format!(
+                        "\n- MISSING SOURCE — {} `{}`; the linked source is no longer available.\n",
+                        evidence.target_type, evidence.target_id
+                    ));
                 }
             }
         }
@@ -1991,7 +2000,7 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
                 source: "manual".to_owned(),
                 confidence: None,
                 citations: vec![Citation {
-                    artifact_id: artifact.id,
+                    artifact_id: artifact.id.clone(),
                     chunk_id: None,
                     title: artifact.title,
                     path: artifact.path.clone(),
@@ -2009,6 +2018,9 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
         assert!(exported.contains("# Local-first decision"));
         assert!(exported.contains("## Evidence"));
         assert!(exported.contains(&artifact.path));
+        assert!(exported.contains(&format!("artifact `{}`", artifact.id)));
+        assert!(exported.contains(&format!("source `{}`", artifact.source_id)));
+        assert!(exported.contains("review: active"));
 
         drop(core);
         let _ = std::fs::remove_dir_all(data_dir);

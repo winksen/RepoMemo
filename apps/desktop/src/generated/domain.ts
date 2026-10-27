@@ -1038,6 +1038,9 @@ export interface MemoryEvidence {
   chunk_id: string | null;
   title: string | null;
   path: string | null;
+  source_id: string | null;
+  heading_path: string | null;
+  review_status: string | null;
   start_line: number | null;
   end_line: number | null;
   exists: boolean;

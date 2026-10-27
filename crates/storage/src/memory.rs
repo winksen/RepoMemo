@@ -143,6 +143,9 @@ impl StorageEngine {
               chunks.id AS chunk_id,
               artifacts.title AS title,
               artifacts.path AS path,
+              artifacts.source_id AS source_id,
+              chunks.heading_path AS heading_path,
+              lifecycle.status AS review_status,
               chunks.start_line AS start_line,
               chunks.end_line AS end_line,
               json_extract(links.metadata_json, '$.commit') AS "commit"
@@ -152,6 +155,7 @@ impl StorageEngine {
               WHEN links.to_type = 'artifact' THEN links.to_id
               ELSE chunks.artifact_id
             END
+            LEFT JOIN artifact_lifecycle lifecycle ON lifecycle.artifact_id = artifacts.id
             WHERE links.from_type = 'memory_card' AND links.from_id = ?1
             ORDER BY links.created_at ASC
             "#,

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.78` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.79` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -629,3 +629,7 @@ This gateway is the root of the functional mindmap. Each branch can grow into it
 | **Environment** | The folder under `workspace-data/` that holds all of one server's data. |
 | **Invitation link** | A one-time link for one email address and role, used to join a workspace or organization. |
 | **Personal access token** | A revocable `rmp_…` key that acts as its owner for scripts, CI and the terminal console. |
+
+### V0.4.79 portable citation exports
+
+Ask answers can be exported as Markdown. Each citation resolves its current source identifier, artifact ID, line range or section, and review state; unavailable or inaccessible sources get an explicit MISSING SOURCE marker. Memory card Markdown exports include the same provenance and mark removed links.
