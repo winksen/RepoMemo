@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.72 (2026-10-27)
+
+Recorded Windows desktop build and handout evidence, with explicit status for D1–D10.
+
+### Checked
+- `cargo test -p repomemo-desktop --locked` passed 38 tests; `desktop:test` passed 9 package tests, `desktop:parity:test` passed 6 tests, and `desktop:check` passed.
+- A fresh Windows x64 executable and unsigned NSIS installer built in an isolated target directory because an older desktop process was running from the normal release path. The installer SHA-256 is `2aca7af724d114c78582577b715683c494e6a2d2f8635d72f93916e6836a8d39`.
+- A `--from` handout produced a portable zip, configuration, installer and verified checksums. [The D1–D10 record](mindmap/technical/release-validation-0.4.72.md) marks live installation, private-CA relay, everyday flows and removal untested; signed updates are blocked on credentials, and Linux/macOS runs require those platforms.
+
+### Changed
+- Set version `0.4.72` everywhere and updated the roadmap, clean-install sheet, release index and mindmaps. No desktop behavior changed.
+
+### Upgrading
+- Nothing to do. The local validation artifacts are unsigned and were not published.
+
 ## V0.4.71 (2026-10-27)
 
 Recorded the first local container clean-install run for the 0.4.71 candidate.

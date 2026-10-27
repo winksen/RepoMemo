@@ -185,15 +185,15 @@ One row per step, one mark per cell: `ok`, or the finding (a finding that needs 
 | C7 Previews and monitoring | 2026-10-27 | Docker Desktop Linux | Not run; [evidence](release-validation-0.4.71.md#unrun-release-steps) | | |
 | C8 Direct install, Linux and Windows | 2026-10-27 | Windows host | Not run: release archives and Linux host absent; [evidence](release-validation-0.4.71.md#unrun-release-steps) | | |
 | C9 The release page | 2026-10-27 | Local checkout | Blocked: no published release page; [evidence](release-validation-0.4.71.md#unrun-release-steps) | No push or tag | |
-| D1 Windows installer | | | | | |
-| D2 A handout | | | | | |
-| D3 A bad file | | | | | |
-| D4 A private authority | | | | | |
-| D5 Everyday, saving, one window | | | | | |
-| D6 Notices and links | | | | | |
-| D7 Updates | | | | | |
-| D8 Removal | | | | | |
-| D9 Linux | | | | | |
-| D10 macOS | | | | | |
+| D1 Windows installer | 2026-10-27 | Windows x64 | Built unsigned installer; install not run; [evidence](release-validation-0.4.72.md#windows-build-and-tests) | Isolated target because an older app was running | |
+| D2 A handout | 2026-10-27 | Windows x64 | `--from` package and sums passed; preset build variant not run; [evidence](release-validation-0.4.72.md#handout-package) | Local test address | |
+| D3 A bad file | 2026-10-27 | Windows x64 | Configuration unit tests passed; live UI not run; [evidence](release-validation-0.4.72.md#windows-build-and-tests) | | |
+| D4 A private authority | 2026-10-27 | Windows x64 | PEM package tests passed; live relay not run; [evidence](release-validation-0.4.72.md#open-desktop-paths) | No private-CA test server | |
+| D5 Everyday, saving, one window | 2026-10-27 | Windows x64 | Not run; [evidence](release-validation-0.4.72.md#open-desktop-paths) | Existing app left undisturbed | |
+| D6 Notices and links | 2026-10-27 | Windows x64 | Not run; [evidence](release-validation-0.4.72.md#open-desktop-paths) | No live candidate session | |
+| D7 Updates | 2026-10-27 | Windows x64 | Blocked; [evidence](release-validation-0.4.72.md#open-desktop-paths) | Signing key and feed absent | |
+| D8 Removal | 2026-10-27 | Windows x64 | Not run; [evidence](release-validation-0.4.72.md#open-desktop-paths) | Candidate not installed | |
+| D9 Linux | 2026-10-27 | Windows x64 | Unavailable; [evidence](release-validation-0.4.72.md#open-desktop-paths) | Linux machine needed | |
+| D10 macOS | 2026-10-27 | Windows x64 | Unavailable; [evidence](release-validation-0.4.72.md#open-desktop-paths) | macOS machine needed | |
 
 When every row is `ok` with no workaround, record it in §4, tick the 0.4 boxes of the roadmap's checklist, and the next minor can be cut.
