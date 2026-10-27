@@ -215,6 +215,16 @@ pub fn start(origin: &str, certificates: Vec<reqwest::Certificate>) -> Result<Ro
 mod tests {
     use super::*;
 
+    use futures_util::stream;
+    use std::convert::Infallible;
+    use tokio_rustls::{
+        rustls::{
+            pki_types::{pem::PemObject, CertificateDer, PrivateKeyDer},
+            ServerConfig,
+        },
+        TlsAcceptor,
+    };
+
     const CA: &str = include_str!("../testdata/test-ca.pem");
 
     #[test]
@@ -273,5 +283,109 @@ mod tests {
         ] {
             assert!(!is_connection_header(name), "{name}");
         }
+    }
+
+    #[tokio::test]
+    async fn private_ca_relay_streams_uploads_and_events_without_following_redirects() {
+        let cert_pem = include_str!("../testdata/relay-localhost.pem");
+        let root_pem = include_str!("../testdata/relay-root.pem");
+        let key_pem = include_str!("../testdata/relay-localhost.key");
+        let certs = CertificateDer::pem_slice_iter(cert_pem.as_bytes())
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        let key = PrivateKeyDer::from_pem_slice(key_pem.as_bytes()).unwrap();
+        let config = ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs, key)
+            .unwrap();
+        let acceptor = TlsAcceptor::from(Arc::new(config));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("https://localhost:{}", listener.local_addr().unwrap().port());
+        let server = tokio::spawn(async move {
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let acceptor = acceptor.clone();
+                tokio::spawn(async move {
+                    let tls = acceptor.accept(stream).await.unwrap();
+                    let service = service_fn(|request: Request<Incoming>| async move {
+                        let path = request.uri().path().to_owned();
+                        let response = match path.as_str() {
+                            "/upload" => {
+                                let mut body = request.into_body();
+                                let mut uploaded = Vec::new();
+                                while let Some(frame) = body.frame().await {
+                                    if let Ok(data) = frame.unwrap().into_data() {
+                                        uploaded.extend_from_slice(&data);
+                                    }
+                                }
+                                Response::new(Full::new(Bytes::from(uploaded)).boxed())
+                            }
+                            "/events" => {
+                                let chunks = ["data: first\n\n", "data: second\n\n"];
+                                let body = StreamBody::new(stream::iter(
+                                    chunks.map(|chunk| Ok::<_, Infallible>(Frame::data(Bytes::from(chunk)))),
+                                ))
+                                .boxed();
+                                let mut response = Response::new(body);
+                                response
+                                    .headers_mut()
+                                    .insert("content-type", HeaderValue::from_static("text/event-stream"));
+                                response
+                            }
+                            "/redirect" => {
+                                let mut response = Response::new(Full::new(Bytes::new()).boxed());
+                                *response.status_mut() = StatusCode::FOUND;
+                                response
+                                    .headers_mut()
+                                    .insert("location", HeaderValue::from_static("https://foreign.example/steal"));
+                                response
+                            }
+                            _ => Response::new(Full::new(Bytes::new()).boxed()),
+                        };
+                        Ok::<_, Infallible>(response)
+                    });
+                    hyper::server::conn::http1::Builder::new()
+                        .serve_connection(TokioIo::new(tls), service)
+                        .await
+                        .unwrap();
+                });
+            }
+        });
+        let route = start(&origin, parse_bundle(root_pem.as_bytes()).unwrap()).unwrap();
+        let client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .unwrap();
+        let upload = client
+            .post(format!("{}/upload", route.proxy))
+            .header(TOKEN_HEADER, &route.token)
+            .body(reqwest::Body::wrap_stream(stream::iter([
+                Ok::<_, Infallible>(Bytes::from_static(b"first-")),
+                Ok(Bytes::from_static(b"second")),
+            ])))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(upload.status(), StatusCode::OK);
+        assert_eq!(upload.bytes().await.unwrap(), Bytes::from_static(b"first-second"));
+        let events = client
+            .get(format!("{}/events", route.proxy))
+            .header(TOKEN_HEADER, &route.token)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(events.headers()["content-type"], "text/event-stream");
+        assert_eq!(events.text().await.unwrap(), "data: first\n\ndata: second\n\n");
+        let redirect = client
+            .get(format!("{}/redirect", route.proxy))
+            .header(TOKEN_HEADER, &route.token)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(redirect.status(), StatusCode::FOUND);
+        assert_eq!(redirect.headers()["location"], "https://foreign.example/steal");
+        let denied = client.get(format!("{}/upload", route.proxy)).send().await.unwrap();
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        server.abort();
     }
 }

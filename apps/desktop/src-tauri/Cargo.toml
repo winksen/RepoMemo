@@ -44,3 +44,6 @@ keyring = { workspace = true, features = ["sync-secret-service", "crypto-rust"] 
 
 [build-dependencies]
 tauri-build.workspace = true
+
+[dev-dependencies]
+tokio-rustls = { version = "0.26.4", default-features = false, features = ["ring", "tls12"] }
