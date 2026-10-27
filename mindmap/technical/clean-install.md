@@ -176,15 +176,15 @@ One row per step, one mark per cell: `ok`, or the finding (a finding that needs 
 
 | Step | Date | Machine | Result | Workaround | Fixed in |
 |---|---|---|---|---|---|
-| C1 Fetch | | | | | |
-| C2 Initialise and start | | | | | |
-| C3 First-run setup and smoke test | | | | | |
-| C4 Verify the images | | | | | |
-| C5 Backups and volumes | | | | | |
-| C6 Upgrade and fall back | | | | | |
-| C7 Previews and monitoring | | | | | |
-| C8 Direct install, Linux and Windows | | | | | |
-| C9 The release page | | | | | |
+| C1 Fetch | 2026-10-27 | Windows Git Bash | Local package and tamper check passed; [evidence](release-validation-0.4.71.md#c1-local-package) | Local `file://` mirror | |
+| C2 Initialise and start | 2026-10-27 | Docker Desktop Linux | Local server and web images healthy, version 0.4.71; [evidence](release-validation-0.4.71.md#c2-local-stack) | Local build, no edge | |
+| C3 First-run setup and smoke test | 2026-10-27 | Docker Desktop Linux | Setup and 25/25 smoke checks passed; [evidence](release-validation-0.4.71.md#c3-first-run-smoke) | Pinned setup-code log fixed; smoke script updated | V0.4.71 |
+| C4 Verify the images | 2026-10-27 | Docker Desktop Linux | Blocked: no published image or attestation; [evidence](release-validation-0.4.71.md#unrun-release-steps) | No push or tag | |
+| C5 Backups and volumes | 2026-10-27 | Docker Desktop Linux | Four volumes restored into a second healthy stack; account and note found; [evidence](release-validation-0.4.71.md#c5-restore) | Git Bash path conversion disabled | |
+| C6 Upgrade and fall back | 2026-10-27 | Docker Desktop Linux | Blocked: published previous/current images absent; [evidence](release-validation-0.4.71.md#unrun-release-steps) | No push or tag | |
+| C7 Previews and monitoring | 2026-10-27 | Docker Desktop Linux | Not run; [evidence](release-validation-0.4.71.md#unrun-release-steps) | | |
+| C8 Direct install, Linux and Windows | 2026-10-27 | Windows host | Not run: release archives and Linux host absent; [evidence](release-validation-0.4.71.md#unrun-release-steps) | | |
+| C9 The release page | 2026-10-27 | Local checkout | Blocked: no published release page; [evidence](release-validation-0.4.71.md#unrun-release-steps) | No push or tag | |
 | D1 Windows installer | | | | | |
 | D2 A handout | | | | | |
 | D3 A bad file | | | | | |

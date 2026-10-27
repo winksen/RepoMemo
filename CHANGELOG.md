@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.71 (2026-10-27)
+
+Recorded the first local container clean-install run for the 0.4.71 candidate.
+
+### Fixed
+- A server pinned to an environment now prints its generated first-run setup code in the container logs, as the quick start directs.
+- The smoke script reads the current `workspace.id` response and reports an indexing timeout only when indexing actually times out.
+
+### Checked
+- The local compose package passed checksum verification and rejected a tampered archive without unpacking. Locally built server and web images became healthy; first-run setup and all 25 smoke checks passed.
+- A four-volume backup restored into a second stack. The original account signed in and its uploaded note was present. `cargo test -p repomemo-server --lib --locked` passed (245 tests; one existing ignored test); `version:check`, `container:check`, `pins:test` and `cargo fmt --all --check` passed.
+- [C1–C9 evidence](mindmap/technical/release-validation-0.4.71.md) records dates, platform, local image IDs and status. C4, C6 and C9 need published artifacts and a tag; C7 and C8 remain untested. Nothing was pushed.
+
+### Upgrading
+- Nothing to do. The setup-code fix applies when a new pinned environment starts without an explicit code.
+
 ## V0.4.70 (2026-10-27)
 
 Distribution workflows now run web and Rust tests on the exact commit before they build or publish.

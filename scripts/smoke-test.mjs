@@ -165,8 +165,8 @@ if (setupCode && email && password) {
   }
   check("an organization exists", Boolean(organization?.id), `status ${organizations.status}`);
   const workspace = await call("/v1/workspaces", { method: "POST", headers: jsonAuth, body: JSON.stringify({ organization_id: organization?.id, name: "Smoke Workspace" }) });
-  check("a workspace is made", workspace.status === 201 && Boolean(workspace.json?.id), `status ${workspace.status} ${workspace.json?.error?.message ?? ""}`);
-  const workspaceId = workspace.json?.id;
+  const workspaceId = workspace.json?.workspace?.id;
+  check("a workspace is made", workspace.status === 201 && Boolean(workspaceId), `status ${workspace.status} ${workspace.json?.error?.message ?? ""}`);
   if (workspaceId) {
     const note = "Deployment smoke note.\n\nThe quokka protocol keeps the containers honest: every release is started, used, backed up and restored.\n";
     const uploaded = await call(`/v1/workspaces/${workspaceId}/artifacts/upload`, {
@@ -181,7 +181,7 @@ if (setupCode && email && password) {
       pending = !Array.isArray(jobs.json) || jobs.json.some((job) => job.status === "pending" || job.status === "running") || jobs.json.length === 0;
       if (pending) await sleep(1000);
     }
-    check("the file is indexed", !pending, "the jobs never finished");
+    check("the file is indexed", !pending, pending ? "the jobs never finished" : "");
     let found = false;
     for (let attempt = 0; attempt < 30 && !found; attempt += 1) {
       const search = await call(`/v1/workspaces/${workspaceId}/search`, {

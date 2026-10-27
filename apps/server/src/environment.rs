@@ -202,6 +202,7 @@ impl Host {
                     EnvironmentState::Empty | EnvironmentState::Valid => {}
                 }
                 host.attach_dir(&dir).await?;
+                host.print_attached_code_banner(&dir);
             }
             None => {
                 if !host.reattach_remembered().await {
@@ -235,11 +236,8 @@ impl Host {
                 tracing::info!(target: "audit", environment = %name, "Attached the environment last chosen in the web app");
                 // The code still opens a first-run setup that was never
                 // finished, and the menu after a detach; print it as usual.
-                if self.config.setup_code.is_none() {
-                    eprintln!(
-                        "\n================================================================\n  RepoMemo attached {ENVIRONMENTS_DIR}/{name}, the environment last\n  chosen in the web app. Code for its first-run setup, or for the\n  environment menu after detaching:\n\n      {}\n\n  It changes every time the server starts.\n================================================================\n",
-                        display_code(&self.code)
-                    );
+                if let Ok(dir) = self.folder(&name) {
+                    self.print_attached_code_banner(&dir);
                 }
                 true
             }
@@ -269,6 +267,17 @@ impl Host {
             display_code(&self.code)
         );
         tracing::warn!(target: "audit", "No environment is attached: open the web app and enter the platform code printed on the console");
+    }
+
+    fn print_attached_code_banner(&self, dir: &Path) {
+        if self.config.setup_code.is_some() {
+            return;
+        }
+        eprintln!(
+            "\n================================================================\n  RepoMemo attached {}.\n  Code for its first-run setup, or for the environment menu:\n\n      {}\n\n  It changes every time the server starts.\n================================================================\n",
+            dir.display(),
+            display_code(&self.code)
+        );
     }
 
     /// Opens storage in `dir` and starts serving it. `dir` must already be
