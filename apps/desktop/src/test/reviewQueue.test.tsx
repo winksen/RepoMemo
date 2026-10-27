@@ -76,6 +76,19 @@ describe("ReviewQueuePanel", () => {
     expect(screen.queryByRole("list", { name: "Review queue" })).toBeNull();
   });
 
+  it("announces an unavailable queue and retries from the same keyboard reachable control", async () => {
+    vi.mocked(getSharedReviewQueue).mockRejectedValueOnce(new Error("Connection lost")).mockResolvedValue(queue);
+    panel();
+    expect(screen.getByRole("status").textContent).toContain("Reading the review queue");
+    expect((await screen.findByRole("alert")).textContent).toContain("Connection lost");
+    const retry = screen.getByRole("button", { name: "Try again" });
+    retry.focus();
+    fireEvent.click(retry);
+    await screen.findByText("Runbook");
+    expect(getSharedReviewQueue).toHaveBeenCalledTimes(2);
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
   it("snoozes an item until the day chosen, reads the list again and shares the answer with the tab", async () => {
     vi.mocked(snoozeSharedReviewItem).mockResolvedValue(undefined);
     const after: ReviewQueue = {

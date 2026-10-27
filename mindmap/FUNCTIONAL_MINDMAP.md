@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.89` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.90` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -682,3 +682,9 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 - Workspace, evidence and task screens say when data is loading or unavailable and provide a retry action.
 - Search distinguishes incomplete timed-out results from a complete empty search and offers a rerun.
 - Empty filtered evidence and task views offer Clear filters; Jobs distinguishes an empty queue from an unavailable list.
+
+## V0.4.90 — Accessible interaction
+
+- The narrow assistant opens as a named modal sheet. Tab stays inside it, and closing it returns focus to the opener.
+- Review loading and failed refreshes are announced inline with a retry action.
+- Reduced motion removes decorative transitions and animations while keeping state changes immediate. Automated contrast and keyboard checks cover light and dark themes; manual screen reader validation remains open because the local preview was unreachable.

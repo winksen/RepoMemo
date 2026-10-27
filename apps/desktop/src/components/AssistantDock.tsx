@@ -79,12 +79,20 @@ export function AssistantDock({ accessToken, onOpenArtifact, workspaceId }: { ac
     else if (returnFocus.current) { returnFocus.current = false; opener.current?.focus(); }
   }, [narrow, sheetOpen]);
 
-  function closeSheetWithEscape(event: KeyboardEvent<HTMLElement>) {
+  function handleSheetKeys(event: KeyboardEvent<HTMLElement>) {
     // Keys pressed in a menu or dialog the assistant opened (rendered elsewhere in the page) are theirs.
     if (event.key === "Escape" && narrow && sheetOpen && event.currentTarget.contains(event.target as Node)) {
       event.preventDefault();
       toggle(false);
     }
+    if (event.key !== "Tab" || !narrow || !sheetOpen) return;
+    const controls = Array.from(dock.current?.querySelectorAll<HTMLElement>("a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])") ?? [])
+      .filter((element) => !element.closest("[hidden]") && !element.classList.contains("shared-assistant-resize"));
+    if (!controls.length) { event.preventDefault(); dock.current?.focus(); return; }
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === dock.current)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dock.current)) { event.preventDefault(); first.focus(); }
   }
 
   function startResize(event: PointerEvent<HTMLDivElement>) {
@@ -113,7 +121,7 @@ export function AssistantDock({ accessToken, onOpenArtifact, workspaceId }: { ac
 
   return <>
     {narrow && sheetOpen ? <button aria-label="Close assistant" className="shared-assistant-backdrop" onClick={() => toggle(false)} tabIndex={-1} type="button" /> : null}
-    <aside aria-label="Workspace assistant" className={`shared-assistant-dock${isOpen ? "" : " collapsed"}${narrow ? " sheet" : ""}`} onKeyDown={closeSheetWithEscape} ref={dock} style={isOpen && !narrow ? { width } : undefined} tabIndex={narrow && sheetOpen ? -1 : undefined}>
+    <aside aria-label="Workspace assistant" aria-modal={narrow && sheetOpen ? true : undefined} className={`shared-assistant-dock${isOpen ? "" : " collapsed"}${narrow ? " sheet" : ""}`} onKeyDown={handleSheetKeys} ref={dock} role={narrow && sheetOpen ? "dialog" : undefined} style={isOpen && !narrow ? { width } : undefined} tabIndex={narrow && sheetOpen ? -1 : undefined}>
     {isOpen ? null : <Button aria-expanded={false} aria-label="Open assistant" onClick={() => toggle(true)} ref={opener} title="Open assistant" type="button" variant="secondary"><Expand size={ICON_SIZE.lg} /><Sparkles size={ICON_SIZE.md} /><span className="shared-assistant-fab-label">Assistant</span></Button>}
     <div className="shared-assistant-dock-body" hidden={!isOpen}>
       <div aria-label="Resize assistant" aria-orientation="vertical" aria-valuemax={MAX_WIDTH} aria-valuemin={MIN_WIDTH} aria-valuenow={width} className="shared-assistant-resize" onKeyDown={resizeWithKeys} onPointerDown={startResize} role="separator" tabIndex={0} />

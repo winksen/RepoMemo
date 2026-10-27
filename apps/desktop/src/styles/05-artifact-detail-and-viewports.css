@@ -36,15 +36,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 1ms !important;
-    transition-duration: 1ms !important;
-  }
-}
-
 /* ===== Narrow viewports ===== */
 @media (max-width: 1120px) {
   body {

@@ -458,12 +458,6 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 /* The skip link of a dialog sits at the corner of the dialog, which is its positioned box (V0.3.25). */
 .rm-dialog-skip { top: 6px; left: 6px; }
 
-/* People who ask their system for less motion get none, except the spinner that says work is going on. */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
-  .spin { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
-}
-
 /* In forced-colors (high contrast) modes the focus ring is the system's. */
 @media (forced-colors: active) {
   button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid Highlight; }

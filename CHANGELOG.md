@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.90 (2026-10-27)
+
+Accessibility fixes for the assistant and review queue.
+
+### Changed
+- The narrow assistant behaves as a named modal sheet with trapped Tab focus and focus return.
+- Review loading and fetch errors are announced inline with a retry action.
+- Reduced motion removes decorative animation and transition while retaining immediate feedback.
+
+### Checks
+- Focused keyboard and review tests, contrast audit in both themes, TypeScript and style checks pass. Manual browser and screen reader validation remains open because the local preview was unreachable.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.89 (2026-10-27)
 
 Workspace screens explain loading, partial results and failures with direct recovery.

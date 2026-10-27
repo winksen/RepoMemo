@@ -11,6 +11,7 @@ import type { ReviewItem, ReviewItemKind, ReviewQueue } from "../types";
 import { useLiveRefresh } from "../lib/liveEvents";
 import { queryClient, workspaceKeys } from "../lib/queryClient";
 import { Button } from "./ui/button";
+import { FeedbackNotice } from "./ui/feedback-notice";
 import { Dropdown } from "./ui/dropdown";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
@@ -74,16 +75,18 @@ export function ReviewQueuePanel({
 }) {
   const [queue, setQueue] = useState<ReviewQueue | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function load() {
     setIsRefreshing(true);
+    setLoadError(null);
     try {
       const next = await getSharedReviewQueue(accessToken, workspaceId);
       setQueue(next);
       // The Review tab's count reads the same answer.
       queryClient.setQueryData(workspaceKeys.review(workspaceId), next);
     } catch (error) {
-      showToast("error", apiMessage(error, "The review queue could not be read."));
+      setLoadError(apiMessage(error, "The review queue could not be read."));
     } finally {
       setIsRefreshing(false);
     }
@@ -118,12 +121,13 @@ export function ReviewQueuePanel({
   }
 
   if (!queue) {
-    return <section className="rm-health" aria-busy="true"><p className="shared-muted-copy">Reading the review queue…</p></section>;
+    return <section className="rm-health" aria-busy={isRefreshing}>{loadError ? <FeedbackNotice action="Try again" detail={loadError} kind="error" onAction={() => void load()} title="Review queue unavailable" /> : <FeedbackNotice kind="loading" title="Reading the review queue" />}</section>;
   }
 
   const count = queue.items.length;
   const snoozed = queue.snoozed ?? [];
   return <section className="rm-health" aria-busy={isRefreshing}>
+    {loadError ? <FeedbackNotice action="Try again" detail={loadError} kind="error" onAction={() => void load()} title="Review queue could not be refreshed" /> : null}
     <div className="rm-map-toolbar">
       <span>{count ? `${count} ${count === 1 ? "item" : "items"} waiting · ${queue.evidence_count} ${queue.evidence_count === 1 ? "file" : "files"} · ${queue.memory_card_count} memory ${queue.memory_card_count === 1 ? "card" : "cards"} · ${queue.finding_count} ${queue.finding_count === 1 ? "finding" : "findings"}` : "Nothing is waiting"}{snoozed.length ? ` · ${snoozed.length} snoozed` : ""}</span>
       <Button disabled={isRefreshing} onClick={() => void load()} type="button" variant="secondary"><Refresh size={ICON_SIZE.sm} /> Refresh</Button>

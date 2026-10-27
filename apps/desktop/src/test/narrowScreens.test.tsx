@@ -25,7 +25,7 @@ function screenIs(width: "narrow" | "wide") {
 }
 
 beforeEach(() => window.localStorage.clear());
-afterEach(cleanup);
+afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; });
 
 const dock = () => render(<AssistantDock accessToken="t" onOpenArtifact={() => undefined} workspaceId="w1" />);
 
@@ -61,6 +61,23 @@ describe("the assistant on a narrow screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open assistant" }));
     fireEvent.click(document.querySelector(".shared-assistant-dock-header button") as HTMLElement);
     expect(sheet.classList.contains("collapsed")).toBe(true);
+  });
+
+  it.each(["light", "dark"])("keeps Tab inside the assistant sheet in the %s theme", (theme) => {
+    document.documentElement.dataset.theme = theme;
+    screenIs("narrow");
+    dock();
+    fireEvent.click(screen.getByRole("button", { name: "Open assistant" }));
+    const sheet = screen.getByRole("dialog", { name: "Workspace assistant" });
+    expect(sheet.getAttribute("aria-modal")).toBe("true");
+    const first = sheet.querySelector(".shared-assistant-dock-header button") as HTMLButtonElement;
+    const last = screen.getByRole("button", { name: "inside" });
+    fireEvent.keyDown(sheet, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
   });
 
   it("keeps the conversation mounted while the sheet is closed", () => {
