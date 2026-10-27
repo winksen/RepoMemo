@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.68 (2026-10-27)
+
+The web test failures are inventoried for repair in V0.4.69.
+
+### Added
+- [Web test debt](mindmap/technical/web-test-debt.md) records each of the 22 failing assertions with its reproduction command, observed cause, disposition and owner. A separate field-validation test hangs in jsdom and prevents the combined suite from finishing here.
+
+### Changed
+- Set the version to `0.4.68` everywhere. Updated the roadmap and 0.4 release index; V0.4.69 remains the repair release. No test was skipped or deleted.
+
+### Checks
+- All 88 web test files ran in isolated Vitest processes on Windows: 22 failed assertions in 14 files, 73 files passed, and one file was stopped after 25 seconds for the constraint-validation loop. The normal combined suite first encountered sandbox `EPERM` temporary-file errors, then stalled on the loop when given a writable temporary directory. `version:check` and `docs:check` passed.
+
+### Upgrading
+- Nothing to do. This release changes the test record and version, not runtime behavior.
+
 ## V0.4.67 (2026-10-27)
 
 The 0.4.x line is closed: preparation for deployment, on the server and on the client. The next theme is proposed.

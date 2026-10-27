@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.4.67` (2026-10-27), after `V0.3.0` *Connected*, released after the maintainer's tests of the clean install (R6, R12) · **Next:** [the 0.5.x line, single sign-on](plans/2026-10-27-0.5-single-sign-on.md) (proposed; waits for the maintainer's decision and for the 0.4 clean-install run); the 0.4.x line, [preparation for deployment](#-the-04x-line-preparation-for-deployment), is built and closed (V0.4.0–V0.4.67, [RELEASES_0.4.md](RELEASES_0.4.md)) · **Built before the tag:** tracks K to N (V0.2.57–V0.2.193) · **Next minor after the 0.4.x line:** single sign-on, proposed (decision 41)
+> **Current version:** `V0.4.68` (2026-10-27), after `V0.3.0` *Connected* · **Next:** [the 0.4.x continuation](#proposed-04x-continuation-gap-audit), V0.4.69–V0.4.105 ([release rows](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x)); the original deployment plan closed at V0.4.67, while its clean-install run and other validation remain open · **Next minor candidate:** [0.5.x single sign-on](plans/2026-10-27-0.5-single-sign-on.md), after the 0.4 evidence and the maintainer's decision (decision 41)
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -60,6 +60,10 @@ timeline
     V0.3.8 to V0.3.18 : Small gaps closed (versions, mentions, review, assistant, search, palette, citations, owners, symbols, template cards)
     V0.3.19 to V0.3.25 : Portable archives, connector depth, container and backup operations, accessibility
     V0.3.26 to V0.3.27 : Security pass and release checks
+  section V0.4.x deployment and proposed continuation
+    V0.4.0 to V0.4.67 : Deployment plan built; clean-install validation open
+    V0.4.68 to V0.4.91 : Proposed evidence, workflows, performance, security and frontend
+    V0.4.92 to V0.4.105 : Proposed documentation and final evidence
 ```
 
 | Stage | Status |
@@ -80,6 +84,7 @@ timeline
 | **V0.3.0 *Connected*** | ✅ Released 2026-10-24: the version set to `0.3.0` and tagged `v0.3.0` after tracks K to N and the clean-machine install |
 | Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | ✅ Built and closed on 2026-10-24 at V0.3.27: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass and release checks; decisions 29–32 taken as proposed, 33 recorded as a proposal |
 | The 0.4.x line: preparation for deployment, server and client, containers first (V0.4.0–V0.4.67) | ✅ Closed on 2026-10-27 by V0.4.67 (opened on 2026-10-25 by V0.4.0; 67 releases planned in eight tracks (configuration, the server image, the web image, compose and tests, direct install, registry, the desktop app on the web client, documents and security); [plan](plans/2026-10-25-deployment.md), [index](RELEASES_0.4.md); decisions 33–40 proposed, then 41–44 for the next line); the maintainer's clean-install run is what is left |
+| Proposed 0.4.x continuation (V0.4.68–V0.4.105, tracks AC–AH) | 🔜 Planned, not built: release evidence, daily workflows, performance and security, frontend experience, a separate documentation sequence and final validation; [gap audit and tracks](#proposed-04x-continuation-gap-audit), [one row per release](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x) |
 | Single sign-on (OIDC) | 💭 Set aside on 2026-10-25, kept as the candidate for the line after; [plan](plans/2026-10-24-single-sign-on.md) |
 | After the 0.4.x line: single sign-on, scale-out, hosted | 💭 Direction (the theme is not chosen; single sign-on is the candidate) |
 
@@ -1496,6 +1501,8 @@ One box per release, added as each release is built. Say what was built and what
 
 > **Status:** proposed and opened on 2026-10-25 by `V0.4.0`, replacing the theme recorded in V0.3.27 (single sign-on, which stays the candidate for a later line). The maintainer chose it: RepoMemo should be deployable from this repository **directly on a server or in containers, containers preferred and tested**, with the API (Rust, its database and its files) and the web client (React) as separate containers, and the **desktop app** resumed as the web client's own UI and components, talking to the API directly, installable, **Windows first**, then Linux and macOS. The plan is [plans/2026-10-25-deployment.md](plans/2026-10-25-deployment.md); every release is in [RELEASES_0.4.md](RELEASES_0.4.md). Decisions 33–40 are proposed there and in the table above; built one by one from `V0.4.1`, 67 of 67: **closed on 2026-10-27 by `V0.4.67`**, awaiting the maintainer's clean-install run ([clean-install.md § 6](technical/clean-install.md#6-the-04-run-containers-and-the-desktop-app-v0466)).
 
+The [proposed continuation](#proposed-04x-continuation-gap-audit) starts after this historical close. Its releases are planned, not checked off in the list below.
+
 ### What this line is
 
 `V0.3.0` made RepoMemo reach where a team's knowledge lives; the 0.3.x line paid off what it left. This line makes it **possible to put it somewhere**: a published pair of images, a compose file a stranger can run, a release archive for a plain server, and a desktop app an administrator can send to a team already pointed at the right server. It adds no product feature to the memory itself.
@@ -1687,6 +1694,42 @@ One box per release, added as each release is built. Say what was built and what
 - [x] **V0.4.65** a security pass over the deployment surface (D65). Done: `mindmap/security/2026-10-27-deployment-security-review.md` (0 high, 1 medium, 2 low, 5 info), the three fixes with a Rust test and a CI check, the troubleshooting page extended (47 errors), `container:check` rules; clippy on the server crate. **Not run:** the new Rust test (compiled), the web image, the workflow; nothing against a live system
 - [x] **V0.4.66** the clean-install record (D66). Done: section 6 of `clean-install.md` (C1–C9, D1–D10, the record sheet), `container:check` rules. **Not run:** the steps; the sheet is empty until the maintainer runs them
 - [x] **V0.4.67** the release checks repeated and the line closed (D67). Done: every light check run and passing (the web suite has the same 22 failures as at V0.4.43), `plans/2026-10-27-0.5-single-sign-on.md`, decisions 41–44 proposed, the roadmap and the index closed. **Still the maintainer's:** `cargo test`, the workflows, the images, installers and packages, the app, and the nineteen steps of the clean-install run
+
+---
+
+## Proposed 0.4.x continuation: gap audit
+
+> **Status:** proposed on 2026-10-27; V0.4.68 is shipped, and V0.4.69–V0.4.105 remain planned. V0.4.67 remains the close of the original deployment plan. The [0.4 release index](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x) has one row, type, track and acceptance test per proposed commit. Keep the `Update V0.4.N` convention and update a row only when that release is actually built.
+
+The next work should first make the deployment claims testable, then improve the daily product, and finally make the documentation a usable route from the README to user, administrator and maintainer tasks. These are gaps in the **record or experience**, not confirmed security defects. A proposed feature needs a short code and UI inventory before implementation so an existing capability is extended rather than duplicated.
+
+| Gap or opportunity | Evidence in this repository | Planned response |
+|---|---|---|
+| Release readiness is ambiguous | V0.4.67 says the light checks passed but also records 22 failing web tests and that Rust tests, workflows, images, packages and the app were not run; [V0.4.68 triage](technical/web-test-debt.md) reproduces 22 failed assertions and one test-runner hang | V0.4.69–V0.4.70 repair failures and make release checks report a tested commit and artifact; V0.4.105 repeats the gate on the final candidate |
+| Deployment is built but not proven end to end | [The 0.4 clean-install record](technical/clean-install.md#6-the-04-run-containers-and-the-desktop-app-v0466) has C1–C9 and D1–D10 to execute; V0.4.67 leaves them to the maintainer | V0.4.71–V0.4.73 record actual results and distinguish pass, fail and blocked; repeat affected paths at V0.4.105 |
+| Distribution depends on external controls | [The deployment review](security/2026-10-27-deployment-security-review.md) accepts X7 (tag protection) as an operator action; the [0.5 proposal](plans/2026-10-27-0.5-single-sign-on.md) says update, Windows and Apple signing credentials do not yet exist | Put tag ruleset and release-environment approval in the release evidence matrix; label unsigned artifacts clearly and keep credential-dependent checks blocked until real credentials are present |
+| Users need clearer source trust and recovery | Evidence provenance, indexing state, review and citation details live in several surfaces, while the roadmap promises inspectable and current evidence | V0.4.74–V0.4.79 propose a single provenance view, scoped retries, review actions and portable citations; authorize every new shared view on the server |
+| Large workspaces need measured limits | The product relies on SQLite, hybrid search, indexing jobs and live lists; this plan has no current workload benchmark for the proposed additions | V0.4.80–V0.4.82 set bounded list/query/job behavior and require before/after measurements with a representative large workspace |
+| Security assurance needs runtime evidence | The deployment security review was static and explicitly did not run a live system; the desktop relay and backup recovery have unrun scenarios | V0.4.83–V0.4.85 add restore, revocation and TLS relay regression coverage without claiming a new vulnerability |
+| Frontend work needs task-based acceptance | Dense tables, long paths, search results, live states and narrow windows are part of the [product constraints](../PRODUCT.md), but the 0.4 deployment work did not revisit them as a complete user flow | V0.4.86–V0.4.91 cover navigation, result hierarchy, dense views, recovery states, keyboard use and responsive layout; check light and dark themes |
+| The documentation entry point is stale | [README.md](../README.md) still says `v0.1.x`, gives a development-server quick start, and lists a placeholder worker; [PRODUCT.md](../PRODUCT.md) still describes shipped remote sources as future work | V0.4.92 starts with a shorter, accurate README; V0.4.93–V0.4.104 reconcile user, administrator, functional and technical docs, including stale product claims |
+
+### Planned tracks and order
+
+| Releases | Track | Outcome |
+|---|---|---|
+| V0.4.68–V0.4.73 | AC. Evidence and release gates | Triage tests, run installation paths and show exactly what has passed |
+| V0.4.74–V0.4.79 | AD. Daily workflows | Make provenance, review, search and citations easier to use |
+| V0.4.80–V0.4.85 | AE. Performance and security | Bound expensive work and prove recovery and access behavior |
+| V0.4.86–V0.4.91 | AF. Frontend experience | Improve scanning, navigation, feedback, accessibility and narrow layouts |
+| V0.4.92–V0.4.104 | AG. Documentation commits | Simplify the README, then complete user, administrator, API, functional and technical documentation |
+| V0.4.105 | AH. Final evidence | Re-run affected checks and install paths on the final 0.4 candidate; decide what is ready to ship |
+
+### Documentation commits
+
+The documentation sequence is deliberately after the feature and interface tracks so it describes the resulting behavior. Begin with [README.md](../README.md) (V0.4.92), add a role-based docs index (V0.4.93), then bring first-run instructions and task-based functional guides for users (V0.4.94–V0.4.97) and administrators (V0.4.98–V0.4.100) up to date. Finish with the API reference (V0.4.101), functional and technical mindmaps (V0.4.102–V0.4.103), and a documentation verification/read-through (V0.4.104). The [release index](RELEASES_0.4.md#documentation-commits-v0492v04104) has the acceptance criterion for every commit. Keep one canonical guide per task and link to it from the README; update `PRODUCT.md` when its present-tense capability statements are reconciled.
+
+**Entry to 0.5.x:** V0.4.105 records final test, install and documentation evidence for the exact candidate; the maintainer still chooses the 0.5 theme. A missing credential or platform stays visibly blocked, with its distribution claim narrowed accordingly. The proposed [single sign-on plan](plans/2026-10-27-0.5-single-sign-on.md) follows this continuation if chosen.
 
 ---
 
