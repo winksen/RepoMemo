@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../../components/SafeMarkdown";
 import { IconBook2 as Book, IconBrain as Brain, IconCode as Code, IconSearch as Search, IconShieldLock as Shield, IconTrash as Trash } from "@tabler/icons-react";
-import { askSharedWorkspace, createSharedSavedSearch, deleteSharedSavedSearch, searchSharedSymbols, searchSharedWorkspace } from "../../lib/sharedApi";
+import { askSharedWorkspace, createSharedSavedSearch, deleteSharedSavedSearch, searchSharedSymbols, searchSharedWorkspace, setSharedSavedSearchSharing } from "../../lib/sharedApi";
 import { type ArtifactType, type AskAnswer, type SymbolSearchResult, type SavedSearch, type SearchResult } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
@@ -119,12 +119,26 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
     setIsSubmitting(true); setError(null);
     try {
       const saved = await createSharedSavedSearch(accessToken, workspace.workspace.id, { name: savedSearchName, query, artifactTypes: retrievalArtifactType === "all" ? [] : [retrievalArtifactType], languages: retrievalLanguage === "all" ? [] : [retrievalLanguage], sourceIds: retrievalSourceId === "all" ? [] : [retrievalSourceId], resultLimit: Number(retrievalLimit) });
-      setSavedSearches((current) => [saved, ...current]); setSavedSearchName(""); showToast("success", "Search saved.");
+      setSavedSearches((current) => [saved, ...current]); setSavedSearchName(""); showToast("success", "Private search saved.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
-  function applySavedSearch(saved: SavedSearch) {
+  async function applySavedSearch(saved: SavedSearch) {
     setQuery(saved.query); setRetrievalArtifactType(saved.artifact_types[0] ?? "all"); setRetrievalLanguage(saved.languages[0] ?? "all"); setRetrievalSourceId(saved.source_ids[0] ?? "all"); setRetrievalLimit(String(saved.result_limit)); setResults([]);
+    setIsSubmitting(true); setError(null);
+    try {
+      const found = await searchSharedWorkspace(accessToken, workspaceId, { query: saved.query, artifactTypes: saved.artifact_types, languages: saved.languages, sourceIds: saved.source_ids, limit: saved.result_limit });
+      setResults(found.results); setSemanticAvailable(found.semanticAvailable);
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
+  }
+
+  async function changeSharing(saved: SavedSearch) {
+    setIsSubmitting(true); setError(null);
+    try {
+      const updated = await setSharedSavedSearchSharing(accessToken, saved.id, !saved.shared);
+      setSavedSearches((current) => current.map((entry) => entry.id === updated.id ? updated : entry));
+      showToast("success", updated.shared ? "Search shared with the workspace." : "Search made private.");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
   async function removeSavedSearch(saved: SavedSearch) {
@@ -162,7 +176,15 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
               <form className="shared-retrieval-search" onSubmit={runSymbolSearch}><SearchField aria-label="Function, class or method name" onValueChange={setSymbolQuery} placeholder="Function, class or method name" value={symbolQuery} /><Button busy={isSubmitting} type="submit" variant="secondary">Find definition</Button></form>
               {symbolResults ? (symbolResults.length ? <div className="shared-search-results">{symbolResults.map((hit) => <article key={hit.symbol.id}><Button className="shared-search-result" onClick={() => onOpenArtifact(hit.symbol.artifact_id)} type="button" variant="secondary"><span><strong>{hit.symbol.name}</strong> · {hit.symbol.kind} · Symbol match: “{symbolQuery.trim()}”</span><span>{hit.path}{hit.symbol.start_line ? `:${hit.symbol.start_line}` : ""}</span></Button></article>)}</div> : <EmptyState description="No indexed code defines a symbol named like that." title="No symbol found" />) : null}
             </section>
-            <section className="shared-saved-searches"><PanelHeading description={savedSearches.length} icon={Book} level={3} title="Saved searches" />{savedSearches.length ? <div className="shared-saved-search-list">{savedSearches.map((saved) => <article key={saved.id}><Button onClick={() => applySavedSearch(saved)} type="button" variant="secondary"><span><strong>{saved.name}</strong><small>{saved.query}</small></span></Button>{canWrite ? <IconButton disabled={isSubmitting} label={`Delete ${saved.name}`} onClick={() => void removeSavedSearch(saved)}><Trash size={ICON_SIZE.sm} /></IconButton> : null}</article>)}</div> : <EmptyState description="Save a query and its filters for recurring investigations." title="No saved searches" />}{canWrite ? <form className="shared-save-search-form" onSubmit={saveCurrentSearch}><Field label="Name for this search" required><Input onChange={(event) => setSavedSearchName(event.target.value)} placeholder="Search name" value={savedSearchName} /></Field><Button busy={isSubmitting} disabled={!query.trim()} type="submit" variant="secondary">Save current search</Button></form> : null}</section>
+            <section className="shared-saved-searches">
+              <PanelHeading description={savedSearches.length} icon={Book} level={3} title="Saved searches" />
+              {savedSearches.length ? <div className="shared-saved-search-list">{savedSearches.map((saved) => <article key={saved.id}>
+                <Button className="shared-saved-search-open" onClick={() => void applySavedSearch(saved)} type="button" variant="secondary"><span><strong>{saved.name}</strong><small>{saved.query} · {saved.shared ? "Shared with workspace" : "Private"}</small></span></Button>
+                {workspace.role === "owner" ? <Button disabled={isSubmitting} onClick={() => void changeSharing(saved)} type="button" variant="secondary">{saved.shared ? "Make private" : "Share"}</Button> : null}
+                {canWrite && (saved.created_by.id === page.session.user.id || workspace.role === "owner" || workspace.role === "admin") ? <IconButton disabled={isSubmitting} label={`Delete ${saved.name}`} onClick={() => void removeSavedSearch(saved)}><Trash size={ICON_SIZE.sm} /></IconButton> : null}
+              </article>)}</div> : <EmptyState description="Save a private query and its filters for recurring investigations. An owner can share it with the workspace." title="No saved searches" />}
+              {canWrite ? <form className="shared-save-search-form" onSubmit={saveCurrentSearch}><Field label="Name for this search" required><Input onChange={(event) => setSavedSearchName(event.target.value)} placeholder="Search name" value={savedSearchName} /></Field><Button busy={isSubmitting} disabled={!query.trim()} type="submit" variant="secondary">Save private search</Button></form> : null}
+            </section>
             <div>{semanticAvailable === false ? <p className="shared-muted-copy" role="status">Semantic search is unavailable for this query. Results use keyword matches only.</p> : null}{results.length ? <div className="shared-search-results"><p className="shared-search-result-count">{results.length} matching evidence {results.length === 1 ? "result" : "results"}</p>{paginate(results, resultsPage).map((result) => <article key={result.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(result.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{result.title}</strong><span>{artifactTypeLabel(result.artifact_type, typeLabels)} · {result.language ?? "Unspecified"} · {result.source_name}</span></span><p>{renderHighlightedSnippet(result.snippet)}</p><span className="shared-search-result-path">{result.match_kind === "keyword_and_semantic" ? "Keyword and semantic match" : result.match_kind === "semantic" ? "Semantic match" : result.match_kind === "keyword" ? `Keyword match: “${query.trim()}”` : "Match type unavailable"} · {result.path}{citationLines(result)}{result.last_author ? ` · last changed by ${lastChangeLabel(result.last_author, result.last_changed_at)}` : ""}</span></Button></article>)}<Pagination onPageChange={setResultsPage} page={resultsPage} total={results.length} /></div> : <EmptyState description="Index one or more artifacts, then search the evidence base from here. Use filters to narrow large workspaces." title="Search the evidence base" />}
               <section className="shared-ask-evidence" aria-live="polite"><div><Brain size={ICON_SIZE.lg} /><h3>Ask your evidence</h3></div><p>Get a citation-backed answer from the indexed workspace context.</p><form onSubmit={askEvidence}><Field hint={submitHint("asks")} label="Question about the evidence" required><Textarea onChange={(event) => setAskQuestion(event.target.value)} placeholder="What do we know about the current implementation?" value={askQuestion} /></Field><Button busy={isSubmitting} type="submit" variant="secondary"><Brain size={ICON_SIZE.md} /> Ask</Button></form>{askAnswer ? <div className="shared-ask-answer"><p className="shared-ai-generated-note">AI-generated from the cited passages · verify against the sources</p><div className="shared-markdown shared-ai-answer"><SafeMarkdown>{askAnswer.answer_markdown}</SafeMarkdown></div>{askAnswer.warnings.length ? <div className="shared-ai-overview-warning">{askAnswer.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}{askAnswer.citations.length ? <EvidenceUsed accessToken={accessToken} citations={askAnswer.citations} numbered onOpenArtifact={onOpenArtifact} /> : null}{canWrite && askAnswer.citations.length ? <div className="shared-ai-actions"><Button disabled={isSubmitting} onClick={() => draftMemoryFromAnswer(askedQuestion || "Answer from workspace evidence", askAnswer.answer_markdown, "Ask your evidence", askAnswer.citations)} type="button" variant="secondary"><Shield size={ICON_SIZE.md} /> Save as memory</Button></div> : null}</div> : null}</section>
             </div></>

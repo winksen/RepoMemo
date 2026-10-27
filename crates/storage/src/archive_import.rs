@@ -225,7 +225,7 @@ impl StorageEngine {
                 .map(|name| artifact_type_to_db(&artifact_type_from_db(name)).to_owned())
                 .collect::<Vec<_>>();
             sqlx::query(
-                "INSERT INTO workspace_saved_searches (id, workspace_id, created_by_user_id, name, query, artifact_types_json, languages_json, source_ids_json, result_limit, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+                "INSERT INTO workspace_saved_searches (id, workspace_id, created_by_user_id, name, query, artifact_types_json, languages_json, source_ids_json, result_limit, shared, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)",
             )
             .bind(Uuid::new_v4().to_string())
             .bind(workspace_id)
@@ -236,6 +236,7 @@ impl StorageEngine {
             .bind(serde_json::to_string(&search.languages)?)
             .bind(serde_json::to_string(&kept_sources)?)
             .bind(search.result_limit)
+            .bind(search.shared)
             .bind(&search.created_at)
             .bind(&search.updated_at)
             .execute(&mut *tx)

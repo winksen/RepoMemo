@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.77` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.78` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -418,7 +418,7 @@ The dashboard has one search box over **every workspace the account can read**. 
 
 ### Saved searches
 
-Writers can save a named search that includes its filters. Anyone can re-run it with one click. Saved searches are shared with the whole workspace; only their author or an administrator deletes one.
+Writers can save a named search that includes its filters. A new search is private to its author. A workspace owner can share it with the workspace or make it private again; searches saved before V0.4.78 remain shared. Opening a saved search executes it again under the reader's current workspace access, so it never stores or reveals an old result set. Its author or an administrator can delete it.
 
 ### Ask your evidence (AI)
 

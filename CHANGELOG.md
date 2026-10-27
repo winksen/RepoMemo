@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.78 (2026-10-27)
+
+Saved searches can remain private or be shared by a workspace owner.
+
+### Changed
+- New saved searches are private to their author. Owners can share or make one private; existing searches remain shared after migration.
+- Listing returns shared searches and the caller's own private searches. Opening a saved search runs the query again through current workspace access and filters.
+- Workspace archives preserve the sharing state, and older archives retain the formerly shared behavior.
+
+### Checks
+- Web typecheck, styles check, saved-search UI tests and server permission regression pass.
+
+### Upgrading
+- Migration 0044 adds saved-search visibility. Existing searches remain shared; new searches start private.
+
 ## V0.4.77 (2026-10-27)
 
 Search results now state how a passage matched, and retrieval filters survive a shared URL.

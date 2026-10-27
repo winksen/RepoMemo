@@ -151,7 +151,7 @@ pub(crate) async fn list_saved_searches(
     require_workspace_read(&state, &subject, &workspace_id).await?;
     state
         .storage
-        .list_saved_searches(&workspace_id)
+        .list_visible_saved_searches(&workspace_id, &subject.user_id)
         .await
         .map(Json)
         .map_err(map_storage_error)
@@ -227,6 +227,26 @@ pub(crate) async fn delete_saved_search(
         .await
         .map_err(map_storage_error)?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub(crate) async fn set_saved_search_sharing(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(search_id): Path<String>,
+    Json(request): Json<ShareSavedSearchRequest>,
+) -> Result<Json<SavedSearch>, ApiError> {
+    let saved = state
+        .storage
+        .get_saved_search(&search_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_owner(&state, &subject, &saved.workspace_id).await?;
+    state
+        .storage
+        .set_saved_search_sharing(&search_id, request.shared)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
 
 pub(crate) async fn list_task_checklist(

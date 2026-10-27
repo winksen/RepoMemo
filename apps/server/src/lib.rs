@@ -826,6 +826,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             put(toggle_task_checklist_item).delete(delete_task_checklist_item),
         )
         .route("/v1/saved-searches/{search_id}", delete(delete_saved_search))
+        .route("/v1/saved-searches/{search_id}/sharing", put(set_saved_search_sharing))
         .route(
             "/v1/workspaces/{workspace_id}/members",
             get(list_workspace_members).put(upsert_workspace_member),

@@ -8,6 +8,7 @@ vi.mock("../lib/sharedApi", () => ({
   deleteSharedSavedSearch: vi.fn(),
   searchSharedSymbols: vi.fn(),
   searchSharedWorkspace: vi.fn(),
+  setSharedSavedSearchSharing: vi.fn(),
 }));
 vi.mock("../components/ui/toast", () => ({ Toast: () => null, showToast: vi.fn() }));
 vi.mock("../web/workspace/data", () => ({
@@ -19,7 +20,7 @@ vi.mock("../web/workspace/data", () => ({
 vi.mock("../web/common", () => ({ EvidenceUsed: () => null, renderHighlightedSnippet: (text: string) => text }));
 
 import { RetrievalSection } from "../web/workspace/RetrievalSection";
-import { searchSharedWorkspace } from "../lib/sharedApi";
+import { searchSharedWorkspace, setSharedSavedSearchSharing } from "../lib/sharedApi";
 import { makePage } from "./workspacePage";
 
 afterEach(() => { cleanup(); saved.list = []; window.history.replaceState(null, "", "/"); vi.clearAllMocks(); });
@@ -54,9 +55,21 @@ describe("retrieval on the shared pieces", () => {
   });
 
   it("deletes a saved search from an icon button that names it", () => {
-    saved.list = [{ id: "s1", name: "Auth flow", query: "login", artifact_types: [], languages: [], source_ids: [], result_limit: 20 }];
+    saved.list = [{ id: "s1", name: "Auth flow", query: "login", artifact_types: [], languages: [], source_ids: [], result_limit: 20, shared: false, created_by: { id: "u1" } }];
     render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
     expect(screen.getByRole("button", { name: "Delete Auth flow" }).className).toContain("rm-icon-button");
+  });
+
+  it("lets an owner share a private search and runs it through current search access", async () => {
+    const search = { id: "s1", name: "Auth flow", query: "login", artifact_types: [], languages: [], source_ids: [], result_limit: 20, shared: false, created_by: { id: "u1" } };
+    saved.list = [search];
+    vi.mocked(setSharedSavedSearchSharing).mockResolvedValue({ ...search, shared: true } as never);
+    vi.mocked(searchSharedWorkspace).mockResolvedValue({ results: [], semanticAvailable: false });
+    render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(setSharedSavedSearchSharing).toHaveBeenCalledWith("t", "s1", true));
+    fireEvent.click(screen.getByRole("button", { name: /Auth flow login/ }));
+    await waitFor(() => expect(searchSharedWorkspace).toHaveBeenCalledWith("t", "w1", expect.objectContaining({ query: "login" })));
   });
 
   it("reopens URL filters and labels match provenance and keyword fallback", async () => {

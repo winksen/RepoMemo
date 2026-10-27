@@ -97,6 +97,7 @@ pub struct SavedSearch {
     pub languages: Vec<String>,
     pub source_ids: Vec<String>,
     pub result_limit: i64,
+    pub shared: bool,
     pub created_by: SharedUser,
     pub created_at: String,
     pub updated_at: String,

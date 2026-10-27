@@ -164,6 +164,11 @@ pub(crate) struct SaveSearchRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct ShareSavedSearchRequest {
+    pub(crate) shared: bool,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct CreateChecklistItemRequest {
     pub(crate) body: String,
 }

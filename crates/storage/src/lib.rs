@@ -298,6 +298,7 @@ struct SavedSearchRow {
     languages_json: String,
     source_ids_json: String,
     result_limit: i64,
+    shared: bool,
     creator_id: String,
     creator_email: String,
     creator_display_name: String,
@@ -1113,6 +1114,7 @@ impl From<SavedSearchRow> for SavedSearch {
             languages: serde_json::from_str(&row.languages_json).unwrap_or_default(),
             source_ids: serde_json::from_str(&row.source_ids_json).unwrap_or_default(),
             result_limit: row.result_limit,
+            shared: row.shared,
             created_by: SharedUser {
                 id: row.creator_id,
                 display_name: row.creator_display_name,

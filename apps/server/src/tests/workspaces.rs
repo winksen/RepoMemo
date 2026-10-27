@@ -1251,6 +1251,62 @@ async fn owners_authors_and_served_types_hold() {
     let comment_id = comment["id"].as_str().unwrap().to_owned();
     let search = response_json(send("POST", format!("/v1/workspaces/{workspace_id}/saved-searches"), &owner, json!({"name": "Owner's", "query": "plain", "artifact_types": [], "languages": [], "source_ids": [], "result_limit": 20})).await).await;
     let search_id = search["id"].as_str().unwrap().to_owned();
+    assert_eq!(search["shared"], false);
+    let private = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/saved-searches"),
+            &writer,
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert!(private.as_array().unwrap().is_empty());
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/saved-searches/{search_id}/sharing"),
+            &writer,
+            json!({"shared": true})
+        )
+        .await
+        .status(),
+        403,
+    );
+    let shared = response_json(
+        send(
+            "PUT",
+            format!("/v1/saved-searches/{search_id}/sharing"),
+            &owner,
+            json!({"shared": true}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(shared["shared"], true);
+    let visible = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/saved-searches"),
+            &writer,
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(visible[0]["id"], search_id);
+    assert_eq!(
+        send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/search"),
+            &writer,
+            json!({"query": "plain"})
+        )
+        .await
+        .status(),
+        200
+    );
     assert_eq!(
         send("DELETE", format!("/v1/saved-searches/{search_id}"), &writer, json!({}))
             .await

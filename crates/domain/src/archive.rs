@@ -227,6 +227,10 @@ pub struct ArchiveVersion {
 }
 
 /// A saved search (format 2). The sources it keeps to are named by the archive's own source ids.
+fn previously_shared() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArchiveSavedSearch {
     pub name: String,
@@ -235,6 +239,8 @@ pub struct ArchiveSavedSearch {
     pub languages: Vec<String>,
     pub source_ids: Vec<String>,
     pub result_limit: i64,
+    #[serde(default = "previously_shared")]
+    pub shared: bool,
     pub created_by: ArchivePerson,
     pub created_at: String,
     pub updated_at: String,

@@ -180,6 +180,7 @@ impl StorageEngine {
                 languages: search.languages,
                 source_ids: search.source_ids,
                 result_limit: search.result_limit,
+                shared: search.shared,
                 created_by: person_from_user(search.created_by),
                 created_at: search.created_at,
                 updated_at: search.updated_at,

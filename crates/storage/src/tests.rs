@@ -2619,6 +2619,7 @@ async fn an_archive_carries_earlier_file_versions_and_saved_searches_and_an_impo
         Some("Author")
     );
     assert_eq!(data.saved_searches.len(), 1);
+    assert!(!data.saved_searches[0].shared);
     assert_eq!(data.saved_searches[0].artifact_types, ["file"]);
     let counts = data.counts(3);
     assert_eq!((counts.versions, counts.saved_searches), (2, 1));
@@ -2652,6 +2653,7 @@ async fn an_archive_carries_earlier_file_versions_and_saved_searches_and_an_impo
     // Nobody is credited by account.
     assert!(history.iter().all(|version| version.uploaded_by.is_none()));
     let searches = storage.list_saved_searches(&copy.id).await.unwrap();
+    assert!(!searches[0].shared);
     assert_eq!(searches.len(), 1);
     assert_eq!(
         (searches[0].name.as_str(), searches[0].query.as_str()),

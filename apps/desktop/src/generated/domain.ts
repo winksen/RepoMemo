@@ -76,6 +76,7 @@ export interface SavedSearch {
   languages: string[];
   source_ids: string[];
   result_limit: number;
+  shared: boolean;
   created_by: SharedUser;
   created_at: string;
   updated_at: string;

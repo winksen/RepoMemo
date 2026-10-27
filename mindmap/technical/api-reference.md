@@ -276,6 +276,7 @@
 | PUT | `/v1/task-checklist/{item_id}` | auth | require_workspace_write | ToggleChecklistItemRequest | TaskChecklistItem |
 | DELETE | `/v1/task-checklist/{item_id}` | auth | require_workspace_write | — | status |
 | DELETE | `/v1/saved-searches/{search_id}` | auth | require_workspace_write | — | status |
+| PUT | `/v1/saved-searches/{search_id}/sharing` | auth | require_workspace_owner | ShareSavedSearchRequest | SavedSearch |
 | GET | `/v1/workspaces/{workspace_id}/members` | auth | require_workspace_admin | — | Vec<WorkspaceMember |
 | PUT | `/v1/workspaces/{workspace_id}/members` | managing | require_workspace_admin | UpsertWorkspaceMemberRequest | WorkspaceMember |
 | GET | `/v1/workspaces/{workspace_id}/invitations` | auth | require_workspace_admin | — | Vec<Invitation |

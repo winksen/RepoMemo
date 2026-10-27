@@ -197,8 +197,14 @@ impl StorageEngine {
     }
 
     pub async fn list_saved_searches(&self, workspace_id: &str) -> Result<Vec<SavedSearch>> {
-        let rows = sqlx::query_as::<_, SavedSearchRow>("SELECT search.id, search.workspace_id, search.name, search.query, search.artifact_types_json, search.languages_json, search.source_ids_json, search.result_limit, creator.id AS creator_id, creator.email AS creator_email, creator.display_name AS creator_display_name, search.created_at, search.updated_at FROM workspace_saved_searches search JOIN users creator ON creator.id = search.created_by_user_id WHERE search.workspace_id = ?1 ORDER BY search.updated_at DESC, search.name ASC")
+        let rows = sqlx::query_as::<_, SavedSearchRow>("SELECT search.id, search.workspace_id, search.name, search.query, search.artifact_types_json, search.languages_json, search.source_ids_json, search.result_limit, search.shared, creator.id AS creator_id, creator.email AS creator_email, creator.display_name AS creator_display_name, search.created_at, search.updated_at FROM workspace_saved_searches search JOIN users creator ON creator.id = search.created_by_user_id WHERE search.workspace_id = ?1 ORDER BY search.updated_at DESC, search.name ASC")
             .bind(workspace_id).fetch_all(self.reader()).await?;
+        Ok(rows.into_iter().map(SavedSearch::from).collect())
+    }
+
+    pub async fn list_visible_saved_searches(&self, workspace_id: &str, user_id: &str) -> Result<Vec<SavedSearch>> {
+        let rows = sqlx::query_as::<_, SavedSearchRow>("SELECT search.id, search.workspace_id, search.name, search.query, search.artifact_types_json, search.languages_json, search.source_ids_json, search.result_limit, search.shared, creator.id AS creator_id, creator.email AS creator_email, creator.display_name AS creator_display_name, search.created_at, search.updated_at FROM workspace_saved_searches search JOIN users creator ON creator.id = search.created_by_user_id WHERE search.workspace_id = ?1 AND (search.shared = 1 OR search.created_by_user_id = ?2) ORDER BY search.updated_at DESC, search.name ASC")
+            .bind(workspace_id).bind(user_id).fetch_all(self.reader()).await?;
         Ok(rows.into_iter().map(SavedSearch::from).collect())
     }
 
@@ -210,16 +216,29 @@ impl StorageEngine {
     ) -> Result<SavedSearch> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
-        sqlx::query("INSERT INTO workspace_saved_searches (id, workspace_id, created_by_user_id, name, query, artifact_types_json, languages_json, source_ids_json, result_limit, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10)")
+        sqlx::query("INSERT INTO workspace_saved_searches (id, workspace_id, created_by_user_id, name, query, artifact_types_json, languages_json, source_ids_json, result_limit, shared, created_at, updated_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,0,?10,?10)")
             .bind(&id).bind(workspace_id).bind(user_id).bind(search.name).bind(search.query)
             .bind(serde_json::to_string(&search.artifact_types)?).bind(serde_json::to_string(&search.languages)?).bind(serde_json::to_string(&search.source_ids)?).bind(search.result_limit).bind(now).execute(&self.pool).await?;
         self.get_saved_search(&id).await
     }
 
     pub async fn get_saved_search(&self, search_id: &str) -> Result<SavedSearch> {
-        let row = sqlx::query_as::<_, SavedSearchRow>("SELECT search.id, search.workspace_id, search.name, search.query, search.artifact_types_json, search.languages_json, search.source_ids_json, search.result_limit, creator.id AS creator_id, creator.email AS creator_email, creator.display_name AS creator_display_name, search.created_at, search.updated_at FROM workspace_saved_searches search JOIN users creator ON creator.id = search.created_by_user_id WHERE search.id = ?1")
+        let row = sqlx::query_as::<_, SavedSearchRow>("SELECT search.id, search.workspace_id, search.name, search.query, search.artifact_types_json, search.languages_json, search.source_ids_json, search.result_limit, search.shared, creator.id AS creator_id, creator.email AS creator_email, creator.display_name AS creator_display_name, search.created_at, search.updated_at FROM workspace_saved_searches search JOIN users creator ON creator.id = search.created_by_user_id WHERE search.id = ?1")
             .bind(search_id).fetch_one(self.reader()).await?;
         Ok(SavedSearch::from(row))
+    }
+
+    pub async fn set_saved_search_sharing(&self, search_id: &str, shared: bool) -> Result<SavedSearch> {
+        let changed = sqlx::query("UPDATE workspace_saved_searches SET shared = ?2, updated_at = ?3 WHERE id = ?1")
+            .bind(search_id)
+            .bind(shared)
+            .bind(Utc::now().to_rfc3339())
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            repomemo_domain::bail_not_found!("Saved search was not found.");
+        }
+        self.get_saved_search(search_id).await
     }
 
     pub async fn delete_saved_search(&self, search_id: &str) -> Result<()> {
