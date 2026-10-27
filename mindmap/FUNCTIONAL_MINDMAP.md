@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.83` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.84` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -648,3 +648,9 @@ Indexing requests rotate between workspaces. Embedding processes at most two 32-
 ### V0.4.83 restore drill
 
 The backup drill exercises a checksum-verified second copy, isolated restore, database integrity, two accounts and evidence bytes, while leaving the live fixture available. Restoring a copied backup checks its `SHA256SUMS`; every restore checks SQLite integrity before reporting success. Operators can run `npm run backup:drill` locally and in the Rust CI gate.
+
+## V0.4.84 — Revoked access
+
+- Removing a member ends their live workspace stream and blocks new reads and reconnects.
+- Ending sessions or revoking a personal token closes streams and blocks future requests.
+- Denied workspace reads appear in the system audit trail.

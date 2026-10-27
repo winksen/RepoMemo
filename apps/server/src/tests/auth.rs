@@ -1368,6 +1368,67 @@ async fn event_streams_end_when_the_token_that_opened_them_is_revoked() {
     )
     .await;
     assert!(ended.is_ok(), "the stream should close once its token is revoked");
+    for path in [
+        format!("/v1/workspaces/{workspace_id}/artifacts"),
+        format!("/v1/workspaces/{workspace_id}/events"),
+    ] {
+        assert_eq!(
+            app.clone()
+                .oneshot(auth_request("GET", &path, &bearer))
+                .await
+                .unwrap()
+                .status(),
+            401,
+            "a revoked token cannot read or reconnect: {path}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn ending_sessions_closes_the_stream_and_rejects_reads_and_reconnects() {
+    let data_dir = temp_data_dir("session-streams");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (owner, _) = register_account(&app, "session-stream-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let stream = app
+        .clone()
+        .oneshot(auth_request(
+            "GET",
+            &format!("/v1/workspaces/{workspace_id}/events"),
+            &owner,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(stream.status(), 200);
+    assert_eq!(
+        app.clone()
+            .oneshot(auth_request("POST", "/v1/auth/logout-all", &owner))
+            .await
+            .unwrap()
+            .status(),
+        204
+    );
+    let ended = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        to_bytes(stream.into_body(), usize::MAX),
+    )
+    .await;
+    assert!(ended.is_ok(), "the stream should close when its session ends");
+    for path in [
+        format!("/v1/workspaces/{workspace_id}/artifacts"),
+        format!("/v1/workspaces/{workspace_id}/events"),
+    ] {
+        assert_eq!(
+            app.clone()
+                .oneshot(auth_request("GET", &path, &owner))
+                .await
+                .unwrap()
+                .status(),
+            401,
+            "an ended session cannot read or reconnect: {path}"
+        );
+    }
     let _ = std::fs::remove_dir_all(data_dir);
 }
 

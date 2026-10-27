@@ -5,9 +5,20 @@ pub(crate) async fn require_workspace_read(
     subject: &AuthenticatedSubject,
     workspace_id: &str,
 ) -> Result<WorkspaceRole, ApiError> {
-    effective_workspace_role(state, &subject.user_id, subject.is_system_admin, workspace_id)
-        .await?
-        .ok_or_else(ApiError::forbidden)
+    match effective_workspace_role(state, &subject.user_id, subject.is_system_admin, workspace_id).await? {
+        Some(role) => Ok(role),
+        None => {
+            let detail = format!("workspace_id={workspace_id}; reason=no_membership");
+            if let Err(error) = state
+                .storage
+                .record_system_event(Some(&subject.user_id), "workspace_read_denied", &detail)
+                .await
+            {
+                tracing::warn!(%error, user_id = %subject.user_id, %workspace_id, "could not audit denied workspace read");
+            }
+            Err(ApiError::forbidden())
+        }
+    }
 }
 
 /// The role a user acts with in a workspace: their membership, raised to

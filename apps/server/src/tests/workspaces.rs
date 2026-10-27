@@ -1518,6 +1518,35 @@ async fn event_streams_end_when_the_member_is_removed() {
     )
     .await;
     assert!(ended.is_ok(), "the stream should close once the member is removed");
+    for path in [
+        format!("/v1/workspaces/{workspace_id}/artifacts"),
+        format!("/v1/workspaces/{workspace_id}/events"),
+    ] {
+        assert_eq!(
+            app.clone()
+                .oneshot(auth_request("GET", &path, &member))
+                .await
+                .unwrap()
+                .status(),
+            403,
+            "a removed member cannot read or reconnect: {path}"
+        );
+    }
+    let audited = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(audited
+        .as_array()
+        .is_some_and(
+            |events| events.iter().any(|event| event["action"] == "workspace_read_denied"
+                && event["detail"]
+                    .as_str()
+                    .is_some_and(|detail| detail.contains(&workspace_id)))
+        ));
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
