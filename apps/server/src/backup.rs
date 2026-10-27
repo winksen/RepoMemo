@@ -655,6 +655,9 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
     use anyhow::Context;
     let source = backups_root(state).join(name);
     let manifest = read_manifest(&source).context("The backup is incomplete or its manifest cannot be read.")?;
+    if source.join(crate::backup_copy::SUMS_FILE).exists() {
+        crate::backup_copy::verify_copy(&source).context("The backup copy failed its SHA-256 checksums.")?;
+    }
     // A sealed backup needs its key, and the key is checked first: a wrong
     // one is refused before any folder is made.
     let (cipher, with_previous) = match manifest.encryption.clone() {
@@ -706,6 +709,11 @@ async fn restore_backup(state: &AppState, name: &str, environment: &str) -> anyh
             return Err(error.context("The restored database did not open, so it was removed."));
         }
     };
+    if let Err(error) = engine.check_integrity().await {
+        engine.close().await;
+        let _ = tokio::fs::remove_dir_all(&target).await;
+        return Err(error.context("The restored database failed its integrity check, so it was removed."));
+    }
     let statistics = engine.system_statistics().await;
     engine.close().await;
     let statistics = statistics.context("The restored database could not be read.")?;

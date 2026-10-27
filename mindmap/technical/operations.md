@@ -412,6 +412,12 @@ A restore **never overwrites the running environment**. It makes a new one next 
 
 **Practise this once, on a spare machine, before you need it.** A backup nobody has restored is a hope.
 
+### Automated restore drill (V0.4.83)
+
+Run `npm run backup:drill` from the repository. The focused server test creates a fixture with two accounts and two evidence files, makes a backup and a second copy, verifies that copy's `SHA256SUMS`, and restores the checked copy into a uniquely named environment. It opens the restored database, runs SQLite `integrity_check`, reads both accounts and the original evidence bytes, and confirms the live fixture still serves its workspace. The temporary data and restored environment are removed after the test. The full Rust CI test gate runs the same drill.
+
+This tests the backup and restore path with generated fixture data. To verify a particular operational backup, restore its second copy on a spare server and check an account and evidence there. When a copied backup has `SHA256SUMS`, the restore endpoint checks it before making an environment; every restore also runs `integrity_check` before reporting success.
+
 ### Encrypting backups
 
 Set `REPOMEMO_BACKUP_KEY` to a passphrase of 16 or more characters and every file of every new backup is sealed with AES-256-GCM before it is written: the database (`repomemo.sqlite.enc`), the key file (`secret.key.enc`) and each stored file (`blobs/…/<name>.enc`). Only `manifest.json` stays readable; it names the cipher, a random salt and a check value, and nothing that can open the backup.

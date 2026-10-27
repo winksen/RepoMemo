@@ -1,4 +1,5 @@
 use super::*;
+use repomemo_storage::{StorageConfig, StorageEngine};
 
 async fn upload(app: &axum::Router, who: &str, workspace_id: &str, name: &str, bytes: Vec<u8>) -> u16 {
     app.clone()
@@ -92,6 +93,14 @@ async fn a_backup_restores_into_a_new_environment_that_opens() {
     assert_eq!(overview["backups"].as_array().unwrap().len(), 2);
     assert_eq!(overview["backups"][0]["reused_blobs"], 2);
 
+    // Drill against a checksum-verified second copy, never the live data.
+    let backup_source = data_dir.join("backups").join(&name);
+    let copy_root = data_dir.join("drill-copy");
+    let copied = crate::backup_copy::copy_backup(&backup_source, &copy_root, None).unwrap();
+    assert_eq!(crate::backup_copy::verify_copy(&copy_root.join(&name)).unwrap(), copied);
+    std::fs::rename(&backup_source, data_dir.join("original-backup")).unwrap();
+    std::fs::rename(copy_root.join(&name), &backup_source).unwrap();
+
     // Restore into a new environment folder, which must open.
     let environment = format!("restore-test-{}", &uuid::Uuid::new_v4().simple().to_string()[..8]);
     let bad_name = app
@@ -141,6 +150,39 @@ async fn a_backup_restores_into_a_new_environment_that_opens() {
     let restored = root.join(&environment);
     assert!(restored.join("repomemo.sqlite").is_file());
     assert!(restored.join("blobs").is_dir());
+    let isolated = StorageEngine::open(StorageConfig::new(restored.clone())).await.unwrap();
+    isolated.check_integrity().await.unwrap();
+    assert!(isolated
+        .find_user_by_email("backup-admin@example.com")
+        .await
+        .unwrap()
+        .is_some());
+    assert!(isolated
+        .find_user_by_email("backup-member@example.com")
+        .await
+        .unwrap()
+        .is_some());
+    let evidence = isolated.list_artifacts(&workspace_id).await.unwrap();
+    assert_eq!(evidence.len(), 2);
+    let plan = evidence.iter().find(|item| item.title == "plan.txt").unwrap();
+    assert_eq!(isolated.read_blob(&plan.content_hash).await.unwrap(), b"Ship on Friday");
+    isolated.close().await;
+    let live = response_json(
+        app.clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/workspaces/{workspace_id}/artifacts"),
+                &admin,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        live.as_array().unwrap().len(),
+        2,
+        "the live environment was not changed by the drill"
+    );
     let _ = std::fs::remove_dir_all(&restored);
     let _ = std::fs::remove_dir(&root);
 

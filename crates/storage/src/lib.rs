@@ -830,6 +830,17 @@ impl StorageEngine {
         self.pool.close().await;
     }
 
+    /// SQLite's full integrity check, used by isolated restore drills.
+    pub async fn check_integrity(&self) -> Result<()> {
+        let verdict: String = sqlx::query_scalar("PRAGMA integrity_check")
+            .fetch_one(self.reader())
+            .await?;
+        if verdict != "ok" {
+            bail!("Restored database failed integrity_check: {verdict}");
+        }
+        Ok(())
+    }
+
     /// A connection for statements that only read.
     fn reader(&self) -> &SqlitePool {
         &self.read_pool

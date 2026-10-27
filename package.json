@@ -1,6 +1,6 @@
 {
   "name": "repomemo",
-  "version": "0.4.82",
+  "version": "0.4.83",
   "private": true,
   "description": "Local-first technical memory workspace for teams.",
   "workspaces": [
@@ -19,6 +19,7 @@
     "types:generate": "node scripts/generate-types.mjs",
     "types:check": "node scripts/generate-types.mjs --check",
     "test:web": "npm --workspace @repomemo/desktop run test",
+    "backup:drill": "cargo test -p repomemo-server --lib a_backup_restores_into_a_new_environment_that_opens --locked",
     "styles:check": "node scripts/check-styles.mjs",
     "container:check": "node scripts/check-container.mjs",
     "a11y:check": "node scripts/check-accessibility.mjs",
