@@ -40,6 +40,14 @@ describe("the evidence section on the shared pieces", () => {
     expect(screen.getByText("No shared evidence yet").closest(".rm-empty-state")).not.toBeNull();
   });
 
+  it("offers a direct way to clear filters when evidence is absent", () => {
+    const store = new Map<string, unknown>([["evidence.artifactQuery", "missing"]]);
+    render(<ConfirmProvider><EvidenceSection page={makePage({ store })} /></ConfirmProvider>);
+    expect(screen.getByText("No files match these filters")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect((screen.getByRole("textbox", { name: "Search evidence files" }) as HTMLInputElement).value).toBe("");
+  });
+
   it("opens the folder form with a labelled, required field", () => {
     render(<ConfirmProvider><EvidenceSection page={makePage()} /></ConfirmProvider>);
     fireEvent.click(screen.getByRole("button", { name: /New folder/ }));

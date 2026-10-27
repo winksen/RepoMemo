@@ -15,13 +15,13 @@ import { apiMessage } from "../format";
  * cache, never a page that is gone. Returns the data, whether a fetch is running, a way to fetch again and a
  * setter that writes the cache.
  */
-export function useSystemData<T>(key: readonly unknown[], load: () => Promise<T>, options: { refreshMs?: number | ((data: T | null | undefined) => number | false); keepPrevious?: boolean; failure?: string } = {}): [T | null, boolean, () => Promise<void>, Dispatch<SetStateAction<T | null>>] {
+export function useSystemData<T>(key: readonly unknown[], load: () => Promise<T>, options: { refreshMs?: number | ((data: T | null | undefined) => number | false); keepPrevious?: boolean; failure?: string; silentError?: boolean } = {}): [T | null, boolean, () => Promise<void>, Dispatch<SetStateAction<T | null>>, Error | null] {
   const [data, setData, query] = useServerState<T | null>({ key, fetch: load, initial: null, staleTime: 0, refetchInterval: options.refreshMs ?? false, keepPrevious: options.keepPrevious });
   useEffect(() => {
-    if (query.error) showToast("error", apiMessage(query.error, options.failure ?? "The system information could not be loaded."));
+    if (query.error && !options.silentError) showToast("error", apiMessage(query.error, options.failure ?? "The system information could not be loaded."));
   }, [query.error]);
   const reload = useCallback(async () => { await query.refetch(); }, [query.refetch]);
-  return [data, query.isFetching, reload, setData];
+  return [data, query.isFetching, reload, setData, query.error];
 }
 
 export function count(value: number): string {

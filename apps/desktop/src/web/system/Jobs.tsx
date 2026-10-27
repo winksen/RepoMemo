@@ -8,6 +8,7 @@ import { Pagination } from "../../components/ui/pagination";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dropdown } from "../../components/ui/dropdown";
 import { EmptyState } from "../../components/ui/empty-state";
+import { FeedbackNotice } from "../../components/ui/feedback-notice";
 import { Field } from "../../components/ui/field";
 import { LoadingState } from "../../components/ui/loading-state";
 import { showToast } from "../../components/ui/toast";
@@ -27,7 +28,7 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
   // Job changes in every workspace arrive on the System event stream; the
   // list then refreshes only now and then, as a safety net.
   const liveHub = useLiveEventHub("/v1/system/events", accessToken);
-  const [result, isLoading, reload] = useSystemData<{ items: SystemJob[]; total: number; nextCursor: string | null }>([...systemKeys.jobs(status), cursor], () => listSystemJobsPage(accessToken, status === "all" ? undefined : status, cursor), { refreshMs: liveHub.connected ? 60_000 : 10_000 });
+  const [result, isLoading, reload, , loadError] = useSystemData<{ items: SystemJob[]; total: number; nextCursor: string | null }>([...systemKeys.jobs(status), cursor], () => listSystemJobsPage(accessToken, status === "all" ? undefined : status, cursor), { refreshMs: liveHub.connected ? 60_000 : 10_000, silentError: true });
   const jobs = result?.items;
   const isLive = useLiveEvents((event) => {
     if (event.type === "resync" || event.type === "job") void invalidateKeys([systemKeys.jobsAll()]);
@@ -56,6 +57,7 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
         <Field label="Status">{(control) => <Dropdown id={control.id} onValueChange={(value) => { setStatus(value); setPage(0); setCursors([null]); }} options={[{ label: "All", value: "all" }, { label: "Running", value: "running" }, { label: "Failed", value: "failed" }, { label: "Completed", value: "completed" }, { label: "Cancelled", value: "cancelled" }]} value={status} />}</Field>
         <RefreshButton isLoading={isLoading} onClick={() => void reload()} />
       </div>
+      {loadError ? <FeedbackNotice action="Try again" detail={apiMessage(loadError)} kind="error" onAction={() => void reload()} title="Jobs could not be refreshed" /> : null}
       {jobs?.length ? <>
       <Table className="rm-dense-table rm-jobs-table">
         <thead><tr><th scope="col">Kind</th><th scope="col">Workspace</th><th scope="col">Status</th><th scope="col">Progress</th><th scope="col">Started</th><th scope="col">Updated</th><th scope="col">Detail</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
@@ -70,7 +72,7 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
         </tr>)}</tbody>
       </Table>
       <Pagination onPageChange={changePage} page={page} pageSize={24} total={result?.total ?? jobs.length} />
-      </> : jobs ? <EmptyState title="No jobs match" /> : <LoadingState label="Loading jobs" />}
+      </> : jobs ? <EmptyState action={status === "all" ? <Button onClick={() => void reload()} variant="secondary">Refresh jobs</Button> : <Button onClick={() => { setStatus("all"); setPage(0); setCursors([null]); }} variant="secondary">Show all jobs</Button>} description={status === "all" ? "New jobs appear here when workspace work is queued." : "Try another status or show all jobs to see the queue."} title={status === "all" ? "No jobs yet" : "No jobs match"} /> : isLoading ? <LoadingState label="Loading jobs" /> : loadError ? null : <EmptyState action={<Button onClick={() => void reload()} variant="secondary">Try again</Button>} description="The job list is not available yet." title="Jobs unavailable" />}
     </section>
   </>;
 }

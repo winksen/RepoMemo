@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.89 (2026-10-27)
+
+Workspace screens explain loading, partial results and failures with direct recovery.
+
+### Changed
+- Inline notices show workspace, evidence and task loading or fetch failures with retry actions.
+- Search timeouts and errors offer a new search; empty filtered evidence and tasks offer Clear filters.
+- Jobs distinguish an empty queue from a failed refresh, with recovery actions and no duplicate error toast.
+
+### Checks
+- Focused workspace and System feedback tests, TypeScript, styles, version and layout checks pass.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.88 (2026-10-27)
 
 Dense evidence and System views keep long values and actions readable.

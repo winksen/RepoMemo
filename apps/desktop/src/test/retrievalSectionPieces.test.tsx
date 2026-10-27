@@ -96,5 +96,7 @@ describe("retrieval on the shared pieces", () => {
     render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
     expect(await screen.findByText(/Search timed out after five seconds/)).toBeTruthy();
     expect(screen.queryByText("Search the evidence base")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Search again" }));
+    await waitFor(() => expect(searchSharedWorkspace).toHaveBeenCalledTimes(2));
   });
 });

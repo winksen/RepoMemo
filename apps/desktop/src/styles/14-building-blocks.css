@@ -119,6 +119,11 @@ th > .rm-badge,
 .rm-table td { font-variant-numeric: tabular-nums; }
 .rm-table tbody tr:hover { background: var(--color-surface-2); }
 .rm-table .rm-table-number { text-align: right; font-variant-numeric: tabular-nums; }
+.rm-feedback-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; margin: 12px 0; padding: 12px 14px; color: var(--color-text); background: var(--color-surface-2); border-radius: 8px; }
+.rm-feedback-notice strong { font-size: 13px; }
+.rm-feedback-notice p { margin: 3px 0 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.5; }
+.rm-feedback-notice .rm-button { flex: 0 0 auto; }
+.rm-feedback-error { background: var(--color-accent-soft); }
 .rm-dense-table .rm-table { table-layout: fixed; }
 .rm-dense-table .rm-table th,
 .rm-dense-table .rm-table td { min-width: 0; overflow-wrap: anywhere; }

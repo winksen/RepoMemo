@@ -3,6 +3,7 @@ import { IconAlertCircle as AlertCircle, IconLoader2 as Loader, IconSearch as Se
 import { cancelSharedJob, createSharedMemoryCard, getSharedRetrievalFacets, getSharedWorkspaceMetrics, getSharedWorkspaceOverview, listSharedArtifactWindow, listSharedIndexFailures, listSharedMemoryCards } from "../lib/sharedApi";
 import { type Citation, type IndexingJobStatus, type LiveEvent, type Organization, type SharedSession, type SharedWorkspace, type WorkspaceActivityEvent } from "../types";
 import { Button } from "../components/ui/button";
+import { FeedbackNotice } from "../components/ui/feedback-notice";
 import { PageHeader } from "../components/ui/page-header";
 import { WorkspaceIcon } from "./workspaceIcons";
 import { Checkbox } from "../components/ui/checkbox";
@@ -99,7 +100,6 @@ export function SharedWorkspaceDetail({
   // Only the first load, or a reload someone asked for, counts as loading; background refreshes stay quiet.
   const isLoading = isReloading || coreQueries.some((query) => query.isLoading);
   const loadError = coreQueries.find((query) => query.error)?.error ?? null;
-  useEffect(() => { if (loadError) setError(apiMessage(loadError)); }, [loadError]);
   // Running jobs seed the live progress panel once per fetch.
   useEffect(() => {
     if (runningJobsQuery.data) setLiveJobs(Object.fromEntries(runningJobsQuery.data.map((job) => [job.id, job])));
@@ -309,6 +309,8 @@ export function SharedWorkspaceDetail({
       <section className="shared-detail-shell" aria-busy={isLoading}>
         <PageHeader description={isEvidenceView ? "Store notes and files in the workspace. New evidence is indexed automatically, so it is ready for retrieval shortly after it is saved." : isDocumentsView ? "Upload Word, Excel, PowerPoint, PDF, OneNote and Outlook files, preview them here, and keep them alongside the workspace evidence ledger." : isRetrievalView ? "Search indexed workspace evidence and inspect the source context behind every result." : isMapView ? "See how far your files are through indexing and search by meaning, and how their content connects." : isRepositoriesView ? "Git repositories linked to this workspace. Each sync indexes what the branch has committed and keeps every file in step: edits update it in place, renames keep its comments and memory links, and deleted files leave search." : isReviewView ? "Everything that waits for a person in one list: files marked for review, memory cards whose evidence changed and open health findings. Each opens where it is resolved and leaves the list when it is." : isHealthView ? "Deterministic checks for stale versions, duplicates, documents that drifted from the code, and files search cannot see. Administrators decide what happens to each finding." : isMemoryView ? "Capture concise facts and decisions that should outlive the current investigation." : isTasksView ? "Turn evidence and decisions into assigned, trackable action items for the team." : isPeopleView ? "See who can access this workspace, and review what people and the AI have done." : isActivityView ? "A durable record of shared workspace changes, including evidence, memory, indexing, and membership updates." : isSettingsView ? "Administrators control workspace access and AI integrations here. Owner-only actions remain clearly marked." : "Artifacts, search results, and durable team memory are all retrieved through the protected shared API."} title={isEvidenceView ? "Evidence ledger" : isDocumentsView ? "Documents" : isRetrievalView ? "Retrieve evidence" : isMapView ? "Knowledge map" : isHealthView ? "Workspace health" : isReviewView ? "Review queue" : isRepositoriesView ? "Repositories" : isMemoryView ? "Durable team memory" : isTasksView ? "Tasks" : isPeopleView ? "People & Activity" : isSettingsView ? "Workspace settings" : null} icon={<WorkspaceIcon size="1em" workspace={workspace.workspace} />} scope={workspace.workspace.name} />
         <Toast kind="error" message={error} />
+        {isLoading ? <FeedbackNotice kind="loading" title={`Loading ${workspace.workspace.name}`} detail="The workspace sections will appear as their information arrives." /> : null}
+        {loadError ? <FeedbackNotice action="Try again" detail={apiMessage(loadError)} kind="error" onAction={() => void load()} title="Some workspace information is unavailable" /> : null}
         {memoryDraftDialog}
         {isRestrictedView ? <div className="shared-empty-state shared-admin-restricted-state"><Shield size={25} /><strong>Workspace administrator access required</strong><span>People, Activity, and Settings are reserved for workspace owners and administrators.</span><Button onClick={() => onNavigate("overview")} type="button" variant="secondary">Go to overview</Button></div> : <>
         {section === "overview" ? <OverviewSection key={workspaceId} page={page} /> : null}

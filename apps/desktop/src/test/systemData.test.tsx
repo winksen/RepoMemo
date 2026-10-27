@@ -44,6 +44,14 @@ describe("System pages and the query cache", () => {
     queryClient.setDefaultOptions({ queries: { retry: 1 } });
   });
 
+  it("exposes inline errors without duplicating them as toasts", async () => {
+    queryClient.setDefaultOptions({ queries: { retry: false } });
+    const { result } = renderHook(() => useSystemData<string[]>(systemKeys.jobsAll(), () => Promise.reject(new Error("Jobs unavailable")), { silentError: true }), { wrapper });
+    await waitFor(() => expect(result.current[4]?.message).toBe("Jobs unavailable"));
+    expect(showToast).not.toHaveBeenCalled();
+    queryClient.setDefaultOptions({ queries: { retry: 1 } });
+  });
+
   it("keeps showing the last answer while a changed filter is fetched, when asked to", async () => {
     let finish: (value: string[]) => void = () => undefined;
     const load = vi.fn().mockResolvedValueOnce(["30 days"]).mockReturnValueOnce(new Promise<string[]>((resolve) => { finish = resolve; }));

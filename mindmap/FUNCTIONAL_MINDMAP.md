@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.88` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.89` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -676,3 +676,9 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 - Evidence list rows show full wrapped paths, visible row actions and aligned multi-selection.
 - Jobs and users tables wrap long values within bounded columns; users can sort by name, connection or join date.
 - Task cards keep controls in one location and can be ordered by priority, due date or title.
+
+## V0.4.89 — Feedback and recovery
+
+- Workspace, evidence and task screens say when data is loading or unavailable and provide a retry action.
+- Search distinguishes incomplete timed-out results from a complete empty search and offers a rerun.
+- Empty filtered evidence and task views offer Clear filters; Jobs distinguishes an empty queue from an unavailable list.
