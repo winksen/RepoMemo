@@ -280,6 +280,7 @@ impl StorageEngine {
                 Some(SearchResult {
                     artifact_id: row.artifact_id,
                     chunk_id: row.chunk_id,
+                    status: None,
                     title: row.title,
                     path: row.path,
                     artifact_type: artifact_type_from_db(&row.artifact_type),
@@ -330,6 +331,7 @@ impl StorageEngine {
                 Some(SearchResult {
                     artifact_id: row.artifact_id,
                     chunk_id: row.chunk_id,
+                    status: None,
                     title: row.title,
                     path: row.path,
                     artifact_type: artifact_type_from_db(&row.artifact_type),
@@ -684,6 +686,20 @@ impl StorageEngine {
         if results.is_empty() {
             return Ok(());
         }
+        let mut lifecycle_query =
+            QueryBuilder::<Sqlite>::new("SELECT artifact_id, status FROM artifact_lifecycle WHERE artifact_id IN (");
+        let mut ids = lifecycle_query.separated(", ");
+        for result in results.iter() {
+            ids.push_bind(result.artifact_id.clone());
+        }
+        ids.push_unseparated(")");
+        let statuses = lifecycle_query
+            .build()
+            .map(|row: SqliteRow| (row.get::<String, _>("artifact_id"), row.get::<String, _>("status")))
+            .fetch_all(self.reader())
+            .await?
+            .into_iter()
+            .collect::<HashMap<_, _>>();
         let mut query = QueryBuilder::<Sqlite>::new(
             "SELECT artifact_id, commit_sha, last_author, last_authored_at FROM repo_files WHERE removed_at IS NULL AND artifact_id IN ("
         );
@@ -709,6 +725,12 @@ impl StorageEngine {
             .into_iter()
             .collect::<HashMap<_, _>>();
         for result in results.iter_mut() {
+            result.status = Some(
+                statuses
+                    .get(&result.artifact_id)
+                    .cloned()
+                    .unwrap_or_else(|| "active".to_owned()),
+            );
             if let Some((commit, author, at)) = commits.get(&result.artifact_id) {
                 result.commit = Some(commit.clone());
                 result.last_author = author.clone();

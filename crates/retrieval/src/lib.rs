@@ -447,6 +447,7 @@ mod tests {
         SearchResult {
             artifact_id: "a".to_owned(),
             chunk_id: chunk_id.to_owned(),
+            status: None,
             title: chunk_id.to_owned(),
             path: chunk_id.to_owned(),
             artifact_type: ArtifactType::MarkdownDoc,

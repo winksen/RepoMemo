@@ -43,6 +43,7 @@ async fn memory_cards_say_when_their_evidence_changed_and_citations_can_be_edite
         .await,
     )
     .await;
+    assert_eq!(hits[0]["status"], "active");
     let chunk_id = hits[0]["chunk_id"].as_str().unwrap().to_owned();
     let created = send(
         "POST",
@@ -96,11 +97,9 @@ async fn memory_cards_say_when_their_evidence_changed_and_citations_can_be_edite
         async move { response_json(response.await).await }
     };
     assert_eq!(search(json!({"query": "refunds"})).await.as_array().unwrap().len(), 0);
-    assert!(!search(json!({"query": "refunds", "lifecycle_statuses": ["outdated"]}))
-        .await
-        .as_array()
-        .unwrap()
-        .is_empty());
+    let outdated = search(json!({"query": "refunds", "lifecycle_statuses": ["outdated"]})).await;
+    assert!(!outdated.as_array().unwrap().is_empty());
+    assert_eq!(outdated[0]["status"], "outdated");
     assert_eq!(
         send(
             "POST",

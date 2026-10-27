@@ -1245,6 +1245,8 @@ pub struct SearchRequest {
 pub struct SearchResult {
     pub artifact_id: String,
     pub chunk_id: String,
+    #[serde(default)]
+    pub status: Option<String>,
     pub title: String,
     pub path: String,
     pub artifact_type: ArtifactType,

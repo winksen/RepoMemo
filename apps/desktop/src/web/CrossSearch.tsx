@@ -9,7 +9,7 @@ import { Field } from "../components/ui/field";
 import { PanelHeading } from "../components/ui/panel-heading";
 import { Input } from "../components/ui/input";
 import { showToast } from "../components/ui/toast";
-import { renderHighlightedSnippet } from "./common";
+import { SearchHitCard } from "./SearchHitCard";
 import { apiMessage, artifactTypeLabel } from "./format";
 import { navigate, routePath } from "./router";
 import { ICON_SIZE } from "../components/ui/icon";
@@ -71,14 +71,11 @@ export function CrossWorkspaceSearch({ accessToken }: { accessToken: string }) {
       </div>
       <Checkbox checked={withCards && !filesOnly} description={filesOnly ? "Cards are not files: they are left out while a kind of file or a language is chosen." : undefined} disabled={filesOnly} label="Include memory cards" onCheckedChange={setWithCards} />
     </form>
+    {isSearching ? <p className="shared-search-result-count" role="status">Searching all workspaces… {found ? `${total} previous results shown` : ""}</p> : null}
     {found ? <div className="shared-search-results" aria-live="polite">
       <p className="shared-search-result-count">{total ? `${found.results.length} ${found.results.length === 1 ? "result" : "results"}${cards.length ? ` and ${cards.length} memory ${cards.length === 1 ? "card" : "cards"}` : ""} for “${searchedFor}” in ${places}` : `Nothing matches “${searchedFor}” in ${places}.`}{found.not_searched ? ` ${found.not_searched} more were not searched; open one to search it alone.` : ""}</p>
       {found.results.map(({ workspace_id, workspace_name, result }) => <article key={`${workspace_id}-${result.chunk_id}`}>
-        <Button className="shared-search-result" onClick={() => navigate(routePath({ name: "artifact", workspaceId: workspace_id, artifactId: result.artifact_id }))} type="button" variant="secondary">
-          <span className="shared-search-result-heading"><strong>{result.title}</strong><span>{workspace_name} · {artifactTypeLabel(result.artifact_type)} · {result.source_name}</span></span>
-          <p>{renderHighlightedSnippet(result.snippet)}</p>
-          <span className="shared-search-result-path">{result.path}{result.start_line ? ` · line ${result.start_line}` : ""}</span>
-        </Button>
+        <SearchHitCard onOpen={() => navigate(routePath({ name: "artifact", workspaceId: workspace_id, artifactId: result.artifact_id }))} query={searchedFor} result={result} workspaceName={workspace_name} />
       </article>)}
       {cards.length ? <ul aria-label="Memory cards found" className="shared-cross-cards">
         {cards.map(({ workspace_id, workspace_name, card }) => <li key={card.id}>

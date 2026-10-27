@@ -77,13 +77,16 @@ describe("retrieval on the shared pieces", () => {
     vi.mocked(searchSharedWorkspace).mockResolvedValue({
       semanticAvailable: false,
       timedOut: false,
-      results: [{ artifact_id: "a1", chunk_id: "c1", title: "Login", path: "auth.md", artifact_type: "markdown_doc", language: null, snippet: "login", start_line: 3, end_line: 3, score: 1, source_name: "Docs", match_kind: "keyword", commit: null, last_author: null, last_changed_at: null }],
+      results: [{ artifact_id: "a1", chunk_id: "c1", status: "needs_review", title: "Login", path: "auth.md", artifact_type: "markdown_doc", language: null, snippet: "login", start_line: 3, end_line: 3, score: 1, source_name: "Docs", match_kind: "keyword", commit: null, last_author: null, last_changed_at: null }],
     });
     render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
     await waitFor(() => expect(searchSharedWorkspace).toHaveBeenCalled());
     expect((screen.getByLabelText("Search indexed evidence") as HTMLInputElement).value).toBe("login");
     expect(window.location.search).toContain("limit=10");
-    expect(await screen.findByText(/Keyword match: “login” · auth.md/)).toBeTruthy();
+    expect(await screen.findByText(/Keyword match: “login”/)).toBeTruthy();
+    expect(screen.getByText(/auth.md · line 3/)).toBeTruthy();
+    expect(screen.getByText("Needs review")).toBeTruthy();
+    expect(screen.getByText(/1 matching evidence result/)).toBeTruthy();
     expect(screen.getByText(/Semantic search is unavailable/)).toBeTruthy();
   });
 

@@ -1393,6 +1393,7 @@ impl From<SearchResultRow> for SearchResult {
         Self {
             artifact_id: row.artifact_id,
             chunk_id: row.chunk_id,
+            status: None,
             title: row.title,
             path: row.path,
             artifact_type: artifact_type_from_db(&row.artifact_type),

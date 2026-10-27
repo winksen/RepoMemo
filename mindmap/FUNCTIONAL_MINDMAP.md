@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.86` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.87` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -665,3 +665,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 - The rail keeps a workspace switcher available on every primary screen.
 - Search, evidence and review are the prominent default destinations; the open section stays visible even when it normally lives in More.
 - The workspace bar names both the workspace and current section.
+
+## V0.4.87 — Search result scanning
+
+- Workspace and cross-workspace results present a title, evidence state, path, source, match reason and passage preview in a consistent order.
+- Search controls and the previous result count remain visible while a new query runs.

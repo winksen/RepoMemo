@@ -1104,6 +1104,7 @@ export interface SearchRequest {
 export interface SearchResult {
   artifact_id: string;
   chunk_id: string;
+  status: string | null;
   title: string;
   path: string;
   artifact_type: ArtifactType;

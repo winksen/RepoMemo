@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.87 (2026-10-27)
+
+Search results are easier to compare and include evidence state.
+
+### Changed
+- Search responses carry the current evidence lifecycle status, including the active default for older records.
+- Workspace and cross-workspace results separate title, state, source, path, match reason and citation preview.
+- Result counts remain visible while a new search runs.
+
+### Checks
+- Focused search UI and lifecycle integration tests, Rust compilation, types, styles and version checks pass.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.86 (2026-10-27)
 
 Workspace navigation now leads with the sections used most often.
