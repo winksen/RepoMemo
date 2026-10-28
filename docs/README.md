@@ -9,6 +9,7 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 | Task | Guide |
 |---|---|
 | Understand what RepoMemo offers, add evidence, search, ask and keep memory | [User guide](USER_GUIDE.md) |
+| Search, Ask, citations and what they prove | [Search, Ask and citations](SEARCH_AND_ASK.md) |
 | Look up exactly how a feature behaves | [Functional mindmap](../mindmap/FUNCTIONAL_MINDMAP.md) |
 | Fix something that does not work when I start or sign in | [Troubleshooting](TROUBLESHOOTING.md) |
 

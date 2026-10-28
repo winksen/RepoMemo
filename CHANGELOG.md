@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.96 (2026-10-28)
+
+A guide to search, Ask and citations, with the no-AI path.
+
+### Changed
+- `docs/SEARCH_AND_ASK.md` explains keyword and semantic search, the retrieve-then-generate order of Ask, what a citation proves and does not, missing sources in exports, and provider limits with worked examples.
+- The documentation index links it.
+
+### Checks
+- `npm run docs:check` passes. Behavior statements were taken from the functional mindmap's retrieval sections (V0.4.78–V0.4.79) rather than run against a live provider.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.95 (2026-10-28)
 
 The user guide opens with five task workflows.
