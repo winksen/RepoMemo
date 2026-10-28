@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.95 (2026-10-28)
+
+The user guide opens with five task workflows.
+
+### Changed
+- A new section of the user guide walks through creating a workspace, adding evidence, reading the index state, reviewing sources and saving memory, each with who can do it, the steps and what to expect.
+- The guide's version stamp now names the 0.4 line.
+
+### Checks
+- `npm run docs:check` passes. The role requirements, index states and review actions were read against the functional mindmap and the web client's labels; the steps were not walked through in a running app.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.94 (2026-10-28)
 
 The first-run path is written from what was actually run.

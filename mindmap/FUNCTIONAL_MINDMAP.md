@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.94` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.95` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -709,3 +709,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - A new administrator sees the prerequisites, the images and when each runs, the seven setup steps (code, administrator, checks, access, logging, first workspace, review) and the default ports before starting.
 - The guides state that only the locally built container path has been run; the published-image pull, the TLS edge, upgrade and direct install await a tagged release.
+
+## V0.4.95 — User workflows
+
+- The user guide states five end-to-end workflows with their role requirement and expected result: create a workspace (owner or admin), add evidence (member and above), read the index state (Indexing…, Indexed, Not indexed), review sources, and save memory.
+- It separates stored text (notes, files, cards) from generated text (Ask answers, which are labelled and cited) so a reader knows what a citation lets them verify.
