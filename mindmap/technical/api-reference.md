@@ -1,6 +1,6 @@
 # HTTP API reference
 
-> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-214-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** V0.2.55. The rows are kept by hand (the guard column of the generator is a first read of each handler); `npm run docs:check` fails when a route of the server has no row, and the nine routes added since V0.2.6 (mail, verification, notification preferences) are in
+> **Branch of:** [TECHNICAL_MINDMAP.md §5](../TECHNICAL_MINDMAP.md#5-http-api-reference-214-operations-under-v1) · **Generated** from the router and the handler signatures by `node scripts/list-routes.mjs --markdown`; the guard column is read from the handler bodies, so check a route's handler before relying on a row · **Status:** kept current by `npm run docs:check`, which fails when a route of the server has no row. For a script, start with [Using the API from scripts](../../docs/API.md).
 
 207 routes of the main router (method and path pairs), plus the platform routes (`/v1/platform/*`, [environment.rs](../../apps/server/src/environment.rs), served before an environment is attached) and the avatar routes (`/v1/users/{id}/avatar`, `/v1/profile/avatar`, [avatars.rs](../../apps/server/src/avatars.rs)).
 
@@ -8,6 +8,7 @@
 
 | | |
 |---|---|
+| **Audience** | Sections for workspace content (workspaces, evidence, retrieval and memory, collaboration, jobs and events) are for scripts with a token. Administration sections need the `admin` or `system` scope. **Internal, not for scripts:** sign-in, session and cookie routes, profile and notifications (used by the apps), health and setup, `/v1/platform/*`, the System console route, avatars, and webhook receivers (called by Git hosts). Any route can change between minor releases before 1.0; the changelog says when one does. See [docs/API.md](../../docs/API.md#6-which-routes-are-for-scripts) |
 | **Base** | JSON over HTTPS, `Content-Type: application/json`. File uploads send the bytes as the body with `X-RepoMemo-Filename` (percent-encoded) and optionally `X-RepoMemo-Folder-Id` |
 | **Authentication** | `Authorization: Bearer <access token>` (a JWT from sign-in) or a personal access token (`rmp_…`). The web app also sends `X-RepoMemo-Client: web`, which makes the refresh token travel in an `HttpOnly` cookie |
 | **Authentication column** | *public*: none. *auth*: any session or token (read-only tokens only on GET and HEAD). *reading*: like auth, and a read-only token may make this POST because it only reads. *managing*: a signed-in session, or a personal access token with the `admin` scope (V0.2.140): what grants access, deletes, repoints, links or exports. *session*: a signed-in session only, never a token. *signed link*: the link's own token |

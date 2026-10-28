@@ -50,6 +50,7 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 
 | Task | Guide |
 |---|---|
+| Read and write from a script with a token, step by step | [Using the API from scripts](API.md) |
 | Every route, with its method, path and role | [API reference](../mindmap/technical/api-reference.md) |
 | Authentication and tokens | [Authentication and authorization](../mindmap/technical/auth-and-authorization.md) |
 

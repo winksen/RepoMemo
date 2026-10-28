@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.100` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.101` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -739,3 +739,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - One guide says what each secret protects and what happens when it changes: a new session secret signs everyone out; a new stored-credentials key means provider keys and repository tokens are entered again, because there is no previous-key setting for it; a new backup key moves the old one to the previous-key setting and seals older backups again.
 - It lists credential lifetimes, the cloud AI consent rule, trusted-proxy and TLS settings, what the audit trail and security log record, and how to verify access and audit after a rotation.
+
+## V0.4.101 — API for scripts
+
+- A token user can list workspaces, search, page through evidence with a cursor, add a note or file, create a task and a memory card, and follow a live event stream, with the scope each needs (read, write, admin, system).
+- The documentation names which routes are for scripts and which are internal (sign-in and cookies, setup, platform, console, avatars, webhook receivers); before 1.0 any route can change between minor releases.

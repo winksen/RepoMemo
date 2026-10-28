@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.101 (2026-10-28)
+
+An API guide for scripts that use personal access tokens.
+
+### Changed
+- `docs/API.md` explains token scopes, errors, paging, search budgets, limits and uploads, then walks a read workflow (workspaces, search, paged evidence) and a write workflow (note, upload, task, memory card), event streams, and which routes are for scripts.
+- The API reference marks its audience: content sections for scripts, administration by scope, and sign-in, setup, platform, console, avatar and webhook routes as internal; its stale status line is replaced.
+
+### Checks
+- `npm run docs:check` passes, and a one-off check of every `docs/*.md` page's links also passes.
+- Request bodies, header names, task states and scopes were read from the server's request types and storage rules. The curl workflows were not run against a live server.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.100 (2026-10-28)
 
 A security administration guide with safe rotation sequences.
