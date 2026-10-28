@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.93` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.94` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -704,3 +704,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - `docs/README.md` answers "which page do I read for this task?" for users, workspace owners, system administrators, operators and API users, and lists contributor references. Historical pages are named as unmaintained records.
 - Each task has one canonical guide; the index links to it rather than restating it.
+
+## V0.4.94 — First run
+
+- A new administrator sees the prerequisites, the images and when each runs, the seven setup steps (code, administrator, checks, access, logging, first workspace, review) and the default ports before starting.
+- The guides state that only the locally built container path has been run; the published-image pull, the TLS edge, upgrade and direct install await a tagged release.

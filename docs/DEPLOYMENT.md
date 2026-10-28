@@ -14,6 +14,9 @@ what to do in what order.
 | How it is upgraded | `deploy/upgrade.sh --version X.Y.Z` (backup, pull, wait until healthy, the old version back if not) | the new archive's installer; the old release stays for a way back ([DIRECT_UPGRADE.md](DIRECT_UPGRADE.md)) |
 | Choose it when | you already run containers, or want the least to maintain | you cannot run containers, or want the server under your own service manager |
 
+**Status.** The container path has been run from locally built images on one Windows host; the released-image pull, the edge, upgrades and the direct install
+have not been run against a published release (none is tagged). [What has been tested](QUICK_START.md#what-has-been-tested) says exactly what.
+
 If in doubt, choose containers. Both run the same server and keep the same data; a direct install can move to containers later by
 restoring a backup.
 
@@ -57,8 +60,8 @@ entered again. The page [QUICK_START.md](QUICK_START.md) has the careful way to 
 
 ### Then, for both
 
-1. Open the address and finish the **first-run setup**: the setup code is in the server's log, or the value of `REPOMEMO_SETUP_CODE` if you
-   set one. You create the first system administrator.
+1. Open the address and finish the **first-run setup** (seven steps: [QUICK_START.md](QUICK_START.md#first-sign-in)): the setup code is in the server's
+   log, or the value of `REPOMEMO_SETUP_CODE` if you set one. You create the first system administrator.
 2. Look: *System › Overview* names the version, the free disk and the last backup; `https://<host>/health` answers; a search returns
    results after you add a file.
 3. **Make the first backup now** (§ 4) and copy it off the machine, before anyone depends on the server.

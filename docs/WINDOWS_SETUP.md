@@ -1,5 +1,9 @@
 # RepoMemo Windows Setup
 
+This page is for **building RepoMemo from source** on Windows. To run a server for a team, use the [quick start](QUICK_START.md) (Docker Desktop with the Linux
+engine, then `deployinit.ps1` in PowerShell or `init.sh` in Git Bash) or the direct install in [Deploying RepoMemo](DEPLOYMENT.md). To give people the
+desktop app, see the [desktop administrator guide](DESKTOP_ADMIN.md).
+
 RepoMemo uses a React frontend and a Rust/Tauri desktop backend. The frontend can typecheck and build with Node alone, but the desktop app requires Rust/Cargo.
 
 ## Current Required Tools
