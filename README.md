@@ -15,7 +15,7 @@ Engineering knowledge is scattered across code, Markdown docs, Office files, scr
 
 It is **evidence-first**. Storing, browsing, indexing and searching work without AI. AI is an optional layer, and it answers only from your indexed evidence, with a citation to the file and lines it used.
 
-**Current version:** `0.4.92`. Releases before `1.0` may change APIs and storage formats; read the *Upgrading* part of the [changelog](CHANGELOG.md) before you upgrade.
+**Current version:** `0.4.93`. Releases before `1.0` may change APIs and storage formats; read the *Upgrading* part of the [changelog](CHANGELOG.md) before you upgrade.
 
 ## What it does
 
@@ -52,6 +52,8 @@ A browser is enough to use a server. The desktop app is the same client in its o
 | Stuck | Fix a start or first-run error | [Troubleshooting](docs/TROUBLESHOOTING.md) |
 | A contributor | Know what the product does and how it works | [Functional mindmap](mindmap/FUNCTIONAL_MINDMAP.md), [Technical mindmap](mindmap/TECHNICAL_MINDMAP.md) |
 | Planning | See what shipped and what is next | [Roadmap](mindmap/ROADMAP.md) |
+
+Every guide, by task and role: [docs/README.md](docs/README.md).
 
 ## Development quick start
 

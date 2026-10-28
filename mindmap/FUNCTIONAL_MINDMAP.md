@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.92` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.93` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -699,3 +699,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - The README states the current version and what RepoMemo is in one screen, then offers the four ways to run it: containers, direct install, the desktop app and a development checkout.
 - A role table sends users, administrators, contributors and planners to their guide. Feature detail lives in the user guide and the functional mindmap, not in the README.
+
+## V0.4.93 — Documentation index
+
+- `docs/README.md` answers "which page do I read for this task?" for users, workspace owners, system administrators, operators and API users, and lists contributor references. Historical pages are named as unmaintained records.
+- Each task has one canonical guide; the index links to it rather than restating it.

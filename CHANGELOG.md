@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.93 (2026-10-28)
+
+A task-based documentation index for every reader.
+
+### Changed
+- `docs/README.md` lists one canonical guide for each task, grouped for users, workspace owners, system administrators, operators, API users and contributors.
+- The README links to it, and `docs:check` now checks its links.
+
+### Checks
+- `npm run docs:check` passes with `docs/README.md` among the checked documents.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.92 (2026-10-28)
 
 The README is a short, current entry point.

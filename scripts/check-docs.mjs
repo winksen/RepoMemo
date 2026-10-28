@@ -114,7 +114,7 @@ const slugsOf = (path) => {
 };
 const documents = [
   ...walk(join(root, "mindmap"), (file) => file.endsWith(".md") && !/[\\/]analysis[\\/]/.test(file)),
-  ...["README.md", "CHANGELOG.md", "UPGRADING.md", "PRODUCT.md", join("docs", "DEVELOPMENT_COMMANDS.md"), join("docs", "TEMPLATES.md")].map((file) => join(root, file)),
+  ...["README.md", "CHANGELOG.md", "UPGRADING.md", "PRODUCT.md", join("docs", "README.md"), join("docs", "DEVELOPMENT_COMMANDS.md"), join("docs", "TEMPLATES.md")].map((file) => join(root, file)),
 ];
 for (const document of documents) {
   let fenced = false;
