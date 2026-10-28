@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.97 (2026-10-28)
+
+A guide to the team review lifecycle.
+
+### Changed
+- `docs/COLLABORATION.md` follows an item from flagged to verified to memory: review states, comments and mentions, the task board, notifications, saved searches, a worked example and how an owner audits the lifecycle.
+- The documentation index links it.
+
+### Checks
+- `npm run docs:check` passes. Rules were taken from the functional mindmap's collaboration, review-queue and notification sections; the flow was not replayed in a running app.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.96 (2026-10-28)
 
 A guide to search, Ask and citations, with the no-AI path.
