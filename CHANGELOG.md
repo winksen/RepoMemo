@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.103 (2026-10-28)
+
+A trace from each major request and background job to its code and data stores.
+
+### Changed
+- `mindmap/technical/request-and-job-trace.md` maps the pieces (server, core, storage, ingestion, retrieval, AI, mail, console, client), the data stores, the request path through limits, authentication and guards, nine request traces, seven background job kinds, the desktop transport, and the deployment topology and security boundaries.
+- The documentation index links it for contributors.
+
+### Checks
+- `npm run docs:check` passes. File and function names were checked against the repository with search; the page was not exercised against a running server.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.102 (2026-10-28)
 
 The functional reference and PRODUCT.md no longer describe unshipped work as shipped.

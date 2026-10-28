@@ -60,6 +60,7 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 |---|---|
 | Build, run and test it | [Development commands](DEVELOPMENT_COMMANDS.md), [Windows setup](WINDOWS_SETUP.md) |
 | How it works | [Technical mindmap](../mindmap/TECHNICAL_MINDMAP.md) |
+| Trace a request or a background job to its code and data | [Request and job trace](../mindmap/technical/request-and-job-trace.md) |
 | What shipped and what comes next | [Roadmap](../mindmap/ROADMAP.md), [0.4 releases](../mindmap/RELEASES_0.4.md) |
 | Why a choice was made | [Architecture decisions](decisions/) |
 | Visual rules | [Design](../DESIGN.md), [Product](../PRODUCT.md) |
