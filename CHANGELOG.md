@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.99 (2026-10-28)
+
+An operator runbook for health, logs, jobs, backup, restore, upgrade and rollback.
+
+### Changed
+- `docs/RUNBOOK.md` gives each routine a command, the signal that means healthy and the recovery when it is not: health checks, logs, metrics, jobs and maintenance, disk, backup, restore, upgrade, rollback and a failed-upgrade table.
+- It closes with what was verified and what was not, and the documentation index links it.
+
+### Checks
+- `npm run docs:check` passes, and a one-off check of every `docs/*.md` page's links also passes.
+- Console commands were matched to the admin console catalog and the scripts' arguments. `deploy/upgrade.sh` against released images was not run because no tag exists.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.98 (2026-10-28)
 
 An administrator path from an empty host to a working team.

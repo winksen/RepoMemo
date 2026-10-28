@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.98` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.99` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -729,3 +729,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - One page orders the administrator's work: install (host operator), first-run setup (becomes the system administrator), settings and mail, the first backup, organization and workspace, invitations, AI and the desktop app, with the account that does each.
 - It states the invitation rules (single use, tied to an email address, seven days; admins grant only member or viewer; no owner is assigned in the interface) and how a leaver is deactivated and, if required, anonymized.
+
+## V0.4.99 — Operator runbook
+
+- One page lists the routine checks (health, logs, metrics, jobs, disk) and the procedures for backup, restore, upgrade and rollback, each with what a healthy result looks like and what to do when it is not.
+- A restore never overwrites the running environment; the way back from an upgrade is the pre-upgrade backup, because a migration that ran is not undone. The page says that `upgrade.sh` was not run against released images.
