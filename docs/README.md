@@ -41,7 +41,8 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 | Health, logs, jobs, backup, restore and limits | [Production guide](../mindmap/technical/operations.md) |
 | Day-to-day procedures: health, logs, jobs, backup, restore, upgrade, rollback | [Operator runbook](RUNBOOK.md) |
 | The command console | [Admin console](../mindmap/technical/admin-console.md) |
-| Sign-in, tokens and permissions | [Authentication and authorization](../mindmap/technical/auth-and-authorization.md) |
+| Rotate secrets, manage tokens and sessions, TLS, proxies, audit | [Security administration](SECURITY_ADMIN.md) |
+| How sign-in, tokens and permissions work | [Authentication and authorization](../mindmap/technical/auth-and-authorization.md) |
 | Diagnose a start or first-run error | [Troubleshooting](TROUBLESHOOTING.md) |
 | Every server setting | [Development commands](DEVELOPMENT_COMMANDS.md) |
 

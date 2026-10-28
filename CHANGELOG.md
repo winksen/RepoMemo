@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.100 (2026-10-28)
+
+A security administration guide with safe rotation sequences.
+
+### Changed
+- `docs/SECURITY_ADMIN.md` lists each secret and what it protects, every credential lifetime, and a safe sequence to rotate the session secret, the stored-credentials key, the backup key, a personal access token and a provider key.
+- It covers cloud AI consent, TLS and trusted proxies, what the audit trail and security log record, and a checklist to verify access and audit behavior after a rotation.
+
+### Checks
+- `npm run docs:check` passes, and a one-off check of every `docs/*.md` page's links also passes.
+- Lifetimes, defaults and rotation limits were read from the authentication page and the settings reference. The sequences were not rehearsed on a running server.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.99 (2026-10-28)
 
 An operator runbook for health, logs, jobs, backup, restore, upgrade and rollback.

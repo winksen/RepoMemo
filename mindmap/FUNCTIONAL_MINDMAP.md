@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.99` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.100` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -734,3 +734,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - One page lists the routine checks (health, logs, metrics, jobs, disk) and the procedures for backup, restore, upgrade and rollback, each with what a healthy result looks like and what to do when it is not.
 - A restore never overwrites the running environment; the way back from an upgrade is the pre-upgrade backup, because a migration that ran is not undone. The page says that `upgrade.sh` was not run against released images.
+
+## V0.4.100 — Security administration guide
+
+- One guide says what each secret protects and what happens when it changes: a new session secret signs everyone out; a new stored-credentials key means provider keys and repository tokens are entered again, because there is no previous-key setting for it; a new backup key moves the old one to the previous-key setting and seals older backups again.
+- It lists credential lifetimes, the cloud AI consent rule, trusted-proxy and TLS settings, what the audit trail and security log record, and how to verify access and audit after a rotation.
