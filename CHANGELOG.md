@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.104 (2026-10-28)
+
+The documentation check covers every guide, version claims, command examples and setup paths.
+
+### Changed
+- `npm run docs:check` now checks the links of every guide in `docs/`, that the README's current version is the product's, that each `npm run` script, `deploy/` file and `repomemo-console` command shown in a guide exists, that no guide uses Compose v1 syntax or a second quick start URL, and that the Node and Rust prerequisites match `package.json` and `Cargo.toml`.
+- A read-through of the README, quick start, user guide and administrator path fixed one contradiction: the user guide said saved searches are not in workspace archives, which the functional mindmap says they have been since V0.3.19.
+
+### Checks
+- `npm run docs:check` passes with the new rules, and fails with the expected messages when a README version, an npm script, a console command, a `deploy/` file and a Compose v1 command are made wrong on purpose.
+- The read-through was done by reading the documents against the code and the mindmaps. Nobody followed the user or administrator workflows in a running app or on a clean machine, so those walkthroughs remain open for V0.4.105.
+
+### Upgrading
+- No migration is required.
+
 ## V0.4.103 (2026-10-28)
 
 A trace from each major request and background job to its code and data stores.

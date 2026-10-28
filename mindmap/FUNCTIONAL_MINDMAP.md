@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.103` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.104` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -782,3 +782,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - The technical documentation now has one page that follows an upload, a search, an Ask, a lifecycle change, a backup and a restore from the HTTP route to the data it reads and writes.
 - It also lists the background jobs (indexing, embedding, repository and connector sync, maintenance, backup, mail), how each starts and fails, and the boundaries between the internet, proxy, server, documents, providers and the operator.
+
+## V0.4.104 — Documentation checked
+
+- The documentation check now fails on a dead link in any guide, a wrong version in the README, a command example that does not exist, Compose v1 syntax, a second quick start URL, and a Node or Rust prerequisite that disagrees with the project files.
+- A read-through from the README to the user and administrator paths found one contradiction (saved searches in archives) and fixed it. Following the workflows in a running product was not done and remains open.

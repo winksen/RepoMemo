@@ -12,7 +12,11 @@
 //   4. Every release of an index (0.2, 0.3, 0.4) marked done has an entry in CHANGELOG.md, and every
 //      entry of the changelog from 0.2.1 on has a row in its index.
 //   5. Every relative link of the documents points at a file that exists and, in a Markdown file,
-//      at a heading that exists.
+//      at a heading that exists. Every guide in docs/ is among the documents.
+//   6. The version the README states is the product's version.
+//   7. The commands the guides show exist: npm scripts, files under deploy/ and console commands.
+//   8. The setup paths agree: one fetch URL for the quick start, no Compose v1 syntax, and the
+//      prerequisites (Node, Rust) match package.json and Cargo.toml.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -114,7 +118,11 @@ const slugsOf = (path) => {
 };
 const documents = [
   ...walk(join(root, "mindmap"), (file) => file.endsWith(".md") && !/[\\/]analysis[\\/]/.test(file)),
-  ...["README.md", "CHANGELOG.md", "UPGRADING.md", "PRODUCT.md", join("docs", "README.md"), join("docs", "DEVELOPMENT_COMMANDS.md"), join("docs", "TEMPLATES.md")].map((file) => join(root, file)),
+  ...["README.md", "CHANGELOG.md", "UPGRADING.md", "PRODUCT.md"].map((file) => join(root, file)),
+  // Every guide of docs/ (the retired tracker and the design blueprint are records, not guides).
+  ...readdirSync(join(root, "docs"))
+    .filter((file) => file.endsWith(".md") && !["IMPLEMENTATION_TRACKER.md", "DESIGN_BLUEPRINT.md"].includes(file))
+    .map((file) => join(root, "docs", file)),
 ];
 for (const document of documents) {
   let fenced = false;
@@ -134,6 +142,52 @@ for (const document of documents) {
     }
   });
 }
+
+// 6. The README's version ---------------------------------------------------
+const readmeVersion = /\*\*Current version:\*\* `([\d.]+)`/.exec(read("README.md"))?.[1];
+if (readmeVersion !== version) problems.push(`README.md says the current version is ${readmeVersion ?? "?"}; the product is ${version}`);
+
+// 7. Command examples --------------------------------------------------------
+// A script of the root package, or of the desktop workspace (run with --workspace).
+const scripts = new Set([...Object.keys(JSON.parse(read("package.json")).scripts), ...Object.keys(JSON.parse(read("apps/desktop/package.json")).scripts)]);
+const consoleCommands = new Set(
+  [...read("mindmap/technical/admin-console.md").matchAll(/^\| `([a-z]+(?: [a-z]+)?)/gm)].flatMap((match) => [match[1], match[1].split(" ")[0]]),
+);
+const guides = documents.filter((file) => !/^(CHANGELOG|UPGRADING)/.test(relative(root, file)) && !relative(root, file).startsWith("mindmap"));
+
+for (const document of guides) {
+  const name = relative(root, document);
+  const text = read(name);
+  for (const match of text.matchAll(/npm run ([\w:.-]+)/g)) {
+    if (!scripts.has(match[1])) problems.push(`${name}: "npm run ${match[1]}" is not a script of package.json`);
+  }
+  for (const match of text.matchAll(/\b(deploy[\\/][\w./\\-]+\.(?:sh|ps1))/g)) {
+    if (!existsSync(join(root, match[1].replace(/\\/g, "/")))) problems.push(`${name}: ${match[1]} does not exist`);
+  }
+  for (const match of text.matchAll(/repomemo-console ([a-z]+)(?: ([a-z]+))?/g)) {
+    if (!consoleCommands.has(match[1]) && !(match[2] && consoleCommands.has(`${match[1]} ${match[2]}`))) {
+      problems.push(`${name}: the console command "${match[1]}${match[2] ? ` ${match[2]}` : ""}" is not in mindmap/technical/admin-console.md`);
+    }
+  }
+}
+
+// 8. Setup paths agree ---------------------------------------------------------
+const nodeMinimum = /"node": ">=([\d.]+)"/.exec(read("package.json"))?.[1];
+const rustMinimum = /rust-version = "([\d.]+)"/.exec(read("Cargo.toml"))?.[1];
+const fetchUrls = new Set();
+for (const document of guides) {
+  const name = relative(root, document);
+  const text = read(name);
+  if (/docker-compose(?![.\w-])/.test(text)) problems.push(`${name}: uses "docker-compose" (Compose v1); the guides use "docker compose"`);
+  for (const match of text.matchAll(/https:\/\/github\.com\/[\w-]+\/[\w-]+\/releases\/latest\/download\/quickstart\.sh/g)) fetchUrls.add(match[0]);
+  for (const match of text.matchAll(/Node(?:\.js)?\s+(\d+\.\d+)\+/g)) {
+    if (nodeMinimum && !nodeMinimum.startsWith(match[1])) problems.push(`${name}: asks for Node ${match[1]}+; package.json needs ${nodeMinimum}`);
+  }
+  for (const match of text.matchAll(/Rust[^\n]{0,60}?\((\d+\.\d+) or later\)/g)) {
+    if (rustMinimum && match[1] !== rustMinimum) problems.push(`${name}: asks for Rust ${match[1]}; Cargo.toml needs ${rustMinimum}`);
+  }
+}
+if (fetchUrls.size > 1) problems.push(`The guides show more than one quick start URL: ${[...fetchUrls].join(", ")}`);
 
 if (problems.length) {
   for (const problem of problems) console.error(`✗ ${problem}`);

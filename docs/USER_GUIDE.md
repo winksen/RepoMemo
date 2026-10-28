@@ -457,7 +457,7 @@ To set expectations:
 - **Single sign-on (SSO)** isn't available.
 - Issue and pull-request connectors cover **GitHub and GitLab** only.
 - A workspace **template** arranges what exists; it doesn't add new sections, and an organization can't save its own template for all its workspaces yet.
-- Archives are a copy, not a continuous sync. Saved searches, assistant chats and the activity feed aren't in them.
+- Archives are a copy, not a continuous sync. Assistant chats and the activity feed aren't in them (saved searches are).
 - `CODEOWNERS` owners are matched to members only when written as an email address; `@handles` and teams stay hints, and nobody is asked to review unless you press **Ask to review**.
 
 ---
