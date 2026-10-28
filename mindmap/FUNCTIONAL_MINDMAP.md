@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.97` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.98` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -724,3 +724,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - One guide covers the review states and who sets them, threaded comments and @mentions (only workspace members, never the author, only people a save adds), the four-column task board, the four notification kinds with their channels and digest, snoozing and saved searches.
 - It ends with an end-to-end example and the three audit points for an owner: the Activity feed, each item's lifecycle history and the Review count.
+
+## V0.4.98 — Administrator guide
+
+- One page orders the administrator's work: install (host operator), first-run setup (becomes the system administrator), settings and mail, the first backup, organization and workspace, invitations, AI and the desktop app, with the account that does each.
+- It states the invitation rules (single use, tied to an email address, seven days; admins grant only member or viewer; no owner is assigned in the interface) and how a leaver is deactivated and, if required, anonymized.

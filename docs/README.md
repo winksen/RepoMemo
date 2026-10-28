@@ -25,6 +25,7 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 
 | Task | Guide |
 |---|---|
+| Follow the whole setup path, and know which account does each step | [Administrator guide](ADMIN_GUIDE.md) |
 | Choose containers or a direct install, size the host, make the first backup | [Deploying RepoMemo](DEPLOYMENT.md) |
 | Install from a release in containers | [Quick start](QUICK_START.md) |
 | Install without containers and put a front door in front | [Front doors](FRONT_DOORS.md) |
