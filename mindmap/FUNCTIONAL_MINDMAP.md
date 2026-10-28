@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.91` (2026-10-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.92` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -694,3 +694,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 - At 320 CSS pixels, including a 640 pixel window at 200% zoom, the header puts account actions on their own row rather than hiding them.
 - Search result metadata, notices and dialog actions wrap inside the available width. The narrow page keeps vertical scrolling available.
 - Focused layout checks cover those rules; live zoom validation remains open because the local preview was unreachable.
+
+## V0.4.92 — README entry point
+
+- The README states the current version and what RepoMemo is in one screen, then offers the four ways to run it: containers, direct install, the desktop app and a development checkout.
+- A role table sends users, administrators, contributors and planners to their guide. Feature detail lives in the user guide and the functional mindmap, not in the README.

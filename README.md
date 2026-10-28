@@ -11,105 +11,77 @@
 
 ## What is RepoMemo?
 
-Engineering knowledge is scattered across code, Markdown docs, Word files, screenshots, runbooks and people's heads. RepoMemo gives a team one place to keep that **evidence**. It makes the evidence **searchable** and turns what the team learns into **durable, cited memory**.
+Engineering knowledge is scattered across code, Markdown docs, Office files, screenshots, runbooks and people's heads. RepoMemo gives a team one place to keep that **evidence**, makes it **searchable**, and turns what the team learns into **durable, cited memory**.
 
-It is **evidence-first**. Storing, browsing, indexing and searching all work without AI. AI is an optional layer, and it is only allowed to answer from your indexed evidence, with a citation to the exact file and lines it used.
+It is **evidence-first**. Storing, browsing, indexing and searching work without AI. AI is an optional layer, and it answers only from your indexed evidence, with a citation to the file and lines it used.
 
-## Features
+**Current version:** `0.4.92`. Releases before `1.0` may change APIs and storage formats; read the *Upgrading* part of the [changelog](CHANGELOG.md) before you upgrade.
 
-| | |
-|---|---|
-| 🗂️ **Evidence workspaces** | Organizations and workspaces with owner, admin, member and viewer roles |
-| 📥 **Capture** | Paste notes, or upload code, Markdown, Word documents and images of up to 10 MiB |
-| 🔎 **Index & search** | Heading-aware chunking, code symbols for TS/JS/Python/Rust, ranked full-text search with filters, and saved searches |
-| 🤖 **Ask with citations** | Optional AI through local **Ollama** or cloud **OpenRouter**. Answers and workspace overviews are grounded in retrieved evidence |
-| 🧠 **Memory cards** | Keep conclusions as durable, evidence-linked cards, with Markdown export |
-| ✅ **Review & collaborate** | Evidence lifecycle (verified, outdated, superseded), comments with @mentions, a task board with checklists, notifications, an activity feed and metrics |
-| 🔒 **Private by default** | Self-hosted server, and nothing is sent to an AI provider until an admin enables one explicitly |
+## What it does
 
-## How it works
+- **Workspaces** inside organizations, with owner, admin, member and viewer roles.
+- **Evidence** from notes, uploaded files and folders, Office documents, PDFs, emails, images and git repositories.
+- **Search** by keyword and by meaning, with filters and saved searches. **Ask** for cited answers when an AI provider is set up.
+- **Memory cards** that keep conclusions linked to their evidence.
+- **Review and collaboration**: evidence status, comments, tasks, notifications, an activity feed.
+- **Private by default**: a self-hosted server, and nothing is sent to an AI provider until an administrator turns one on.
 
 ```
- Browser (React SPA)  ──JWT──►  RepoMemo API (Rust · Axum)  ──►  SQLite + content-addressed file store
-                                        │
-                                        └──► optional AI provider (Ollama / OpenRouter)
+ Browser or desktop window ──►  RepoMemo server (Rust · Axum)  ──►  SQLite + file store
+                                          │
+                                          └──► optional AI provider (Ollama / OpenRouter)
 ```
 
-RepoMemo can be run two ways:
+## Choose how to run it
 
-- **Shared mode (primary).** A self-hosted API server and a web client for teams.
-- **Desktop app.** A Tauri window onto a server (since V0.2.49): it asks for the server's address, keeps the session in the system credential store and shows the same pages as the browser.
-## Quick start (shared mode)
+| You want to… | Use | Start here |
+|---|---|---|
+| Run a server for a team | **Containers** (preferred) | [Quick start](docs/QUICK_START.md) |
+| Run a server without containers | **Direct install** (Linux service or Windows) | [Deploying RepoMemo](docs/DEPLOYMENT.md) |
+| Use a server from a desktop window | **Desktop app**, which asks for your server's address | [Desktop files](docs/DESKTOP_FILES.md) |
+| Change RepoMemo itself | **Development checkout** | [Development quick start](#development-quick-start) |
 
-**Prerequisites:** Node.js 22.12+, npm 10+, and the stable Rust toolchain (1.88 or later). For Windows specifics, see [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).
+A browser is enough to use a server. The desktop app is the same client in its own window.
+
+## Find the right guide
+
+| I am… | I want to… | Read |
+|---|---|---|
+| A user | Add evidence, search, ask and keep memory | [User guide](docs/USER_GUIDE.md) |
+| An administrator | Install, back up and upgrade a server | [Deploying RepoMemo](docs/DEPLOYMENT.md) |
+| Stuck | Fix a start or first-run error | [Troubleshooting](docs/TROUBLESHOOTING.md) |
+| A contributor | Know what the product does and how it works | [Functional mindmap](mindmap/FUNCTIONAL_MINDMAP.md), [Technical mindmap](mindmap/TECHNICAL_MINDMAP.md) |
+| Planning | See what shipped and what is next | [Roadmap](mindmap/ROADMAP.md) |
+
+## Development quick start
+
+**Prerequisites:** Node.js 22.12+, npm 10+, and the stable Rust toolchain (1.88 or later). On Windows, see [docs/WINDOWS_SETUP.md](docs/WINDOWS_SETUP.md).
 
 ```bash
 npm install
-```
-
-Start the API on `127.0.0.1:3020`. It needs a JWT secret of at least 32 characters.
-
-```bash
 REPOMEMO_JWT_SECRET="replace-with-a-random-secret-of-32+-chars" cargo run -p repomemo-server
 ```
 
-In PowerShell, set the secret with `$env:REPOMEMO_JWT_SECRET = '...'` before running `cargo run -p repomemo-server`.
-
-Start the web client on `127.0.0.1:3021` from a second terminal:
+In PowerShell, set `$env:REPOMEMO_JWT_SECRET = '...'` first. The server listens on `127.0.0.1:3020`. In a second terminal, start the web client:
 
 ```bash
 npm run web:dev
 ```
 
-Open <http://127.0.0.1:3021>, create an account, create an organization and a workspace, and add some evidence.
-
-**Desktop app** (asks for your server's address on first start):
-
-```bash
-npm run dev
-```
-
-More commands, including tests, builds and the worker, are in [docs/DEVELOPMENT_COMMANDS.md](docs/DEVELOPMENT_COMMANDS.md).
-
-## Documentation
-
-The documentation starts in the **[`mindmap/`](mindmap/)** folder:
-
-| Document | For | What it covers |
-|---|---|---|
-| 📖 **[User guide](docs/USER_GUIDE.md)** | Users and admins | A light tour of what RepoMemo offers, with diagrams |
-| 🧭 **[Functional mindmap](mindmap/FUNCTIONAL_MINDMAP.md)** | Everyone | What RepoMemo does: roles, features, workflows, product principles, known gaps |
-| 🛠️ **[Technical mindmap](mindmap/TECHNICAL_MINDMAP.md)** | Engineers | Architecture, the full API reference, pipelines, data model, risks |
-| 🗺️ **[Roadmap](mindmap/ROADMAP.md)** | Everyone | What has shipped, what is next, and the longer-term direction |
-
-Other references:
-
-- [Architecture decisions (ADRs)](docs/decisions/)
-- [Development commands](docs/DEVELOPMENT_COMMANDS.md)
-- [Implementation tracker](docs/IMPLEMENTATION_TRACKER.md)
+Open <http://127.0.0.1:3021>, create an account, then an organization and a workspace. `npm run dev` starts the desktop app instead. Every command, test and setting is in [docs/DEVELOPMENT_COMMANDS.md](docs/DEVELOPMENT_COMMANDS.md).
 
 ## Repository layout
 
 ```
 apps/
   server/      Shared-mode HTTP API (Axum)
+  console/     Command console for administrators
   desktop/     React web client + Tauri desktop shell
-  worker/      Background worker (placeholder)
-crates/
-  api/         RepoMemoCore: import, index, search, ask, memory
-  storage/     SQLite (sqlx) + blob store + migrations
-  ingestion/   File detection and Word text extraction
-  indexer/     Chunking and tree-sitter symbol extraction
-  retrieval/   Full-text and hybrid retrieval
-  ai/          Ollama and OpenRouter providers
-  domain/      Shared data types
+crates/        Core, storage, ingestion, indexer, retrieval, AI providers, domain types
+deploy/        Container and direct-install scripts
 mindmap/       Functional and technical documentation, roadmap
-docs/          Setup guides, ADRs, historical phase specs
+docs/          Setup guides, ADRs, historical specifications
 ```
-
-## Status
-
-RepoMemo is in **early development** (`v0.1.x`). APIs and storage formats may change between versions. See the [roadmap](mindmap/ROADMAP.md) for the current focus.
 
 ## License
 
