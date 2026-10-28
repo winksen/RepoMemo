@@ -38,7 +38,7 @@ The application is used as a focused technical workbench on desktop displays. In
 - The server is the authority on access: the client only hides what a role cannot do.
 - The implementation uses Rust (Axum, sqlx), React, TypeScript, and Tauri for the desktop window.
 - Product copy must not fabricate customers, benchmarks, deployment claims, pricing, or completed capabilities.
-- Remote repositories, mail delivery, connectors, single sign-on, scale-out and hosted deployment remain roadmap items rather than present-tense product claims (see `mindmap/ROADMAP.md`).
+- Git repositories (local and remote), mail delivery, and GitHub and GitLab connectors are shipped. Single sign-on, scale-out, hosted deployment, signed installers and published releases are not, and must not be described in the present tense (see `mindmap/ROADMAP.md` and the known limits in `mindmap/FUNCTIONAL_MINDMAP.md`).
 
 ## Brand Commitments
 
@@ -49,7 +49,8 @@ The product name is RepoMemo. Its voice is calm, precise, technical, private by 
 - Product overview and development constraints: `README.md`, `CLAUDE.md`
 - What the product does: `mindmap/FUNCTIONAL_MINDMAP.md`
 - How it works: `mindmap/TECHNICAL_MINDMAP.md`
-- Delivery history and the plan to V0.2.0: `mindmap/ROADMAP.md`
+- Delivery history and what comes next: `mindmap/ROADMAP.md`
+- Task guides for users, administrators and operators: `docs/README.md`
 - Security posture: `mindmap/security/2026-10-10-security-review.md`
 - Implemented web interface: `apps/desktop/src/SharedWebApp.tsx` and `apps/desktop/src/components/`
 - Visual rules and implementation: `DESIGN.md`, `apps/desktop/src/styles/`

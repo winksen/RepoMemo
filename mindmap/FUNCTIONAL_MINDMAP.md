@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.101` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.102` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ---
 
@@ -132,7 +132,7 @@ mindmap
       Activity feed
 ```
 
-Each branch below maps to one section of this document. Deeper branch documents will live next to this file (see [Branch documents](#branch-documents-planned)).
+Each branch below maps to one section of this document. Deeper branch documents will live next to this file (see [Branch documents](#branch-documents-planned-none-written)).
 
 ---
 
@@ -563,9 +563,37 @@ Since V0.2.49 the **desktop app is a window onto a server.** On first start it a
 
 ---
 
-## 13. Known functional gaps (at V0.3.0)
+## 13. Known functional gaps and limits (reviewed at V0.4.102)
 
-These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets.
+These are observed in the code and are useful for prioritizing. The roadmap item that addresses each one is in brackets. Rows that describe an earlier version say so; the first table lists what is **not shipped** at V0.4.102, so no proposed capability reads as present.
+
+**Proposed or not built at V0.4.102**
+
+| Capability or limit | Status |
+|---|---|
+| Single sign-on (OIDC, SAML) and provisioning from an identity provider | **Proposed** as the 0.5.x theme ([plan](plans/2026-10-27-0.5-single-sign-on.md)); sign-in is email and password only |
+| Scale-out: PostgreSQL, object storage, more than one server | **Not built**; one server, SQLite and a file store |
+| A hosted RepoMemo service | **Not offered**; self-hosted only |
+| Published releases, signed installers and signed updates | **Not yet**: no 0.4 tag exists, so release images, archives and installers are built by CI on a tag but not yet published or validated end to end; signing keys do not exist yet ([evidence](technical/release-evidence-0.4.73.md)) |
+| Linux arm64 builds; signed updates for Linux and macOS | **Left out of 0.4** on purpose |
+| Live browser, zoom (200%) and screen-reader validation of the web client | **Open**: automated keyboard, contrast and layout checks pass; the manual checks await a reachable preview (V0.4.90, V0.4.91) |
+| Organization-defined workspace templates, per-user layouts | **Not built** (see the template table below) |
+| Branch documents under `mindmap/functional/` | **Not written**; the canonical guides are under `docs/` ([index](../docs/README.md)) |
+
+**Where each primary workflow is documented**
+
+| Workflow | Canonical guide |
+|---|---|
+| Install and first sign-in | [Quick start](../docs/QUICK_START.md), [Deploying RepoMemo](../docs/DEPLOYMENT.md) |
+| Create a workspace, add evidence, index state, review, memory | [User guide](../docs/USER_GUIDE.md#3a-five-workflows-to-learn-first) |
+| Search, Ask and citations | [Search, Ask and citations](../docs/SEARCH_AND_ASK.md) |
+| Review, comments, tasks, notifications | [Collaboration](../docs/COLLABORATION.md) |
+| Administration and invitations | [Administrator guide](../docs/ADMIN_GUIDE.md) |
+| Operations, backup, restore, upgrade | [Operator runbook](../docs/RUNBOOK.md) |
+| Secrets, tokens, TLS, audit | [Security administration](../docs/SECURITY_ADMIN.md) |
+| Scripts and tokens | [Using the API from scripts](../docs/API.md) |
+
+**Gaps observed in the code** (each row names the release that narrowed it)
 
 | Gap | Impact |
 |---|---|
@@ -594,9 +622,9 @@ Invitation links and administrator reset links, gaps until V0.1.62, shipped in V
 
 ---
 
-## Branch documents (planned)
+## Branch documents (planned, none written)
 
-This gateway is the root of the functional mindmap. Each branch can grow into its own page under `mindmap/functional/`:
+This gateway is the root of the functional mindmap. These pages **do not exist yet**; until they do, the task guides in the [documentation index](../docs/README.md) are canonical. Each branch can grow into its own page under `mindmap/functional/`:
 
 | Branch | Planned page |
 |---|---|
@@ -744,3 +772,8 @@ The backup drill exercises a checksum-verified second copy, isolated restore, da
 
 - A token user can list workspaces, search, page through evidence with a cursor, add a note or file, create a task and a memory card, and follow a live event stream, with the scope each needs (read, write, admin, system).
 - The documentation names which routes are for scripts and which are internal (sign-in and cookies, setup, platform, console, avatars, webhook receivers); before 1.0 any route can change between minor releases.
+
+## V0.4.102 — Functional reference reconciled
+
+- §13 lists what is not shipped at V0.4.102: single sign-on (proposed for 0.5.x), scale-out, a hosted service, published releases and signed installers, live accessibility validation, organization templates and the unwritten branch documents.
+- A table maps install, workspace, search and Ask, collaboration, administration, operations, security and API workflows to their canonical guides.
