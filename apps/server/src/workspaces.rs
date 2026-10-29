@@ -102,7 +102,8 @@ pub(crate) async fn preview_access_policy(
     ))
 }
 
-/// Owners (and full system administrators, whose action is recorded as theirs) choose the policy. No one is added or
+/// Only the owner chooses the policy (a system administrator who is not the owner acts as an administrator here and is
+/// refused, see the access matrix test). No one is added or
 /// removed by the change itself.
 pub(crate) async fn set_access_policy(
     SessionSubject(subject): SessionSubject,

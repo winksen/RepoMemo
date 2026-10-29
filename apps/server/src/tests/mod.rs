@@ -8,6 +8,7 @@ use axum::{
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
+mod access_matrix;
 mod ai;
 mod archive_history;
 mod auth;

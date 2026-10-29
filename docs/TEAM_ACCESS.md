@@ -248,12 +248,15 @@ everyone in it and turns the memberships that followed an organization role into
 the workspace's own, so a later organization role change does not alter them;
 making a restricted workspace shared adds nobody who is already in the
 organization. Owners change it in the workspace's People page (*Who joins
-automatically*), and choose it when creating a workspace (*Restricted*). A
-full system administrator who changes it does so as the owner, and the change
-is recorded in the workspace activity and the system audit. Organization
-owners and administrators are not workspace members unless added, but a full
-system administrator can still open every workspace; that power is separate
-from, and unchanged by, this policy. Migration 0050 adds the policy.
+automatically*), and choose it when creating a workspace (*Restricted*). Only
+the workspace's owner changes it (corrected in V0.5.18: an earlier version of
+this guide said a system administrator could); the change is recorded in the
+workspace activity and the system audit. Organization owners and
+administrators are not workspace members unless added. A full system
+administrator can still open every workspace as an administrator, but is not its
+owner and cannot change the policy: hand the workspace to someone first, for
+example by offboarding the owner. That power is separate from, and unchanged by,
+this policy. Migration 0050 adds the policy.
 
 ## Effective access and previews
 
@@ -406,3 +409,37 @@ address; it signs them out everywhere and is audited. There is no support
 backdoor and no way to read or bypass a code. Not included: a server-wide
 requirement that everyone (or all administrators) use two-step sign-in, and QR
 codes.
+
+## The access matrix
+
+V0.5.18 writes down, and tests, who can do what in a **restricted** workspace.
+One test (`access_matrix`) has every actor try the same routes: reading
+(overview, files, tasks, search, the event stream), administering (people,
+who-can-open-it, export) and owning (the access policy).
+
+| Actor | Read | Administer | Change the policy |
+|---|---|---|---|
+| Owner | yes | yes | yes |
+| Workspace administrator | yes | yes | no |
+| Member, viewer | yes | no | no |
+| Guest within their end date | yes | no | no |
+| Token limited to this workspace (owner is a member) | yes | no | no |
+| System administrator, not a member | yes, as an administrator | yes | no |
+| Guest after the end date | no | no | no |
+| Someone never added, an organization owner or administrator not added | no | no | no |
+| Token limited to another workspace | no | no | no |
+
+Every refusal is `403` with the same answer a workspace that does not exist
+gives; the workspace is absent from the refused person's list, dashboard and
+cross-workspace search. The system administrator row is the one stated
+exception, not a gap. The test also checks that the probing changed nobody's
+membership. A second test checks that what was created before 0.5 keeps its
+meaning after the upgrade: shared workspaces, no end dates, unlimited tokens, no
+second factor, and organization members still enrolled in shared workspaces.
+
+What the matrix does not cover, because it needs a live provider or browser:
+provider sign-in and group sync against a real provider, the desktop app, the
+event stream seen from a browser, and the exact moment a stream closes at a
+guest's deadline (it is rechecked at the deadline and at the periodic recheck).
+**Correction:** the V0.5.11 section above said a system administrator could
+change the policy; the matrix showed only the owner can, and this guide was fixed.

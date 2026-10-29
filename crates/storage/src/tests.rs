@@ -3060,3 +3060,60 @@ async fn a_guest_loses_access_at_the_end_date_and_regains_it_when_renewed() {
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn access_added_after_0_5_leaves_every_existing_grant_as_it_was() {
+    use repomemo_domain::WorkspaceRole;
+    let data_dir = std::env::temp_dir().join(format!("repomemo-defaults-{}", uuid::Uuid::new_v4()));
+    let storage = StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap();
+    let owner = storage.create_user("owner@example.com", "Owner", "hash").await.unwrap();
+    let member = storage
+        .create_user("member@example.com", "Member", "hash")
+        .await
+        .unwrap();
+    let organization = storage.create_organization(&owner.id, "Org").await.unwrap();
+    let workspace = storage
+        .create_shared_workspace(&owner.id, &organization.id, "Shared")
+        .await
+        .unwrap()
+        .workspace
+        .id;
+    storage
+        .upsert_workspace_member(&workspace, "member@example.com", WorkspaceRole::Viewer)
+        .await
+        .unwrap();
+    let (_, _) = storage
+        .create_personal_token(&member.id, "script", "read", 30)
+        .await
+        .unwrap();
+    // Everything made the old way means what it meant: shared, no end date, unlimited, no second factor.
+    assert_eq!(
+        storage.workspace_access_policy(&workspace).await.unwrap().as_deref(),
+        Some("shared")
+    );
+    assert_eq!(storage.membership_expiry(&member.id, &workspace).await.unwrap(), None);
+    assert!(matches!(
+        storage.workspace_role_for_user(&member.id, &workspace).await.unwrap(),
+        Some(WorkspaceRole::Viewer)
+    ));
+    let tokens = storage.list_personal_tokens(&member.id).await.unwrap();
+    assert_eq!(tokens.len(), 1);
+    assert!(tokens[0].workspaces.is_none());
+    assert_eq!(storage.mfa_status(&member.id).await.unwrap(), (false, 0));
+    // A person who joins the organization later is still enrolled in the shared workspace, as before.
+    let later = storage.create_user("later@example.com", "Later", "hash").await.unwrap();
+    storage
+        .upsert_organization_member(
+            &organization.id,
+            "later@example.com",
+            repomemo_domain::OrganizationRole::Member,
+        )
+        .await
+        .unwrap();
+    assert!(storage
+        .workspace_role_for_user(&later.id, &workspace)
+        .await
+        .unwrap()
+        .is_some());
+    let _ = std::fs::remove_dir_all(data_dir);
+}

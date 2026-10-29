@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.5.17` (2026-10-29) · **Next:** V0.5.18 access matrix verification. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.5.18` (2026-10-29) · **Next:** V0.5.19 team-access walkthroughs and operating guides. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -1798,7 +1798,7 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.5.15** ✅ 2026-10-29 | 🔒 | API access | Constrain integration/PAT access to explicitly selected workspaces with expiry and an access inventory | G03 | A token cannot reach a different workspace, cannot outlive its grant and stops working when its owner loses access; existing-token migration is documented |
 | **V0.5.16** ✅ 2026-10-29 | 🔒 | Local MFA | Add optional TOTP enforcement for local-password accounts, with hashed single-use recovery codes | G02 | Password alone cannot bypass enabled MFA through browser, token issuance or alternate login routes; replay and recovery reuse are refused |
 | **V0.5.17** ✅ 2026-10-29 | ✨ | MFA UX | Add enrollment, recovery and administrator-policy screens for local MFA | G02 | Enrollment requires a successful code, recovery codes are shown once, reset requires verified authority and a user can recover without a support backdoor |
-| **V0.5.18** 🔜 | 🔒 | Access verification | Exercise the complete role, guest, token, MFA and restricted-workspace matrix | G02, G03 | Denied access stays denied across caches, events, previews, exports and retrieval; upgrades retain intentional existing grants |
+| **V0.5.18** ✅ 2026-10-29 | 🔒 | Access verification | Exercise the complete role, guest, token, MFA and restricted-workspace matrix | G02, G03 | Denied access stays denied across caches, events, previews, exports and retrieval; upgrades retain intentional existing grants |
 | **V0.5.19** 🔜 | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | G01–G03 | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |
 
 ### The 0.6.x line: trusted knowledge in daily work

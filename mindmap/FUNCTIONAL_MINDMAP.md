@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.18 — Verify the access matrix across roles, guests, tokens and restricted workspaces.
+
+- One matrix test has twelve actors (owner, administrator, member, viewer, guest, a guest after the end date, an outsider, an organization administrator who was not added, a system administrator, a member's session and two limited tokens) try the same reads, administration routes, export, event stream and policy change on a restricted workspace, then checks that every refusal is a 403 that matches a workspace that does not exist, that the workspace is absent from lists and cross-workspace search, and that nobody's membership changed. A second test checks that what existed before 0.5 keeps its meaning.
+- An audit of every handler that takes a workspace, file or task identifier found each one reaches the same membership check (which already covers expiry and token limits), and the health and map caches are filled only after that check, so no gap needed a code change.
+- The matrix corrected a claim in the V0.5.11 guide: only the workspace owner can change the access policy; a system administrator who is not the owner opens the workspace as an administrator but cannot. The guide and a code comment now say so.
+
+Checks: Two tests were written (the matrix and the upgrade defaults); clippy (server, storage), formatting, version, migration and documentation checks pass. Neither test was executed, and a provider, the desktop app and a browser were not exercised.
 
 ## V0.5.17 — Add two-step sign-in enrollment, recovery and administrator screens.
 

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.18 (2026-10-29)
+
+Verify the access matrix across roles, guests, tokens and restricted workspaces.
+
+### Changed
+- One matrix test has twelve actors (owner, administrator, member, viewer, guest, a guest after the end date, an outsider, an organization administrator who was not added, a system administrator, a member's session and two limited tokens) try the same reads, administration routes, export, event stream and policy change on a restricted workspace, then checks that every refusal is a 403 that matches a workspace that does not exist, that the workspace is absent from lists and cross-workspace search, and that nobody's membership changed. A second test checks that what existed before 0.5 keeps its meaning.
+- An audit of every handler that takes a workspace, file or task identifier found each one reaches the same membership check (which already covers expiry and token limits), and the health and map caches are filled only after that check, so no gap needed a code change.
+- The matrix corrected a claim in the V0.5.11 guide: only the workspace owner can change the access policy; a system administrator who is not the owner opens the workspace as an administrator but cannot. The guide and a code comment now say so.
+
+### Checks
+- Two tests were written (the matrix and the upgrade defaults); clippy (server, storage), formatting, version, migration and documentation checks pass. Neither test was executed, and a provider, the desktop app and a browser were not exercised.
+
+### Upgrading
+- No change to the product; the V0.5.11 guide text was corrected.
+
 ## V0.5.17 (2026-10-29)
 
 Add two-step sign-in enrollment, recovery and administrator screens.
