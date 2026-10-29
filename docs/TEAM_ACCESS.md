@@ -118,3 +118,17 @@ cannot sign in using a new identity before invitation acceptance finishes.
 If enrollment was interrupted after account creation, the account remains
 unconfirmed; recover its local account through the normal reset process and
 explicitly link again. No support bypass or automatic email merge exists.
+
+## Sign in with the provider
+
+V0.5.4 adds "Continue with <provider>" to the sign-in page when a provider is
+enabled, and "Create the account with <provider>" on an invitation for a new
+account. The browser opens the provider page in a new tab; the desktop app
+opens it in the system browser. The original window polls for the single-use
+result every two seconds and always offers **Open it again** and **Cancel**.
+
+Cancelling, provider refusal, an expired five-minute handoff or a changed
+provider setting each return to the sign-in form with a message; local sign-in
+stays available. The profile page shows the linked provider and starts explicit
+linking, which does not replace the current session. Live browser, desktop and
+provider journeys remain pending.

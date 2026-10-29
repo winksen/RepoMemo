@@ -13,6 +13,7 @@ import { EmptyState } from "../components/ui/empty-state";
 import { Field } from "../components/ui/field";
 import { Input } from "../components/ui/input";
 import { showToast } from "../components/ui/toast";
+import { LinkedProviderPanel } from "../components/LinkedProviderPanel";
 import { ApiTokensPanel } from "../components/ApiTokensPanel";
 import { accountKeys } from "../lib/queryClient";
 import { useAsyncAction } from "../lib/useAsyncAction";
@@ -160,6 +161,7 @@ export function SharedProfile({
         </section>
         <section className="shared-profile-panel"><PanelHeading icon={Key} title="Password" /><form onSubmit={changePassword}><Field label="Current password" required><Input autoComplete="current-password" minLength={12} onChange={(event) => setCurrentPassword(event.target.value)} type="password" value={currentPassword} /></Field><Field label="New password" required><Input autoComplete="new-password" minLength={12} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={newPassword} /></Field><Field label="Confirm new password" required><Input autoComplete="new-password" minLength={12} onChange={(event) => setConfirmPassword(event.target.value)} type="password" value={confirmPassword} /></Field><Button busy={isSubmitting} type="submit" variant="secondary"><Key size={ICON_SIZE.md} /> Change password</Button></form></section>
         <section className="shared-profile-panel"><PanelHeading icon={Logout} title="Sessions" /><p className="shared-muted-copy">Signed in on a shared or lost device? End every session at once, this one included. Changing your password also ends your sessions on other devices.</p><Button disabled={isSubmitting} onClick={() => setIsConfirmingSignOut(true)} type="button" variant="secondary"><Logout size={ICON_SIZE.md} /> Sign out everywhere</Button></section>
+        <LinkedProviderPanel accessToken={accessToken} />
         <ApiTokensPanel accessToken={accessToken} isAdministrator={Boolean(session.is_system_admin || session.is_app_admin)} />
         <Dialog description="Every device signed in to your account is signed out, including this one. You will need your password to sign in again." footer={<><DialogCancel onClick={() => setIsConfirmingSignOut(false)} /><Button busy={isSubmitting} onClick={() => void endAllSessions()} type="button" variant="main"><Logout size={ICON_SIZE.md} /> Sign out everywhere</Button></>} onClose={() => setIsConfirmingSignOut(false)} open={isConfirmingSignOut} title="Sign out of every session?" />
       </div>

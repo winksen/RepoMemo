@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.4` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.4 — Add provider sign-in to the browser and the desktop app.
+
+- The sign-in page offers "Continue with <provider>" when a provider is enabled, and an invitation for a new account can be accepted through it. The browser opens the provider in a new tab; the desktop app opens the system browser and the original window waits for the single-use result.
+- Cancel, Open it again, provider refusal, the five-minute expiry and a changed provider setting each return to the form with a toast and the local sign-in intact.
+- The profile page lists the linked provider and starts explicit linking without replacing the current session.
+
+Checks: Two UI tests (success, cancellation, failure, expiry) were written and compiled; TypeScript, generated types, styles, accessibility, version and documentation checks pass. Tests were not executed; live browser and desktop journeys remain pending.
 
 ## V0.5.3 — Link provider identities to accounts only by explicit proof or invitation.
 

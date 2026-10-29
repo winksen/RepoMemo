@@ -15,7 +15,7 @@ Engineering knowledge is scattered across code, Markdown docs, Office files, scr
 
 It is **evidence-first**. Storing, browsing, indexing and searching work without AI. AI is an optional layer, and it answers only from your indexed evidence, with a citation to the file and lines it used.
 
-**Current version:** `0.5.3`. Releases before `1.0` may change APIs and storage formats; read the *Upgrading* part of the [changelog](CHANGELOG.md) before you upgrade.
+**Current version:** `0.5.4`. Releases before `1.0` may change APIs and storage formats; read the *Upgrading* part of the [changelog](CHANGELOG.md) before you upgrade.
 
 ## What it does
 

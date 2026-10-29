@@ -1,12 +1,13 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { IconArrowRight as ArrowRight, IconKey as Key, IconShieldLock as Shield, IconUsers as Users } from "@tabler/icons-react";
 import { DesktopServerNote } from "../components/DesktopServerNote";
-import { loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser } from "../lib/sharedApi";
+import { fetchSignInProvider, loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser, startProviderFlow } from "../lib/sharedApi";
 import { Button } from "../components/ui/button";
 import { Field } from "../components/ui/field";
 import { SegmentedControl } from "../components/ui/segmented-control";
 import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
+import { ProviderSignIn } from "../components/ProviderSignIn";
 import { AuthFrame } from "../components/AuthFrame";
 import { type AuthMode } from "./constants";
 import { apiMessage } from "./format";
@@ -34,6 +35,9 @@ export function AuthCanvas({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
   const [forgotOpen, setForgotOpen] = useState(false);
+  const [provider, setProvider] = useState<string | null>(null);
+
+  useEffect(() => { void fetchSignInProvider().then(setProvider).catch(() => setProvider(null)); }, []);
 
   useEffect(() => {
     setMode(setupPending ? "sign-in" : initialMode);
@@ -115,6 +119,7 @@ export function AuthCanvas({
           {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
         </Button>
       </form>
+      {mode === "sign-in" && provider ? <ProviderSignIn label={`Continue with ${provider}`} onDone={(session) => onAuthenticated(session.access_token)} start={() => startProviderFlow()} /> : null}
       {mode === "sign-in" ? <div className="shared-auth-hint">
         {forgotOpen
           ? <p>We will send a link to <strong>{email.trim() || "the address above"}</strong> if an account uses it and this server sends mail. It works once, for one hour. <Button busy={isSubmitting} onClick={() => void forgot()} variant="secondary">Send the link</Button> <Button onClick={() => setForgotOpen(false)} variant="secondary">Cancel</Button></p>

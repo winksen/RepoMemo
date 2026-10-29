@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.4 (2026-10-29)
+
+Add provider sign-in to the browser and the desktop app.
+
+### Changed
+- The sign-in page offers "Continue with <provider>" when a provider is enabled, and an invitation for a new account can be accepted through it. The browser opens the provider in a new tab; the desktop app opens the system browser and the original window waits for the single-use result.
+- Cancel, Open it again, provider refusal, the five-minute expiry and a changed provider setting each return to the form with a toast and the local sign-in intact.
+- The profile page lists the linked provider and starts explicit linking without replacing the current session.
+
+### Checks
+- Two UI tests (success, cancellation, failure, expiry) were written and compiled; TypeScript, generated types, styles, accessibility, version and documentation checks pass. Tests were not executed; live browser and desktop journeys remain pending.
+
+### Upgrading
+- No migration. The desktop app and the server should be upgraded together.
+
 ## V0.5.3 (2026-10-29)
 
 Link provider identities to accounts only by explicit proof or invitation.

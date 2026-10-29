@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { IconArrowRight as ArrowRight, IconMailForward as MailForward } from "@tabler/icons-react";
-import { acceptSharedInvitation, loginSharedUser, previewSharedInvitation, registerSharedUser } from "../lib/sharedApi";
+import { acceptSharedInvitation, fetchSignInProvider, loginSharedUser, previewSharedInvitation, registerSharedUser, startProviderFlow } from "../lib/sharedApi";
 import type { AcceptedInvitation, InvitationPreview, SharedSession } from "../types";
+import { ProviderSignIn } from "./ProviderSignIn";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
 import { Field } from "./ui/field";
@@ -48,6 +49,9 @@ export function InvitePage({
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [isBusy, setIsBusy] = useState(false);
+  const [provider, setProvider] = useState<string | null>(null);
+
+  useEffect(() => { void fetchSignInProvider().then(setProvider).catch(() => setProvider(null)); }, []);
 
   useEffect(() => {
     previewSharedInvitation(token).then(setPreview).catch((error) => setProblem(apiMessage(error, "This invitation link could not be checked.")));
@@ -133,6 +137,7 @@ export function InvitePage({
             <Field label="Password" required><Input autoComplete={preview.account_exists ? "current-password" : "new-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
             <Button busy={isBusy} type="submit" variant="main"><ArrowRight size={ICON_SIZE.md} /> {preview.account_exists ? "Sign in and join" : "Create account and join"}</Button>
           </form>
+          {provider && !preview.account_exists ? <ProviderSignIn label={`Create the account with ${provider}`} onDone={(session) => onAuthenticated(session.access_token, "/dashboard")} start={() => startProviderFlow(token)} /> : null}
         </>}
       </div>
     </section>

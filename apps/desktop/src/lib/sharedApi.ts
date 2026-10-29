@@ -316,7 +316,7 @@ export class SharedApiError extends Error {
   }
 }
 
-interface TokenResponse {
+export interface TokenResponse {
   access_token: string;
   refresh_token: string;
   token_type: "Bearer";
@@ -416,6 +416,40 @@ export async function loginSharedUser(input: {
     body: JSON.stringify(input),
   });
   storeTokens(response);
+  return response;
+}
+
+export type ProviderFlow = { authorization_url: string; state: string; proof: string; expires_in: number };
+export type ProviderLink = [issuer: string, linkedAt: string];
+
+/** The enabled sign-in provider's display name, or null when the server offers password sign-in only. */
+export async function fetchSignInProvider(): Promise<string | null> {
+  return (await request<{ name: string | null }>("/v1/auth/identity")).name ?? null;
+}
+
+export function startProviderFlow(invitationToken?: string): Promise<ProviderFlow> {
+  return request<ProviderFlow>("/v1/auth/identity/start", {
+    method: "POST",
+    body: JSON.stringify(invitationToken ? { invitation_token: invitationToken } : {}),
+  });
+}
+
+export function startProviderLink(accessToken: string): Promise<ProviderFlow> {
+  return request<ProviderFlow>("/v1/profile/identity", { method: "POST" }, accessToken);
+}
+
+export function listProviderLinks(accessToken: string): Promise<{ links: ProviderLink[] }> {
+  return request<{ links: ProviderLink[] }>("/v1/profile/identity", {}, accessToken);
+}
+
+/** Asks once for the outcome of a provider sign-in: null while the provider page is still open. */
+export async function pollProviderFlow(flow: ProviderFlow, keepSession = true): Promise<TokenResponse | null> {
+  const response = await request<TokenResponse | { status: "pending" }>("/v1/auth/identity/complete", {
+    method: "POST",
+    body: JSON.stringify({ state: flow.state, proof: flow.proof }),
+  });
+  if (!("access_token" in response)) return null;
+  if (keepSession) storeTokens(response);
   return response;
 }
 
