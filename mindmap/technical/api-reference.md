@@ -119,6 +119,7 @@
 | GET | `/v1/profile/identity` | session | own account | — | Linked issuer and date; no provider subject or secret |
 | POST | `/v1/profile/identity` | session | own account | — | Start explicit identity linking with session-version proof |
 | PUT | `/v1/system/identity` | session | system administrator | ProviderRequest | Save sealed credentials; enabled providers require fresh discovery/key checks; `enforced` needs a linked administrator and 1–5 break-glass system administrators |
+| POST | `/v1/system/identity/groups/preview` | session | system administrator | GroupPreview | Plan of memberships a set of provider groups would add, change, remove or keep for one person; changes nothing |
 | POST | `/v1/system/identity/check` | session | system administrator | ProviderRequest | Bounded discovery and signing-key reachability; does not save or prove sign-in |
 
 ## Organizations

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.5` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.6` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.6 — Map allowlisted provider groups to existing memberships without inferring ownership.
+
+- System administrators map provider groups (from a configurable ID-token claim) to organization or workspace roles. Ownership is never mapped, targets must exist, and a preview shows what a named person's groups would add, change, remove or keep before anything is saved or applied.
+- Groups are applied at provider sign-in. Only memberships a mapping created are changed or removed; direct grants, owners and roles edited after a sync are kept. A token without the claim, or a sync failure, changes nothing and never blocks sign-in; a sign-in that changes memberships records a system audit event.
+- Migration 0048 adds the server-level table of grants a mapping made.
+
+Checks: One storage test covers preview without change, add, remove, direct-grant and owner protection; clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.5 — Require provider sign-in with guarded break-glass administrator access.
 

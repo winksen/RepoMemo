@@ -2,7 +2,7 @@
 //! Provider errors never include response bodies, request URLs or credentials.
 use crate::*;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use repomemo_storage::IdentityProvider;
+use repomemo_storage::{valid_group_role, GroupMapping, IdentityProvider};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde_json::{json, Value};
 use url::Url;
@@ -274,6 +274,7 @@ async fn exchange(state: &AppState, flow: &Value, code: &str) -> Result<Value, A
     let keys = fetch_json(&provider.jwks_uri).await?;
     let claims = token_claims(token, &keys, &provider, flow["nonce"].as_str().unwrap_or_default())?;
     let user_id = resolve_identity(state, &provider, &claims, &flow["context"]).await?;
+    sync_groups(state, &provider, &claims, &user_id).await;
     let version = state
         .storage
         .user_session_version(&user_id)
@@ -499,6 +500,10 @@ pub(crate) struct ProviderRequest {
     enforced: bool,
     #[serde(default)]
     break_glass_emails: Vec<String>,
+    #[serde(default)]
+    group_claim: String,
+    #[serde(default)]
+    group_mappings: Vec<GroupMapping>,
 }
 
 fn https_url(value: &str) -> Result<Url, ApiError> {
@@ -632,6 +637,11 @@ fn configuration(request: &ProviderRequest) -> Result<IdentityProvider, ApiError
         || request.client_id.len() > 512
         || request.client_secret.len() > 16384
         || request.allowed_domains.len() > 50
+        || request.group_claim.len() > 64
+        || request
+            .group_claim
+            .bytes()
+            .any(|c| !c.is_ascii_alphanumeric() && !b"_-.:/".contains(&c))
         || request.allowed_domains.iter().any(|d| {
             d.is_empty()
                 || d.len() > 253
@@ -650,6 +660,12 @@ fn configuration(request: &ProviderRequest) -> Result<IdentityProvider, ApiError
         enabled: request.enabled,
         allowed_domains: request.allowed_domains.iter().map(|d| d.to_ascii_lowercase()).collect(),
         enforced: request.enforced,
+        group_claim: if request.group_claim.trim().is_empty() {
+            "groups".into()
+        } else {
+            request.group_claim.trim().into()
+        },
+        group_mappings: request.group_mappings.clone(),
         ..Default::default()
     })
 }
@@ -738,6 +754,7 @@ pub(crate) async fn save_provider(
             return Err(ApiError::bad_request("The provider key set is empty or too large."));
         }
     }
+    validate_mappings(&state, &provider.group_mappings).await?;
     if provider.enforced {
         provider.break_glass =
             enforcement_ready(&state, &subject.user_id, &provider, &request.break_glass_emails).await?;
@@ -764,6 +781,115 @@ pub(crate) async fn save_provider(
             .map_err(ApiError::internal)?;
     }
     provider_overview(&state, Some(provider)).await
+}
+
+fn claim_groups(provider: &IdentityProvider, claims: &Value) -> Option<Vec<String>> {
+    let values = claims.get(&provider.group_claim)?.as_array()?;
+    Some(
+        values
+            .iter()
+            .filter_map(Value::as_str)
+            .filter(|g| !g.is_empty() && g.len() <= 256)
+            .take(200)
+            .map(str::to_owned)
+            .collect(),
+    )
+}
+
+/// Applies the group mappings after a successful provider sign-in. A token without the claim changes nothing, and a
+/// failure never blocks sign-in: the person simply keeps the memberships they had.
+async fn sync_groups(state: &AppState, provider: &IdentityProvider, claims: &Value, user_id: &str) {
+    if provider.group_mappings.is_empty() {
+        return;
+    }
+    let Some(groups) = claim_groups(provider, claims) else {
+        return;
+    };
+    match state
+        .storage
+        .sync_group_grants(user_id, &provider.group_mappings, &groups, true)
+        .await
+    {
+        Ok(plan) if !plan.is_empty() => {
+            let detail = format!(
+                "Provider groups added {}, changed {} and removed {} memberships",
+                plan.add.len(),
+                plan.change.len(),
+                plan.remove.len()
+            );
+            if let Err(error) = state
+                .storage
+                .record_system_event(Some(user_id), "identity_groups_synced", &detail)
+                .await
+            {
+                tracing::error!(error = %error, "Failed to record a system audit event");
+            }
+        }
+        Ok(_) => {}
+        Err(error) => tracing::error!(error = %error, "Provider group sync failed"),
+    }
+}
+
+async fn validate_mappings(state: &AppState, mappings: &[GroupMapping]) -> Result<(), ApiError> {
+    let invalid = |m: &str| ApiError::bad_request(m.to_owned());
+    if mappings.len() > 100 {
+        return Err(invalid("Use at most 100 group mappings."));
+    }
+    for m in mappings {
+        if m.group.trim().is_empty() || m.group.len() > 256 {
+            return Err(invalid(
+                "Each mapping needs a provider group of at most 256 characters.",
+            ));
+        }
+        if !valid_group_role(&m.scope, &m.role) {
+            return Err(invalid(
+                "Mapped roles are admin or member for an organization and admin, member or viewer for a workspace; ownership is never mapped.",
+            ));
+        }
+        let exists = if m.scope == "organization" {
+            state.storage.organization_exists(&m.target_id).await
+        } else {
+            state.storage.workspace_exists(&m.target_id).await
+        }
+        .map_err(ApiError::internal)?;
+        if !exists {
+            return Err(invalid(
+                "A mapping names an organization or workspace that does not exist.",
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+pub(crate) struct GroupPreview {
+    email: String,
+    #[serde(default)]
+    groups: Vec<String>,
+    #[serde(default)]
+    group_mappings: Vec<GroupMapping>,
+}
+
+/// What signing in with these groups would add, change or remove for one person, without doing it.
+pub(crate) async fn preview_groups(
+    SessionSubject(subject): SessionSubject,
+    State(state): State<AppState>,
+    Json(request): Json<GroupPreview>,
+) -> Result<Json<Value>, ApiError> {
+    system::require_full_system_admin(&subject)?;
+    validate_mappings(&state, &request.group_mappings).await?;
+    let user = state
+        .storage
+        .find_user_by_email(&request.email)
+        .await
+        .map_err(|_| ApiError::bad_request("Enter a valid email address."))?
+        .ok_or_else(|| ApiError::bad_request("No account uses this email address."))?;
+    let plan = state
+        .storage
+        .sync_group_grants(&user.id, &request.group_mappings, &request.groups, false)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(json!({"plan":plan})))
 }
 
 async fn provider_overview(state: &AppState, provider: Option<IdentityProvider>) -> Result<Json<Value>, ApiError> {

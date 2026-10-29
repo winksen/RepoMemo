@@ -149,3 +149,21 @@ audit trail. If every named break-glass account is deactivated or demoted, any
 active system administrator keeps password access, so a working path always
 remains. Turning enforcement off, disabling the provider or changing the issuer
 requires removing the requirement first. Password-only servers are unchanged.
+
+## Map provider groups to memberships
+
+V0.5.6 lets a system administrator map allowlisted provider groups to existing
+organization or workspace memberships in System settings, one line each:
+`group | organization or workspace | target ID | role`. Organizations accept
+`admin` or `member`; workspaces accept `admin`, `member` or `viewer`. Ownership
+is never mapped. The ID-token claim that lists groups defaults to `groups`.
+
+The mapping is applied at each provider sign-in. A token without the claim
+changes nothing. **Preview group changes** shows, for a named person and a list
+of groups, what would be added, changed, removed or kept, without doing it.
+Only memberships a mapping created (recorded in the server-level table added by
+migration 0048) are ever changed or removed; a membership held directly, or by
+an owner, is kept as it is, and one whose role someone changed after the sync
+is released from the sync rather than overwritten. A failed sync never blocks
+sign-in. A sign-in that changes memberships records one system audit event.
+Memberships are not re-evaluated between sign-ins (see session lifecycle).

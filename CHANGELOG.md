@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.6 (2026-10-29)
+
+Map allowlisted provider groups to existing memberships without inferring ownership.
+
+### Changed
+- System administrators map provider groups (from a configurable ID-token claim) to organization or workspace roles. Ownership is never mapped, targets must exist, and a preview shows what a named person's groups would add, change, remove or keep before anything is saved or applied.
+- Groups are applied at provider sign-in. Only memberships a mapping created are changed or removed; direct grants, owners and roles edited after a sync are kept. A token without the claim, or a sync failure, changes nothing and never blocks sign-in; a sign-in that changes memberships records a system audit event.
+- Migration 0048 adds the server-level table of grants a mapping made.
+
+### Checks
+- One storage test covers preview without change, add, remove, direct-grant and owner protection; clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- Migration 0048 runs automatically; no mapping exists until configured, so memberships are unchanged. Rollback uses the pre-upgrade backup.
+
 ## V0.5.5 (2026-10-29)
 
 Require provider sign-in with guarded break-glass administrator access.

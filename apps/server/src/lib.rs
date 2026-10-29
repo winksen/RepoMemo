@@ -622,6 +622,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/auth/identity/callback", get(identity::callback))
         .route("/v1/auth/identity/complete", post(identity::complete))
         .route("/v1/profile/identity", get(identity::links).post(identity::start_link))
+        .route("/v1/system/identity/groups/preview", post(identity::preview_groups))
         .route(
             "/v1/system/identity",
             get(identity::get_provider).put(identity::save_provider),

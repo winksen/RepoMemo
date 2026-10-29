@@ -51,7 +51,7 @@ pub use archive_import::{ImportedWorkspace, PendingPassage};
 pub use connectors::{ConnectorItemOutcome, ConnectorItemWrite};
 pub use credentials::{RepoCredentialInfo, RepoSecret, RepoWebhookInfo};
 pub use environment::{inspect_environment, inspect_environment_split, EnvironmentState};
-pub use identity::IdentityProvider;
+pub use identity::{valid_group_role, GroupChange, GroupMapping, GroupSyncPlan, IdentityProvider};
 pub use mail::{DigestCandidate, DigestNotice, MailOutboxCounts, MailSettingsUpdate, QueuedMail, StoredMailSettings};
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use organizations::StarterSetup;
