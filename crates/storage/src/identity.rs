@@ -501,6 +501,30 @@ impl StorageEngine {
         Ok(inserted.rows_affected() == 1)
     }
 
+    /// People holding memberships that earlier syncs granted and that none of `mappings` would grant any more: what
+    /// they lose at their next provider sign-in if these mappings are saved.
+    pub async fn group_grants_not_covered(&self, mappings: &[GroupMapping]) -> Result<Vec<GroupChange>> {
+        let rows: Vec<(String, String, String, String, String)> = sqlx::query_as(
+            "SELECT COALESCE(u.email, u.display_name), g.scope, g.target_id, g.role, g.group_name FROM identity_group_grants g JOIN users u ON u.id = g.user_id ORDER BY 1, 2, 3 LIMIT 500",
+        )
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .filter(|(_, scope, target, _, group)| {
+                !mappings
+                    .iter()
+                    .any(|m| &m.scope == scope && &m.target_id == target && &m.group == group)
+            })
+            .map(|(person, scope, target_id, role, group)| GroupChange {
+                scope,
+                target_id,
+                role,
+                group: format!("{group} ({person})"),
+            })
+            .collect())
+    }
+
     pub async fn identity_provider(&self) -> Result<Option<IdentityProvider>> {
         let row: Option<String> = sqlx::query_scalar("SELECT configuration FROM identity_provider WHERE id=1")
             .fetch_optional(self.reader())

@@ -649,6 +649,76 @@ impl StorageEngine {
         })
     }
 
+    /// Everyone who holds a membership of the workspace, with where it came from: set directly, following an
+    /// organization role (and the provider group behind that organization role, if any), or granted by a provider
+    /// group mapping. Full system administrators, who can open every workspace without a membership, are listed apart.
+    pub async fn workspace_effective_access(&self, workspace_id: &str) -> Result<Value> {
+        type Row = (
+            String,
+            Option<String>,
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+        );
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT u.id, u.email, u.display_name, wm.role, wm.origin, g.group_name, og.group_name \
+             FROM workspace_memberships wm \
+             JOIN users u ON u.id = wm.user_id \
+             LEFT JOIN identity_group_grants g ON g.user_id = wm.user_id AND g.scope = 'workspace' AND g.target_id = wm.workspace_id AND g.role = wm.role \
+             LEFT JOIN workspace_organizations wo ON wo.workspace_id = wm.workspace_id \
+             LEFT JOIN identity_group_grants og ON og.user_id = wm.user_id AND og.scope = 'organization' AND og.target_id = wo.organization_id \
+             WHERE wm.workspace_id = ?1 AND u.deactivated_at IS NULL \
+             ORDER BY CASE wm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'member' THEN 2 ELSE 3 END, u.display_name",
+        )
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?;
+        let members: Vec<Value> = rows
+            .into_iter()
+            .map(|(id, email, name, role, origin, group, org_group)| {
+                let (origin, via) = match (group, origin.as_str(), org_group) {
+                    (Some(group), _, _) => ("group", Some(group)),
+                    (None, "organization", via) => ("organization", via),
+                    _ => ("direct", None),
+                };
+                serde_json::json!({"user_id":id,"email":email,"display_name":name,"role":role,"origin":origin,"via_group":via})
+            })
+            .collect();
+        let administrators: Vec<(String, Option<String>)> = sqlx::query_as(
+            "SELECT display_name, email FROM users WHERE is_system_admin = 1 AND deactivated_at IS NULL AND id NOT IN (SELECT user_id FROM workspace_memberships WHERE workspace_id = ?1) ORDER BY display_name",
+        )
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(serde_json::json!({
+            "members": members,
+            "system_administrators": administrators.into_iter().map(|(n, e)| serde_json::json!({"display_name":n,"email":e})).collect::<Vec<_>>(),
+        }))
+    }
+
+    /// What a policy change would do, without doing it. Nobody is ever added or removed by the change itself.
+    pub async fn preview_workspace_access_policy(&self, workspace_id: &str, restricted: bool) -> Result<Value> {
+        let following: Vec<(String,)> = sqlx::query_as(
+            "SELECT COALESCE(u.email, u.display_name) FROM workspace_memberships wm JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = ?1 AND wm.origin = 'organization' ORDER BY 1",
+        )
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?;
+        let waiting: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM organization_memberships om JOIN workspace_organizations wo ON wo.organization_id = om.organization_id WHERE wo.workspace_id = ?1 AND om.user_id NOT IN (SELECT user_id FROM workspace_memberships WHERE workspace_id = ?1)",
+        )
+        .bind(workspace_id)
+        .fetch_one(self.reader())
+        .await?;
+        Ok(if restricted {
+            serde_json::json!({"added":0,"removed":0,"become_direct":following.len(),"people":following.into_iter().map(|p| p.0).collect::<Vec<_>>()})
+        } else {
+            serde_json::json!({"added":0,"removed":0,"become_direct":0,"people":Vec::<String>::new(),"organization_members_not_added":waiting})
+        })
+    }
+
     /// `shared` or `restricted`; None when the workspace does not exist.
     pub async fn workspace_access_policy(&self, workspace_id: &str) -> Result<Option<String>> {
         Ok(

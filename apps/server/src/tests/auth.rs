@@ -1884,3 +1884,145 @@ async fn restricted_workspaces_never_enroll_organization_members_and_policy_chan
         400
     );
 }
+
+#[tokio::test]
+async fn a_restricted_workspace_is_invisible_to_people_who_were_not_added_and_access_has_origins() {
+    let app = router(ServerConfig::for_test(temp_data_dir("workspace-hidden")))
+        .await
+        .unwrap();
+    let (owner, _) = register_account(&app, "owner@example.com").await;
+    register_account(&app, "outsider@example.com").await;
+    register_account(&app, "orgadmin@example.com").await;
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        async move { app.oneshot(json_request(method, &uri, &who, body)).await.unwrap() }
+    };
+    let organization = response_json(
+        call(
+            "POST",
+            "/v1/organizations".into(),
+            owner.clone(),
+            json!({"name":"Team"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let closed = response_json(
+        call(
+            "POST",
+            "/v1/workspaces".into(),
+            owner.clone(),
+            json!({"organization_id":organization,"name":"Secret","access_policy":"restricted"}),
+        )
+        .await,
+    )
+    .await["workspace"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    join(
+        &app,
+        &owner,
+        "organizations",
+        &organization,
+        "outsider@example.com",
+        "member",
+    )
+    .await;
+    join(
+        &app,
+        &owner,
+        "organizations",
+        &organization,
+        "orgadmin@example.com",
+        "admin",
+    )
+    .await;
+    let login = |email: &'static str| {
+        let app = app.clone();
+        async move {
+            let session = response_json(
+                app.oneshot(public_post(
+                    "/v1/auth/login",
+                    json!({"email":email,"password":"not-a-real-password"}),
+                ))
+                .await
+                .unwrap(),
+            )
+            .await;
+            format!("Bearer {}", session["access_token"].as_str().unwrap())
+        }
+    };
+    for who in [login("outsider@example.com").await, login("orgadmin@example.com").await] {
+        let list = response_json(call("GET", "/v1/workspaces".into(), who.clone(), Value::Null).await).await;
+        assert!(list.as_array().unwrap().is_empty(), "the list does not mention it");
+        let search =
+            response_json(call("POST", "/v1/search".into(), who.clone(), json!({"query":"Secret"})).await).await;
+        assert!(search["workspaces"].as_array().unwrap().is_empty());
+        assert_eq!(search["not_searched"], 0);
+        // A direct address answers the same for the hidden workspace and for one that does not exist.
+        let hidden = call(
+            "GET",
+            format!("/v1/workspaces/{closed}/members"),
+            who.clone(),
+            Value::Null,
+        )
+        .await;
+        let missing = call(
+            "GET",
+            "/v1/workspaces/does-not-exist/members".into(),
+            who.clone(),
+            Value::Null,
+        )
+        .await;
+        assert_eq!(hidden.status(), 403);
+        assert_eq!(hidden.status(), missing.status());
+        assert_eq!(response_json(hidden).await, response_json(missing).await);
+        assert_eq!(
+            call(
+                "GET",
+                format!("/v1/workspaces/{closed}/effective-access"),
+                who,
+                Value::Null
+            )
+            .await
+            .status(),
+            403
+        );
+    }
+    let access = response_json(
+        call(
+            "GET",
+            format!("/v1/workspaces/{closed}/effective-access"),
+            owner.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(access["policy"], "restricted");
+    let members = access["members"].as_array().unwrap();
+    assert_eq!(members.len(), 1);
+    assert_eq!(
+        (members[0]["role"].as_str(), members[0]["origin"].as_str()),
+        (Some("owner"), Some("direct"))
+    );
+    let preview = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{closed}/access-policy/preview"),
+            owner,
+            json!({"policy":"shared"}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        (preview["added"].as_i64(), preview["removed"].as_i64()),
+        (Some(0), Some(0))
+    );
+    assert_eq!(preview["organization_members_not_added"], 2);
+}

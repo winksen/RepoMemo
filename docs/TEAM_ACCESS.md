@@ -254,3 +254,24 @@ is recorded in the workspace activity and the system audit. Organization
 owners and administrators are not workspace members unless added, but a full
 system administrator can still open every workspace; that power is separate
 from, and unchanged by, this policy. Migration 0050 adds the policy.
+
+## Effective access and previews
+
+V0.5.12 explains access before it is changed. A workspace's **People** page now
+lists everyone who can open it and why: *added directly*, *follows the
+organization role* (with the provider group behind that organization role when
+there is one) or *granted by a provider group*, and names the system
+administrators who can open every workspace without being members. Changing the
+shared/restricted policy first shows its effect and asks to confirm: nobody is
+added or removed, and the count of people whose access stops following the
+organization role (or the organization members who stay outside) is stated.
+
+In System settings, **Preview group changes** now also lists the existing
+group-granted memberships that a changed mapping would remove at the holders'
+next provider sign-in; leave the email empty to see only that.
+
+A restricted workspace is not disclosed to people who were not added: it is
+absent from their workspace list, dashboard and cross-workspace search results,
+and the address of a hidden workspace answers exactly as the address of one that
+does not exist. Organization owners and administrators are covered by this too.
+System administrators remain the explicit exception.

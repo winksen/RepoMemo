@@ -18,6 +18,7 @@ interface Provider { name: string; issuer: string; client_id: string; enabled: b
 interface Mapping { group: string; scope: string; target_id: string; role: string }
 interface Change { scope: string; target_id: string; role: string; group: string }
 interface Plan { add: Change[]; change: Change[]; remove: Change[]; keep: Change[] }
+interface Preview { plan: Plan | null; released: Change[] }
 interface Overview { provider: Provider | null; has_secret: boolean; callback_url: string | null; break_glass_emails?: string[] }
 const empty: Provider = { name: "", issuer: "", client_id: "", enabled: false, allowed_domains: [], enforced: false };
 
@@ -31,13 +32,14 @@ export function IdentitySettings({ accessToken }: { accessToken: string }) {
   const [previewEmail, setPreviewEmail] = useState("");
   const [previewGroups, setPreviewGroups] = useState("");
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [released, setReleased] = useState<Change[] | null>(null);
   const [action, setAction] = useState<"check" | "save" | null>(null);
   const busy = action !== null;
   const form = useRef<HTMLFormElement>(null);
   const [failed, setFailed] = useState(false);
   const [dirty, setDirty] = useState(false);
   useUnsavedChanges(dirty, { subject: "the identity provider settings" });
-  function apply(value: Overview) { setOverview(value); setDraft(value.provider ?? empty); setDomains(value.provider?.allowed_domains.join(", ") ?? ""); setBreakGlass((value.break_glass_emails ?? []).join(", ")); setMappings((value.provider?.group_mappings ?? []).map(m => [m.group, m.scope, m.target_id, m.role].join(" | ")).join("\n")); setPlan(null); setSecret(""); setDirty(false); }
+  function apply(value: Overview) { setOverview(value); setDraft(value.provider ?? empty); setDomains(value.provider?.allowed_domains.join(", ") ?? ""); setBreakGlass((value.break_glass_emails ?? []).join(", ")); setMappings((value.provider?.group_mappings ?? []).map(m => [m.group, m.scope, m.target_id, m.role].join(" | ")).join("\n")); setPlan(null); setReleased(null); setSecret(""); setDirty(false); }
   async function load() {
     setFailed(false);
     try { apply(await request<Overview>("/v1/system/identity", {}, accessToken)); }
@@ -54,8 +56,9 @@ export function IdentitySettings({ accessToken }: { accessToken: string }) {
   async function preview() {
     setAction("check");
     try {
-      const result = await request<{ plan: Plan }>("/v1/system/identity/groups/preview", { method: "POST", body: JSON.stringify({ email: previewEmail, groups: previewGroups.split(",").map(g => g.trim()).filter(Boolean), group_mappings: parseMappings() }) }, accessToken);
+      const result = await request<Preview>("/v1/system/identity/groups/preview", { method: "POST", body: JSON.stringify({ email: previewEmail, groups: previewGroups.split(",").map(g => g.trim()).filter(Boolean), group_mappings: parseMappings() }) }, accessToken);
       setPlan(result.plan);
+      setReleased(result.released);
     } catch (error) { showToast("error", apiMessage(error, "The group mapping preview failed. Check the mapping lines and the email address.")); }
     finally { setAction(null); }
   }
@@ -89,10 +92,11 @@ export function IdentitySettings({ accessToken }: { accessToken: string }) {
         <Field label="Provider session limit (hours)" hint="How long a provider sign-in can be renewed before the person must sign in at the provider again (1 to 720, default 12). This is the longest a disabled provider identity keeps access if the provider sends no logout notice."><Input type="number" min={1} max={720} value={draft.max_session_hours || 12} onChange={event => edit({ max_session_hours: Number(event.target.value) })} /></Field>
         <Field label="Group claim" hint="The ID-token claim that lists the person's groups. Leave empty for “groups”. A token without it changes no memberships."><Input maxLength={64} value={draft.group_claim ?? ""} onChange={event => edit({ group_claim: event.target.value })} /></Field>
         <Field label="Group mappings" hint="One per line: group | organization or workspace | target ID | role. Roles: admin or member for an organization; admin, member or viewer for a workspace. Ownership is never mapped, and memberships set directly are never changed or removed."><Textarea rows={4} value={mappings} onChange={event => { setMappings(event.target.value); setDirty(true); }} /></Field>
-        <Field label="Preview for a person" hint="Shows what signing in with these groups would add, change or remove, without doing it."><Input type="email" placeholder="person@example.com" value={previewEmail} onChange={event => setPreviewEmail(event.target.value)} /></Field>
+        <Field label="Preview for a person" hint="Shows what signing in with these groups would add, change or remove, without doing it. Leave empty to see only who would lose access to a mapping you removed."><Input type="email" placeholder="person@example.com" value={previewEmail} onChange={event => setPreviewEmail(event.target.value)} /></Field>
         <Field label="Their provider groups" hint="Comma-separated."><Input value={previewGroups} onChange={event => setPreviewGroups(event.target.value)} /></Field>
-        <Button type="button" onClick={() => void preview()} disabled={busy || !previewEmail}>Preview group changes</Button>
+        <Button type="button" onClick={() => void preview()} disabled={busy}>Preview group changes</Button>
         {plan ? <ul aria-label="Group mapping preview">{(["add", "change", "remove", "keep"] as const).flatMap(kind => plan[kind].map(c => <li key={`${kind}-${c.scope}-${c.target_id}`}>{kind === "keep" ? "Keep (already held directly)" : kind[0].toUpperCase() + kind.slice(1)}: {c.scope} {c.target_id} as {c.role} via {c.group}</li>))}{Object.values(plan).every(list => list.length === 0) ? <li>No membership changes.</li> : null}</ul> : null}
+        {released ? <p role="status">{released.length ? `${released.length} existing group-granted ${released.length === 1 ? "membership" : "memberships"} would be removed at the next provider sign-in of the people holding ${released.length === 1 ? "it" : "them"}: ${released.slice(0, 5).map(c => `${c.group} on ${c.scope} ${c.target_id}`).join("; ")}${released.length > 5 ? "…" : ""}` : "No existing group-granted membership would be removed by these mappings."}</p> : null}
         <div className="rm-identity-actions"><Button type="button" onClick={() => void submit(true)} disabled={busy} busy={action === "check"}>Check discovery</Button><Button type="submit" variant="main" busy={action === "save"}>Save provider</Button></div>
       </fieldset>
     </form>

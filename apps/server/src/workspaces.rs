@@ -62,6 +62,46 @@ pub(crate) async fn get_access_policy(
     Ok(Json(json!({"policy":policy})))
 }
 
+/// Who can open the workspace and why: each membership with its origin, and the system administrators who can
+/// open it without one. For administrators of the workspace.
+pub(crate) async fn effective_access(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let mut access = state
+        .storage
+        .workspace_effective_access(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    access["policy"] = json!(state
+        .storage
+        .workspace_access_policy(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .unwrap_or_else(|| "shared".into()));
+    Ok(Json(access))
+}
+
+/// What a policy change would do, before it is made.
+pub(crate) async fn preview_access_policy(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<AccessPolicyRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let restricted = parse_access_policy(Some(&request.policy))?;
+    Ok(Json(
+        state
+            .storage
+            .preview_workspace_access_policy(&workspace_id, restricted)
+            .await
+            .map_err(map_storage_error)?,
+    ))
+}
+
 /// Owners (and full system administrators, whose action is recorded as theirs) choose the policy. No one is added or
 /// removed by the change itself.
 pub(crate) async fn set_access_policy(

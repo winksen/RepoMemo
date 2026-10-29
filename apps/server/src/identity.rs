@@ -957,6 +957,7 @@ async fn validate_mappings(state: &AppState, mappings: &[GroupMapping]) -> Resul
 
 #[derive(Deserialize)]
 pub(crate) struct GroupPreview {
+    #[serde(default)]
     email: String,
     #[serde(default)]
     groups: Vec<String>,
@@ -972,6 +973,14 @@ pub(crate) async fn preview_groups(
 ) -> Result<Json<Value>, ApiError> {
     system::require_full_system_admin(&subject)?;
     validate_mappings(&state, &request.group_mappings).await?;
+    let released = state
+        .storage
+        .group_grants_not_covered(&request.group_mappings)
+        .await
+        .map_err(ApiError::internal)?;
+    if request.email.trim().is_empty() {
+        return Ok(Json(json!({"plan":null,"released":released})));
+    }
     let user = state
         .storage
         .find_user_by_email(&request.email)
@@ -983,7 +992,7 @@ pub(crate) async fn preview_groups(
         .sync_group_grants(&user.id, &request.group_mappings, &request.groups, false)
         .await
         .map_err(ApiError::internal)?;
-    Ok(Json(json!({"plan":plan})))
+    Ok(Json(json!({"plan":plan,"released":released})))
 }
 
 /// The longest a provider-started session lasts without signing in at the provider again.

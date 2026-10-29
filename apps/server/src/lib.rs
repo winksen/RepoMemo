@@ -1028,6 +1028,11 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(request_artifact_review),
         )
         .route("/v1/artifacts/{artifact_id}/compare", get(compare_artifact_versions))
+        .route("/v1/workspaces/{workspace_id}/effective-access", get(effective_access))
+        .route(
+            "/v1/workspaces/{workspace_id}/access-policy/preview",
+            post(preview_access_policy),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/access-policy",
             get(get_access_policy).put(set_access_policy),

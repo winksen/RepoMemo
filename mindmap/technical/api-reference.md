@@ -120,7 +120,7 @@
 | GET | `/v1/profile/identity` | session | own account | — | Linked issuer and date; no provider subject or secret |
 | POST | `/v1/profile/identity` | session | own account | — | Start explicit identity linking with session-version proof |
 | PUT | `/v1/system/identity` | session | system administrator | ProviderRequest | Save sealed credentials; enabled providers require fresh discovery/key checks; `enforced` needs a linked administrator and 1–5 break-glass system administrators |
-| POST | `/v1/system/identity/groups/preview` | session | system administrator | GroupPreview | Plan of memberships a set of provider groups would add, change, remove or keep for one person; changes nothing |
+| POST | `/v1/system/identity/groups/preview` | session | system administrator | GroupPreview | Plan of memberships a set of provider groups would add, change, remove or keep for one person (email optional), and the group-granted memberships the mapping would release; changes nothing |
 | POST | `/v1/system/identity/check` | session | system administrator | ProviderRequest | Bounded discovery and signing-key reachability; does not save or prove sign-in |
 
 ## Organizations
@@ -311,5 +311,7 @@
 | PUT | `/v1/workspaces/{workspace_id}/ai-policy` | managing | require_workspace_admin | UpdateAiPolicyRequest | AiPolicyResponse |
 | POST | `/v1/workspaces/{workspace_id}/ai-providers/{provider_id}/test` | auth | require_workspace_admin | — | ProviderTestResult |
 | GET | `/v1/workspaces/{workspace_id}/access-policy` | auth | workspace reader | — | `shared` or `restricted` |
+| GET | `/v1/workspaces/{workspace_id}/effective-access` | auth | workspace administrator | — | Each membership with role and origin (direct, organization, provider group), policy, and system administrators who can open it without membership |
+| POST | `/v1/workspaces/{workspace_id}/access-policy/preview` | auth | workspace administrator | `{policy}` | Counts and people a policy change affects; changes nothing |
 | PUT | `/v1/workspaces/{workspace_id}/access-policy` | session | workspace owner | `{policy}` | Changes who joins by default; adds and removes nobody; recorded in activity and system audit |
 | POST | `/v1/workspaces/{workspace_id}/transfer-ownership` | session | require_workspace_owner | TransferOwnershipRequest | status |

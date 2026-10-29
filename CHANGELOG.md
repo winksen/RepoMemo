@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.12 (2026-10-29)
+
+Show effective access and its origin before access changes.
+
+### Changed
+- The workspace People page lists everyone who can open it and why (added directly, follows the organization role, granted by a provider group, with the group named) and names the system administrators who can open it without a membership. `GET /v1/workspaces/{workspace_id}/effective-access` serves it to workspace administrators.
+- Changing the shared/restricted policy now previews and confirms its effect first (`POST …/access-policy/preview`); the group-mapping preview also lists the existing group-granted memberships a changed mapping would release at the holders' next sign-in.
+- A restricted workspace stays undisclosed to people who were not added, organization owners and administrators included: it is absent from their list, dashboard and cross-workspace search, and a hidden address answers like a missing one. System administrators remain the stated exception.
+
+### Checks
+- One server test covers the hidden workspace for an outsider and an organization administrator (list, search, identical answers for hidden and missing addresses, denied effective-access) plus the owner's origins and the preview; the UI test covers origins and the confirm step. Clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- No migration.
+
 ## V0.5.11 (2026-10-29)
 
 Add shared and restricted workspace membership policy.

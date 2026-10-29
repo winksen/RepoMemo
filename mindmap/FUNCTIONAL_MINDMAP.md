@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.11` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.12 — Show effective access and its origin before access changes.
+
+- The workspace People page lists everyone who can open it and why (added directly, follows the organization role, granted by a provider group, with the group named) and names the system administrators who can open it without a membership. `GET /v1/workspaces/{workspace_id}/effective-access` serves it to workspace administrators.
+- Changing the shared/restricted policy now previews and confirms its effect first (`POST …/access-policy/preview`); the group-mapping preview also lists the existing group-granted memberships a changed mapping would release at the holders' next sign-in.
+- A restricted workspace stays undisclosed to people who were not added, organization owners and administrators included: it is absent from their list, dashboard and cross-workspace search, and a hidden address answers like a missing one. System administrators remain the stated exception.
+
+Checks: One server test covers the hidden workspace for an outsider and an organization administrator (list, search, identical answers for hidden and missing addresses, denied effective-access) plus the owner's origins and the preview; the UI test covers origins and the confirm step. Clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.11 — Add shared and restricted workspace membership policy.
 
