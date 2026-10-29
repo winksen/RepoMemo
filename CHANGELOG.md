@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.19 (2026-10-29)
+
+Close the team-access line with operating guides and a walkthrough record.
+
+### Changed
+- New [team-access operating guide](docs/TEAM_ACCESS_OPERATIONS.md): the order to set things up in, joiner, mover and leaver procedures, guest and token handling, recovery for lost two-step devices, provider outages and half-finished enrollment, the audit export to keep, and an explicit list of residual limits. The team-access reference, user guide, administrator guide and docs index now describe what shipped instead of what was planned.
+- [The closing record](mindmap/technical/release-evidence-0.5.19.md) writes the line's exit journey (ten steps across setup, joining, a restricted workspace, groups, a guest, a limited token, two-step sign-in, offboarding, required provider sign-in and the audit) and four recovery rehearsals, each with a result sheet.
+- **Nothing in the walkthroughs has been performed:** no provider, browser, desktop app or container was available and no test was executed, so every result is pending and the line's exit journey has not passed on the supported distribution. No distribution is newly certified.
+
+### Checks
+- Version, migration lock (53 files), generated types, styles, accessibility, documentation links and TypeScript pass; clippy for the storage and server crates (all targets) and formatting pass. The existing templates-crate lint failure is unrelated. No test was executed and nothing was built or run.
+
+### Upgrading
+- No change to the product. Before requiring provider sign-in, do the closing record's rehearsal on a test server.
+
 ## V0.5.18 (2026-10-29)
 
 Verify the access matrix across roles, guests, tokens and restricted workspaces.

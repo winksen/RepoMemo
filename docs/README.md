@@ -43,6 +43,7 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 | The command console | [Admin console](../mindmap/technical/admin-console.md) |
 | Rotate secrets, manage tokens and sessions, TLS, proxies, audit | [Security administration](SECURITY_ADMIN.md) |
 | Team access, identity rollout and pending validation | [Team access](TEAM_ACCESS.md) |
+| Run team access day to day: setup order, joiners and leavers, recovery drills, limits | [Team access operating guide](TEAM_ACCESS_OPERATIONS.md) |
 | How sign-in, tokens and permissions work | [Authentication and authorization](../mindmap/technical/auth-and-authorization.md) |
 | Diagnose a start or first-run error | [Troubleshooting](TROUBLESHOOTING.md) |
 | Every server setting | [Development commands](DEVELOPMENT_COMMANDS.md) |

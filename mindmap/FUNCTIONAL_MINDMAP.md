@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.19` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.19 — Close the team-access line with operating guides and a walkthrough record.
+
+- New [team-access operating guide](../docs/TEAM_ACCESS_OPERATIONS.md): the order to set things up in, joiner, mover and leaver procedures, guest and token handling, recovery for lost two-step devices, provider outages and half-finished enrollment, the audit export to keep, and an explicit list of residual limits. The team-access reference, user guide, administrator guide and docs index now describe what shipped instead of what was planned.
+- [The closing record](technical/release-evidence-0.5.19.md) writes the line's exit journey (ten steps across setup, joining, a restricted workspace, groups, a guest, a limited token, two-step sign-in, offboarding, required provider sign-in and the audit) and four recovery rehearsals, each with a result sheet.
+- **Nothing in the walkthroughs has been performed:** no provider, browser, desktop app or container was available and no test was executed, so every result is pending and the line's exit journey has not passed on the supported distribution. No distribution is newly certified.
+
+Checks: Version, migration lock (53 files), generated types, styles, accessibility, documentation links and TypeScript pass; clippy for the storage and server crates (all targets) and formatting pass. The existing templates-crate lint failure is unrelated. No test was executed and nothing was built or run.
 
 ## V0.5.18 — Verify the access matrix across roles, guests, tokens and restricted workspaces.
 

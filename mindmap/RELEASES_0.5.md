@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.5 → 0.6
 
-> **Current:** `V0.5.18` (2026-10-29)
+> **Current:** `V0.5.19` (2026-10-29)
 
 > **Theme:** Team access and identity · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -38,7 +38,7 @@
 | **V0.5.16** | ✅ 2026-10-29 | AI. Team access | 🔒 | Local MFA | Add optional TOTP enforcement for local-password accounts, with hashed single-use recovery codes | Password alone cannot bypass enabled MFA through browser, token issuance or alternate login routes; replay and recovery reuse are refused |
 | **V0.5.17** | ✅ 2026-10-29 | AI. Team access | ✨ | MFA UX | Add enrollment, recovery and administrator-policy screens for local MFA | Enrollment requires a successful code, recovery codes are shown once, reset requires verified authority and a user can recover without a support backdoor |
 | **V0.5.18** | ✅ 2026-10-29 | AI. Team access | 🔒 | Access verification | Exercise the complete role, guest, token, MFA and restricted-workspace matrix | Denied access stays denied across caches, events, previews, exports and retrieval; upgrades retain intentional existing grants |
-| **V0.5.19** | 🔜 | AI. Team access | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |
+| **V0.5.19** | ✅ 2026-10-29 | AI. Team access | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |
 
 ## Verification and handoff
 

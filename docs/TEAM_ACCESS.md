@@ -2,21 +2,24 @@
 
 ## Current access model
 
-At V0.5.1, accounts sign in with passwords; administrators can prepare OIDC settings. Provider sign-in, local MFA,
-restricted workspace policy, guest expiry and workspace-scoped tokens are
-planned in the [0.5 release index](../mindmap/RELEASES_0.5.md).
-This guide changes with each implementation release; a planned row is not a
-shipped capability or a live validation pass.
+At V0.5.19 the line is built and compiled but **not live-validated**. Accounts can sign in with a password (optionally
+with a time-based code) or through one OpenID Connect provider; the rest of this guide describes each feature in the
+order it shipped, and the [operating guide](TEAM_ACCESS_OPERATIONS.md) is the procedure to follow. A feature described
+here has been implemented; none has been rehearsed against a real provider, browser or the desktop app.
 
-| Existing capability | Behavior and source |
+| Capability | Behavior |
 |---|---|
-| Organization membership | Grants inherited access to the organization's workspaces; explicit workspace grants retain their origin |
-| Workspace guests | Direct membership grants only that workspace, without organization membership; no expiry yet |
-| Owners and offboarding | Ownership transfer and account deactivation already exist; the 0.5 line will bring them into one handover flow |
-| System administrator | Administers the server and has workspace access; app administrators have system tooling without universal content access |
-| Personal access tokens | Existing read/write/admin/system scopes and expiration; current tokens are not bound to selected workspaces |
-| Audit export | Existing System audit CSV/JSON export; identity events will extend that store |
-| Citation editing | Memory-card writers can change linked evidence; this is already implemented |
+| Organization membership | Grants access to the organization's *shared* workspaces; explicit workspace grants retain their origin |
+| Workspace policy | Shared (organization members are enrolled) or restricted (people are added one by one); existing workspaces are shared |
+| Workspace guests | Direct membership grants only that workspace, without organization membership; an end date and renewal can be set |
+| Provider sign-in | One OIDC provider, linking by issuer and subject, invited enrollment, a confirmation code, optional enforcement with break-glass administrators |
+| Group mapping | Allowlisted provider groups grant existing roles at sign-in; never ownership; previewed first |
+| Local two-step sign-in | Optional TOTP with recovery codes; password or reset link alone never opens a session |
+| Owners and offboarding | One guarded offboarding: preview, hand over ownership and open work, deactivate, verify revocation |
+| System administrator | Administers the server and opens every workspace as an administrator; app administrators have system tooling without universal content access |
+| Personal access tokens | read/write/admin/system scopes and expiry; can be limited to chosen workspaces; an inventory for administrators |
+| Audit export | The System audit export, with an identity-and-sign-in scope |
+| Citation editing | Memory-card writers can change linked evidence |
 
 See [administrator tasks](ADMIN_GUIDE.md), [API access](API.md), and
 [security operations](SECURITY_ADMIN.md) for the existing workflows.

@@ -55,4 +55,4 @@ The desktop app is the web client in its own window, showing your server; it kee
 
 ## Team-access rollout
 
-The [team-access guide](TEAM_ACCESS.md) separates existing guests, transfer and audit from the identity and access features being added in 0.5. Follow its current implementation status before changing sign-in policy.
+Provider sign-in, group mapping, restricted workspaces, guest end dates, offboarding, limited tokens and local two-step sign-in arrived in 0.5. Follow the [team-access operating guide](TEAM_ACCESS_OPERATIONS.md) (setup order, joiners and leavers, recovery drills, limits) and use the [team-access reference](TEAM_ACCESS.md) for what each feature does. None of it has been rehearsed against a real provider yet: do the rehearsal on a test server before requiring provider sign-in.

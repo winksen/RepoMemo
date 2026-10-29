@@ -351,6 +351,17 @@ flowchart TD
 
 Inviting is simple: an admin enters an email address and a role, and RepoMemo sends the invitation (or gives a link to copy if mail isn't set up). Pending invitations can be withdrawn.
 
+### Signing in and keeping your account safe
+
+| Feature | What it gives you |
+|---|---|
+| **Sign in with your organization** | If your administrator turned it on, the sign-in page offers *Continue with* their provider. After you finish at the provider it shows an eight-digit code: type it back into RepoMemo. Only type a code from a page you opened yourself. Link your account first from **Profile › Sign-in provider** if you already have one |
+| **Two-step sign-in** | **Profile › Two-step sign-in** adds a six-digit code from an authenticator app to your password. Keep the ten recovery codes somewhere safe: each works once, and they are shown only once |
+| **API tokens** | **Profile › API tokens** can be limited to the workspaces a script needs. A token stops working in a workspace when you lose access to it |
+| **Guest access** | If you were added to one workspace only, an administrator may have set an end date; after it you cannot open the workspace until it is renewed |
+
+See the [team-access reference](TEAM_ACCESS.md) for how each works.
+
 ---
 
 ## 10. AI: optional, explicit, safe
@@ -388,6 +399,7 @@ An archive is a copy, not a sync: importing the same file twice makes two worksp
 | Task | Where |
 |---|---|
 | Invite people, change roles, remove members | **People**, or **Organization administration** |
+| See who can open the workspace and why; choose whether organization members join automatically (shared or restricted); give guests an end date | **People** (*Who can open this workspace*, *Guests*) |
 | Configure AI and who may use it | **Settings › AI integration** |
 | Link repositories and trackers | **Settings › Repositories**, **Issues and pull requests** |
 | Choose and adjust the template, pick the workspace icon | **Settings › Template**, **Settings** |
@@ -454,7 +466,7 @@ What the app adds to the pages of the browser:
 
 To set expectations:
 
-- **Single sign-on (SSO)** isn't available.
+- **Single sign-on** works with one OpenID Connect provider and has not been tried against a real one yet; SAML, SCIM and several providers aren't available. Two-step sign-in is an authenticator-app code only: no hardware keys, no QR code, and no server-wide requirement.
 - Issue and pull-request connectors cover **GitHub and GitLab** only.
 - A workspace **template** arranges what exists; it doesn't add new sections, and an organization can't save its own template for all its workspaces yet.
 - Archives are a copy, not a continuous sync. Assistant chats and the activity feed aren't in them (saved searches are).
