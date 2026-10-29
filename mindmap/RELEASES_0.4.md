@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.4 → next
 
-> **Line:** `V0.4.0` to `V0.4.104` committed; `V0.4.105` onward proposed · **Current:** `V0.4.104` (2026-10-28) · **Next:** the planned 0.4.x continuation below, before the proposed [0.5.x single sign-on plan](plans/2026-10-27-0.5-single-sign-on.md)
+> **Line:** `V0.4.0` to `V0.4.105` committed · **Current:** `V0.4.105` (2026-10-29) · **Next:** [0.5 plan](plans/2026-10-27-0.5-single-sign-on.md); live validation remains pending
 > **Previous line:** [Releases 0.3 → 0.4](RELEASES_0.3.md) · **Related:** [Roadmap, the 0.4.x line](ROADMAP.md#-the-04x-line-preparation-for-deployment) · [The plan](plans/2026-10-25-deployment.md) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.4 line, planned and later shipped, one row each. The theme is **preparation for deployment, on the server and on the client**: the API with its database and files, and the web client, as containers first and as a direct install second, and the desktop app brought back as the same client, installable, starting with Windows. It was chosen on 2026-10-25 (decision 33) and is planned in [the deployment plan](plans/2026-10-25-deployment.md). The rules are those of 0.3.x: **one change per release**, each shippable alone, committed as `Update V0.4.N` with a short list. Containers are what the tests focus on.
@@ -168,4 +168,4 @@ Each row is one planned Update V0.4.N commit. The sequence starts with the publi
 
 | Release | Status | Track | Type | Area | What changes | Done when |
 |---|---|---|---|---|---|---|
-| **V0.4.105** | 🔜 planned | AH. Final evidence | 📘 Update | Release | Re-run required tests, image and package workflows, affected clean-install paths and documentation checks against one pinned final candidate; publish pass, fail and blocked results and the release decision | Every claim names its tested commit and artifact; a failure blocks readiness and a blocked platform is excluded from the ready claim |
+| **V0.4.105** | ✅ 2026-10-29 | AH. Final evidence | 📘 Update | Release | [Final candidate evidence](technical/release-evidence-0.4.105.md): local checks repeated, missing migration checksum recorded, live workflows and distribution checks pending; implementation overlap authorized | Every claim names its tested commit and artifact; a failure blocks readiness and a blocked platform is excluded from the ready claim |

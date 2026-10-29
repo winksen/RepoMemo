@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.4.104` (2026-10-28), after `V0.3.0` *Connected* · **Next:** [the 0.4.x continuation](#proposed-04x-continuation-gap-audit), V0.4.105–V0.4.105 ([release rows](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x)); the original deployment plan closed at V0.4.67, while published-artifact and live desktop validation remain open · **Next minor candidate:** [0.5.x single sign-on](plans/2026-10-27-0.5-single-sign-on.md), after the 0.4 evidence and the maintainer's decision (decision 41)
+> **Current version:** `V0.4.105` (2026-10-29) · **Next:** V0.5.0 team-access opening. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -1699,7 +1699,7 @@ One box per release, added as each release is built. Say what was built and what
 
 ## Proposed 0.4.x continuation: gap audit
 
-> **Status:** proposed on 2026-10-27; V0.4.68–V0.4.104 are committed, and V0.4.105–V0.4.105 remain planned. V0.4.67 remains the close of the original deployment plan. The [0.4 release index](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x) has one row, type, track and acceptance test per proposed commit. Keep the `Update V0.4.N` convention and update a row only when that release is actually built.
+> **Status:** proposed on 2026-10-27; V0.4.68–V0.4.105 are committed; live validation remains pending. V0.4.67 remains the close of the original deployment plan. The [0.4 release index](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x) has one row, type, track and acceptance test per proposed commit. Keep the `Update V0.4.N` convention and update a row only when that release is actually built.
 
 The next work should first make the deployment claims testable, then improve the daily product, and finally make the documentation a usable route from the README to user, administrator and maintainer tasks. These are gaps in the **record or experience**, not confirmed security defects. A proposed feature needs a short code and UI inventory before implementation so an existing capability is extended rather than duplicated.
 
@@ -1723,7 +1723,7 @@ The next work should first make the deployment claims testable, then improve the
 | V0.4.80–V0.4.85 | AE. Performance and security | Bound expensive work and prove recovery and access behavior |
 | V0.4.86–V0.4.91 | AF. Frontend experience | Improve scanning, navigation, feedback, accessibility and narrow layouts |
 | V0.4.92–V0.4.104 | AG. Documentation commits | Simplify the README, then complete user, administrator, API, functional and technical documentation |
-| V0.4.105 | AH. Final evidence | Re-run affected checks and install paths on the final 0.4 candidate; decide what is ready to ship |
+| V0.4.105 | AH. Final evidence | [Candidate evidence](technical/release-evidence-0.4.105.md) recorded; live validation pending and implementation overlap authorized |
 
 ### Documentation commits
 

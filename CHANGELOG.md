@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.4.105 (2026-10-29)
+
+Record the final 0.4 candidate and the limits of its validation.
+
+### Changed
+- The final candidate evidence matrix separates local source checks from pending exact-commit workflows, image scans, clean installs and live desktop validation.
+- Record the unchanged migration 0044 in the migration lock; it was missing its checksum.
+- The maintainer authorized implementing the 0.5 line while live evidence stays pending; no distribution is newly certified ready and no push or tag is made.
+
+### Checks
+- Static checks, TypeScript, 92 web files / 496 tests and production npm audit pass. Rust tests pass (622 passed, four existing ignores), as do documentation and release-note checks. Sandbox filesystem refusals are recorded separately from test outcomes.
+
+### Upgrading
+- No schema change; migration 0044 is unchanged. Live install, upgrade, restore and provider checks remain pending.
+
 ## V0.4.104 (2026-10-28)
 
 The documentation check covers every guide, version claims, command examples and setup paths.

@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.104` (2026-10-28). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.4.105` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
+
+- The final candidate evidence matrix separates local source checks from pending exact-commit workflows, image scans, clean installs and live desktop validation.
+- Record the unchanged migration 0044 in the migration lock; it was missing its checksum.
+- The maintainer authorized implementing the 0.5 line while live evidence stays pending; no distribution is newly certified ready and no push or tag is made.
+
+Checks: Static checks, TypeScript, 92 web files / 496 tests and production npm audit pass. Rust tests pass (622 passed, four existing ignores), as do documentation and release-note checks. Sandbox filesystem refusals are recorded separately from test outcomes.
 
 ---
 
