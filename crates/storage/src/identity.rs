@@ -19,6 +19,12 @@ pub struct IdentityProvider {
     pub end_session_endpoint: Option<String>,
     #[serde(default)]
     pub checked_at: Option<String>,
+    /// Password sign-in is refused for everyone except the break-glass accounts.
+    #[serde(default)]
+    pub enforced: bool,
+    /// User ids of full system administrators who keep password sign-in while it is enforced.
+    #[serde(default)]
+    pub break_glass: Vec<String>,
 }
 
 impl StorageEngine {
@@ -76,7 +82,7 @@ impl StorageEngine {
 
     pub async fn identity_links(&self, user: &str) -> Result<Vec<(String, String)>> {
         Ok(
-            sqlx::query_as("SELECT issuer,created_at FROM linked_identities WHERE user_id=?1")
+            sqlx::query_as("SELECT issuer,created_at FROM linked_identities WHERE user_id=?1 AND confirmed=1")
                 .bind(user)
                 .fetch_all(self.reader())
                 .await?,

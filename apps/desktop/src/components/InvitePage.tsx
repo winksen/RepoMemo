@@ -51,7 +51,7 @@ export function InvitePage({
   const [isBusy, setIsBusy] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
 
-  useEffect(() => { void fetchSignInProvider().then(setProvider).catch(() => setProvider(null)); }, []);
+  useEffect(() => { void fetchSignInProvider().then((answer) => setProvider(answer.name)).catch(() => setProvider(null)); }, []);
 
   useEffect(() => {
     previewSharedInvitation(token).then(setPreview).catch((error) => setProblem(apiMessage(error, "This invitation link could not be checked.")));

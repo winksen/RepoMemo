@@ -112,13 +112,13 @@
 | GET | `/v1/system/mail/outbox` | auth | require_system_admin | `limit` query | Vec<MailOutboxEntry> (recipient, subject, kind, state, attempts; never the body or a link) |
 | POST | `/v1/system/mail/test` | auth | require_full_system_admin, require_system_change | TestMailRequest | MailOutboxEntry (queued; refused while 50 are waiting) |
 | GET | `/v1/system/identity` | session | system administrator | — | Redacted provider settings and callback URL |
-| GET | `/v1/auth/identity` | public | — | — | Enabled provider display name |
+| GET | `/v1/auth/identity` | public | — | — | Enabled provider display name and whether it is required |
 | POST | `/v1/auth/identity/start` | public | sign-in quota | — | Authorization URL and initiating-client proof; five-minute expiry |
 | GET | `/v1/auth/identity/callback` | public | state, PKCE, nonce, signature | Callback | Completes a single-use provider response; no session tokens in the page |
 | POST | `/v1/auth/identity/complete` | public | initiating-client proof | Complete | 202 pending or existing session response; result consumed once |
 | GET | `/v1/profile/identity` | session | own account | — | Linked issuer and date; no provider subject or secret |
 | POST | `/v1/profile/identity` | session | own account | — | Start explicit identity linking with session-version proof |
-| PUT | `/v1/system/identity` | session | system administrator | ProviderRequest | Save sealed credentials; enabled providers require fresh discovery/key checks |
+| PUT | `/v1/system/identity` | session | system administrator | ProviderRequest | Save sealed credentials; enabled providers require fresh discovery/key checks; `enforced` needs a linked administrator and 1–5 break-glass system administrators |
 | POST | `/v1/system/identity/check` | session | system administrator | ProviderRequest | Bounded discovery and signing-key reachability; does not save or prove sign-in |
 
 ## Organizations

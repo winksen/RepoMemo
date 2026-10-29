@@ -35,7 +35,64 @@ async fn enabled_provider(state: &AppState) -> Result<IdentityProvider, ApiError
 
 pub(crate) async fn public_provider(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
     let provider = state.storage.identity_provider().await.map_err(ApiError::internal)?;
-    Ok(Json(json!({"name":provider.filter(|p|p.enabled).map(|p|p.name)})))
+    let provider = provider.filter(|p| p.enabled);
+    Ok(Json(
+        json!({"name":provider.as_ref().map(|p|&p.name),"enforced":provider.is_some_and(|p|p.enforced)}),
+    ))
+}
+
+/// The name of the provider when password sign-in is replaced by it.
+pub(crate) async fn enforced_provider(state: &AppState) -> Result<Option<String>, ApiError> {
+    Ok(state
+        .storage
+        .identity_provider()
+        .await
+        .map_err(ApiError::internal)?
+        .filter(|p| p.enabled && p.enforced)
+        .map(|p| p.name))
+}
+
+/// Password routes consult this after the password is proven. Only break-glass system administrators pass while
+/// enforcement is on; if none of them is left usable, any full system administrator does, so a path always remains.
+pub(crate) async fn password_sign_in_allowed(state: &AppState, user_id: &str) -> Result<(), ApiError> {
+    let Some(provider) = state
+        .storage
+        .identity_provider()
+        .await
+        .map_err(ApiError::internal)?
+        .filter(|p| p.enabled && p.enforced)
+    else {
+        return Ok(());
+    };
+    let mut usable = Vec::new();
+    for id in &provider.break_glass {
+        let access = state.storage.user_access(id).await.map_err(ApiError::internal)?;
+        if access.is_some_and(|a| a.is_system_admin) {
+            usable.push(id.as_str());
+        }
+    }
+    let is_admin = state
+        .storage
+        .user_access(user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .is_some_and(|a| a.is_system_admin);
+    if !is_admin || (!usable.is_empty() && !usable.contains(&user_id)) {
+        return Err(ApiError::forbidden_because(format!(
+            "This server requires sign-in with {}.",
+            provider.name
+        )));
+    }
+    state
+        .storage
+        .record_system_event(
+            Some(user_id),
+            "break_glass_sign_in",
+            "Password sign-in used while provider sign-in is enforced",
+        )
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(())
 }
 
 #[derive(Default, Deserialize)]
@@ -438,6 +495,10 @@ pub(crate) struct ProviderRequest {
     enabled: bool,
     #[serde(default)]
     allowed_domains: Vec<String>,
+    #[serde(default)]
+    enforced: bool,
+    #[serde(default)]
+    break_glass_emails: Vec<String>,
 }
 
 fn https_url(value: &str) -> Result<Url, ApiError> {
@@ -588,6 +649,7 @@ fn configuration(request: &ProviderRequest) -> Result<IdentityProvider, ApiError
         client_id: request.client_id.trim().into(),
         enabled: request.enabled,
         allowed_domains: request.allowed_domains.iter().map(|d| d.to_ascii_lowercase()).collect(),
+        enforced: request.enforced,
         ..Default::default()
     })
 }
@@ -598,9 +660,7 @@ pub(crate) async fn get_provider(
 ) -> Result<Json<Value>, ApiError> {
     system::require_full_system_admin(&subject)?;
     let provider = state.storage.identity_provider().await.map_err(ApiError::internal)?;
-    Ok(Json(
-        json!({"provider": provider, "has_secret": state.storage.identity_secret().await.map_err(ApiError::internal)?.is_some(), "callback_url": state.mail.link("/v1/auth/identity/callback")}),
-    ))
+    provider_overview(&state, provider).await
 }
 
 pub(crate) async fn check_provider(
@@ -678,14 +738,102 @@ pub(crate) async fn save_provider(
             return Err(ApiError::bad_request("The provider key set is empty or too large."));
         }
     }
+    if provider.enforced {
+        provider.break_glass =
+            enforcement_ready(&state, &subject.user_id, &provider, &request.break_glass_emails).await?;
+    }
+    let was_enforced = old.as_ref().is_some_and(|p| p.enforced);
     state
         .storage
         .save_identity_provider(&provider, &secret, &subject.user_id)
         .await
         .map_err(ApiError::internal)?;
+    if was_enforced != provider.enforced {
+        state
+            .storage
+            .record_system_event(
+                Some(&subject.user_id),
+                "identity_enforcement_changed",
+                if provider.enforced {
+                    "Provider sign-in is now required; password sign-in is limited to break-glass administrators"
+                } else {
+                    "Provider sign-in is no longer required"
+                },
+            )
+            .await
+            .map_err(ApiError::internal)?;
+    }
+    provider_overview(&state, Some(provider)).await
+}
+
+async fn provider_overview(state: &AppState, provider: Option<IdentityProvider>) -> Result<Json<Value>, ApiError> {
+    let mut emails = Vec::new();
+    for id in provider.iter().flat_map(|p| p.break_glass.iter()) {
+        if let Some(email) = state
+            .storage
+            .find_user(id)
+            .await
+            .map_err(ApiError::internal)?
+            .and_then(|u| u.email)
+        {
+            emails.push(email);
+        }
+    }
     Ok(Json(
-        json!({"provider":provider,"has_secret":true,"callback_url":state.mail.link("/v1/auth/identity/callback")}),
+        json!({"provider":provider,"break_glass_emails":emails,"has_secret":state.storage.identity_secret().await.map_err(ApiError::internal)?.is_some(),"callback_url":state.mail.link("/v1/auth/identity/callback")}),
     ))
+}
+
+/// Enforcement may only be saved when the provider is enabled and checked, the administrator saving it has already
+/// linked their own account to it, and at least one active system administrator keeps password access.
+async fn enforcement_ready(
+    state: &AppState,
+    admin: &str,
+    provider: &IdentityProvider,
+    emails: &[String],
+) -> Result<Vec<String>, ApiError> {
+    if !provider.enabled {
+        return Err(ApiError::bad_request(
+            "Enable and check the provider before requiring it.",
+        ));
+    }
+    let linked = state.storage.identity_links(admin).await.map_err(ApiError::internal)?;
+    if !linked.iter().any(|(issuer, _)| *issuer == provider.issuer) {
+        return Err(ApiError::bad_request(
+            "Link your own account to this provider on your profile before requiring provider sign-in.",
+        ));
+    }
+    if emails.is_empty() || emails.len() > 5 {
+        return Err(ApiError::bad_request(
+            "Name one to five system administrators who keep password sign-in as break-glass access.",
+        ));
+    }
+    let mut ids = Vec::new();
+    for email in emails {
+        let user = state
+            .storage
+            .find_user_by_email(email)
+            .await
+            .map_err(|_| ApiError::bad_request("Enter valid break-glass email addresses."))?;
+        let active_admin = match &user {
+            Some(user) => state
+                .storage
+                .user_access(&user.id)
+                .await
+                .map_err(ApiError::internal)?
+                .is_some_and(|a| a.is_system_admin),
+            None => false,
+        };
+        let Some(user) = user.filter(|_| active_admin) else {
+            return Err(ApiError::bad_request(format!(
+                "{email} is not an active system administrator."
+            )));
+        };
+        if !ids.contains(&user.id) {
+            ids.push(user.id);
+        }
+    }
+    Ok(ids)
 }
 
 #[cfg(test)]

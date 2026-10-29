@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.4` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.5` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.5 — Require provider sign-in with guarded break-glass administrator access.
+
+- System administrators can require provider sign-in. Saving needs an enabled, checked provider, the saving administrator's own linked account, and one to five named break-glass system administrators.
+- While required, password login, registration and password-reset sign-in are refused for everyone except those break-glass accounts; each use is recorded in the system audit trail. If none of them is still an active administrator, any active system administrator keeps a password path, so access cannot be lost entirely.
+- The sign-in page leads with the provider and keeps the password form behind an "Administrator break-glass sign-in" step. Disabling the provider or changing its issuer is refused until the requirement is removed. Existing sessions and password-only servers are unchanged.
+
+Checks: One server test covers member refusal, break-glass success, registration refusal, the no-usable-break-glass fallback and turning enforcement off; clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.4 — Add provider sign-in to the browser and the desktop app.
 

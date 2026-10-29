@@ -422,9 +422,10 @@ export async function loginSharedUser(input: {
 export type ProviderFlow = { authorization_url: string; state: string; proof: string; expires_in: number };
 export type ProviderLink = [issuer: string, linkedAt: string];
 
-/** The enabled sign-in provider's display name, or null when the server offers password sign-in only. */
-export async function fetchSignInProvider(): Promise<string | null> {
-  return (await request<{ name: string | null }>("/v1/auth/identity")).name ?? null;
+/** The enabled sign-in provider's display name (null when the server offers password sign-in only) and whether it replaces passwords. */
+export async function fetchSignInProvider(): Promise<{ name: string | null; enforced: boolean }> {
+  const answer = await request<{ name: string | null; enforced?: boolean }>("/v1/auth/identity");
+  return { name: answer.name ?? null, enforced: Boolean(answer.name && answer.enforced) };
 }
 
 export function startProviderFlow(invitationToken?: string): Promise<ProviderFlow> {

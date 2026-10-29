@@ -160,6 +160,11 @@ pub(crate) async fn register(
             "This server is not set up yet. Its administrator must finish the setup first.",
         ));
     }
+    if let Some(name) = identity::enforced_provider(&state).await? {
+        return Err(ApiError::forbidden_because(format!(
+            "Accounts on this server are created through {name}. Open your invitation and continue with the provider."
+        )));
+    }
     match request
         .invitation_token
         .as_deref()
@@ -326,6 +331,7 @@ pub(crate) async fn login(
             "This account has been deactivated. Ask a system administrator to reactivate it.",
         ));
     }
+    identity::password_sign_in_allowed(&state, &user.id).await?;
     state.guards.logins.clear(&pair_key);
     state
         .storage

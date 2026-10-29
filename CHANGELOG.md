@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.5 (2026-10-29)
+
+Require provider sign-in with guarded break-glass administrator access.
+
+### Changed
+- System administrators can require provider sign-in. Saving needs an enabled, checked provider, the saving administrator's own linked account, and one to five named break-glass system administrators.
+- While required, password login, registration and password-reset sign-in are refused for everyone except those break-glass accounts; each use is recorded in the system audit trail. If none of them is still an active administrator, any active system administrator keeps a password path, so access cannot be lost entirely.
+- The sign-in page leads with the provider and keeps the password form behind an "Administrator break-glass sign-in" step. Disabling the provider or changing its issuer is refused until the requirement is removed. Existing sessions and password-only servers are unchanged.
+
+### Checks
+- One server test covers member refusal, break-glass success, registration refusal, the no-usable-break-glass fallback and turning enforcement off; clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- No migration; enforcement is off until an administrator turns it on. Link your own account and name break-glass administrators first.
+
 ## V0.5.4 (2026-10-29)
 
 Add provider sign-in to the browser and the desktop app.

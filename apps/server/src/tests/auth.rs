@@ -1655,3 +1655,72 @@ async fn over_https_the_refresh_cookie_has_the_secure_prefix_and_the_old_one_is_
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn enforced_provider_sign_in_leaves_only_break_glass_password_access() {
+    let dir = temp_data_dir("identity-enforced");
+    let app = router(ServerConfig::for_test(dir.clone())).await.unwrap();
+    let (_, owner) = register_account(&app, "owner@example.com").await;
+    register_account(&app, "member@example.com").await;
+    let owner_id = owner["user"]["id"].as_str().unwrap().to_owned();
+    let storage = repomemo_storage::StorageEngine::open(repomemo_storage::StorageConfig::new(dir))
+        .await
+        .unwrap();
+    let mut provider = repomemo_storage::IdentityProvider {
+        name: "Company".into(),
+        enabled: true,
+        enforced: true,
+        break_glass: vec![owner_id.clone()],
+        ..Default::default()
+    };
+    storage
+        .save_identity_provider(&provider, "test-secret", &owner_id)
+        .await
+        .unwrap();
+    let login = |email: &str| {
+        public_post(
+            "/v1/auth/login",
+            json!({"email":email,"password":"not-a-real-password"}),
+        )
+    };
+    let status = |request: axum::http::Request<axum::body::Body>| {
+        let app = app.clone();
+        async move { app.oneshot(request).await.unwrap().status() }
+    };
+    assert_eq!(status(login("member@example.com")).await, 403);
+    assert_eq!(status(login("owner@example.com")).await, 200);
+    assert_eq!(
+        status(public_post(
+            "/v1/auth/register",
+            json!({"email":"new@example.com","display_name":"New","password":"not-a-real-password"})
+        ))
+        .await,
+        403
+    );
+    let public = response_json(
+        app.clone()
+            .oneshot(
+                axum::http::Request::get("/v1/auth/identity")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(public["enforced"], true);
+    // With no usable break-glass account left, a system administrator still has a path; members do not.
+    provider.break_glass.clear();
+    storage
+        .save_identity_provider(&provider, "test-secret", &owner_id)
+        .await
+        .unwrap();
+    assert_eq!(status(login("owner@example.com")).await, 200);
+    assert_eq!(status(login("member@example.com")).await, 403);
+    provider.enforced = false;
+    storage
+        .save_identity_provider(&provider, "test-secret", &owner_id)
+        .await
+        .unwrap();
+    assert_eq!(status(login("member@example.com")).await, 200);
+}

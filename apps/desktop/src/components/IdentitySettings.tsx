@@ -13,22 +13,23 @@ import { PanelHeading } from "./ui/panel-heading";
 import { showToast } from "./ui/toast";
 import { useUnsavedChanges } from "../lib/unsavedChanges";
 
-interface Provider { name: string; issuer: string; client_id: string; enabled: boolean; allowed_domains: string[]; checked_at?: string | null }
-interface Overview { provider: Provider | null; has_secret: boolean; callback_url: string | null }
-const empty: Provider = { name: "", issuer: "", client_id: "", enabled: false, allowed_domains: [] };
+interface Provider { name: string; issuer: string; client_id: string; enabled: boolean; allowed_domains: string[]; checked_at?: string | null; enforced?: boolean }
+interface Overview { provider: Provider | null; has_secret: boolean; callback_url: string | null; break_glass_emails?: string[] }
+const empty: Provider = { name: "", issuer: "", client_id: "", enabled: false, allowed_domains: [], enforced: false };
 
 export function IdentitySettings({ accessToken }: { accessToken: string }) {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [draft, setDraft] = useState(empty);
   const [secret, setSecret] = useState("");
   const [domains, setDomains] = useState("");
+  const [breakGlass, setBreakGlass] = useState("");
   const [action, setAction] = useState<"check" | "save" | null>(null);
   const busy = action !== null;
   const form = useRef<HTMLFormElement>(null);
   const [failed, setFailed] = useState(false);
   const [dirty, setDirty] = useState(false);
   useUnsavedChanges(dirty, { subject: "the identity provider settings" });
-  function apply(value: Overview) { setOverview(value); setDraft(value.provider ?? empty); setDomains(value.provider?.allowed_domains.join(", ") ?? ""); setSecret(""); setDirty(false); }
+  function apply(value: Overview) { setOverview(value); setDraft(value.provider ?? empty); setDomains(value.provider?.allowed_domains.join(", ") ?? ""); setBreakGlass((value.break_glass_emails ?? []).join(", ")); setSecret(""); setDirty(false); }
   async function load() {
     setFailed(false);
     try { apply(await request<Overview>("/v1/system/identity", {}, accessToken)); }
@@ -41,7 +42,7 @@ export function IdentitySettings({ accessToken }: { accessToken: string }) {
     setAction(check ? "check" : "save");
     try {
       const result = await request<Overview & { message?: string }>(`/v1/system/identity${check ? "/check" : ""}`, {
-        method: check ? "POST" : "PUT", body: JSON.stringify({ ...draft, client_secret: secret, allowed_domains: domains.split(",").map(d => d.trim()).filter(Boolean) }),
+        method: check ? "POST" : "PUT", body: JSON.stringify({ ...draft, client_secret: secret, allowed_domains: domains.split(",").map(d => d.trim()).filter(Boolean), break_glass_emails: breakGlass.split(",").map(d => d.trim()).filter(Boolean) }),
       }, accessToken);
       if (!check) apply(result);
       showToast("success", check ? result.message ?? "Discovery checked." : "Provider settings saved.");
@@ -51,7 +52,7 @@ export function IdentitySettings({ accessToken }: { accessToken: string }) {
   if (!overview) return failed ? <Button onClick={() => void load()}>Retry provider settings</Button> : <LoadingState label="Loading identity provider" />;
   return <section className="shared-settings-group">
     <PanelHeading icon={IconKey} title="Sign-in provider" description="One OpenID Connect provider for this server" />
-    <p className="shared-muted-copy">Use a public HTTPS issuer with authorization code, S256 PKCE, RS256 and client_secret_post support. All endpoints must share its origin. Password sign-in stays available.</p>
+    <p className="shared-muted-copy">Use a public HTTPS issuer with authorization code, S256 PKCE, RS256 and client_secret_post support. All endpoints must share its origin. Password sign-in stays available unless you require the provider below.</p>
     <p className="shared-muted-copy rm-identity-callback">Register this callback with the provider: <code>{overview.callback_url ?? "Set the server public URL first"}</code></p>
     <form ref={form} onSubmit={event => { event.preventDefault(); void submit(false); }}>
       <fieldset className="rm-identity-fields" disabled={busy}>
@@ -60,7 +61,9 @@ export function IdentitySettings({ accessToken }: { accessToken: string }) {
         <Field label="Client ID" required><Input value={draft.client_id} onChange={event => edit({ client_id: event.target.value })} /></Field>
         <Field label="Client secret" hint={overview.has_secret ? "A secret is saved. Leave empty to keep it; enter a new one when changing the issuer or client ID." : "Stored encrypted. Never returned by the server."}><Input type="password" autoComplete="new-password" value={secret} onChange={event => { setSecret(event.target.value); setDirty(true); }} /></Field>
         <Field label="Allowed email domains" hint="Comma-separated exact domains. This does not grant workspace access or link an existing account."><Input value={domains} onChange={event => { setDomains(event.target.value); setDirty(true); }} /></Field>
-        <Switch label="Enable provider" checked={draft.enabled} onCheckedChange={enabled => edit({ enabled })} />
+        <Switch label="Enable provider" checked={draft.enabled} onCheckedChange={enabled => edit({ enabled, ...(enabled ? {} : { enforced: false }) })} />
+        <Switch label="Require provider sign-in" checked={Boolean(draft.enforced)} disabled={!draft.enabled} onCheckedChange={enforced => edit({ enforced })} />
+        {draft.enforced ? <Field label="Break-glass administrators" required hint="One to five active system administrators, comma-separated, who keep password sign-in. You must have linked your own account to this provider first. Each use is recorded in the audit trail."><Input required value={breakGlass} onChange={event => { setBreakGlass(event.target.value); setDirty(true); }} /></Field> : null}
         <div className="rm-identity-actions"><Button type="button" onClick={() => void submit(true)} disabled={busy} busy={action === "check"}>Check discovery</Button><Button type="submit" variant="main" busy={action === "save"}>Save provider</Button></div>
       </fieldset>
     </form>

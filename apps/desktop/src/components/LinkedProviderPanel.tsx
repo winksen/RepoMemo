@@ -12,7 +12,7 @@ export function LinkedProviderPanel({ accessToken }: { accessToken: string }) {
   const refresh = useCallback(async () => {
     try {
       const [name, linked] = await Promise.all([fetchSignInProvider(), listProviderLinks(accessToken)]);
-      setProvider(name);
+      setProvider(name.name);
       setLinks(linked.links);
     } catch (problem) { showToast("error", apiMessage(problem, "Linked sign-in providers could not be loaded.")); }
   }, [accessToken]);

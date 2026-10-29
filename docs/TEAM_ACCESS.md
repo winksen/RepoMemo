@@ -132,3 +132,20 @@ provider setting each return to the sign-in form with a message; local sign-in
 stays available. The profile page shows the linked provider and starts explicit
 linking, which does not replace the current session. Live browser, desktop and
 provider journeys remain pending.
+
+## Require provider sign-in
+
+V0.5.5 lets a full system administrator turn on **Require provider sign-in**
+in System settings. It can only be saved when the provider is enabled and
+checked, when the administrator saving it has already linked their own account
+to that provider, and when one to five active system administrators are named
+as break-glass accounts. Local password sign-in, registration and password-reset
+sign-in are then refused for everyone else, with a message naming the provider.
+Existing sessions are not ended by this release.
+
+Break-glass administrators keep password sign-in at the sign-in page under
+"Administrator break-glass sign-in"; every such use is recorded in the system
+audit trail. If every named break-glass account is deactivated or demoted, any
+active system administrator keeps password access, so a working path always
+remains. Turning enforcement off, disabling the provider or changing the issuer
+requires removing the requirement first. Password-only servers are unchanged.

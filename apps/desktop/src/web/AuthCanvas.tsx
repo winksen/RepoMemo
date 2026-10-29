@@ -36,8 +36,12 @@ export function AuthCanvas({
   const [error, setError] = useState<string | null>(initialError);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
+  const [enforced, setEnforced] = useState(false);
+  const [breakGlass, setBreakGlass] = useState(false);
 
-  useEffect(() => { void fetchSignInProvider().then(setProvider).catch(() => setProvider(null)); }, []);
+  useEffect(() => { void fetchSignInProvider().then((answer) => { setProvider(answer.name); setEnforced(answer.enforced); }).catch(() => setProvider(null)); }, []);
+  // Enforced provider sign-in: the password form is only a break-glass door for administrators.
+  const passwordHidden = enforced && !breakGlass && !setupPending;
 
   useEffect(() => {
     setMode(setupPending ? "sign-in" : initialMode);
@@ -99,7 +103,7 @@ export function AuthCanvas({
         { icon: <Users size={ICON_SIZE.md} />, title: "Membership-aware", text: "Workspace access is scoped to the signed-in account." },
       ]}
     >
-      {setupPending ? null : <SegmentedControl aria-label="Account action" fill onValueChange={(next) => { navigate(next === "sign-in" ? "/login" : "/register"); setMode(next); setError(null); }} options={[{ label: "Sign in", value: "sign-in" }, { label: "Create account", value: "sign-up" }]} value={mode} />}
+      {setupPending || enforced ? null : <SegmentedControl aria-label="Account action" fill onValueChange={(next) => { navigate(next === "sign-in" ? "/login" : "/register"); setMode(next); setError(null); }} options={[{ label: "Sign in", value: "sign-in" }, { label: "Create account", value: "sign-up" }]} value={mode} />}
       {setupPending ? <div className="shared-auth-heading">
         <p className="shared-eyebrow">Server setup</p>
         <h2>Finish setting up RepoMemo</h2>
@@ -109,7 +113,8 @@ export function AuthCanvas({
         <h2>{mode === "sign-in" ? "Continue to RepoMemo" : "Create your account"}</h2>
         <p>{mode === "sign-in" ? "Use the credentials registered with this server." : "Your account will be the initial owner of any organization you create."}</p>
       </div>}
-      <form className="shared-auth-form" onSubmit={submit}>
+      {mode === "sign-in" && provider ? <ProviderSignIn label={`Continue with ${provider}`} onDone={(session) => onAuthenticated(session.access_token)} start={() => startProviderFlow()} /> : null}
+      {passwordHidden ? <p className="shared-auth-hint">This server requires {provider}. <Button onClick={() => setBreakGlass(true)} type="button" variant="secondary">Administrator break-glass sign-in</Button></p> : <form className="shared-auth-form" onSubmit={submit}>
         {mode === "sign-up" ? <Field label="Display name" required><Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" value={displayName} /></Field> : null}
         <Field label="Email" required><Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" type="email" value={email} /></Field>
         <Field label="Password" required><Input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
@@ -118,9 +123,8 @@ export function AuthCanvas({
           <ArrowRight size={ICON_SIZE.md} />
           {mode === "sign-in" ? "Sign in to shared mode" : "Create account and continue"}
         </Button>
-      </form>
-      {mode === "sign-in" && provider ? <ProviderSignIn label={`Continue with ${provider}`} onDone={(session) => onAuthenticated(session.access_token)} start={() => startProviderFlow()} /> : null}
-      {mode === "sign-in" ? <div className="shared-auth-hint">
+      </form>}
+      {mode === "sign-in" && !passwordHidden ? <div className="shared-auth-hint">
         {forgotOpen
           ? <p>We will send a link to <strong>{email.trim() || "the address above"}</strong> if an account uses it and this server sends mail. It works once, for one hour. <Button busy={isSubmitting} onClick={() => void forgot()} variant="secondary">Send the link</Button> <Button onClick={() => setForgotOpen(false)} variant="secondary">Cancel</Button></p>
           : <p>Forgot your password? <Button onClick={() => setForgotOpen(true)} variant="secondary">Get a link by email</Button>, or ask a system administrator of this server for a reset link (System › Users).</p>}

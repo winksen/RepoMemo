@@ -705,6 +705,14 @@ pub(crate) async fn complete_password_reset(
     validate_password(&request.password, reset_email.as_deref())?;
     // Hash first: a failure here must not use up the link.
     let password_hash = hash_password(&request.password).await?;
+    if let Some(user) = state
+        .storage
+        .find_password_reset(&request.token)
+        .await
+        .map_err(map_storage_error)?
+    {
+        crate::identity::password_sign_in_allowed(&state, &user.user.id).await?;
+    }
     let user_id = state
         .storage
         .consume_password_reset(&request.token)
