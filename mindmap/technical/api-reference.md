@@ -81,6 +81,8 @@
 | PUT | `/v1/system/users/{user_id}/app-admin` | session | require_full_system_admin | SystemAdminRequest | status |
 | POST | `/v1/system/users/{user_id}/sessions/end` | auth | require_full_system_admin, require_system_change | — | status |
 | POST | `/v1/system/users/{user_id}/unlock` | auth | require_full_system_admin, require_system_change | — | Value |
+| GET | `/v1/system/users/{user_id}/offboarding` | session | full system administrator | — | What the account owns and holds (owned places, open tasks and reviews, sessions, tokens, sent invitations) and whether it is the last system administrator |
+| POST | `/v1/system/users/{user_id}/offboard` | session | full system administrator, system scope | `{transfer_to}` | Checks first, then transfers ownership, reassigns open tasks, deactivates and verifies revocation; audited |
 | POST | `/v1/system/users/{user_id}/deactivate` | auth | require_full_system_admin, require_system_change | — | Value |
 | POST | `/v1/system/users/{user_id}/anonymize` | auth | require_full_system_admin, require_system_change | AnonymizeRequest | Value |
 | POST | `/v1/system/users/{user_id}/reactivate` | auth | require_full_system_admin, require_system_change | — | status |

@@ -2124,3 +2124,117 @@ async fn guest_end_dates_are_set_by_administrators_and_validated() {
         response_json(call("GET", format!("/v1/workspaces/{workspace}/guests"), owner, Value::Null).await).await;
     assert!(listed["guests"][0]["expires_at"].is_null());
 }
+
+#[tokio::test]
+async fn offboarding_hands_over_work_checks_everything_first_and_verifies_revocation() {
+    let app = router(ServerConfig::for_test(temp_data_dir("offboarding")))
+        .await
+        .unwrap();
+    let (admin, _) = register_account(&app, "admin@example.com").await;
+    let (leaver, leaver_account) = register_account(&app, "leaver@example.com").await;
+    let (_, successor_account) = register_account(&app, "successor@example.com").await;
+    let (_, outsider_account) = register_account(&app, "outsider@example.com").await;
+    let leaver_id = leaver_account["user"]["id"].as_str().unwrap().to_owned();
+    let successor_id = successor_account["user"]["id"].as_str().unwrap().to_owned();
+    let outsider_id = outsider_account["user"]["id"].as_str().unwrap().to_owned();
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        async move { app.oneshot(json_request(method, &uri, &who, body)).await.unwrap() }
+    };
+    let workspace = create_workspace(&app, &leaver).await;
+    let organization = response_json(call("GET", "/v1/organizations".into(), leaver.clone(), Value::Null).await).await
+        [0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    join(
+        &app,
+        &leaver,
+        "organizations",
+        &organization,
+        "successor@example.com",
+        "member",
+    )
+    .await;
+    let task = call(
+        "POST",
+        format!("/v1/workspaces/{workspace}/tasks"),
+        leaver.clone(),
+        json!({"title":"Review the runbook","status":"open","priority":"medium","assignee_user_id":leaver_id}),
+    )
+    .await;
+    assert!(task.status().is_success(), "{}", task.status());
+    let preview = response_json(
+        call(
+            "GET",
+            format!("/v1/system/users/{leaver_id}/offboarding"),
+            admin.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(preview["open_tasks"], 1);
+    assert!(!preview["owned"].as_array().unwrap().is_empty());
+    assert_eq!(preview["last_system_administrator"], false);
+    let offboard = |who: &str, id: &str, to: Option<&str>| {
+        call(
+            "POST",
+            format!("/v1/system/users/{id}/offboard"),
+            who.to_owned(),
+            json!({"transfer_to":to}),
+        )
+    };
+    // Nothing happens unless it can all happen.
+    assert_eq!(offboard(&admin, &leaver_id, None).await.status(), 400);
+    assert_eq!(offboard(&admin, &leaver_id, Some(&leaver_id)).await.status(), 400);
+    assert_eq!(offboard(&admin, &leaver_id, Some(&outsider_id)).await.status(), 409);
+    assert_eq!(offboard(&leaver, &leaver_id, Some(&successor_id)).await.status(), 403);
+    assert_eq!(
+        response_json(
+            call(
+                "GET",
+                format!("/v1/system/users/{leaver_id}/offboarding"),
+                admin.clone(),
+                Value::Null
+            )
+            .await
+        )
+        .await["open_tasks"],
+        1
+    );
+    let done = offboard(&admin, &leaver_id, Some(&successor_id)).await;
+    assert_eq!(done.status(), 200);
+    let done = response_json(done).await;
+    assert_eq!(done["tasks_reassigned"], 1);
+    assert!(done["ownership_transferred"].as_i64().unwrap() >= 1);
+    assert_eq!(done["verified"], true);
+    // The old session no longer works and the work and its attribution moved on.
+    assert_eq!(
+        call("GET", "/v1/profile".into(), leaver, Value::Null).await.status(),
+        401
+    );
+    let after = response_json(
+        call(
+            "GET",
+            format!("/v1/system/users/{leaver_id}/offboarding"),
+            admin.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        (after["open_tasks"].as_i64(), after["owned"].as_array().map(Vec::len)),
+        (Some(0), Some(0))
+    );
+    assert_eq!(offboard(&admin, &leaver_id, None).await.status(), 409);
+    // The last system administrator cannot be offboarded, and nobody offboards themselves.
+    assert_eq!(offboard(&admin, &outsider_id, None).await.status(), 200);
+    let admin_id = response_json(call("GET", "/v1/session".into(), admin.clone(), Value::Null).await).await["user"]
+        ["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(offboard(&admin, &admin_id, None).await.status(), 409);
+}

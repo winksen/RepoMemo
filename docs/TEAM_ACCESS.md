@@ -295,3 +295,29 @@ recorded once as `guest_access_expired` by the hourly maintenance pass (access
 ends at the date whether or not that pass has run). Administrators cannot
 change an administrator's date. Existing memberships have no end date.
 Migration 0051 adds the two fields.
+
+## Offboarding
+
+V0.5.14 adds **Offboard account…** to System › Users, one guarded step that
+joins what used to be separate: transferring ownership, handing over work and
+deactivating. The dialog first shows what the account owns, its open tasks and
+reviews (reviews are tasks tied to a file) and the sessions, personal tokens and
+sent invitations that will end. If there is anything to hand over, you choose
+who receives it; that person must be able to open each workspace that has open
+tasks and must belong to each organization or workspace that changes owner.
+
+Everything that could refuse is checked **before** anything changes: your own
+account, an already deactivated account, the last system administrator (which
+cannot be offboarded, so the server is never left without one), and a recipient
+who cannot take over. Then ownership moves (the previous owner stays an
+administrator, as with any transfer, so no workspace or organization is ever
+left without an owner), open tasks and reviews are reassigned with a line in
+each workspace's activity, and the account is deactivated. Whoever created a
+task, file or comment stays its creator: attribution is not rewritten.
+
+The result states whether revocation was **verified**: no active session,
+personal token, sent invitation or open task remains for the account. The audit
+trail records `user_offboarded` with the counts. Anonymizing remains a separate
+step afterwards. The older *Deactivate account* action still works and still
+refuses an owner. `GET /v1/system/users/{user_id}/offboarding` is the preview
+and `POST …/offboard` the action; both are for full system administrators.

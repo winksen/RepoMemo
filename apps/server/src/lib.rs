@@ -675,6 +675,11 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/system/users/{user_id}/unlock", post(system::unlock_user))
         .route("/v1/system/users/{user_id}/deactivate", post(system::deactivate_user))
+        .route(
+            "/v1/system/users/{user_id}/offboarding",
+            get(system::offboarding_preview),
+        )
+        .route("/v1/system/users/{user_id}/offboard", post(system::offboard_user))
         .route("/v1/system/users/{user_id}/reactivate", post(system::reactivate_user))
         .route("/v1/system/users/{user_id}/anonymize", post(system::anonymize_user))
         .route(

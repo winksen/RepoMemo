@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.14 (2026-10-29)
+
+Unify offboarding with a preview of ownership, tasks and reviews.
+
+### Changed
+- System › Users gains **Offboard account…**: a preview of what the account owns, its open tasks and reviews and what will end, a chosen recipient, then ownership transfer, task and review reassignment (with a workspace activity line each) and deactivation in one step. Creators stay creators; nothing is rewritten.
+- Everything that can refuse is checked before anything changes: the caller's own account, an already deactivated one, the last system administrator (so the server never has none) and a recipient who cannot open the workspaces with open tasks or belong to the places that change owner. Owners always keep an owner: the previous one stays an administrator, as in any transfer.
+- The result reports whether revocation was verified (no active session, token, sent invitation or open task left) and the audit trail records `user_offboarded`. The older Deactivate action is unchanged.
+
+### Checks
+- One server test covers the preview, every refusal before any change, the hand-over, verified revocation, the ended session and the last-administrator refusal; two UI tests cover the dialog. Clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- No migration.
+
 ## V0.5.13 (2026-10-29)
 
 Add expiry and renewal to guest workspace membership.

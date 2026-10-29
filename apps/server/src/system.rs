@@ -1430,6 +1430,231 @@ pub(crate) async fn deactivate_user(
     })))
 }
 
+/// What offboarding an account involves, before anything is done: what it owns, its open tasks and reviews, and what
+/// deactivating ends.
+pub(crate) async fn offboarding_preview(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_full_system_admin(&subject)?;
+    state
+        .storage
+        .find_user(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("User was not found."))?;
+    let mut preview = state
+        .storage
+        .offboarding_preview(&user_id)
+        .await
+        .map_err(map_storage_error)?;
+    preview["last_system_administrator"] = json!(
+        state
+            .storage
+            .user_access(&user_id)
+            .await
+            .map_err(ApiError::internal)?
+            .is_some_and(|a| a.is_system_admin)
+            && state
+                .storage
+                .other_active_system_admins(&user_id)
+                .await
+                .map_err(ApiError::internal)?
+                == 0
+    );
+    Ok(Json(preview))
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct OffboardRequest {
+    /// Who receives what the account owns and its open tasks and reviews. Required when there is any.
+    #[serde(default)]
+    transfer_to: Option<String>,
+}
+
+/// Offboards an account in one guarded step: everything it owns and every open task and review goes to the person
+/// chosen, then the account is deactivated and the result is checked. Everything that can refuse is checked before
+/// anything changes: the last system administrator, the caller's own account, and a recipient who cannot take over.
+pub(crate) async fn offboard_user(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+    Json(request): Json<OffboardRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_full_system_admin(&subject)?;
+    require_system_change(&subject)?;
+    let user = state
+        .storage
+        .find_user(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("User was not found."))?;
+    if user.id == subject.user_id {
+        return Err(ApiError::conflict(
+            "You cannot offboard your own account. Ask another system administrator.",
+        ));
+    }
+    if state
+        .storage
+        .is_deactivated(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::conflict("This account is already deactivated."));
+    }
+    let admin = state
+        .storage
+        .user_access(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .is_some_and(|a| a.is_system_admin);
+    if admin
+        && state
+            .storage
+            .other_active_system_admins(&user_id)
+            .await
+            .map_err(ApiError::internal)?
+            == 0
+    {
+        return Err(ApiError::conflict(
+            "This is the last system administrator. Grant the role to someone else first.",
+        ));
+    }
+    let preview = state
+        .storage
+        .offboarding_preview(&user_id)
+        .await
+        .map_err(map_storage_error)?;
+    let owned = state.storage.owned_places(&user_id).await.map_err(map_storage_error)?;
+    let has_work = !owned.is_empty() || preview["open_tasks"].as_i64().unwrap_or(0) > 0;
+    let recipient = match request.transfer_to.as_deref().filter(|id| !id.is_empty()) {
+        Some(id) => Some(id.to_owned()),
+        None if has_work => {
+            return Err(ApiError::bad_request(
+                "Choose who receives what this account owns and its open tasks and reviews.",
+            ))
+        }
+        None => None,
+    };
+    if let Some(recipient) = &recipient {
+        if *recipient == user_id {
+            return Err(ApiError::bad_request("Choose someone else to receive the work."));
+        }
+        if state
+            .storage
+            .user_access(recipient)
+            .await
+            .map_err(ApiError::internal)?
+            .is_none()
+        {
+            return Err(ApiError::bad_request("The person chosen is not an active account."));
+        }
+        // Everything that could refuse is asked before anything is changed.
+        for place in &owned {
+            let can_take = if place.kind == "organization" {
+                state.storage.user_belongs_to_organization(recipient, &place.id).await
+            } else {
+                can_take_workspace(&state, recipient, &place.id).await
+            }
+            .map_err(map_storage_error)?;
+            if !can_take {
+                return Err(ApiError::conflict(format!(
+                    "The person chosen is not a member of {} “{}”. Choose someone who is.",
+                    place.kind, place.name
+                )));
+            }
+        }
+        let blockers = state
+            .storage
+            .task_handover_blockers(&user_id, recipient)
+            .await
+            .map_err(map_storage_error)?;
+        if !blockers.is_empty() {
+            return Err(ApiError::conflict(format!(
+                "The person chosen cannot open {}, where open tasks wait. Choose someone who can, or add them first.",
+                blockers.join(", ")
+            )));
+        }
+    }
+    let who = user.email.clone().unwrap_or(user.display_name.clone());
+    let mut transferred = 0;
+    if let Some(recipient) = &recipient {
+        for place in &owned {
+            if place.kind == "organization" {
+                state
+                    .storage
+                    .transfer_organization_ownership(&place.id, recipient)
+                    .await
+                    .map_err(map_storage_error)?;
+            } else {
+                state
+                    .storage
+                    .transfer_workspace_ownership(&place.id, recipient)
+                    .await
+                    .map_err(map_storage_error)?;
+            }
+            transferred += 1;
+        }
+    }
+    let tasks_moved = match &recipient {
+        Some(recipient) => state
+            .storage
+            .reassign_open_tasks(&user_id, recipient)
+            .await
+            .map_err(map_storage_error)?,
+        None => 0,
+    };
+    let Some(ended) = state
+        .storage
+        .deactivate_user(&user_id)
+        .await
+        .map_err(map_storage_error)?
+    else {
+        return Err(ApiError::conflict(format!("{who} is already deactivated.")));
+    };
+    let remaining = state
+        .storage
+        .offboarding_remaining(&user_id, &chrono::Utc::now().to_rfc3339())
+        .await
+        .map_err(map_storage_error)?;
+    let verified = ["sessions", "personal_tokens", "invitations", "open_tasks"]
+        .iter()
+        .all(|key| remaining[*key].as_i64() == Some(0));
+    audit(
+        &state,
+        &subject,
+        "user_offboarded",
+        format!(
+            "Offboarded {who}: handed over {transferred} owned place(s) and {tasks_moved} open task(s) or review(s), ended their sessions, revoked {} token(s) and withdrew {} invitation(s). Revocation {}.",
+            ended.personal_tokens,
+            ended.invitations,
+            if verified { "verified" } else { "NOT verified" }
+        ),
+    )
+    .await;
+    Ok(Json(json!({
+        "ownership_transferred": transferred,
+        "tasks_reassigned": tasks_moved,
+        "personal_tokens_revoked": ended.personal_tokens,
+        "invitations_withdrawn": ended.invitations,
+        "verified": verified,
+        "remaining": remaining,
+    })))
+}
+
+async fn can_take_workspace(state: &AppState, recipient: &str, workspace_id: &str) -> anyhow::Result<bool> {
+    Ok(state
+        .storage
+        .workspace_role_for_user(recipient, workspace_id)
+        .await?
+        .is_some()
+        || state
+            .storage
+            .user_in_workspace_organization(recipient, workspace_id)
+            .await?)
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct AnonymizeRequest {
     /// The account's email address, typed to confirm: this cannot be undone.

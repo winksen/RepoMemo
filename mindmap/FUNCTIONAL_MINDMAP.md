@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.14 — Unify offboarding with a preview of ownership, tasks and reviews.
+
+- System › Users gains **Offboard account…**: a preview of what the account owns, its open tasks and reviews and what will end, a chosen recipient, then ownership transfer, task and review reassignment (with a workspace activity line each) and deactivation in one step. Creators stay creators; nothing is rewritten.
+- Everything that can refuse is checked before anything changes: the caller's own account, an already deactivated one, the last system administrator (so the server never has none) and a recipient who cannot open the workspaces with open tasks or belong to the places that change owner. Owners always keep an owner: the previous one stays an administrator, as in any transfer.
+- The result reports whether revocation was verified (no active session, token, sent invitation or open task left) and the audit trail records `user_offboarded`. The older Deactivate action is unchanged.
+
+Checks: One server test covers the preview, every refusal before any change, the hand-over, verified revocation, the ended session and the last-administrator refusal; two UI tests cover the dialog. Clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.13 — Add expiry and renewal to guest workspace membership.
 

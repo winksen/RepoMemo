@@ -150,6 +150,116 @@ impl StorageEngine {
         }))
     }
 
+    /// What leaving a person's account involves: what they own, the open tasks and reviews assigned to them, and
+    /// what deactivating will end. Reads only.
+    pub async fn offboarding_preview(&self, user_id: &str) -> Result<Value> {
+        let now = Utc::now().to_rfc3339();
+        type Task = (String, String, String, String, Option<String>, i64);
+        let tasks: Vec<Task> = sqlx::query_as(
+            "SELECT t.id, t.workspace_id, w.name, t.title, t.due_at, t.artifact_id IS NOT NULL FROM workspace_tasks t JOIN workspaces w ON w.id = t.workspace_id WHERE t.assignee_user_id = ?1 AND t.status != 'done' ORDER BY w.name, t.due_at IS NULL, t.due_at LIMIT 200",
+        )
+        .bind(user_id)
+        .fetch_all(self.reader())
+        .await?;
+        let open_tasks: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM workspace_tasks WHERE assignee_user_id = ?1 AND status != 'done'")
+                .bind(user_id)
+                .fetch_one(self.reader())
+                .await?;
+        let counts = self.offboarding_remaining(user_id, &now).await?;
+        let owned = self.owned_places(user_id).await?;
+        Ok(serde_json::json!({
+            "owned": owned.into_iter().map(|p| serde_json::json!({"kind":p.kind,"id":p.id,"name":p.name})).collect::<Vec<_>>(),
+            "open_tasks": open_tasks,
+            "tasks": tasks.into_iter().map(|(id, workspace_id, workspace, title, due_at, review)| serde_json::json!({
+                "id":id,"workspace_id":workspace_id,"workspace":workspace,"title":title,"due_at":due_at,"review":review == 1
+            })).collect::<Vec<_>>(),
+            "sessions": counts["sessions"],
+            "personal_tokens": counts["personal_tokens"],
+            "invitations": counts["invitations"],
+        }))
+    }
+
+    /// What of a person's access and work is still live, to confirm an offboarding left nothing behind.
+    pub async fn offboarding_remaining(&self, user_id: &str, now: &str) -> Result<Value> {
+        let one = |sql: &'static str| {
+            let pool = self.reader().clone();
+            let (user, now) = (user_id.to_owned(), now.to_owned());
+            async move {
+                sqlx::query_scalar::<_, i64>(sql)
+                    .bind(user)
+                    .bind(now)
+                    .fetch_one(&pool)
+                    .await
+            }
+        };
+        Ok(serde_json::json!({
+            "sessions": one("SELECT COUNT(*) FROM refresh_tokens WHERE user_id = ?1 AND revoked_at IS NULL AND expires_at > ?2").await?,
+            "personal_tokens": one("SELECT COUNT(*) FROM personal_access_tokens WHERE user_id = ?1 AND revoked_at IS NULL AND ?2 IS NOT NULL").await?,
+            "invitations": one("SELECT COUNT(*) FROM invitations WHERE invited_by_user_id = ?1 AND accepted_at IS NULL AND revoked_at IS NULL AND ?2 IS NOT NULL").await?,
+            "open_tasks": one("SELECT COUNT(*) FROM workspace_tasks WHERE assignee_user_id = ?1 AND status != 'done' AND ?2 IS NOT NULL").await?,
+            "owned": one("SELECT (SELECT COUNT(*) FROM organization_memberships WHERE user_id = ?1 AND role = 'owner') + (SELECT COUNT(*) FROM workspace_memberships WHERE user_id = ?1 AND role = 'owner') + (?2 IS NULL)").await?,
+        }))
+    }
+
+    /// Workspaces where open tasks of `from` exist but `to` has no live membership, so the work could not be handed over.
+    pub async fn task_handover_blockers(&self, from: &str, to: &str) -> Result<Vec<String>> {
+        let now = Utc::now().to_rfc3339();
+        Ok(sqlx::query_scalar::<_, String>(
+            "SELECT DISTINCT w.name FROM workspace_tasks t JOIN workspaces w ON w.id = t.workspace_id WHERE t.assignee_user_id = ?1 AND t.status != 'done' AND NOT EXISTS (SELECT 1 FROM workspace_memberships wm WHERE wm.workspace_id = t.workspace_id AND wm.user_id = ?2 AND (wm.expires_at IS NULL OR wm.expires_at > ?3)) ORDER BY 1",
+        )
+        .bind(from)
+        .bind(to)
+        .bind(now)
+        .fetch_all(self.reader())
+        .await?)
+    }
+
+    /// Hands every open task and review of `from` to `to`. The person who made each one stays its creator, so what
+    /// they wrote is still theirs; a line in each workspace's activity records the handover. Returns how many moved.
+    pub async fn reassign_open_tasks(&self, from: &str, to: &str) -> Result<u64> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        let workspaces: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT workspace_id, COUNT(*) FROM workspace_tasks WHERE assignee_user_id = ?1 AND status != 'done' GROUP BY workspace_id",
+        )
+        .bind(from)
+        .fetch_all(&mut *tx)
+        .await?;
+        let moved = sqlx::query(
+            "UPDATE workspace_tasks SET assignee_user_id = ?2, updated_at = ?3 WHERE assignee_user_id = ?1 AND status != 'done'",
+        )
+        .bind(from)
+        .bind(to)
+        .bind(&now)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        for (workspace, count) in workspaces {
+            sqlx::query("INSERT INTO workspace_activity (id, workspace_id, actor_user_id, action, subject_type, subject_id, summary, created_at) VALUES (?1, ?2, ?3, 'tasks_reassigned', 'user', ?4, ?5, ?6)")
+                .bind(Uuid::new_v4().to_string())
+                .bind(&workspace)
+                .bind(to)
+                .bind(from)
+                .bind(format!("{count} open task(s) and review(s) were handed over during offboarding."))
+                .bind(&now)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(moved)
+    }
+
+    /// How many other active full system administrators there are.
+    pub async fn other_active_system_admins(&self, user_id: &str) -> Result<i64> {
+        Ok(sqlx::query_scalar(
+            "SELECT COUNT(*) FROM users WHERE is_system_admin = 1 AND deactivated_at IS NULL AND id != ?1",
+        )
+        .bind(user_id)
+        .fetch_one(self.reader())
+        .await?)
+    }
+
     /// Lets a deactivated account sign in again with its own password.
     /// Returns whether it was deactivated. What deactivating ended (sessions,
     /// tokens, invitations) is not brought back.
