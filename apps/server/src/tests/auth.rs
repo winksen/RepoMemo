@@ -2026,3 +2026,101 @@ async fn a_restricted_workspace_is_invisible_to_people_who_were_not_added_and_ac
     );
     assert_eq!(preview["organization_members_not_added"], 2);
 }
+
+#[tokio::test]
+async fn guest_end_dates_are_set_by_administrators_and_validated() {
+    let app = router(ServerConfig::for_test(temp_data_dir("guest-expiry")))
+        .await
+        .unwrap();
+    let (owner, owner_account) = register_account(&app, "owner@example.com").await;
+    let (guest, guest_account) = register_account(&app, "guest@example.com").await;
+    let workspace = create_workspace(&app, &owner).await;
+    join(&app, &owner, "workspaces", &workspace, "guest@example.com", "member").await;
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        async move { app.oneshot(json_request(method, &uri, &who, body)).await.unwrap() }
+    };
+    let guest_id = guest_account["user"]["id"].as_str().unwrap().to_owned();
+    let owner_id = owner_account["user"]["id"].as_str().unwrap().to_owned();
+    let listed = response_json(
+        call(
+            "GET",
+            format!("/v1/workspaces/{workspace}/guests"),
+            owner.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(listed["guests"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        call(
+            "GET",
+            format!("/v1/workspaces/{workspace}/guests"),
+            guest.clone(),
+            Value::Null
+        )
+        .await
+        .status(),
+        403
+    );
+    let end = (chrono::Utc::now() + chrono::Duration::days(30))
+        .format("%Y-%m-%d")
+        .to_string();
+    let set = |who: String, user: String, body: Value| {
+        call(
+            "PUT",
+            format!("/v1/workspaces/{workspace}/guests/{user}/expiry"),
+            who,
+            body,
+        )
+    };
+    assert_eq!(
+        set(guest.clone(), guest_id.clone(), json!({"expires_at":end}))
+            .await
+            .status(),
+        403
+    );
+    assert_eq!(
+        set(owner.clone(), owner_id, json!({"expires_at":end})).await.status(),
+        400
+    );
+    assert_eq!(
+        set(owner.clone(), guest_id.clone(), json!({"expires_at":"2001-01-01"}))
+            .await
+            .status(),
+        400
+    );
+    assert_eq!(
+        set(owner.clone(), guest_id.clone(), json!({"expires_at":"soon"}))
+            .await
+            .status(),
+        400
+    );
+    assert_eq!(
+        set(owner.clone(), guest_id.clone(), json!({"expires_at":end}))
+            .await
+            .status(),
+        200
+    );
+    let listed = response_json(
+        call(
+            "GET",
+            format!("/v1/workspaces/{workspace}/guests"),
+            owner.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert!(listed["guests"][0]["expires_at"].as_str().unwrap().starts_with(&end));
+    assert_eq!(
+        set(owner.clone(), guest_id.clone(), json!({"expires_at":null}))
+            .await
+            .status(),
+        200
+    );
+    let listed =
+        response_json(call("GET", format!("/v1/workspaces/{workspace}/guests"), owner, Value::Null).await).await;
+    assert!(listed["guests"][0]["expires_at"].is_null());
+}

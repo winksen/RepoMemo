@@ -275,3 +275,23 @@ absent from their workspace list, dashboard and cross-workspace search results,
 and the address of a hidden workspace answers exactly as the address of one that
 does not exist. Organization owners and administrators are covered by this too.
 System administrators remain the explicit exception.
+
+## Guest expiry and renewal
+
+V0.5.13 lets a workspace owner or administrator give a **guest** (someone in
+the workspace who is not in its organization) an end date, in the workspace's
+*People › Guests* panel. The date is the end of a day in UTC, must be in the
+future and at most a year ahead, and can be renewed with a later day or removed.
+People in the organization and the workspace owner cannot have one.
+
+From that moment the guest is no longer a member: the workspace is gone from
+their list, dashboard, search, tasks and picture visibility; exports, reads and
+events are refused; an open event stream is closed at the deadline; and their
+personal tokens stop reaching it, because every one of these asks the same
+membership check. The membership stays on record, so a renewal restores the
+same role with no re-invitation. Setting, renewing and removing a date are
+recorded in the workspace activity and the system audit; the end itself is
+recorded once as `guest_access_expired` by the hourly maintenance pass (access
+ends at the date whether or not that pass has run). Administrators cannot
+change an administrator's date. Existing memberships have no end date.
+Migration 0051 adds the two fields.

@@ -251,10 +251,20 @@ pub(crate) async fn watch_event_stream_access(
 ) {
     loop {
         let remaining = subject.expires_at.saturating_sub(jsonwebtoken::get_current_timestamp());
+        // A guest's stream ends at their end date, not at the next recheck.
+        let until_end = state
+            .storage
+            .membership_expiry(&subject.user_id, &workspace_id)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|at| chrono::DateTime::parse_from_rfc3339(&at).ok())
+            .map(|at| (at.timestamp() - chrono::Utc::now().timestamp()).max(0) as u64 + 1)
+            .unwrap_or(u64::MAX);
         tokio::select! {
             _ = closer.closed() => return,
             _ = state.closing_signal.notified() => {}
-            _ = tokio::time::sleep(EVENT_STREAM_RECHECK.min(Duration::from_secs(remaining))) => {}
+            _ = tokio::time::sleep(EVENT_STREAM_RECHECK.min(Duration::from_secs(remaining)).min(Duration::from_secs(until_end))) => {}
         }
         let expired = jsonwebtoken::get_current_timestamp() >= subject.expires_at;
         let access = state.storage.user_access(&subject.user_id).await.ok();

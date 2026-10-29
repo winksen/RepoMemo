@@ -140,10 +140,11 @@ impl StorageEngine {
     /// shares an organization or a workspace with them.
     pub async fn users_share_a_group(&self, viewer: &str, target: &str) -> Result<bool> {
         let shared: i64 = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM organization_memberships a JOIN organization_memberships b ON b.organization_id = a.organization_id WHERE a.user_id = ?1 AND b.user_id = ?2)                  OR EXISTS (SELECT 1 FROM workspace_memberships a JOIN workspace_memberships b ON b.workspace_id = a.workspace_id WHERE a.user_id = ?1 AND b.user_id = ?2)",
+            "SELECT EXISTS (SELECT 1 FROM organization_memberships a JOIN organization_memberships b ON b.organization_id = a.organization_id WHERE a.user_id = ?1 AND b.user_id = ?2)                  OR EXISTS (SELECT 1 FROM workspace_memberships a JOIN workspace_memberships b ON b.workspace_id = a.workspace_id WHERE a.user_id = ?1 AND b.user_id = ?2 AND (a.expires_at IS NULL OR a.expires_at > ?3) AND (b.expires_at IS NULL OR b.expires_at > ?3))",
         )
         .bind(viewer)
         .bind(target)
+        .bind(Utc::now().to_rfc3339())
         .fetch_one(self.reader())
         .await?;
         Ok(shared != 0)

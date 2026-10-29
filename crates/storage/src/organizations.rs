@@ -245,11 +245,12 @@ impl StorageEngine {
             "SELECT o.id, o.name, m.role, o.created_at, o.updated_at, 0 AS guest FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE m.user_id = ?1 \
              UNION ALL \
              SELECT o.id, o.name, 'member' AS role, o.created_at, o.updated_at, 1 AS guest FROM organizations o \
-             WHERE EXISTS (SELECT 1 FROM workspace_organizations wo INNER JOIN workspace_memberships wm ON wm.workspace_id = wo.workspace_id WHERE wo.organization_id = o.id AND wm.user_id = ?1) \
+             WHERE EXISTS (SELECT 1 FROM workspace_organizations wo INNER JOIN workspace_memberships wm ON wm.workspace_id = wo.workspace_id WHERE wo.organization_id = o.id AND wm.user_id = ?1 AND (wm.expires_at IS NULL OR wm.expires_at > ?2)) \
              AND NOT EXISTS (SELECT 1 FROM organization_memberships m WHERE m.organization_id = o.id AND m.user_id = ?1) \
              ORDER BY 2 ASC",
         )
         .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
         .fetch_all(self.reader())
         .await?;
 
@@ -719,6 +720,110 @@ impl StorageEngine {
         })
     }
 
+    /// The guests of a workspace (members who are not in its organization), with their end date, expired or not.
+    pub async fn list_workspace_guests(&self, workspace_id: &str) -> Result<Vec<Value>> {
+        type Row = (String, Option<String>, String, String, Option<String>);
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT u.id, u.email, u.display_name, wm.role, wm.expires_at FROM workspace_memberships wm \
+             JOIN users u ON u.id = wm.user_id \
+             JOIN workspace_organizations wo ON wo.workspace_id = wm.workspace_id \
+             WHERE wm.workspace_id = ?1 AND u.deactivated_at IS NULL \
+               AND NOT EXISTS (SELECT 1 FROM organization_memberships om WHERE om.organization_id = wo.organization_id AND om.user_id = wm.user_id) \
+             ORDER BY u.display_name",
+        )
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?;
+        let now = Utc::now().to_rfc3339();
+        Ok(rows
+            .into_iter()
+            .map(|(id, email, name, role, expires_at)| {
+                let expired = expires_at.as_deref().is_some_and(|at| at <= now.as_str());
+                serde_json::json!({"user_id":id,"email":email,"display_name":name,"role":role,"expires_at":expires_at,"expired":expired})
+            })
+            .collect())
+    }
+
+    /// Gives a guest an end date, renews it, or (with `None`) removes it. Only a guest can have one: someone in the
+    /// workspace's organization, or its owner, does not expire. The end must be in the future and within a year.
+    pub async fn set_guest_expiry(&self, workspace_id: &str, user_id: &str, expires_at: Option<&str>) -> Result<bool> {
+        let now = Utc::now();
+        if let Some(at) = expires_at {
+            let at = chrono::DateTime::parse_from_rfc3339(at)
+                .map_err(|_| repomemo_domain::invalid!("Enter a valid end date."))?
+                .with_timezone(&Utc);
+            if at <= now || at > now + chrono::Duration::days(366) {
+                repomemo_domain::bail_invalid!("The end date must be in the future and within a year.");
+            }
+        }
+        let mut tx = self.pool.begin().await?;
+        let row: Option<(String, Option<String>, i64)> = sqlx::query_as(
+            "SELECT wm.role, wm.expires_at, EXISTS (SELECT 1 FROM workspace_organizations wo JOIN organization_memberships om ON om.organization_id = wo.organization_id WHERE wo.workspace_id = wm.workspace_id AND om.user_id = wm.user_id) FROM workspace_memberships wm WHERE wm.workspace_id = ?1 AND wm.user_id = ?2",
+        )
+        .bind(workspace_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some((role, previous, in_organization)) = row else {
+            repomemo_domain::bail_not_found!("That person is not in this workspace.");
+        };
+        if in_organization == 1 || role == "owner" {
+            repomemo_domain::bail_invalid!("Only guests, people outside the organization, can have an end date.");
+        }
+        sqlx::query("UPDATE workspace_memberships SET expires_at = ?1, expiry_noted_at = NULL, updated_at = ?2 WHERE workspace_id = ?3 AND user_id = ?4")
+            .bind(expires_at)
+            .bind(now.to_rfc3339())
+            .bind(workspace_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(previous.is_some())
+    }
+
+    /// Writes the end of each guest membership that has passed to the audit trail, once. Access itself ends at the
+    /// date whether or not this has run. Returns how many were recorded.
+    pub async fn record_expired_guests(&self) -> Result<usize> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT workspace_id, user_id FROM workspace_memberships WHERE expires_at IS NOT NULL AND expires_at <= ?1 AND expiry_noted_at IS NULL",
+        )
+        .bind(&now)
+        .fetch_all(&mut *tx)
+        .await?;
+        for (workspace, user) in &rows {
+            sqlx::query(
+                "UPDATE workspace_memberships SET expiry_noted_at = ?1 WHERE workspace_id = ?2 AND user_id = ?3",
+            )
+            .bind(&now)
+            .bind(workspace)
+            .bind(user)
+            .execute(&mut *tx)
+            .await?;
+            sqlx::query("INSERT INTO system_audit_events (id, created_at, actor_user_id, action, detail) VALUES (?1, ?2, NULL, 'guest_access_expired', ?3)")
+                .bind(Uuid::new_v4().to_string())
+                .bind(&now)
+                .bind(format!("Guest access of user {user} to workspace {workspace} ended at its end date"))
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(rows.len())
+    }
+
+    /// When a person's access to a workspace ends, if it has an end date.
+    pub async fn membership_expiry(&self, user_id: &str, workspace_id: &str) -> Result<Option<String>> {
+        Ok(sqlx::query_scalar::<_, Option<String>>(
+            "SELECT expires_at FROM workspace_memberships WHERE workspace_id = ?1 AND user_id = ?2",
+        )
+        .bind(workspace_id)
+        .bind(user_id)
+        .fetch_optional(self.reader())
+        .await?
+        .flatten())
+    }
+
     /// `shared` or `restricted`; None when the workspace does not exist.
     pub async fn workspace_access_policy(&self, workspace_id: &str) -> Result<Option<String>> {
         Ok(
@@ -763,9 +868,10 @@ impl StorageEngine {
 
     pub async fn list_shared_workspaces_for_user(&self, user_id: &str) -> Result<Vec<SharedWorkspace>> {
         let rows = sqlx::query_as::<_, SharedWorkspaceRow>(
-            "SELECT w.id, w.name, w.created_at, w.updated_at, w.settings_json, wo.organization_id, wm.role FROM workspaces w INNER JOIN workspace_organizations wo ON wo.workspace_id = w.id INNER JOIN workspace_memberships wm ON wm.workspace_id = w.id WHERE wm.user_id = ?1 ORDER BY w.updated_at DESC, w.name ASC",
+            "SELECT w.id, w.name, w.created_at, w.updated_at, w.settings_json, wo.organization_id, wm.role FROM workspaces w INNER JOIN workspace_organizations wo ON wo.workspace_id = w.id INNER JOIN workspace_memberships wm ON wm.workspace_id = w.id WHERE wm.user_id = ?1 AND (wm.expires_at IS NULL OR wm.expires_at > ?2) ORDER BY w.updated_at DESC, w.name ASC",
         )
         .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
         .fetch_all(self.reader())
         .await?;
 
@@ -774,9 +880,10 @@ impl StorageEngine {
 
     pub async fn workspace_memberships_for_user(&self, user_id: &str) -> Result<Vec<WorkspaceMembership>> {
         let rows = sqlx::query_as::<_, (String, String)>(
-            "SELECT workspace_id, role FROM workspace_memberships WHERE user_id = ?1",
+            "SELECT workspace_id, role FROM workspace_memberships wm WHERE user_id = ?1 AND (wm.expires_at IS NULL OR wm.expires_at > ?2)",
         )
         .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
         .fetch_all(self.reader())
         .await?;
         rows.into_iter()
@@ -791,10 +898,11 @@ impl StorageEngine {
 
     pub async fn workspace_role_for_user(&self, user_id: &str, workspace_id: &str) -> Result<Option<WorkspaceRole>> {
         let role = sqlx::query_scalar::<_, String>(
-            "SELECT role FROM workspace_memberships WHERE workspace_id = ?1 AND user_id = ?2",
+            "SELECT role FROM workspace_memberships wm WHERE workspace_id = ?1 AND user_id = ?2 AND (wm.expires_at IS NULL OR wm.expires_at > ?3)",
         )
         .bind(workspace_id)
         .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
         .fetch_optional(self.reader())
         .await?;
         role.map(|role| workspace_role_from_db(&role)).transpose()
@@ -802,9 +910,10 @@ impl StorageEngine {
 
     pub async fn list_workspace_members(&self, workspace_id: &str) -> Result<Vec<WorkspaceMember>> {
         let rows = sqlx::query_as::<_, WorkspaceMemberRow>(
-            "SELECT u.id, u.email, u.display_name, wm.role, wm.created_at, wm.updated_at FROM workspace_memberships wm INNER JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = ?1 ORDER BY CASE wm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'member' THEN 2 ELSE 3 END, u.display_name ASC",
+            "SELECT u.id, u.email, u.display_name, wm.role, wm.created_at, wm.updated_at FROM workspace_memberships wm INNER JOIN users u ON u.id = wm.user_id WHERE wm.workspace_id = ?1 AND (wm.expires_at IS NULL OR wm.expires_at > ?2) ORDER BY CASE wm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'member' THEN 2 ELSE 3 END, u.display_name ASC",
         )
         .bind(workspace_id)
+        .bind(Utc::now().to_rfc3339())
         .fetch_all(self.reader())
         .await?;
         rows.into_iter().map(WorkspaceMember::try_from).collect()

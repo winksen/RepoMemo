@@ -65,7 +65,7 @@ impl StorageEngine {
             JOIN users AS creator ON creator.id = task.created_by_user_id
             JOIN users AS assignee ON assignee.id = task.assignee_user_id
             JOIN workspace_memberships AS membership
-              ON membership.workspace_id = task.workspace_id AND membership.user_id = ?1
+              ON membership.workspace_id = task.workspace_id AND membership.user_id = ?1 AND (membership.expires_at IS NULL OR membership.expires_at > ?2)
             WHERE task.assignee_user_id = ?1 AND task.status != 'done'
             ORDER BY
               CASE task.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
@@ -75,6 +75,7 @@ impl StorageEngine {
             "#,
         )
         .bind(user_id)
+        .bind(chrono::Utc::now().to_rfc3339())
         .fetch_all(self.reader())
         .await?;
         Ok(rows.into_iter().map(CollaborationTask::from).collect())

@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.13 — Add expiry and renewal to guest workspace membership.
+
+- Owners and administrators give a guest (a workspace member outside its organization) an end date in People › Guests: the end of a UTC day, in the future and within a year; it can be renewed or removed. Organization members and owners cannot have one, and administrators cannot change another administrator's date.
+- At the end date the guest loses the workspace everywhere the one membership check is used: list, dashboard, search, tasks, exports and reads, events (an open stream closes at the deadline) and personal tokens. The membership stays on record, so renewal restores the same role. Setting, renewing and removing a date are audited; the end itself is recorded once as `guest_access_expired` by the hourly maintenance pass, though access ends on time without it.
+- Migration 0051 adds the end date and its audit marker. Existing memberships keep no end date.
+
+Checks: One storage test covers the end of access across every listing and its restoration on renewal, plus the audit once; one server test covers who may set a date and its validation; two UI tests cover the panel. Clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.12 — Show effective access and its origin before access changes.
 

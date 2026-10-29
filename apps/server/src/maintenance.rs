@@ -179,6 +179,11 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         Err(error) => failed(&mut report, "refresh tokens", error),
     }
 
+    // Access to a workspace ends at a guest's end date whether or not this has run; it writes the end to the trail.
+    if let Err(error) = storage.record_expired_guests().await {
+        failed(&mut report, "guest expiry", error);
+    }
+
     // Kept a week past expiry, so "this link expired" can still be explained.
     match storage
         .purge_expired_access_links(&(Utc::now() - chrono::Duration::days(7)).to_rfc3339())

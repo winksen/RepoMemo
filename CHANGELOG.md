@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.13 (2026-10-29)
+
+Add expiry and renewal to guest workspace membership.
+
+### Changed
+- Owners and administrators give a guest (a workspace member outside its organization) an end date in People › Guests: the end of a UTC day, in the future and within a year; it can be renewed or removed. Organization members and owners cannot have one, and administrators cannot change another administrator's date.
+- At the end date the guest loses the workspace everywhere the one membership check is used: list, dashboard, search, tasks, exports and reads, events (an open stream closes at the deadline) and personal tokens. The membership stays on record, so renewal restores the same role. Setting, renewing and removing a date are audited; the end itself is recorded once as `guest_access_expired` by the hourly maintenance pass, though access ends on time without it.
+- Migration 0051 adds the end date and its audit marker. Existing memberships keep no end date.
+
+### Checks
+- One storage test covers the end of access across every listing and its restoration on renewal, plus the audit once; one server test covers who may set a date and its validation; two UI tests cover the panel. Clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- Migration 0051 runs automatically; nobody's access changes. Rollback uses the pre-upgrade backup.
+
 ## V0.5.12 (2026-10-29)
 
 Show effective access and its origin before access changes.

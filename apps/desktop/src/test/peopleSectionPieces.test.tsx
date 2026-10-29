@@ -6,7 +6,7 @@ vi.mock("../lib/sharedApi", () => ({
   createSharedInvitation: vi.fn(),
   listSharedInvitations: vi.fn().mockResolvedValue([]),
   removeSharedWorkspaceMember: vi.fn(),
-  request: vi.fn().mockResolvedValue({ policy: "shared", members: [], system_administrators: [] }),
+  request: vi.fn().mockResolvedValue({ policy: "shared", members: [], system_administrators: [], guests: [] }),
   revokeSharedInvitation: vi.fn(),
   transferSharedWorkspaceOwnership: vi.fn(),
   upsertSharedWorkspaceMember: vi.fn(),

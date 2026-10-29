@@ -629,3 +629,87 @@ pub(crate) async fn record_workspace_activity(
         tracing::error!(error = %error, workspace_id, action, "Failed to record workspace activity");
     }
 }
+
+#[derive(Deserialize)]
+pub(crate) struct GuestExpiryRequest {
+    /// A day such as 2026-12-31 (the end of that day, UTC), a moment (RFC 3339), or null for no end date.
+    expires_at: Option<String>,
+}
+
+/// The guests of the workspace and when their access ends, for its administrators.
+pub(crate) async fn list_guests(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let guests = state
+        .storage
+        .list_workspace_guests(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(json!({"guests":guests})))
+}
+
+fn guest_end(value: &str) -> Result<String, ApiError> {
+    let value = value.trim();
+    if let Ok(day) = chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d") {
+        let end = day.and_hms_opt(23, 59, 59).expect("a valid time").and_utc();
+        return Ok(end.to_rfc3339());
+    }
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map(|moment| moment.with_timezone(&Utc).to_rfc3339())
+        .map_err(|_| ApiError::bad_request("Enter the end as a day such as 2026-12-31."))
+}
+
+/// Gives a guest an end date, renews it, or removes it. At the end the guest can no longer read, search, export or
+/// receive events, and their tokens stop reaching the workspace. Administrators cannot change another administrator.
+pub(crate) async fn set_guest_expiry(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, user_id)): Path<(String, String)>,
+    Json(request): Json<GuestExpiryRequest>,
+) -> Result<Json<Value>, ApiError> {
+    let caller = require_workspace_admin(&state, &subject, &workspace_id).await?;
+    if matches!(caller, WorkspaceRole::Admin)
+        && matches!(
+            state
+                .storage
+                .workspace_role_for_user(&user_id, &workspace_id)
+                .await
+                .map_err(map_storage_error)?,
+            Some(WorkspaceRole::Owner | WorkspaceRole::Admin)
+        )
+    {
+        return Err(ApiError::forbidden());
+    }
+    let end = request.expires_at.as_deref().map(guest_end).transpose()?;
+    let renewed = state
+        .storage
+        .set_guest_expiry(&workspace_id, &user_id, end.as_deref())
+        .await
+        .map_err(map_storage_error)?;
+    let (action, summary) = match (&end, renewed) {
+        (Some(end), true) => ("guest_access_renewed", format!("Renewed guest access until {end}.")),
+        (Some(end), false) => ("guest_expiry_set", format!("Guest access ends {end}.")),
+        (None, _) => ("guest_expiry_removed", "Guest access no longer ends.".to_owned()),
+    };
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        action,
+        "user",
+        Some(&user_id),
+        summary.clone(),
+    )
+    .await;
+    crate::system::audit(
+        &state,
+        &subject,
+        action,
+        format!("{summary} Workspace {workspace_id}, user {user_id}."),
+    )
+    .await;
+    Ok(Json(json!({"expires_at":end})))
+}

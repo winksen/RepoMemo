@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.5 → 0.6
 
-> **Current:** `V0.5.12` (2026-10-29)
+> **Current:** `V0.5.13` (2026-10-29)
 
 > **Theme:** Team access and identity · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -32,7 +32,7 @@
 | **V0.5.10** | ✅ 2026-10-29 | AI. Team access | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
 | **V0.5.11** | ✅ 2026-10-29 | AI. Team access | ✨ | Workspace access | Add explicit organization-shared versus restricted workspace membership policy | A restricted workspace never auto-enrolls a new org member; existing memberships migrate without silent loss or expansion and server-admin powers are explicit |
 | **V0.5.12** | ✅ 2026-10-29 | AI. Team access | 🔧 | Access UX | Show effective access and its origin before membership or group-policy changes | An administrator can explain every grant and preview affected people; search, counts and direct URLs reveal no restricted workspace to unauthorized users |
-| **V0.5.13** | 🔜 | AI. Team access | ✨ | Guests | Add expiry and renewal to existing direct guest membership | An expired guest loses read, search, export, event and token access at the deadline; renewals and expiry are auditable |
+| **V0.5.13** | ✅ 2026-10-29 | AI. Team access | ✨ | Guests | Add expiry and renewal to existing direct guest membership | An expired guest loses read, search, export, event and token access at the deadline; renewals and expiry are auditable |
 | **V0.5.14** | 🔜 | AI. Team access | 🔧 | Offboarding | Unify existing deactivation and ownership transfer with a preview of outstanding tasks and reviews | An admin reassigns work, preserves attribution and verifies revocation; the flow refuses orphaning the last owner |
 | **V0.5.15** | 🔜 | AI. Team access | 🔒 | API access | Constrain integration/PAT access to explicitly selected workspaces with expiry and an access inventory | A token cannot reach a different workspace, cannot outlive its grant and stops working when its owner loses access; existing-token migration is documented |
 | **V0.5.16** | 🔜 | AI. Team access | 🔒 | Local MFA | Add optional TOTP enforcement for local-password accounts, with hashed single-use recovery codes | Password alone cannot bypass enabled MFA through browser, token issuance or alternate login routes; replay and recovery reuse are refused |

@@ -311,6 +311,8 @@
 | PUT | `/v1/workspaces/{workspace_id}/ai-policy` | managing | require_workspace_admin | UpdateAiPolicyRequest | AiPolicyResponse |
 | POST | `/v1/workspaces/{workspace_id}/ai-providers/{provider_id}/test` | auth | require_workspace_admin | — | ProviderTestResult |
 | GET | `/v1/workspaces/{workspace_id}/access-policy` | auth | workspace reader | — | `shared` or `restricted` |
+| GET | `/v1/workspaces/{workspace_id}/guests` | auth | workspace administrator | — | Guests (members outside the organization) with end date and whether it passed |
+| PUT | `/v1/workspaces/{workspace_id}/guests/{user_id}/expiry` | session | workspace administrator | `{expires_at}` (day, RFC 3339 or null) | Sets, renews or removes a guest end date (future, within a year); audited |
 | GET | `/v1/workspaces/{workspace_id}/effective-access` | auth | workspace administrator | — | Each membership with role and origin (direct, organization, provider group), policy, and system administrators who can open it without membership |
 | POST | `/v1/workspaces/{workspace_id}/access-policy/preview` | auth | workspace administrator | `{policy}` | Counts and people a policy change affects; changes nothing |
 | PUT | `/v1/workspaces/{workspace_id}/access-policy` | session | workspace owner | `{policy}` | Changes who joins by default; adds and removes nobody; recorded in activity and system audit |

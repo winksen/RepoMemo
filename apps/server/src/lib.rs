@@ -1029,6 +1029,11 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/artifacts/{artifact_id}/compare", get(compare_artifact_versions))
         .route("/v1/workspaces/{workspace_id}/effective-access", get(effective_access))
+        .route("/v1/workspaces/{workspace_id}/guests", get(list_guests))
+        .route(
+            "/v1/workspaces/{workspace_id}/guests/{user_id}/expiry",
+            put(set_guest_expiry),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/access-policy/preview",
             post(preview_access_policy),

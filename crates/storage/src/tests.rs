@@ -2965,3 +2965,98 @@ async fn a_database_from_a_newer_release_is_refused_and_left_as_it_was() {
     assert!(error.contains("migration 999999"), "{error}");
     let _ = std::fs::remove_dir_all(data);
 }
+
+#[tokio::test]
+async fn a_guest_loses_access_at_the_end_date_and_regains_it_when_renewed() {
+    use repomemo_domain::WorkspaceRole;
+    let data_dir = std::env::temp_dir().join(format!("repomemo-guest-{}", uuid::Uuid::new_v4()));
+    let storage = StorageEngine::open(StorageConfig::new(data_dir.clone())).await.unwrap();
+    let owner = storage.create_user("owner@example.com", "Owner", "hash").await.unwrap();
+    let guest = storage.create_user("guest@example.com", "Guest", "hash").await.unwrap();
+    let organization = storage.create_organization(&owner.id, "Org").await.unwrap();
+    let workspace = storage
+        .create_shared_workspace(&owner.id, &organization.id, "Shared")
+        .await
+        .unwrap()
+        .workspace
+        .id;
+    storage
+        .upsert_workspace_member(&workspace, "guest@example.com", WorkspaceRole::Member)
+        .await
+        .unwrap();
+    let tomorrow = (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339();
+    let guests = storage.list_workspace_guests(&workspace).await.unwrap();
+    assert_eq!(guests.len(), 1);
+    assert!(guests[0]["expires_at"].is_null());
+    // Only a guest has an end date, and it must be a sensible one.
+    assert!(storage
+        .set_guest_expiry(&workspace, &owner.id, Some(&tomorrow))
+        .await
+        .is_err());
+    let yesterday = (chrono::Utc::now() - chrono::Duration::days(1)).to_rfc3339();
+    assert!(storage
+        .set_guest_expiry(&workspace, &guest.id, Some(&yesterday))
+        .await
+        .is_err());
+    let far = (chrono::Utc::now() + chrono::Duration::days(800)).to_rfc3339();
+    assert!(storage
+        .set_guest_expiry(&workspace, &guest.id, Some(&far))
+        .await
+        .is_err());
+    assert!(!storage
+        .set_guest_expiry(&workspace, &guest.id, Some(&tomorrow))
+        .await
+        .unwrap());
+    assert!(storage
+        .workspace_role_for_user(&guest.id, &workspace)
+        .await
+        .unwrap()
+        .is_some());
+    assert_eq!(storage.record_expired_guests().await.unwrap(), 0);
+
+    sqlx::query("UPDATE workspace_memberships SET expires_at = '2000-01-01T00:00:00+00:00' WHERE user_id = ?1")
+        .bind(&guest.id)
+        .execute(&storage.pool)
+        .await
+        .unwrap();
+    assert!(storage
+        .workspace_role_for_user(&guest.id, &workspace)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(storage
+        .list_shared_workspaces_for_user(&guest.id)
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(storage
+        .workspace_memberships_for_user(&guest.id)
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(storage.list_organizations_for_user(&guest.id).await.unwrap().is_empty());
+    assert_eq!(storage.list_workspace_members(&workspace).await.unwrap().len(), 1);
+    assert_eq!(
+        storage.list_workspace_guests(&workspace).await.unwrap()[0]["expired"],
+        true
+    );
+    assert_eq!(storage.record_expired_guests().await.unwrap(), 1);
+    assert_eq!(storage.record_expired_guests().await.unwrap(), 0);
+    let events = storage.list_system_events(50).await.unwrap();
+    assert!(events.iter().any(|e| e.action == "guest_access_expired"));
+
+    assert!(storage
+        .set_guest_expiry(&workspace, &guest.id, Some(&tomorrow))
+        .await
+        .unwrap());
+    assert!(storage
+        .workspace_role_for_user(&guest.id, &workspace)
+        .await
+        .unwrap()
+        .is_some());
+    assert_eq!(
+        storage.list_shared_workspaces_for_user(&guest.id).await.unwrap().len(),
+        1
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}
