@@ -4264,7 +4264,7 @@ name = "repomemo-ai"
 version = "0.5.19"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.1",
  "repomemo-domain",
  "reqwest 0.12.28",
  "serde",
@@ -4396,7 +4396,7 @@ name = "repomemo-mail"
 version = "0.5.19"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "repomemo-ai",
  "rustls",
@@ -4424,7 +4424,7 @@ dependencies = [
  "anyhow",
  "argon2",
  "axum",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "hex",
  "hyper-util",
@@ -4457,7 +4457,7 @@ name = "repomemo-storage"
 version = "0.5.19"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.1",
  "chrono",
  "hex",
  "repomemo-domain",
