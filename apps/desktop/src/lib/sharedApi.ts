@@ -2060,8 +2060,8 @@ export function previewSharedPasswordReset(token: string): Promise<PasswordReset
 }
 
 /** Sets the new password and signs this browser in; every other session of the account ends. */
-export async function completeSharedPasswordReset(token: string, password: string): Promise<TokenResponse> {
-  const response = await request<TokenResponse>("/v1/auth/password-reset", { method: "POST", body: JSON.stringify({ token, password }) });
+export async function completeSharedPasswordReset(token: string, password: string, mfaCode?: string): Promise<TokenResponse> {
+  const response = await request<TokenResponse>("/v1/auth/password-reset", { method: "POST", body: JSON.stringify({ token, password, ...(mfaCode ? { mfa_code: mfaCode } : {}) }) });
   storeTokens(response);
   return response;
 }

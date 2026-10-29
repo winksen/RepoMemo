@@ -176,7 +176,8 @@ impl StorageEngine {
               u.deactivated_at, u.anonymized_at,
               (SELECT COUNT(*) FROM organization_memberships m WHERE m.user_id = u.id) AS organization_count,
               (SELECT COUNT(*) FROM workspace_memberships m WHERE m.user_id = u.id) AS workspace_count,
-              (SELECT COUNT(*) FROM refresh_tokens t WHERE t.user_id = u.id AND t.revoked_at IS NULL AND t.expires_at > ?1) AS active_sessions
+              (SELECT COUNT(*) FROM refresh_tokens t WHERE t.user_id = u.id AND t.revoked_at IS NULL AND t.expires_at > ?1) AS active_sessions,
+              EXISTS (SELECT 1 FROM user_mfa f WHERE f.user_id = u.id AND f.enabled = 1) AS two_step
             FROM users u
             ORDER BY (u.deactivated_at IS NOT NULL) ASC, u.is_system_admin DESC, u.is_app_admin DESC, u.display_name COLLATE NOCASE ASC
             "#,
@@ -233,6 +234,7 @@ impl StorageEngine {
                 organization_count: row.get("organization_count"),
                 workspace_count: row.get("workspace_count"),
                 active_sessions: row.get("active_sessions"),
+                two_step: row.get::<i64, _>("two_step") == 1,
                 workspaces: workspaces_by_user
                     .remove(row.get::<String, _>("id").as_str())
                     .unwrap_or_default(),

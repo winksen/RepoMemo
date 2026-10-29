@@ -1657,6 +1657,8 @@ export interface SystemUser {
   workspace_count: number;
   /** Refresh tokens that are neither revoked nor expired. */
   active_sessions: number;
+  /** Whether the account has confirmed two-step sign-in. */
+  two_step: boolean;
   /**
    * The workspaces the account is a direct member of, with its role in each.
    * System administrators additionally act as administrators everywhere.

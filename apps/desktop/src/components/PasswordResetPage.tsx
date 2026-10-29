@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { IconKey as Key } from "@tabler/icons-react";
-import { completeSharedPasswordReset, previewSharedPasswordReset } from "../lib/sharedApi";
+import { SharedApiError, completeSharedPasswordReset, previewSharedPasswordReset } from "../lib/sharedApi";
 import type { PasswordResetPreview } from "../types";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";
@@ -24,6 +24,8 @@ export function PasswordResetPage({ onAuthenticated, token }: { onAuthenticated:
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [isBusy, setIsBusy] = useState(false);
+  const [needsCode, setNeedsCode] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
 
   useEffect(() => {
     previewSharedPasswordReset(token).then(setPreview).catch((error) => setProblem(apiMessage(error, "This link could not be checked.")));
@@ -34,10 +36,15 @@ export function PasswordResetPage({ onAuthenticated, token }: { onAuthenticated:
     if (password !== confirmation) { showToast("error", "The two passwords are not the same."); return; }
     setIsBusy(true);
     try {
-      const response = await completeSharedPasswordReset(token, password);
+      const response = await completeSharedPasswordReset(token, password, needsCode ? mfaCode.trim() : undefined);
       showToast("success", "Your password was changed. Every other device was signed out.");
       onAuthenticated(response.access_token);
-    } catch (error) { showToast("error", apiMessage(error, "The password could not be changed.")); setIsBusy(false); }
+    } catch (error) {
+      // A reset link alone never signs in an account with two-step sign-in; the link stays valid.
+      if (error instanceof SharedApiError && error.code === "mfa_required") { setNeedsCode(true); setMfaCode(""); }
+      showToast("error", apiMessage(error, "The password could not be changed."));
+      setIsBusy(false);
+    }
   }
 
   return <main className="shared-auth-canvas">
@@ -65,6 +72,7 @@ export function PasswordResetPage({ onAuthenticated, token }: { onAuthenticated:
             <input autoComplete="username" hidden readOnly value={preview.email ?? ""} />
             <Field label="New password" required><Input autoComplete="new-password" autoFocus maxLength={1024} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
             <Field label="Repeat it" required><Input autoComplete="new-password" maxLength={1024} minLength={12} onChange={(event) => setConfirmation(event.target.value)} type="password" value={confirmation} /></Field>
+            {needsCode ? <Field label="Authentication code" hint="From your authenticator app, or a recovery code. If you have neither, ask a system administrator to remove two-step sign-in." required><Input autoComplete="one-time-code" onChange={(event) => setMfaCode(event.target.value)} value={mfaCode} /></Field> : null}
             <Button busy={isBusy} type="submit" variant="main"><Key size={ICON_SIZE.md} /> Save the new password</Button>
           </form>
         </>}

@@ -768,6 +768,8 @@ export interface SystemUser {
   organization_count: number;
   workspace_count: number;
   active_sessions: number;
+  /** Whether the account has confirmed two-step sign-in. */
+  two_step?: boolean;
   workspaces: SystemUserWorkspace[];
   organizations: SystemUserOrganization[];
 }

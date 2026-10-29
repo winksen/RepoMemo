@@ -44,6 +44,7 @@ import { Dropdown } from "../../components/ui/dropdown";
 import { Tooltip } from "../../components/ui/tooltip";
 import { showToast } from "../../components/ui/toast";
 import { appLink, SecretDialog } from "../../components/SecretDialog";
+import { request } from "../../lib/sharedApi";
 import { OffboardDialog } from "../../components/OffboardDialog";
 import { TokenInventory } from "../../components/TokenInventory";
 import { ICON_SIZE } from "../../components/ui/icon";
@@ -52,7 +53,7 @@ import { useSystemData, count, RefreshButton } from "./shared";
 import { systemKeys } from "../../lib/queryClient";
 
 /** The confirmations that take something away: their button is the danger button. */
-const DESTRUCTIVE_KINDS = new Set(["revoke", "revoke-app", "sign-out", "deactivate", "anonymize"]);
+const DESTRUCTIVE_KINDS = new Set(["revoke", "revoke-app", "sign-out", "deactivate", "anonymize", "mfa-reset"]);
 
 const ROLE_ICON = { owner: <Crown size={ICON_SIZE.sm} />, admin: <ShieldCheck size={ICON_SIZE.sm} />, member: <UserIcon size={ICON_SIZE.sm} />, viewer: <Eye size={ICON_SIZE.sm} /> };
 
@@ -86,7 +87,7 @@ function AccessTree({ user }: { user: SystemUser }) {
   </ul>;
 }
 
-type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out" | "reset" | "deactivate" | "reactivate" | "anonymize"; user: SystemUser };
+type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out" | "reset" | "deactivate" | "reactivate" | "anonymize" | "mfa-reset"; user: SystemUser };
 
 export function UsersSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
   const [users, isLoading, reload] = useSystemData<SystemUser[]>(systemKeys.users(), () => listSystemUsers(accessToken));
@@ -126,6 +127,9 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
       } else if (pending.kind === "anonymize") {
         const removed = await anonymizeSystemUser(accessToken, pending.user.id, confirmText);
         showToast("success", `The account is anonymized: ${removed.memberships_removed} membership${removed.memberships_removed === 1 ? "" : "s"} and ${removed.notices_removed} notice${removed.notices_removed === 1 ? "" : "s"} removed. What they wrote now shows as Former member.`);
+      } else if (pending.kind === "mfa-reset") {
+        await request(`/v1/system/users/${pending.user.id}/mfa-reset`, { method: "POST", body: "{}" }, accessToken);
+        showToast("success", `${pending.user.display_name}'s two-step sign-in was removed and they were signed out everywhere. They sign in with their password and can set it up again.`);
       } else if (pending.kind === "reactivate") {
         await reactivateSystemUser(accessToken, pending.user.id);
         showToast("success", `${pending.user.display_name} can sign in again with their password.`);
@@ -157,6 +161,7 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
     "sign-out": { title: `Sign ${pending.user.display_name} out everywhere?`, description: "Every device signed in to this account is signed out at once, and its personal access tokens are revoked, so scripts using them stop too. Their password is not changed.", action: "Sign out everywhere" },
     deactivate: { title: `Deactivate ${pending.user.display_name}?`, description: "They can no longer sign in or use a token. Their sessions end now, their API tokens are revoked and the invitations they sent are withdrawn. Everything they wrote stays, and so do their memberships. An owner must transfer what they own first. You can reactivate the account later.", action: "Deactivate account" },
     anonymize: { title: `Anonymize ${pending.user.display_name}?`, description: <>Their email address, name, password, picture, memberships, notices and assistant conversations are removed for good, and the address and name are taken out of activity summaries. What they wrote stays, credited to <strong>Former member</strong>. Log files and earlier backups are not rewritten. <strong>This cannot be undone.</strong> Type <code>{pending.user.email}</code> to confirm.</>, action: "Anonymize account" },
+    "mfa-reset": { title: `Remove ${pending.user.display_name}'s two-step sign-in?`, description: <>Do this only after you have confirmed, outside RepoMemo, that it really is {pending.user.display_name} who lost both their authenticator and their recovery codes. Their password alone will sign them in until they set it up again, they are signed out everywhere, and this is recorded in the audit trail. Type the email address to confirm.</>, action: "Remove two-step sign-in" },
     reactivate: { title: `Reactivate ${pending.user.display_name}?`, description: "They can sign in again with the password they had. Sessions, tokens and invitations that ended when the account was deactivated are not brought back.", action: "Reactivate account" },
     reset: { title: `Create a password reset link for ${pending.user.display_name}?`, description: "You get a one-time link to pass on to them. It works for 24 hours; a newer link replaces it. Their current password keeps working until the link is used; then every device of the account is signed out and sign-in lockouts are lifted.", action: "Create link" },
   }[pending.kind] : null;
@@ -171,7 +176,7 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
     <Table className="rm-dense-table rm-users-table">
       <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{paging.rows.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
-        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}</small>{user.deactivated_at ? <small><Tooltip content={`Deactivated ${formatTime(user.deactivated_at)}`}><Badge icon={<UserOff size={ICON_SIZE.sm} />} tone="warning">{user.anonymized_at ? "Anonymized" : "Deactivated"}</Badge></Tooltip></small> : null}</span></span></th>
+        <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}{user.two_step ? " · two-step on" : ""}</small>{user.deactivated_at ? <small><Tooltip content={`Deactivated ${formatTime(user.deactivated_at)}`}><Badge icon={<UserOff size={ICON_SIZE.sm} />} tone="warning">{user.anonymized_at ? "Anonymized" : "Deactivated"}</Badge></Tooltip></small> : null}</span></span></th>
         <td>{user.is_system_admin ? <Tooltip content="Administers the server and every organization and workspace"><Badge icon={<ServerCog size={ICON_SIZE.sm} />}>Sys Admin</Badge></Tooltip> : user.is_app_admin ? <Tooltip content="Uses the System pages, without access to every organization and workspace"><Badge icon={<UserCog size={ICON_SIZE.sm} />}>App Admin</Badge></Tooltip> : <Badge icon={<UserIcon size={ICON_SIZE.sm} />}>User</Badge>}</td>
         <td><AccessTree user={user} /></td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
         <td>{session.is_system_admin && !user.anonymized_at ? <ActionMenu items={[
@@ -188,14 +193,15 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
             ? { label: "Reactivate account", icon: <UserCheck size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "reactivate", user }) }
             : { label: "Deactivate account", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "deactivate", user }), destructive: true },
           ...(user.deactivated_at ? [] : [{ label: "Offboard account…", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => setOffboarding(user), destructive: true }]),
+          ...(user.two_step && !user.deactivated_at && user.id !== session.user.id ? [{ label: "Remove two-step sign-in…", icon: <Key size={ICON_SIZE.sm} />, onSelect: () => { setConfirmText(""); setPending({ kind: "mfa-reset", user }); }, destructive: true }] : []),
           ...(user.deactivated_at && !user.anonymized_at ? [{ label: "Anonymize account", icon: <UserOff size={ICON_SIZE.sm} />, onSelect: () => { setConfirmText(""); setPending({ kind: "anonymize", user }); }, destructive: true }] : []),
         ]} label={`Actions for ${user.display_name}`} /> : null}</td>
       </tr>)}</tbody>
     </Table>
     <Pagination {...paging.props} />
     </> : isLoading ? <LoadingState label="Loading users" /> : <EmptyState title="Users are not available" />}
-    <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button busy={isBusy} disabled={pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase()} type="submit" variant={pending && DESTRUCTIVE_KINDS.has(pending.kind) ? "danger" : "main"}>{dialog?.action}</Button></>} onClose={() => setPending(null)} onSubmit={() => void confirm()} open={Boolean(pending)} title={dialog?.title ?? ""}>
-      {pending?.kind === "anonymize" ? <Field label="Confirm the email address"><Input autoComplete="off" onChange={(event) => setConfirmText(event.target.value)} placeholder={pending.user.email} value={confirmText} /></Field> : null}
+    <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button busy={isBusy} disabled={(pending?.kind === "anonymize" || pending?.kind === "mfa-reset") && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase()} type="submit" variant={pending && DESTRUCTIVE_KINDS.has(pending.kind) ? "danger" : "main"}>{dialog?.action}</Button></>} onClose={() => setPending(null)} onSubmit={() => void confirm()} open={Boolean(pending)} title={dialog?.title ?? ""}>
+      {pending?.kind === "anonymize" || pending?.kind === "mfa-reset" ? <Field label="Confirm the email address"><Input autoComplete="off" onChange={(event) => setConfirmText(event.target.value)} placeholder={pending.user.email} value={confirmText} /></Field> : null}
     </Dialog>
     {session.is_system_admin ? <TokenInventory accessToken={accessToken} /> : null}
     {offboarding ? <OffboardDialog accessToken={accessToken} candidates={users ?? []} onClose={() => setOffboarding(null)} onDone={() => { setOffboarding(null); void reload(); }} user={offboarding} /> : null}

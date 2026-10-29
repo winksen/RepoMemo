@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.17 (2026-10-29)
+
+Add two-step sign-in enrollment, recovery and administrator screens.
+
+### Changed
+- Profile › Two-step sign-in sets up an authenticator app (key and link, no QR code) and turns on only after a right first code, then shows ten recovery codes once and asks for confirmation that they were saved; replacing the codes and turning it off need the password and a code, and the panel warns when two or fewer codes remain.
+- The sign-in page and the password reset page ask for the authentication code when an account needs one, and a wrong code leaves the reset link valid. System › Users marks accounts with two-step on and offers Remove two-step sign-in…, the only recovery for someone who lost both device and codes: it needs the administrator to confirm identity outside RepoMemo and type the person's email, signs them out everywhere and is audited. There is no support backdoor.
+- Not included: a server-wide requirement to use two-step sign-in, and QR codes. System users now report whether two-step is on (generated types updated).
+
+### Checks
+- Two UI tests cover enrollment (disabled until a right code, codes shown until kept) and the password-and-code proof for turning it off. Generated types, clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed; no screen was seen in a browser.
+
+### Upgrading
+- No migration. The desktop app and the server should be upgraded together.
+
 ## V0.5.16 (2026-10-29)
 
 Add optional TOTP enforcement for local-password accounts with single-use recovery codes.

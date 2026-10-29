@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.16` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.17 — Add two-step sign-in enrollment, recovery and administrator screens.
+
+- Profile › Two-step sign-in sets up an authenticator app (key and link, no QR code) and turns on only after a right first code, then shows ten recovery codes once and asks for confirmation that they were saved; replacing the codes and turning it off need the password and a code, and the panel warns when two or fewer codes remain.
+- The sign-in page and the password reset page ask for the authentication code when an account needs one, and a wrong code leaves the reset link valid. System › Users marks accounts with two-step on and offers Remove two-step sign-in…, the only recovery for someone who lost both device and codes: it needs the administrator to confirm identity outside RepoMemo and type the person's email, signs them out everywhere and is audited. There is no support backdoor.
+- Not included: a server-wide requirement to use two-step sign-in, and QR codes. System users now report whether two-step is on (generated types updated).
+
+Checks: Two UI tests cover enrollment (disabled until a right code, codes shown until kept) and the password-and-code proof for turning it off. Generated types, clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed; no screen was seen in a browser.
 
 ## V0.5.16 — Add optional TOTP enforcement for local-password accounts with single-use recovery codes.
 

@@ -381,3 +381,28 @@ administrator with `POST /v1/system/users/{user_id}/mfa-reset`: it removes the
 second factor, ends the person's sessions and is audited
 (`mfa_reset_by_administrator`). There is no other bypass. Migration 0053 holds
 the sealed secret, the last accepted step and the recovery code hashes.
+
+## Two-step sign-in screens
+
+V0.5.17 adds the screens for the V0.5.16 enforcement.
+
+**For you (Profile › Two-step sign-in).** *Set up* shows a key to type into an
+authenticator app, and an `otpauth://` link for apps that open it (there is no
+QR code). Two-step sign-in is turned on only when you type a right first code.
+You are then shown ten recovery codes **once**: copy them, and confirm you have
+saved them before the panel lets you close it; they are not kept in the browser.
+*Replace recovery codes* and *Turn off* ask for your password and a code; the
+panel warns when two or fewer codes are left.
+
+**At sign-in and password reset.** The sign-in page and the reset-link page ask
+for an *Authentication code* (an app code or a recovery code) when the account
+needs one. A wrong code keeps the reset link valid.
+
+**For administrators (System › Users).** Accounts with it on are marked
+"two-step on". *Remove two-step sign-in…* is the only recovery for someone who
+lost both their device and their codes: it asks the administrator to confirm,
+outside RepoMemo, that it really is that person, and to type the person's email
+address; it signs them out everywhere and is audited. There is no support
+backdoor and no way to read or bypass a code. Not included: a server-wide
+requirement that everyone (or all administrators) use two-step sign-in, and QR
+codes.

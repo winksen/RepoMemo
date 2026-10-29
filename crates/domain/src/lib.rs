@@ -1953,6 +1953,9 @@ pub struct SystemUser {
     pub workspace_count: i64,
     /// Refresh tokens that are neither revoked nor expired.
     pub active_sessions: i64,
+    /// Whether the account has confirmed two-step sign-in.
+    #[serde(default)]
+    pub two_step: bool,
     /// The workspaces the account is a direct member of, with its role in each.
     /// System administrators additionally act as administrators everywhere.
     #[serde(default)]
