@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.4.105` (2026-10-29) · **Next:** V0.5.0 team-access opening. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.5.0` (2026-10-29) · **Next:** V0.5.1 provider configuration. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -62,8 +62,15 @@ timeline
     V0.3.26 to V0.3.27 : Security pass and release checks
   section V0.4.x deployment and proposed continuation
     V0.4.0 to V0.4.67 : Deployment plan built; clean-install validation open
-    V0.4.68 to V0.4.91 : Proposed evidence, workflows, performance, security and frontend
-    V0.4.92 to V0.4.105 : Proposed documentation and final evidence
+    V0.4.68 to V0.4.104 : Continuation committed; final evidence remains open
+    V0.4.105 : Candidate evidence recorded; live validation pending
+  section Proposed path to public V1.0.0
+    V0.5.x : Team access and identity
+    V0.6.x : Trusted knowledge in daily work
+    V0.7.x : Projects connected to evidence
+    V0.8.x : Connected teams and community knowledge
+    V0.9.x : Pilot proof and release candidate
+    V1.0.0 : Public stable release after all mandatory gates
 ```
 
 | Stage | Status |
@@ -84,9 +91,12 @@ timeline
 | **V0.3.0 *Connected*** | ✅ Released 2026-10-24: the version set to `0.3.0` and tagged `v0.3.0` after tracks K to N and the clean-machine install |
 | Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | ✅ Built and closed on 2026-10-24 at V0.3.27: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass and release checks; decisions 29–32 taken as proposed, 33 recorded as a proposal |
 | The 0.4.x line: preparation for deployment, server and client, containers first (V0.4.0–V0.4.67) | ✅ Closed on 2026-10-27 by V0.4.67 (opened on 2026-10-25 by V0.4.0; 67 releases planned in eight tracks (configuration, the server image, the web image, compose and tests, direct install, registry, the desktop app on the web client, documents and security); [plan](plans/2026-10-25-deployment.md), [index](RELEASES_0.4.md); decisions 33–40 proposed, then 41–44 for the next line); the maintainer's clean-install run is what is left |
-| Proposed 0.4.x continuation (V0.4.68–V0.4.105, tracks AC–AH) | 🔜 Planned, not built: release evidence, daily workflows, performance and security, frontend experience, a separate documentation sequence and final validation; [gap audit and tracks](#proposed-04x-continuation-gap-audit), [one row per release](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x) |
-| Single sign-on (OIDC) | 💭 Set aside on 2026-10-25, kept as the candidate for the line after; [plan](plans/2026-10-24-single-sign-on.md) |
-| After the 0.4.x line: single sign-on, scale-out, hosted | 💭 Direction (the theme is not chosen; single sign-on is the candidate) |
+| 0.4.x continuation (V0.4.68–V0.4.105, tracks AC–AH) | V0.4.68–V0.4.105 committed; [candidate evidence](technical/release-evidence-0.4.105.md) records pending live validation and authorized implementation overlap. [Gap audit and tracks](#proposed-04x-continuation-gap-audit), [one row per release](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x) |
+| 0.5.x team access and identity | 🔜 Expanded proposal: preserves the OIDC sequence and adds restricted workspaces, guest expiry, offboarding and MFA; [index](RELEASES_0.5.md) |
+| 0.6.x trusted daily knowledge | 🔜 Activation, personal work, safe editing, review accountability and recovery; [index](RELEASES_0.6.md) |
+| 0.7.x evidence-backed projects | 🔜 Projects, milestones, task discussion, dependencies, views and updates; [index](RELEASES_0.7.md) |
+| 0.8.x connections and community knowledge | 🔜 Connector trust, tracker/chat adoption, migration and curated publication; [index](RELEASES_0.8.md) |
+| 0.9.x pilot proof → 1.0.0 | 🔜 Observed team journeys, capacity, recovery and exact-candidate release proof; [index](RELEASES_0.9.md) |
 
 ---
 
@@ -1219,10 +1229,10 @@ The brief of each release (change, files, done when, commit line) is in the [pla
 | 38 | **Registry and tags** | V0.4.0 | GitHub's container registry, `X.Y.Z`, `X.Y` and `latest`, multi-architecture, pushed by a tag only, with an SBOM and an attestation. *Proposed* |
 | 39 | **One desktop client** | V0.4.0 | The desktop app is the web client in a window: no desktop-only screen except the window's chrome and the connect screen, which uses the web client's components. *Proposed* |
 | 40 | **How an administrator gives a team the app** | V0.4.0 | The same executable plus `repomemo-desktop.json`, or an installer packaged for one server; signing and updates are later releases that need the maintainer's certificates and keys. *Proposed* |
-| 41 | **The theme of the 0.5.x line** | V0.4.67 | Single sign-on with OpenID Connect first; SAML, SCIM and several providers at once stay later. Plan: [plans/2026-10-27-0.5-single-sign-on.md](plans/2026-10-27-0.5-single-sign-on.md). *Proposed* |
+| 41 | **The theme of the 0.5.x line** | V0.4.67 | Original proposal: OpenID Connect first; SAML, SCIM and several providers later ([plan](plans/2026-10-27-0.5-single-sign-on.md)). **Expanded proposal, 2026-10-29:** team access and identity, retaining OIDC and adding the adoption gaps in [the new sequence](#proposed-path-to-10-team-readiness). Not an implementation approval or shipped feature. |
 | 42 | **Passwords once single sign-on is on** | V0.4.67 | They stay for break-glass accounts and for servers that do not turn it on; turning them off is a setting guarded by an administrator having signed in through the provider first. *Proposed* |
 | 43 | **The desktop app and the provider** | V0.4.67 | The sign-in goes through the system browser with a one-time code back to the app, never an embedded page. *Proposed* |
-| 44 | **Numbering of the 0.5.x line** | V0.4.67 | `V0.5.0` opens the line after the 0.4 clean-install record is filled; `V0.5.1`–`V0.5.10` are built one by one. *Proposed* |
+| 44 | **Numbering of the 0.5.x line** | V0.4.67 | Original proposal: `V0.5.0` opens after 0.4 evidence, then `V0.5.1`–`V0.5.10`. **Expanded proposal, 2026-10-29:** preserve those reservations, treat `V0.5.10` as an identity checkpoint, then continue through `V0.5.19`; [index](RELEASES_0.5.md). |
 
 ---
 
@@ -1703,6 +1713,8 @@ One box per release, added as each release is built. Say what was built and what
 
 The next work should first make the deployment claims testable, then improve the daily product, and finally make the documentation a usable route from the README to user, administrator and maintainer tasks. These are gaps in the **record or experience**, not confirmed security defects. A proposed feature needs a short code and UI inventory before implementation so an existing capability is extended rather than duplicated.
 
+The gap table preserves the original 2026-10-27 audit observations. V0.4.68–V0.4.104 subsequently addressed the implementation and documentation rows; the release index records those outcomes. The [2026-10-29 readiness report](analysis/2026-10-29-team-readiness.md) is the current functional assessment, and V0.4.105 remains the final-evidence gate.
+
 | Gap or opportunity | Evidence in this repository | Planned response |
 |---|---|---|
 | Release readiness is ambiguous | V0.4.67 reported 22 failing web tests; [V0.4.68 triage](technical/web-test-debt.md) reproduced them and a runner hang; V0.4.69 made the local suite pass; V0.4.70 gates distribution builds on tests for the exact commit, and the [V0.4.73 evidence matrix](technical/release-evidence-0.4.73.md) separates built, tested and released paths while live workflow results remain unrun | V0.4.105 repeats the gate on the final candidate |
@@ -1723,26 +1735,213 @@ The next work should first make the deployment claims testable, then improve the
 | V0.4.80–V0.4.85 | AE. Performance and security | Bound expensive work and prove recovery and access behavior |
 | V0.4.86–V0.4.91 | AF. Frontend experience | Improve scanning, navigation, feedback, accessibility and narrow layouts |
 | V0.4.92–V0.4.104 | AG. Documentation commits | Simplify the README, then complete user, administrator, API, functional and technical documentation |
-| V0.4.105 | AH. Final evidence | [Candidate evidence](technical/release-evidence-0.4.105.md) recorded; live validation pending and implementation overlap authorized |
+| V0.4.105 | AH. Final evidence | Candidate checks and [distribution decision](technical/release-evidence-0.4.105.md) recorded; live validation pending |
 
 ### Documentation commits
 
 The documentation sequence is deliberately after the feature and interface tracks so it describes the resulting behavior. Begin with [README.md](../README.md) (V0.4.92), add a role-based docs index (V0.4.93), then bring first-run instructions and task-based functional guides for users (V0.4.94–V0.4.97) and administrators (V0.4.98–V0.4.100) up to date. Finish with the API reference (V0.4.101), functional and technical mindmaps (V0.4.102–V0.4.103), and a documentation verification/read-through (V0.4.104). The [release index](RELEASES_0.4.md#documentation-commits-v0492v04104) has the acceptance criterion for every commit. Keep one canonical guide per task and link to it from the README; update `PRODUCT.md` when its present-tense capability statements are reconciled.
 
-**Entry to 0.5.x:** V0.4.105 records final test, install and documentation evidence for the exact candidate; the maintainer still chooses the 0.5 theme. A missing credential or platform stays visibly blocked, with its distribution claim narrowed accordingly. The proposed [single sign-on plan](plans/2026-10-27-0.5-single-sign-on.md) follows this continuation if chosen.
+**Entry to 0.5.x:** V0.4.105 records final test, install and documentation evidence for the exact candidate. A missing credential or platform stays visibly blocked, with its distribution claim narrowed accordingly. The [expanded team-readiness proposal](#proposed-path-to-10-team-readiness) retains the original [OIDC plan](plans/2026-10-27-0.5-single-sign-on.md) as its first track; the new tables govern proposed scope and acceptance where the two differ.
+
+---
+
+## Proposed path to 1.0: team readiness
+
+> **Review:** [Functional readiness for teams and the public 1.0](analysis/2026-10-29-team-readiness.md) (2026-10-29). It inventories existing capabilities, distinguishes missing workflows from documentation drift, compares primary competitor sources and defines the pilot gates.
+
+**Status:** proposed on 2026-10-29; no row below is shipped or a release commitment. One intended commit per row, named `Update V0.N.P`, with a short body describing the change. Split oversized rows before implementation and renumber only unshipped rows. Update the changelog, user/API guides, mindmaps, archive compatibility and focused checks with the implementation, not in this planning change. No product version is bumped by this plan.
+
+**Proposed product promise:** a self-hosted technical knowledge and coordination product: a team can find a trustworthy source, preserve a reviewed decision, connect it to owned project work, and recover or export its data. Small teams gain lightweight project execution; teams already using a tracker keep that tracker as the source of execution state. This is not a claim of enterprise-wide readiness or full project-suite parity.
+
+### Release sequence and dependencies
+
+| Line | User outcome | Depends on | Public 1.0 role |
+|---|---|---|---|
+| 0.5.x | Join, restrict and end team access predictably | V0.4.105 candidate evidence | Identity and audience boundaries |
+| 0.6.x | Reach value, preserve edits and keep knowledge reviewed | 0.5 access model | Core knowledge promise |
+| 0.7.x | Plan lightweight projects with decisions and evidence attached | 0.5 access and 0.6 revision model | Useful daily coordination |
+| 0.8.x | Adopt existing tools and publish selected community knowledge | 0.5 permissions, 0.6 review, 0.7 project links | Integrations and external readership |
+| 0.9.x | Prove adoption, support and recovery on a frozen candidate | Required 0.5–0.8 outcomes | Pilot and distribution evidence |
+| 1.0.0 | Publish the tested product with a bounded support promise | All mandatory release gates | First public stable release |
+
+**Existing SSO proposal:** the [2026-10-27 plan](plans/2026-10-27-0.5-single-sign-on.md) remains a historical design record and is not rewritten here. Its first eleven version reservations remain. The proposed acceptance below strengthens account linking, extends the audit exporter that already exists, and changes 0.5.10 from line closure to an identity checkpoint. No old proposed acceptance overrides the new account-access requirements.
+
+**Scope control:** local OCR (0.6.13), a second tracker (0.8.7) and a second chat adapter (0.8.10) require a pilot owner before implementation. Jira/Slack are the default first choices; pilot evidence may select Linear/Teams instead before work starts. Record a deferral and narrow the supported feature list when a conditional item is not justified. Access boundaries, trustworthy evidence, recovery and publication isolation are mandatory. Full details and pilot thresholds are in the [readiness report](analysis/2026-10-29-team-readiness.md).
+
+**Delivery rules for every line:** authorize each new surface on the server; use the existing client/design system; keep core storage/search useful without AI; include migration and archive compatibility with each schema/entity change; cover negative access, concurrent edits and recovery as applicable. Each closing row records supported-client and live-workflow evidence, rather than treating a compile as a user test. Follow repository execution rules; unrun checks remain unrun. Keep roadmap and release-index rows aligned when implementation ships.
+
+### The 0.5.x line: team access and identity
+
+> **Index:** [every 0.5 release](RELEASES_0.5.md) · **Track:** AI. Team access · **Report gaps:** G02, G03
+
+**Entry:** [V0.4.105 evidence](technical/release-evidence-0.4.105.md) is recorded. On 2026-10-29 the maintainer authorized implementation through V0.5.19 while live checks remain pending. The existing OIDC plan supplies the identity design; the refinements below take precedence where they differ.
+
+**Exit:** A new team can join through password/MFA or OIDC, keep a workspace restricted, inspect effective access, expire a guest and remove a leaver without losing owned work. Browser and supported desktop journeys have recorded evidence.
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.5.0** ✅ 2026-10-29 | 📘 | Opening | Open the expanded team-access line and reconcile capability claims against code, including existing citation editing, guests, owner transfer and audit export | G01–G03 | The release index, access model and guide agree; no shipped capability is planned as a new implementation |
+| **V0.5.1** 🔜 | ✨ | Identity | Configure and check one OIDC provider with sealed credentials and bounded discovery | G02 | An administrator can diagnose discovery/configuration errors without exposing secrets or enabling an untested provider |
+| **V0.5.2** 🔜 | ✨ | Identity | Implement the OIDC authorization and callback flow with state, nonce, PKCE and token validation | G02 | Valid sign-in issues the existing session; replay, wrong issuer/audience, expired tokens and mismatched state are refused |
+| **V0.5.3** 🔜 | 🔒 | Identity | Link accounts by issuer/subject, requiring explicit proof for an existing account rather than trusting an email match alone | G02 | A matching or reassigned email cannot take over an existing account; authenticated linking and invited new-account enrollment both work |
+| **V0.5.4** 🔜 | ✨ | Sign-in UX | Add provider sign-in in the browser and a system-browser handoff for desktop | G02 | Success, cancellation, expired handoff and provider failure return to the correct client with a recoverable next action |
+| **V0.5.5** 🔜 | 🔒 | Identity policy | Allow enforced SSO with tested break-glass access and guarded password disablement | G02 | An administrator cannot disable the last working access path; password-only deployments remain usable |
+| **V0.5.6** 🔜 | ✨ | Membership | Map allowlisted provider groups to existing organization/workspace memberships, retaining grant origins | G02 | Mappings preview additions/removals, never infer ownership, preserve direct grants and cannot silently demote the last owner |
+| **V0.5.7** 🔜 | 🔒 | Session lifecycle | Add provider logout and supported back-channel logout with an absolute reauthentication deadline | G02 | A disabled identity cannot refresh forever; an IdP without logout notifications has a documented, tested maximum access window |
+| **V0.5.8** 🔜 | 🔧 | Audit | Extend the existing audit/export path with identity linking, provider policy, login and group-mapping events | G02, G03 | An authorized export explains identity changes and failures without tokens or secrets; no duplicate audit subsystem is created |
+| **V0.5.9** 🔜 | 🔒 | Identity review | Review and close findings on redirects, account linking, discovery, tokens and recovery | G02 | No high/medium identity finding remains open and negative cases have regression coverage |
+| **V0.5.10** 🔜 | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | G01, G02 | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
+| **V0.5.11** 🔜 | ✨ | Workspace access | Add explicit organization-shared versus restricted workspace membership policy | G02 | A restricted workspace never auto-enrolls a new org member; existing memberships migrate without silent loss or expansion and server-admin powers are explicit |
+| **V0.5.12** 🔜 | 🔧 | Access UX | Show effective access and its origin before membership or group-policy changes | G02 | An administrator can explain every grant and preview affected people; search, counts and direct URLs reveal no restricted workspace to unauthorized users |
+| **V0.5.13** 🔜 | ✨ | Guests | Add expiry and renewal to existing direct guest membership | G02, G03 | An expired guest loses read, search, export, event and token access at the deadline; renewals and expiry are auditable |
+| **V0.5.14** 🔜 | 🔧 | Offboarding | Unify existing deactivation and ownership transfer with a preview of outstanding tasks and reviews | G03 | An admin reassigns work, preserves attribution and verifies revocation; the flow refuses orphaning the last owner |
+| **V0.5.15** 🔜 | 🔒 | API access | Constrain integration/PAT access to explicitly selected workspaces with expiry and an access inventory | G03 | A token cannot reach a different workspace, cannot outlive its grant and stops working when its owner loses access; existing-token migration is documented |
+| **V0.5.16** 🔜 | 🔒 | Local MFA | Add optional TOTP enforcement for local-password accounts, with hashed single-use recovery codes | G02 | Password alone cannot bypass enabled MFA through browser, token issuance or alternate login routes; replay and recovery reuse are refused |
+| **V0.5.17** 🔜 | ✨ | MFA UX | Add enrollment, recovery and administrator-policy screens for local MFA | G02 | Enrollment requires a successful code, recovery codes are shown once, reset requires verified authority and a user can recover without a support backdoor |
+| **V0.5.18** 🔜 | 🔒 | Access verification | Exercise the complete role, guest, token, MFA and restricted-workspace matrix | G02, G03 | Denied access stays denied across caches, events, previews, exports and retrieval; upgrades retain intentional existing grants |
+| **V0.5.19** 🔜 | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | G01–G03 | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |
+
+### The 0.6.x line: trusted knowledge in daily work
+
+> **Index:** [every 0.6 release](RELEASES_0.6.md) · **Track:** AJ. Daily knowledge · **Report gaps:** G04–G08, G13
+
+**Entry:** The 0.5 access model is stable. Reuse existing notifications, lifecycle, citation editing, templates, saved searches and workspace archives.
+
+**Exit:** A teammate reaches value without AI, recovers an interrupted edit, reviews a changed conclusion, restores an accidental deletion and completes the workflow by keyboard. New knowledge data survives export/import.
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.6.0** 🔜 | 📘 | Opening | Define the first-value and knowledge-review journeys with representative fixtures and clear state terminology | G04, G06 | Fixtures cover no AI, no mail, stale evidence, missing sources and a guest; ownership and approval meanings are agreed in the plan |
+| **V0.6.1** 🔜 | ✨ | Onboarding | Add a dismissible workspace checklist using the chosen template and real source readiness | G04 | A new member adds evidence, finds it and saves a cited memory without configuring AI; progress follows completed actions rather than clicks |
+| **V0.6.2** 🔜 | ✨ | My work | Add a permission-filtered personal view of assigned tasks, due reviews and mentions across workspaces | G04 | A returning user reaches the next action from one view; inaccessible work and counts disappear after revocation |
+| **V0.6.3** 🔜 | ✨ | Memory history | Keep attributed revisions of memory content and its citation set, with compare and restore | G05, G06 | An earlier conclusion and its evidence can be inspected; restore creates a new revision and never rewrites history |
+| **V0.6.4** 🔜 | 🔒 | Concurrent editing | Reject stale note and memory writes using a version precondition | G05 | Two editors cannot silently overwrite each other; the losing editor retains their text and can compare or reload explicitly |
+| **V0.6.5** 🔜 | 🔧 | Draft recovery | Recover interrupted note/memory drafts without publishing them automatically | G05 | Reload or a failed save preserves the draft; logout, server switch and revoked access cannot reveal it to another session |
+| **V0.6.6** 🔜 | ✨ | Review ownership | Add an accountable reviewer and next-review date to evidence and memory cards | G06 | Owners can delegate review, departed owners are surfaced, and the queue distinguishes overdue review from changed evidence |
+| **V0.6.7** 🔜 | 🔧 | Review reminders | Schedule review reminders through existing preferences, inbox and digest delivery | G06 | A due review produces one deduplicated reminder per policy window; timezone, snooze and muted-mail behavior are predictable |
+| **V0.6.8** 🔜 | ✨ | Approval workflow | Add optional reviewer approval tied to a specific knowledge revision | G06 | Editing approved content invalidates its approval; configured independent review cannot be self-approved and decisions retain attribution |
+| **V0.6.9** 🔜 | 🔧 | Change explanation | Show the evidence changes that caused a memory card to need review | G06 | The reviewer can inspect previous/current passages or an explicit unavailable-source reason and resolve the affected citation in context |
+| **V0.6.10** 🔜 | 🔧 | Citation durability | Bind saved references and portable exports to inspectable content revisions | G06 | A source update cannot silently make a historical citation appear current; unavailable snapshots and access refusals are stated accurately |
+| **V0.6.11** 🔜 | ✨ | Deletion recovery | Add bounded trash and restore for locally authored/uploaded evidence and memory | G05 | Accidental deletion can be undone with references restored; purge is explicit and audited; remotely revoked or removed source content is not resurrected by trash |
+| **V0.6.12** 🔜 | 🔧 | Image intake | Allow image storage and preview with no AI provider, showing its searchability state | G07 | A screenshot can be kept and found by metadata without leaving the server; later optional vision indexing never implies it was already text-searchable |
+| **V0.6.13** 🔜 | ✨ | Local OCR (conditional) | Add optional bounded local OCR for scanned PDFs and images, retaining original/page provenance | G07 | Pilot scans yield searchable page-linked text; missing OCR gives a clear limitation, low-quality extraction is labelled and resource limits hold |
+| **V0.6.14** 🔜 | ✨ | Organization templates | Let organization admins save and version templates using the existing validated template model | G07 | A workspace previews and adopts an org template without restart; template updates never change access or silently move existing content |
+| **V0.6.15** 🔜 | 🔧 | Folders | Move evidence folders with a preview of descendants and preserved references | G07 | Cycles and depth overflow are refused; paths update consistently and citations/comments remain attached |
+| **V0.6.16** 🔜 | ✨ | Search feedback | Capture an unanswered question or unhelpful result as a permission-scoped improvement request | G08 | The user can submit without losing query context; an owner can resolve it to evidence or a memory, and query retention is explicit |
+| **V0.6.17** 🔜 | 🔧 | Journey UX | Make the onboarding, personal queue and review flow keyboard/narrow-screen usable | G04, G13 | Focus, context and drafts survive navigation, retry and reconnect; the specified journeys work at 200% zoom and in both themes with recorded manual checks |
+| **V0.6.18** 🔜 | 🔧 | Portability | Extend workspace archives for knowledge revisions, review policy, templates and recovery state | G05, G06 | Round-trip preserves citation meaning and records, rechecks identities and never imports a privileged approval as a trusted local actor |
+| **V0.6.19** 🔜 | 📘 | Closing | Record no-AI activation, review, edit-conflict and recovery walkthroughs | G04–G08, G13 | The daily-knowledge exit journey passes; guides distinguish implemented OCR or its explicitly deferred scope |
+
+### The 0.7.x line: projects connected to their evidence
+
+> **Index:** [every 0.7 release](RELEASES_0.7.md) · **Track:** AK. Project execution · **Report gaps:** G09
+
+**Entry:** The 0.5 access boundary and 0.6 knowledge/revision model are established. A workspace remains the security boundary; projects organize work inside it.
+
+**Exit:** A small team can create a project brief, plan a milestone, assign and discuss tasks, identify dependencies, publish a grounded status update and export/import the result. Existing trackers remain the authority for their mirrored issues.
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.7.0** 🔜 | 📘 | Opening | Specify the lightweight project model and its limits with a sample team journey | G09 | Project, milestone, task, checklist and evidence have distinct meanings; legacy tasks need no project and advanced portfolio/sprint planning is excluded |
+| **V0.7.1** 🔜 | ✨ | Projects | Add workspace-scoped projects with owner, goal, lifecycle and target date | G09 | Members can create and archive a project; its access is exactly the workspace's and legacy tasks continue to work |
+| **V0.7.2** 🔜 | ✨ | Project brief | Attach decision memories and evidence to a project brief with backlinks | G09 | A teammate can explain the project's goal and supporting decisions without copying source text or following a broken access link |
+| **V0.7.3** 🔜 | ✨ | Task details | Give tasks stable human-readable identifiers, direct URLs and a dedicated detail view | G09 | A link opens the same task after title changes; guests receive an authorized view and missing/deleted tasks have useful states |
+| **V0.7.4** 🔜 | ✨ | Task discussion | Add task comments, mentions and explicit watching using existing notification preferences | G09 | A discussion stays with its task, mentions notify once and unwatch/mute stops optional delivery without losing assignment notices |
+| **V0.7.5** 🔜 | 🔧 | Task context | Replace the single-artifact limit with multiple evidence and memory references | G09 | Existing artifact links migrate intact; new links remain permission-checked and the task can cite the decision that created it |
+| **V0.7.6** 🔜 | 🔒 | Task editing | Apply optimistic concurrency to task details and status changes | G05, G09 | Concurrent edits cannot silently drop assignment, description or status; recoverable conflicts retain the attempted change |
+| **V0.7.7** 🔜 | ✨ | Milestones | Group project tasks into named milestones with due dates and completion rules | G09 | A lead sees completed, remaining and overdue work with an explainable denominator; changing a date does not silently reschedule tasks |
+| **V0.7.8** 🔜 | ✨ | Task hierarchy | Add parent/child tasks separate from checklist steps | G09 | Parents and children stay in the same authorized workspace, cycles are refused and parent completion does not hide unfinished children |
+| **V0.7.9** 🔜 | ✨ | Dependencies | Add blocks/blocked-by links and a clear blocker explanation | G09 | Self-links and cycles are refused; closing a blocker updates the indication without automatically completing dependent work |
+| **V0.7.10** 🔜 | ✨ | Labels | Add workspace-managed task labels with accessible colors and filters | G09 | Labels can be renamed/merged without losing assignments and labels cannot be used as an access-control substitute |
+| **V0.7.11** 🔜 | ✨ | Workflows | Allow named workflow states mapped to stable open/in-progress/blocked/done categories | G09 | Existing four states migrate unchanged; reporting and integrations use explicit category mappings, and removal requires remapping occupied states |
+| **V0.7.12** 🔜 | ✨ | Task list | Add a paged task list with saved filters for project, milestone, assignee, priority, label and due date | G09 | Saved views re-evaluate current rights; URLs retain the chosen view and large lists do not require downloading all tasks |
+| **V0.7.13** 🔜 | 🔧 | Task board | Use the same query/view model for the board with keyboard status movement | G09 | Board and list show the same filtered work; movement preserves focus and failed changes roll back visibly |
+| **V0.7.14** 🔜 | 🔧 | Bulk work | Add previewed multi-task assignment, labels and milestone updates | G09 | Each item reports success or refusal, failed items remain selected and authorization/concurrency are checked per task |
+| **V0.7.15** 🔜 | ✨ | Due reminders | Add task due/overdue reminders through the existing inbox and digests | G09 | Timezone and date-only behavior are defined, completed work is excluded and retries do not duplicate notifications |
+| **V0.7.16** 🔜 | ✨ | Recurring work | Create recurring tasks from explicit schedules with an occurrence identity | G09 | Retries and restarts create only one occurrence, missed runs have a documented policy and a recurring task can be stopped without deleting history |
+| **V0.7.17** 🔜 | ✨ | Project updates | Publish attributed project status updates with milestone, blocker and evidence links | G09 | A reader can inspect what changed and why the lead chose on-track/at-risk/blocked; updates are authored or confirmed by a person |
+| **V0.7.18** 🔜 | ✨ | CSV migration | Import and export task CSV with field mapping and a dry-run report | G09, G11 | Invalid rows and unknown assignees are explained before commit; retries avoid duplicates and exported cells are safe to open in spreadsheets |
+| **V0.7.19** 🔜 | 🔧 | Project portability | Extend workspace archives for projects, task relations, comments, workflow and schedules | G09 | Round-trip retains relationships, rejects cross-workspace references and imports schedules paused pending explicit activation |
+| **V0.7.20** 🔜 | 📘 | Closing | Validate a complete small-team project and document coexistence with external trackers | G09 | A team completes the exit journey; no unsupported Gantt, resource accounting, sprint or portfolio capability is claimed |
+
+### The 0.8.x line: connected teams and community knowledge
+
+> **Index:** [every 0.8 release](RELEASES_0.8.md) · **Track:** AL. Connections and sharing · **Report gaps:** G10–G12
+
+**Entry:** The 0.5 audience controls and 0.6 revision/approval model have passed their gates. Read-only tracker mirrors reference 0.7 projects; public publishing uses a separate, explicit audience.
+
+**Exit:** A pilot can migrate existing work, keep one tracker mirror current, receive safe chat links and publish/revoke a reviewed knowledge snapshot. Deletion, lost credentials, restricted source content and retries have demonstrated outcomes.
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.8.0** 🔜 | 📘 | Opening | Define a connector conformance contract: ownership, audience, cursor, freshness, deletion, rate limits and permission loss | G10 | Fixtures and a support matrix distinguish a deliberate shared-source import from unsupported per-user source ACL mirroring |
+| **V0.8.1** 🔜 | 🔒 | Connection setup | Preview the selected source partition, copied data and destination audience before importing | G10 | An admin explicitly approves uniform sharing; sources requiring unsupported item-level restrictions are refused and secrets never appear in the preview |
+| **V0.8.2** 🔜 | 🔒 | Source access changes | Quarantine affected mirrored evidence when access is revoked or sharing can no longer be established | G10 | Denied sources disappear from retrieval, previews, exports and publication; transient failures and deletion differ, with a documented maximum stale-access window |
+| **V0.8.3** 🔜 | 🔧 | Connector health | Expose last successful sync, coverage, exclusions, backlog and recoverable errors | G10 | An operator distinguishes complete, partial, stale and paused sources, resumes a cursor and diagnoses a retry without duplicate evidence |
+| **V0.8.4** 🔜 | ✨ | Outbound events | Add opt-in signed outbound webhooks with event IDs, bounded retries and delivery inspection | G11 | Only approved destinations receive selected events, duplicate delivery is identifiable and disabled endpoints stop receiving queued content |
+| **V0.8.5** 🔜 | ✨ | Jira intake | Read selected Jira Cloud project issues into existing connector evidence with stable remote IDs | G11 | A dry run reports scope and permissions; paged import resumes, preserves source links and changes nothing in Jira |
+| **V0.8.6** 🔜 | 🔧 | Jira lifecycle | Reconcile Jira edits, removals and access changes through the connector contract | G10, G11 | Rate limits, repeated pages, removed access and deleted issues pass conformance fixtures; remote/local status ownership is explicit |
+| **V0.8.7** 🔜 | ✨ | Linear (conditional) | Add a read-only Linear team/project adapter using the same conformance contract | G10, G11 | A startup pilot imports and resyncs a representative fixture without duplicates or permission expansion; updates and deletion are covered |
+| **V0.8.8** 🔜 | 🔧 | Tracker context | Link mirrored issues and pull requests to local projects and tasks without duplicating ownership | G09, G11 | A user can distinguish remote state from local follow-up, navigate both directions through links and never mistakes a local edit for a remote update |
+| **V0.8.9** 🔜 | ✨ | Slack delivery | Send opted-in review/project digests to approved Slack destinations as authenticated links | G11 | A pilot receives deduplicated links without sensitive titles/excerpts, unauthorized readers cannot open them and disconnect stops delivery |
+| **V0.8.10** 🔜 | ✨ | Teams delivery (conditional) | Add equivalent link-only delivery for Microsoft Teams using the same destination and retry policy | G11 | A company pilot validates the destination, receives one digest per window and verifies revocation; unsupported delivery modes are named |
+| **V0.8.11** 🔜 | ✨ | Knowledge migration | Import a Markdown/asset directory with link mapping, preview and resumable progress | G11 | A representative wiki migrates with internal links and attachments intact; unsupported and unsafe paths are reported and retries do not duplicate records |
+| **V0.8.12** 🔜 | ✨ | Confluence migration | Add a bounded importer for a documented Confluence export format | G11 | A representative space export preserves supported hierarchy, links and source attribution; restrictions require explicit mapping and unsupported macros are reported |
+| **V0.8.13** 🔜 | 🔧 | AI administration | Extend existing AI limits with visible workspace budgets, usage and provider-failure behavior | G08 | Admins see consumption and limit reasons, spending limits stop calls predictably and keyword search remains available when AI is disabled or unavailable |
+| **V0.8.14** 🔜 | 🔒 | Answer quality | Add a versioned retrieval/answer evaluation set and in-product correction feedback | G08, G10 | Known/absent/conflicting evidence, stale sources and hostile source instructions are covered; answers cite accessible evidence and never treat source text as action authority |
+| **V0.8.15** 🔜 | ✨ | Public snapshots | Create an opt-in publication record containing only explicitly reviewed snapshot content | G12 | Publishing requires an authorized preview; private citations, comments, attachments, people and metadata are excluded unless independently approved as public |
+| **V0.8.16** 🔜 | ✨ | Publication controls | Add public preview, publish, unpublish and visible stale/source-revoked state | G12 | A publisher sees exactly what anonymous readers see; withdrawal and source-access revocation invalidate serving/caches without changing the private original |
+| **V0.8.17** 🔜 | ✨ | Community reading | Add a responsive public knowledge index and search limited to published snapshots | G12, G13 | Anonymous readers can navigate approved content; query results, counts, URLs and errors reveal no private workspace content |
+| **V0.8.18** 🔜 | 🔧 | Integration portability | Carry connector provenance and publication metadata safely in archives | G10–G12 | Import retains attribution but reconnects no credentials, sends no webhooks and publishes nothing until explicitly reauthorized |
+| **V0.8.19** 🔜 | 📘 | Closing | Validate one real tracker/chat pilot, knowledge migration and community publication journey | G10–G12 | The exit journey and connector denial fixtures pass; conditional adapters lacking pilot evidence are explicitly deferred, with no support claim |
+
+### The 0.9.x line: pilot proof and public release candidate
+
+> **Index:** [every 0.9 release](RELEASES_0.9.md) · **Track:** AM. Public readiness · **Report gaps:** G01, G13–G15
+
+**Entry:** Required 0.5–0.8 outcomes are implemented; conditional deferrals and supported integrations/platforms are explicit. This line freezes features and closes observed failures.
+
+**Exit:** Named pilots and exact-candidate release evidence satisfy the non-waivable access, data integrity, accessibility and recoverability gates; the maintainer can approve a concrete 1.0 artifact set.
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V0.9.0** 🔜 | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | G15 | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
+| **V0.9.1** 🔜 | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | G08, G15 | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
+| **V0.9.2** 🔜 | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | G14 | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |
+| **V0.9.3** 🔜 | 📘 | Adoption guides | Publish task-based guides and realistic sample data for the four pilot audiences | G04, G14 | A new reader can find setup, first value, migration, guest access and troubleshooting from the README; no invented customer or performance claims appear |
+| **V0.9.4** 🔜 | 📘 | Observed usability | Record pilots performing activation, retrieval, review, project handoff and admin offboarding | G13, G15 | Success, time, assistance and failures are recorded against the proposed thresholds; every blocking finding has an owner and a required fix before the candidate |
+| **V0.9.5** 🔜 | 🔧 | Inclusive use | Close observed keyboard, screen-reader, zoom and narrow-screen blockers in the core journeys | G13 | The affected journeys are rerun with recorded devices/themes; fixes are split into additional numbered commits if they are independent |
+| **V0.9.6** 🔜 | 📘 | Supported capacity | Measure concurrent search, indexing, projects and sync on representative pilot data | G15 | The support envelope records hardware, dataset, concurrency, p95, disk and saturation behavior; unmeasured targets are labelled and overload is recoverable |
+| **V0.9.7** 🔜 | 🔧 | Upgrade and recovery | Exercise supported-version upgrades, backup/restore and complete archive round trips | G01, G15 | The exact candidate preserves identity, citations and new entities; recovery point/time and supported rollback procedure are demonstrated on a clean host |
+| **V0.9.8** 🔜 | 🔒 | Release assurance | Review access, integrations, public sharing, AI boundaries and dependency/image findings | G01, G02, G10, G12 | No open high/medium finding, unauthorized disclosure or data-loss defect remains; negative integration and publication cases have regression evidence |
+| **V0.9.9** 🔜 | 📘 | Distribution rehearsal | Validate downloadable candidate images/installers and signatures for each claimed platform | G01 | A clean machine installs, upgrades and removes the real artifacts; digests, SBOM, provenance, signing and update behavior are recorded where claimed |
+| **V0.9.10** 🔜 | 📘 | Support contract | Publish supported versions/platforms, upgrade policy, backup expectations and support/incident routes | G14, G15 | A new operator knows what is supported and how to recover or report a problem; API/archive compatibility commitments and deprecation policy are explicit |
+| **V0.9.11** 🔜 | 📘 | Pilot acceptance | Review week-two usage and the full readiness matrix, then close observed product blockers | G15 | All required report gates pass with linked evidence; unresolved failures produce focused pre-1.0 fix rows rather than an assumed waiver |
+| **V0.9.12** 🔜 | 📘 | Release candidate | Freeze the final candidate and repeat affected checks on its exact commit | G01, G13–G15 | Documentation, release notes, migrations, CI and manual records name the same candidate; a subsequent code change invalidates affected sign-offs |
+
+### V1.0.0: first public stable release
+
+| Release | Type | Section | The one change | IDs | Done when |
+|---|---|---|---|---|---|
+| **V1.0.0** 🔜 | 📘 | Public release | Publish the approved stable artifacts, release notes and support/compatibility promise | G01, G13–G15 | The exact candidate has passed the report's pilot, access, integrity, accessibility, capacity, upgrade/restore and distribution gates; the maintainer approves the artifact set, and a post-publication download/install check confirms those exact artifacts |
+
+No calendar date is promised. A failed mandatory gate adds focused pre-1.0 fixes and repeats the affected checks. Optional adapters or unvalidated platforms can be deferred with narrower claims; unauthorized access, unsupported citations, data loss and unreliable recovery cannot be waived into readiness. Publication is a future maintainer action, not part of this documentation change.
 
 ---
 
 ## 💭 Later: after the 0.4.x line
 
-What the 0.3.x and 0.4.x lines leave out. Single sign-on is proposed as the line after 0.4.x ([the plan for 0.5.x](plans/2026-10-27-0.5-single-sign-on.md), built on [the earlier plan](plans/2026-10-24-single-sign-on.md)); the other directions below have no order.
+The ordered pre-1.0 work is now [planned above](#proposed-path-to-10-team-readiness). These remaining directions are deliberately outside the default 1.0 promise; revisit them against pilot demand and measured constraints.
 
-| Direction | Scope |
+| Direction | Scope and trigger |
 |---|---|
-| **More connectors** | Linear and Jira, after the GitHub and GitLab connector (F17) proves its model |
-| **Assistant depth** | Beyond F5 and the palette: actions that propose memory cards and tasks for a person to confirm |
-| **Scale-out team server** | PostgreSQL, object storage, a durable job queue claimed by a worker process, shared rate-limit counters, and Qdrant when vector search needs a service (see [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md)) |
-| **Enterprise / hosted** | Single sign-on (OIDC, SAML), permission-aware retrieval across organizations, audit export, policy controls and redaction, hosted and self-hosted packaging |
+| **Enterprise identity and permissions** | SAML, SCIM, multiple IdPs and per-person source ACL mirroring when a target deployment requires them; OIDC alone is not enterprise readiness |
+| **Additional live sources** | Drive, SharePoint, Confluence and chat ingestion after source permission/deletion semantics and a pilot owner are established; export migration in 0.8 is not live synchronization |
+| **Advanced project management** | Portfolio initiatives, sprints, Gantt auto-scheduling, workload, time and budget accounting only after teams outgrow the bounded project model |
+| **Assistant and developer-tool depth** | Confirmed write actions, MCP/IDE surfaces and broader automation after stable API/permission contracts and observed demand; no autonomous external changes by default |
+| **Collaborative editing and mobile** | Real-time multi-author editing, native mobile and offline writes if conflict-safe editing and responsive web workflows prove insufficient |
+| **Scale-out team server** | PostgreSQL, object storage, durable worker queue, shared rate limits and a vector service only when measurements or availability needs justify them; see [ADR-0004](../docs/decisions/0004-embedded-vector-storage-before-qdrant.md) |
+| **Hosted service** | Billing, tenant isolation, abuse operations, support staffing and operational commitments are a separate product plan |
 
 ---
 

@@ -52,3 +52,7 @@ The desktop app is the web client in its own window, showing your server; it kee
 | A start or first-run error | [Troubleshooting](TROUBLESHOOTING.md) |
 | Every server setting | [Development commands](DEVELOPMENT_COMMANDS.md) |
 | Commands for the server | [Admin console](../mindmap/technical/admin-console.md) |
+
+## Team-access rollout
+
+The [team-access guide](TEAM_ACCESS.md) separates existing guests, transfer and audit from the identity and access features being added in 0.5. Follow its current implementation status before changing sign-in policy.

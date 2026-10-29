@@ -42,6 +42,7 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 | Day-to-day procedures: health, logs, jobs, backup, restore, upgrade, rollback | [Operator runbook](RUNBOOK.md) |
 | The command console | [Admin console](../mindmap/technical/admin-console.md) |
 | Rotate secrets, manage tokens and sessions, TLS, proxies, audit | [Security administration](SECURITY_ADMIN.md) |
+| Team access, identity rollout and pending validation | [Team access](TEAM_ACCESS.md) |
 | How sign-in, tokens and permissions work | [Authentication and authorization](../mindmap/technical/auth-and-authorization.md) |
 | Diagnose a start or first-run error | [Troubleshooting](TROUBLESHOOTING.md) |
 | Every server setting | [Development commands](DEVELOPMENT_COMMANDS.md) |
@@ -61,7 +62,7 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 | Build, run and test it | [Development commands](DEVELOPMENT_COMMANDS.md), [Windows setup](WINDOWS_SETUP.md) |
 | How it works | [Technical mindmap](../mindmap/TECHNICAL_MINDMAP.md) |
 | Trace a request or a background job to its code and data | [Request and job trace](../mindmap/technical/request-and-job-trace.md) |
-| What shipped and what comes next | [Roadmap](../mindmap/ROADMAP.md), [0.4 releases](../mindmap/RELEASES_0.4.md) |
+| What shipped and what comes next | [Roadmap](../mindmap/ROADMAP.md), [0.5 releases](../mindmap/RELEASES_0.5.md) |
 | Why a choice was made | [Architecture decisions](decisions/) |
 | Visual rules | [Design](../DESIGN.md), [Product](../PRODUCT.md) |
 

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.0 (2026-10-29)
+
+Open the team-access and identity implementation line.
+
+### Changed
+- Adopt the expanded release plan through V0.5.19 and preserve the following proposed lines. Existing guests, ownership transfer, audit export and citation editing are foundations, not new features.
+- Add the team-access guide and correct stale citation-editing and cross-workspace-filter descriptions.
+- The documentation checker follows the current minor index and checks every available release index. Live evidence remains pending under the maintainer's implementation-overlap decision.
+
+### Checks
+- Version, documentation and release-note checks pass. This release changes no runtime behavior; the preceding candidate test results are historical evidence, not a new live sign-in test.
+
+### Upgrading
+- No migration or access change.
+
 ## V0.4.105 (2026-10-29)
 
 Record the final 0.4 candidate and the limits of its validation.

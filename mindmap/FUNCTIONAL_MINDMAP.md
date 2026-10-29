@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.4.105` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -11,6 +11,14 @@
 - The maintainer authorized implementing the 0.5 line while live evidence stays pending; no distribution is newly certified ready and no push or tag is made.
 
 Checks: Static checks, TypeScript, 92 web files / 496 tests and production npm audit pass. Rust tests pass (622 passed, four existing ignores), as do documentation and release-note checks. Sandbox filesystem refusals are recorded separately from test outcomes.
+
+## V0.5.0 — Open the team-access and identity implementation line.
+
+- Adopt the expanded release plan through V0.5.19 and preserve the following proposed lines. Existing guests, ownership transfer, audit export and citation editing are foundations, not new features.
+- Add the team-access guide and correct stale citation-editing and cross-workspace-filter descriptions.
+- The documentation checker follows the current minor index and checks every available release index. Live evidence remains pending under the maintainer's implementation-overlap decision.
+
+Checks: Version, documentation and release-note checks pass. This release changes no runtime behavior; the preceding candidate test results are historical evidence, not a new live sign-in test.
 
 ---
 
@@ -422,7 +430,7 @@ Re-indexing keeps every passage whose text did not change, so memory cards and a
 
 ### Search all workspaces
 
-The dashboard has one search box over **every workspace the account can read**. Results from all of them are merged, best first, and each names its workspace and opens the file there. Each workspace is searched under its own rules: only if its AI policy lets the person use AI is the query also matched by meaning (and sent to that workspace's embedding provider); otherwise that workspace is searched by keywords only and the page says so. Workspaces the person cannot read are never searched or named. It takes only words: the filters, code symbols and Ask stay inside one workspace.
+The dashboard has one search box over **every workspace the account can read**. Results from all of them are merged, best first, and each names its workspace and opens the file there. Each workspace is searched under its own rules: only if its AI policy lets the person use AI is the query also matched by meaning (and sent to that workspace's embedding provider); otherwise that workspace is searched by keywords only and the page says so. Workspaces the person cannot read are never searched or named. It supports workspace selection, evidence state, kind, language, source type and update-date filters. Code symbols and Ask remain workspace-scoped.
 
 ### Saved searches
 
@@ -507,7 +515,7 @@ A memory card is a **short, durable statement the team wants to keep**. Examples
 
 - **Create**: a title and a Markdown body, linked to **as many evidence items** as needed. A card can also be saved straight from an Ask answer or the AI overview, keeping the passages they cited.
 - **Search**: a text match on the title and body.
-- **Card page** (`/workspaces/:id/memory-cards/:cardId`): the statement (formatted Markdown), its source, and **linked evidence**, each opening its file. If the linked artifact has been deleted, the evidence is shown as missing. The links of an existing card cannot be changed yet.
+- **Card page** (`/workspaces/:id/memory-cards/:cardId`): the statement (formatted Markdown), its source, and **linked evidence**, each opening its file. If the linked artifact has been deleted, the evidence is shown as missing. Writers can edit the linked evidence of an existing card.
 - **Edit / delete**: writers only.
 - **Export** a card as a Markdown file that includes its evidence links and line ranges, for use in a wiki, an ADR or a PR description.
 

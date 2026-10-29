@@ -67,7 +67,7 @@ const stamps = [
   ["mindmap/FUNCTIONAL_MINDMAP.md", /reflects the code at `V([\d.]+)`/],
   ["mindmap/TECHNICAL_MINDMAP.md", /code at `V([\d.]+)`/],
   ["mindmap/ROADMAP.md", /\*\*Current version:\*\* `V([\d.]+)`/],
-  ["mindmap/RELEASES_0.4.md", /\*\*Current:\*\* `V([\d.]+)`/],
+  [`mindmap/RELEASES_${version.split('.').slice(0, 2).join('.')}.md`, /\*\*Current:\*\* `V([\d.]+)`/],
 ];
 for (const [path, pattern] of stamps) {
   const found = pattern.exec(read(path))?.[1];
@@ -78,7 +78,8 @@ if (!new RegExp(`^## V${version.replace(/\./g, "\\.")} \\(`, "m").test(read("CHA
 // 4. Releases ---------------------------------------------------------------
 const changelog = read("CHANGELOG.md");
 // One index for each minor line; the line's first number (0.2.0, 0.3.0, 0.4.0) is the previous line's last.
-for (const [line, file] of [["2", "mindmap/RELEASES_0.2.md"], ["3", "mindmap/RELEASES_0.3.md"], ["4", "mindmap/RELEASES_0.4.md"]]) {
+for (const [line, file] of readdirSync(join(root, "mindmap"))
+  .flatMap(file => { const match = /^RELEASES_0\.(\d+)\.md$/.exec(file); return match && Number(match[1]) >= 2 ? [[match[1], `mindmap/${file}`]] : []; })) {
   const first = `0.${line}.0`;
   const entries = new Set([...changelog.matchAll(new RegExp(`^## V(0\\.${line}\\.\\d+) \\(`, "gm"))].map((match) => match[1]));
   const index = read(file);
