@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { MailSettingsPanel } from "../../components/MailSettingsPanel";
+import { IdentitySettings } from "../../components/IdentitySettings";
 import {
   IconAdjustments as Adjustments,
   IconAlertCircle as AlertCircle,
@@ -128,6 +129,7 @@ export function SettingsSection({ accessToken, session }: { accessToken: string;
       })}</div>
     </section>)}
     <MailSettingsPanel accessToken={accessToken} canChange={session.is_system_admin === true} />
+    {session.is_system_admin ? <IdentitySettings accessToken={accessToken} /> : null}
     {session.is_system_admin ? <EnvironmentGroup accessToken={accessToken} /> : null}
     <section className="shared-settings-group">
       <PanelHeading description="read only" icon={Server} title="Set by the server environment" />

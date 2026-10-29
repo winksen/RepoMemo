@@ -1,4 +1,45 @@
 use super::*;
+use axum::http::StatusCode;
+
+#[tokio::test]
+async fn identity_settings_require_a_system_session_and_never_return_secrets() {
+    let app = router(ServerConfig::for_test(temp_data_dir("identity-settings")))
+        .await
+        .unwrap();
+    let (admin, _) = register_account(&app, "owner@example.com").await;
+    let (member, _) = register_account(&app, "member@example.com").await;
+    let config = json!({"name":"Example","issuer":"https://identity.example.com","client_id":"repomemo","client_secret":"only-stored-sealed","enabled":false});
+    let response = app
+        .clone()
+        .oneshot(json_request("PUT", "/v1/system/identity", &member, config.clone()))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    let response = app
+        .clone()
+        .oneshot(json_request("PUT", "/v1/system/identity", &admin, config))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_json(response).await;
+    assert_eq!(body["has_secret"], true);
+    assert!(!body.to_string().contains("only-stored-sealed"));
+    let response = app
+        .clone()
+        .oneshot(auth_request("GET", "/v1/system/identity", &admin))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(!response_json(response).await.to_string().contains("only-stored-sealed"));
+    let changed = json!({"name":"Example","issuer":"https://other.example.com","client_id":"repomemo","enabled":false});
+    assert_eq!(
+        app.oneshot(json_request("PUT", "/v1/system/identity", &admin, changed))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+}
 
 #[tokio::test]
 async fn refresh_tokens_rotate_and_detect_reuse() {

@@ -2,7 +2,7 @@
 
 ## Current access model
 
-At V0.5.0, accounts sign in with passwords. OpenID Connect, local MFA,
+At V0.5.1, accounts sign in with passwords; administrators can prepare OIDC settings. Provider sign-in, local MFA,
 restricted workspace policy, guest expiry and workspace-scoped tokens are
 planned in the [0.5 release index](../mindmap/RELEASES_0.5.md).
 This guide changes with each implementation release; a planned row is not a
@@ -36,3 +36,36 @@ release sign-off.
 OIDC linking will require an existing authenticated account or invited new
 enrollment. A verified email match alone must never attach an identity to an
 existing account. Ownership will never be inferred from a provider claim.
+
+## Configure a provider
+
+System administrators use **System › Settings › Sign-in provider**. App
+administrators and personal tokens cannot read or change these settings.
+Enter the name, issuer, client ID and secret. Register the callback shown on
+the form with your provider; it comes from the existing `REPOMEMO_PUBLIC_URL`
+setting, never the incoming request's host. Enabling requires an HTTPS public URL.
+
+**Check discovery** reads discovery and signing keys without saving. Saving an
+enabled provider repeats those checks; a failure preserves the previous setting.
+Successful discovery does not prove the client secret or a complete sign-in.
+V0.5.1 prepares configuration; sign-in follows in the subsequent releases.
+
+Supported configuration is deliberately bounded: public HTTPS issuer and all
+endpoints on the same origin, authorization code, S256 PKCE, RS256 ID tokens
+and `client_secret_post`. No redirects or environment proxy are used; resolved
+IPs are checked and pinned. DNS has five seconds, requests ten seconds, and
+JSON responses at most 256 KiB. Private/internal issuers, cross-origin provider
+endpoints and other token-endpoint authentication methods are not supported yet.
+An operator must not disable these checks to make a provider pass.
+
+The secret is encrypted with the server's existing sealing key and never
+returned. Leave the secret blank to retain it; replacing issuer or client ID
+requires reentering it. Exact allowed email domains constrain later enrollment,
+not access grants. Save events use the existing system audit store.
+
+Migration 0045 adds server-level identity configuration. Workspace archives
+exclude it and contain no provider secret. Full backups carry the database;
+restore with the same sealing key. Older servers cannot open the migrated
+database: use the pre-upgrade backup for rollback.
+
+Protocol reference: [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html).

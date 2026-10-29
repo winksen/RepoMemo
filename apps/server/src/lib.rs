@@ -26,6 +26,7 @@ mod errors;
 mod events;
 mod health;
 mod health_probe;
+mod identity;
 mod indexing;
 mod load;
 mod logs;
@@ -616,6 +617,11 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(logout).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
         )
         .route("/v1/auth/logout-all", post(logout_everywhere))
+        .route(
+            "/v1/system/identity",
+            get(identity::get_provider).put(identity::save_provider),
+        )
+        .route("/v1/system/identity/check", post(identity::check_provider))
         .route(
             "/v1/auth/forgot-password",
             post(access::forgot_password).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),

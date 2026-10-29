@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.1 (2026-10-29)
+
+Configure and check a sealed OpenID Connect provider.
+
+### Changed
+- System administrators can save and check one provider from System settings. Credentials are sealed, never returned, and must be replaced when the issuer or client ID changes.
+- Discovery enforces public HTTPS, same-origin endpoints, pinned DNS, no redirects or proxy, bounded responses and timeouts, and advertised code/PKCE/RS256/client_secret_post support. Enabling repeats discovery/key checks; sign-in itself follows in the next releases.
+- Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
+
+### Checks
+- Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+### Upgrading
+- Migration 0045 runs automatically. Full backup restoration needs the existing sealing key; provider settings are excluded from workspace archives.
+
 ## V0.5.0 (2026-10-29)
 
 Open the team-access and identity implementation line.

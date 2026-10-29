@@ -293,6 +293,9 @@ tr.rm-system-row-inactive .rm-system-person img, tr.rm-system-row-inactive .rm-s
 .rm-system-link:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .rm-system-settings { display: grid; }
 .rm-mail-form { display: grid; gap: 14px; max-width: 560px; }
+.rm-identity-fields { display: grid; gap: 14px; max-width: 560px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.rm-identity-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.rm-identity-callback { overflow-wrap: anywhere; }
 .rm-mail-test { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; max-width: 560px; }
 .rm-mail-test .rm-field { flex: 1 1 260px; }
 .rm-system-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--color-border); }

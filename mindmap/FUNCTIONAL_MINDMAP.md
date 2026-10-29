@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -19,6 +19,14 @@ Checks: Static checks, TypeScript, 92 web files / 496 tests and production npm a
 - The documentation checker follows the current minor index and checks every available release index. Live evidence remains pending under the maintainer's implementation-overlap decision.
 
 Checks: Version, documentation and release-note checks pass. This release changes no runtime behavior; the preceding candidate test results are historical evidence, not a new live sign-in test.
+
+## V0.5.1 — Configure and check a sealed OpenID Connect provider.
+
+- System administrators can save and check one provider from System settings. Credentials are sealed, never returned, and must be replaced when the issuer or client ID changes.
+- Discovery enforces public HTTPS, same-origin endpoints, pinned DNS, no redirects or proxy, bounded responses and timeouts, and advertised code/PKCE/RS256/client_secret_post support. Enabling repeats discovery/key checks; sign-in itself follows in the next releases.
+- Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
+
+Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
 
 ---
 

@@ -111,6 +111,9 @@
 | PUT | `/v1/system/mail` | session | require_full_system_admin | MailSettingsRequest | MailOverview (the password is stored encrypted and never returned) |
 | GET | `/v1/system/mail/outbox` | auth | require_system_admin | `limit` query | Vec<MailOutboxEntry> (recipient, subject, kind, state, attempts; never the body or a link) |
 | POST | `/v1/system/mail/test` | auth | require_full_system_admin, require_system_change | TestMailRequest | MailOutboxEntry (queued; refused while 50 are waiting) |
+| GET | `/v1/system/identity` | session | system administrator | — | Redacted provider settings and callback URL |
+| PUT | `/v1/system/identity` | session | system administrator | ProviderRequest | Save sealed credentials; enabled providers require fresh discovery/key checks |
+| POST | `/v1/system/identity/check` | session | system administrator | ProviderRequest | Bounded discovery and signing-key reachability; does not save or prove sign-in |
 
 ## Organizations
 
