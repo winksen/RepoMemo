@@ -232,3 +232,25 @@ enrollment, group mapping, required sign-in with break-glass, outage recovery,
 logout and the session limit, and the container path) and a result sheet whose
 cells are all pending. Do the outage-recovery step before relying on required
 provider sign-in.
+
+## Shared and restricted workspaces
+
+V0.5.11 gives every workspace an access policy. **Shared** is how workspaces
+have always worked: people who join the organization are added to the workspace
+with a role that follows their organization role. **Restricted** never adds
+anyone because of an organization role, now or later; its people are added one
+by one (directly, by invitation or by a group mapping), and it starts with its
+creator alone as its owner.
+
+Every workspace that existed before the upgrade is **shared**, so nobody gains
+or loses access. Changing the policy moves nobody: restricting a workspace keeps
+everyone in it and turns the memberships that followed an organization role into
+the workspace's own, so a later organization role change does not alter them;
+making a restricted workspace shared adds nobody who is already in the
+organization. Owners change it in the workspace's People page (*Who joins
+automatically*), and choose it when creating a workspace (*Restricted*). A
+full system administrator who changes it does so as the owner, and the change
+is recorded in the workspace activity and the system audit. Organization
+owners and administrators are not workspace members unless added, but a full
+system administrator can still open every workspace; that power is separate
+from, and unchanged by, this policy. Migration 0050 adds the policy.

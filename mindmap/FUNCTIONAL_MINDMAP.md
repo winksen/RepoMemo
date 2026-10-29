@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.10` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.11` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.11 — Add shared and restricted workspace membership policy.
+
+- A workspace is now **shared** (people who join the organization are added with a role that follows theirs, as before) or **restricted** (nobody is added because of an organization role, now or later; it starts with its creator alone as its owner). Owners choose it when creating a workspace and in People › Who joins automatically; every existing workspace is migrated as shared, so nobody gains or loses access.
+- Changing the policy adds and removes nobody. Restricting turns organization-following memberships into the workspace's own so a later organization role change cannot alter them; sharing again adds nobody already in the organization. The change is recorded in the workspace activity and the system audit. A full system administrator keeps the unchanged ability to open every workspace; that power is separate and stated in the guide.
+- Migration 0050 adds the policy column. `GET`/`PUT /v1/workspaces/{workspace_id}/access-policy` are new.
+
+Checks: One server test covers a member joining the organization (enrolled in the shared workspace, not the restricted one), policy changes that move nobody, owner-only change and a refused value; two UI tests cover the panel. Clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.10 — Close the identity track with an evidence record and a provider rehearsal.
 

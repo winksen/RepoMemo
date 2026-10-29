@@ -1,4 +1,5 @@
 use crate::*;
+use serde_json::Value;
 
 pub(crate) async fn create_workspace(
     subject: AuthenticatedSubject,
@@ -16,18 +17,90 @@ pub(crate) async fn create_workspace(
                 .ok_or_else(|| ApiError::bad_request("That template was not found."))?,
         ),
     };
+    let restricted = parse_access_policy(request.access_policy.as_deref())?;
     quotas::check_new_workspace(&state, &subject).await?;
     let workspace = state
         .storage
-        .create_shared_workspace_from(
+        .create_shared_workspace_with_policy(
             &subject.user_id,
             &request.organization_id,
             &request.name,
             setup.as_ref(),
+            restricted,
         )
         .await
         .map_err(map_storage_error)?;
     Ok((StatusCode::CREATED, Json(workspace)))
+}
+
+fn parse_access_policy(value: Option<&str>) -> Result<bool, ApiError> {
+    match value.map(str::trim) {
+        None | Some("") | Some("shared") => Ok(false),
+        Some("restricted") => Ok(true),
+        Some(_) => Err(ApiError::bad_request("The access policy must be shared or restricted.")),
+    }
+}
+
+#[derive(Deserialize)]
+pub(crate) struct AccessPolicyRequest {
+    policy: String,
+}
+
+/// Who joins this workspace without being asked, for anyone who can open it.
+pub(crate) async fn get_access_policy(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Value>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let policy = state
+        .storage
+        .workspace_access_policy(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .unwrap_or_else(|| "shared".into());
+    Ok(Json(json!({"policy":policy})))
+}
+
+/// Owners (and full system administrators, whose action is recorded as theirs) choose the policy. No one is added or
+/// removed by the change itself.
+pub(crate) async fn set_access_policy(
+    SessionSubject(subject): SessionSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<AccessPolicyRequest>,
+) -> Result<Json<Value>, ApiError> {
+    require_workspace_owner(&state, &subject, &workspace_id).await?;
+    let restricted = parse_access_policy(Some(&request.policy))?;
+    if request.policy.trim().is_empty() {
+        return Err(ApiError::bad_request("The access policy must be shared or restricted."));
+    }
+    let changed = state
+        .storage
+        .set_workspace_access_policy(&workspace_id, restricted)
+        .await
+        .map_err(map_storage_error)?;
+    if changed {
+        let word = if restricted { "restricted" } else { "shared" };
+        record_workspace_activity(
+            &state,
+            &workspace_id,
+            &subject.user_id,
+            "access_policy_changed",
+            "workspace",
+            Some(&workspace_id),
+            format!("Made the workspace {word}."),
+        )
+        .await;
+        crate::system::audit(
+            &state,
+            &subject,
+            "workspace_access_policy_changed",
+            format!("Workspace {workspace_id} is now {word}."),
+        )
+        .await;
+    }
+    Ok(Json(json!({"policy":if restricted {"restricted"} else {"shared"}})))
 }
 
 /// The caller's workspaces; every workspace for a system administrator.

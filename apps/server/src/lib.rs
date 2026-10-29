@@ -1029,6 +1029,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/artifacts/{artifact_id}/compare", get(compare_artifact_versions))
         .route(
+            "/v1/workspaces/{workspace_id}/access-policy",
+            get(get_access_policy).put(set_access_policy),
+        )
+        .route(
             "/v1/workspaces/{workspace_id}/transfer-ownership",
             post(transfer_workspace_ownership),
         )

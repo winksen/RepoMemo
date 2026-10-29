@@ -355,7 +355,7 @@ impl StorageEngine {
         // organization: it never takes a workspace away from its owner, does not undo a role a
         // workspace set itself (`origin = 'direct'`), and does not bring back a person a
         // workspace administrator removed (V0.2.142, review E9).
-        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at, origin) SELECT wo.workspace_id, ?1, CASE ?2 WHEN 'admin' THEN 'admin' ELSE 'member' END, ?3, ?3, 'organization' FROM workspace_organizations wo WHERE wo.organization_id = ?4 AND NOT EXISTS (SELECT 1 FROM workspace_membership_removals r WHERE r.workspace_id = wo.workspace_id AND r.user_id = ?1) ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at WHERE workspace_memberships.origin = 'organization' AND workspace_memberships.role <> 'owner'")
+        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at, origin) SELECT wo.workspace_id, ?1, CASE ?2 WHEN 'admin' THEN 'admin' ELSE 'member' END, ?3, ?3, 'organization' FROM workspace_organizations wo WHERE wo.organization_id = ?4 AND wo.access_policy = 'shared' AND NOT EXISTS (SELECT 1 FROM workspace_membership_removals r WHERE r.workspace_id = wo.workspace_id AND r.user_id = ?1) ON CONFLICT(workspace_id, user_id) DO UPDATE SET role = excluded.role, updated_at = excluded.updated_at WHERE workspace_memberships.origin = 'organization' AND workspace_memberships.role <> 'owner'")
             .bind(&user.id)
             .bind(organization_role_to_db(&role))
             .bind(&now)
@@ -554,6 +554,20 @@ impl StorageEngine {
         name: &str,
         setup: Option<&StarterSetup>,
     ) -> Result<SharedWorkspace> {
+        self.create_shared_workspace_with_policy(creator_id, organization_id, name, setup, false)
+            .await
+    }
+
+    /// A `restricted` workspace starts with its creator alone, as its owner; nobody is enrolled because of an
+    /// organization role, now or when people join the organization later.
+    pub async fn create_shared_workspace_with_policy(
+        &self,
+        creator_id: &str,
+        organization_id: &str,
+        name: &str,
+        setup: Option<&StarterSetup>,
+        restricted: bool,
+    ) -> Result<SharedWorkspace> {
         let creator_role = self.require_workspace_creator(creator_id, organization_id).await?;
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
@@ -582,17 +596,29 @@ impl StorageEngine {
                 }
             }
         }
-        sqlx::query("INSERT INTO workspace_organizations (workspace_id, organization_id) VALUES (?1, ?2)")
-            .bind(&id)
-            .bind(organization_id)
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at, origin) SELECT ?1, om.user_id, CASE om.role WHEN 'owner' THEN 'owner' WHEN 'admin' THEN 'admin' ELSE 'member' END, ?2, ?2, 'organization' FROM organization_memberships om WHERE om.organization_id = ?3")
-            .bind(&id)
-            .bind(&now)
-            .bind(organization_id)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            "INSERT INTO workspace_organizations (workspace_id, organization_id, access_policy) VALUES (?1, ?2, ?3)",
+        )
+        .bind(&id)
+        .bind(organization_id)
+        .bind(if restricted { "restricted" } else { "shared" })
+        .execute(&mut *tx)
+        .await?;
+        if restricted {
+            sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at, origin) VALUES (?1, ?2, 'owner', ?3, ?3, 'direct')")
+                .bind(&id)
+                .bind(creator_id)
+                .bind(&now)
+                .execute(&mut *tx)
+                .await?;
+        } else {
+            sqlx::query("INSERT INTO workspace_memberships (workspace_id, user_id, role, created_at, updated_at, origin) SELECT ?1, om.user_id, CASE om.role WHEN 'owner' THEN 'owner' WHEN 'admin' THEN 'admin' ELSE 'member' END, ?2, ?2, 'organization' FROM organization_memberships om WHERE om.organization_id = ?3")
+                .bind(&id)
+                .bind(&now)
+                .bind(organization_id)
+                .execute(&mut *tx)
+                .await?;
+        }
         sqlx::query("INSERT INTO workspace_activity (id, workspace_id, actor_user_id, action, subject_type, subject_id, summary, created_at) VALUES (?1, ?2, ?3, 'workspace_created', 'workspace', ?2, ?4, ?5)")
             .bind(Uuid::new_v4().to_string())
             .bind(&id)
@@ -615,8 +641,54 @@ impl StorageEngine {
                 settings,
             },
             organization_id: organization_id.to_owned(),
-            role: organization_role_to_workspace_role(&creator_role),
+            role: if restricted {
+                WorkspaceRole::Owner
+            } else {
+                organization_role_to_workspace_role(&creator_role)
+            },
         })
+    }
+
+    /// `shared` or `restricted`; None when the workspace does not exist.
+    pub async fn workspace_access_policy(&self, workspace_id: &str) -> Result<Option<String>> {
+        Ok(
+            sqlx::query_scalar("SELECT access_policy FROM workspace_organizations WHERE workspace_id = ?1")
+                .bind(workspace_id)
+                .fetch_optional(self.reader())
+                .await?,
+        )
+    }
+
+    /// Changes who joins by default. Neither direction adds or removes anyone. Turning `restricted` on turns the
+    /// memberships that followed an organization role into the workspace's own, so a later organization role change
+    /// does not silently alter them; turning it off adds nobody who is already in the organization.
+    pub async fn set_workspace_access_policy(&self, workspace_id: &str, restricted: bool) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        let previous: Option<String> =
+            sqlx::query_scalar("SELECT access_policy FROM workspace_organizations WHERE workspace_id = ?1")
+                .bind(workspace_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let Some(previous) = previous else {
+            repomemo_domain::bail_not_found!("Workspace was not found.");
+        };
+        let wanted = if restricted { "restricted" } else { "shared" };
+        if previous == wanted {
+            return Ok(false);
+        }
+        sqlx::query("UPDATE workspace_organizations SET access_policy = ?1 WHERE workspace_id = ?2")
+            .bind(wanted)
+            .bind(workspace_id)
+            .execute(&mut *tx)
+            .await?;
+        if restricted {
+            sqlx::query("UPDATE workspace_memberships SET origin = 'direct' WHERE workspace_id = ?1 AND origin = 'organization'")
+                .bind(workspace_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(true)
     }
 
     pub async fn list_shared_workspaces_for_user(&self, user_id: &str) -> Result<Vec<SharedWorkspace>> {

@@ -14,6 +14,7 @@ import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { showToast } from "../../components/ui/toast";
 import { InviteMembers } from "../../components/InviteMembers";
+import { WorkspaceAccessPolicy } from "../../components/WorkspaceAccessPolicy";
 import { apiMessage, formatTime, isAiActivity } from "../format";
 import { ContributionCalendar } from "../common";
 import { useActivity, useActivityCalendar, useCapabilities, useMembers } from "./data";
@@ -93,6 +94,7 @@ export function PeopleSection({ page }: { page: WorkspacePage }) {
                   {canManageMembers && member.role !== "owner" ? <Button className="shared-member-remove" disabled={isSubmitting} onClick={() => void removeMember(member.user.id)} variant="secondary">Remove</Button> : null}
                 </article>)}
               </div>
+              {canManageMembers ? <WorkspaceAccessPolicy accessToken={accessToken} canChange={canManageWorkspace} workspaceId={workspace.workspace.id} /> : null}
               {canManageMembers ? <section className="shared-settings-group">
                 <p className="shared-muted-copy">Add a registered RepoMemo user or update their role. Administrators cannot create, edit, or remove other administrators; owners retain the final authority.</p>
                 <form className="shared-member-form" onSubmit={saveMember}><Field label="Member email" required><Input onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" type="email" value={memberEmail} /></Field><Field label="Member role">{(control) => <Dropdown id={control.id} onValueChange={(value) => setMemberRole(value as WorkspaceRole)} options={[{ label: "Viewer", value: "viewer" }, { label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} />}</Field><Button busy={isSubmitting} type="submit" variant="secondary">Add / update</Button></form>

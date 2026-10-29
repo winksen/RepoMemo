@@ -567,10 +567,11 @@ export function createSharedWorkspace(
   organizationId: string,
   name: string,
   templateId?: string,
+  restricted = false,
 ): Promise<SharedWorkspace> {
   return request<SharedWorkspace>("/v1/workspaces", {
     method: "POST",
-    body: JSON.stringify({ organization_id: organizationId, name, ...(templateId ? { template_id: templateId } : {}) }),
+    body: JSON.stringify({ organization_id: organizationId, name, ...(templateId ? { template_id: templateId } : {}), ...(restricted ? { access_policy: "restricted" } : {}) }),
   }, accessToken);
 }
 

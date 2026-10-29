@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.11 (2026-10-29)
+
+Add shared and restricted workspace membership policy.
+
+### Changed
+- A workspace is now **shared** (people who join the organization are added with a role that follows theirs, as before) or **restricted** (nobody is added because of an organization role, now or later; it starts with its creator alone as its owner). Owners choose it when creating a workspace and in People › Who joins automatically; every existing workspace is migrated as shared, so nobody gains or loses access.
+- Changing the policy adds and removes nobody. Restricting turns organization-following memberships into the workspace's own so a later organization role change cannot alter them; sharing again adds nobody already in the organization. The change is recorded in the workspace activity and the system audit. A full system administrator keeps the unchanged ability to open every workspace; that power is separate and stated in the guide.
+- Migration 0050 adds the policy column. `GET`/`PUT /v1/workspaces/{workspace_id}/access-policy` are new.
+
+### Checks
+- One server test covers a member joining the organization (enrolled in the shared workspace, not the restricted one), policy changes that move nobody, owner-only change and a refused value; two UI tests cover the panel. Clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- Migration 0050 runs automatically and keeps every workspace shared. Rollback uses the pre-upgrade backup.
+
 ## V0.5.10 (2026-10-29)
 
 Close the identity track with an evidence record and a provider rehearsal.

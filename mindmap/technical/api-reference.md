@@ -310,4 +310,6 @@
 | GET | `/v1/workspaces/{workspace_id}/ai-policy` | auth | require_workspace_read | — | AiPolicyResponse |
 | PUT | `/v1/workspaces/{workspace_id}/ai-policy` | managing | require_workspace_admin | UpdateAiPolicyRequest | AiPolicyResponse |
 | POST | `/v1/workspaces/{workspace_id}/ai-providers/{provider_id}/test` | auth | require_workspace_admin | — | ProviderTestResult |
+| GET | `/v1/workspaces/{workspace_id}/access-policy` | auth | workspace reader | — | `shared` or `restricted` |
+| PUT | `/v1/workspaces/{workspace_id}/access-policy` | session | workspace owner | `{policy}` | Changes who joins by default; adds and removes nobody; recorded in activity and system audit |
 | POST | `/v1/workspaces/{workspace_id}/transfer-ownership` | session | require_workspace_owner | TransferOwnershipRequest | status |

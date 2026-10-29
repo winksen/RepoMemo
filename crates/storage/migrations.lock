@@ -53,3 +53,4 @@
 0.5.3  0047_identity_enrollment.sql  36c57a15b7b93ca399a06db3ad04106b525dd782e5f6a174eababe6640f95e8c
 0.5.6  0048_identity_group_grants.sql  d512102794823dbde4ce0e6b9c1b4113d40d60c1de4f70744f4ee282ba9c62d6
 0.5.7  0049_identity_sessions.sql  b8d88070c20a1ed95de48246d0186e3d9785cf945a14332ebcca4e6dff1a3f74
+0.5.11  0050_workspace_access_policy.sql  45d2f8ad044e1e07e7778a3a44a55bbb69c49b7a5b2681c141b00e069743a087

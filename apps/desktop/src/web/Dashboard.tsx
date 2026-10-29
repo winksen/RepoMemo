@@ -3,6 +3,7 @@ import { IconBuildingCommunity as Building, IconChevronRight as ChevronRight, Ic
 import { createSharedOrganization, createSharedWorkspace, type DashboardWorkspaceFigures } from "../lib/sharedApi";
 import { WorkspaceImport } from "../components/WorkspaceImport";
 import { TemplatePicker } from "../components/TemplatePicker";
+import { Switch } from "../components/ui/switch";
 import { type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
@@ -105,6 +106,7 @@ export function SharedWorkspaceHome({
 }) {
   const [organizationName, setOrganizationName] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
+  const [restrictedWorkspace, setRestrictedWorkspace] = useState(false);
   const [templateId, setTemplateId] = useState("general");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -140,9 +142,10 @@ export function SharedWorkspaceHome({
     if (!organizationId) return;
     setIsSubmitting(true); setFormError(null); setError(null);
     try {
-      const workspace = await createSharedWorkspace(accessToken, organizationId, workspaceName, templates.length > 1 ? templateId : undefined);
+      const workspace = await createSharedWorkspace(accessToken, organizationId, workspaceName, templates.length > 1 ? templateId : undefined, restrictedWorkspace);
       setWorkspaces((current) => [workspace, ...current]);
       setWorkspaceName("");
+      setRestrictedWorkspace(false);
       setTemplateId("general");
       showToast("success", `${workspace.workspace.name} was created.`);
     } catch (requestError) { setFormError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
@@ -159,7 +162,7 @@ export function SharedWorkspaceHome({
         <div className="shared-page-content">
           <PageHeader actions={organizations.length && session.can_create_organizations !== false ? <Button onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New organization</Button> : null} description={showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : "Workspaces are server-authoritative and available only to their members."} title={showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"} />
           {showOrganizationForm ? <form className="shared-setup-form" onSubmit={createOrganization}><label>Organization name<Input autoFocus onChange={(event) => setOrganizationName(event.target.value)} placeholder="Engineering" required value={organizationName} /></label><div className="shared-setup-actions"><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Plus size={ICON_SIZE.md} />} Create organization</Button>{organizations.length ? <Button disabled={isSubmitting} onClick={organizationNavigation.cancelOrganizationCreation} type="button" variant="secondary">Cancel</Button> : null}</div></form> : <>
-            {canManageOrganization ? <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><Input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Plus size={ICON_SIZE.md} />} Create workspace</Button><TemplatePicker disabled={isSubmitting} name="dashboard-template" onChange={setTemplateId} templates={templates} value={templateId} /></form> : <p className="shared-muted-copy">Your organization role grants access to its workspaces but not workspace creation.</p>}
+            {canManageOrganization ? <form className="shared-create-workspace" onSubmit={createWorkspace}><div><strong>Create a workspace</strong><span>Start a bounded memory space for a repository, system, or initiative.</span></div><label className="sr-only" htmlFor="shared-workspace-name">Workspace name</label><Input id="shared-workspace-name" onChange={(event) => setWorkspaceName(event.target.value)} placeholder="Payments platform" required value={workspaceName} /><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Plus size={ICON_SIZE.md} />} Create workspace</Button><TemplatePicker disabled={isSubmitting} name="dashboard-template" onChange={setTemplateId} templates={templates} value={templateId} /><Switch checked={restrictedWorkspace} disabled={isSubmitting} label="Restricted: add people one by one, not the whole organization" onCheckedChange={setRestrictedWorkspace} /></form> : <p className="shared-muted-copy">Your organization role grants access to its workspaces but not workspace creation.</p>}
             {canManageOrganization ? <WorkspaceImport accessToken={accessToken} key={`import-${organizationId}`} onImported={(workspace) => setWorkspaces((current) => [workspace, ...current])} organizationId={organizationId} /> : null}
             <div className="shared-workspace-list">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => <article className="shared-workspace-row" key={entry.workspace.id}><span className="shared-workspace-icon"><WorkspaceIcon size={ICON_SIZE.lg} workspace={entry.workspace} /></span><div><h2>{entry.workspace.name}</h2><p>Created {new Date(entry.workspace.created_at).toLocaleDateString()} · Your role: {entry.role}{templateName(figures[entry.workspace.id]) ? ` · ${templateName(figures[entry.workspace.id])}` : ""}{headlineText(figures[entry.workspace.id]?.template) ? ` · ${headlineText(figures[entry.workspace.id]?.template)}` : ""}</p></div><Button aria-label={`Open ${entry.workspace.name}`} className="shared-workspace-open" onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><ChevronRight size={ICON_SIZE.lg} /></Button></article>)}{workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}</div>
             {currentOrganization && canManageOrganization ? <OrganizationAdministration accessToken={accessToken} onOrganizationUpdated={(updated) => setOrganizations((current) => current.map((organization) => organization.id === updated.id ? updated : organization))} organization={currentOrganization} /> : null}

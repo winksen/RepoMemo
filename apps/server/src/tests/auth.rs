@@ -1764,3 +1764,123 @@ async fn provider_sessions_refresh_only_until_their_absolute_deadline() {
     );
     assert_eq!(app.oneshot(refresh(renewed)).await.unwrap().status(), 401);
 }
+
+#[tokio::test]
+async fn restricted_workspaces_never_enroll_organization_members_and_policy_changes_move_nobody() {
+    let app = router(ServerConfig::for_test(temp_data_dir("workspace-policy")))
+        .await
+        .unwrap();
+    let (owner, _) = register_account(&app, "owner@example.com").await;
+    let (member, _) = register_account(&app, "member@example.com").await;
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        async move { app.oneshot(json_request(method, &uri, &who, body)).await.unwrap() }
+    };
+    let organization = response_json(
+        call(
+            "POST",
+            "/v1/organizations".into(),
+            owner.clone(),
+            json!({"name":"Team"}),
+        )
+        .await,
+    )
+    .await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let make = |name: &'static str, policy: &'static str| {
+        let (owner, organization) = (owner.clone(), organization.clone());
+        async move {
+            let response = call(
+                "POST",
+                "/v1/workspaces".into(),
+                owner,
+                json!({"organization_id":organization,"name":name,"access_policy":policy}),
+            )
+            .await;
+            assert_eq!(response.status(), 201);
+            response_json(response).await["workspace"]["id"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        }
+    };
+    let open = make("Open", "shared").await;
+    let closed = make("Closed", "restricted").await;
+    join(
+        &app,
+        &owner,
+        "organizations",
+        &organization,
+        "member@example.com",
+        "member",
+    )
+    .await;
+    let visible = |who: String| async move {
+        let list = response_json(call("GET", "/v1/workspaces".into(), who, Value::Null).await).await;
+        list.as_array()
+            .unwrap()
+            .iter()
+            .map(|w| w["workspace"]["id"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(visible(member.clone()).await, vec![open.clone()]);
+    assert_eq!(
+        call(
+            "PUT",
+            format!("/v1/workspaces/{closed}/access-policy"),
+            member.clone(),
+            json!({"policy":"shared"})
+        )
+        .await
+        .status(),
+        403
+    );
+    // Opening a restricted workspace adds nobody; restricting a shared one removes nobody.
+    assert_eq!(
+        call(
+            "PUT",
+            format!("/v1/workspaces/{closed}/access-policy"),
+            owner.clone(),
+            json!({"policy":"shared"})
+        )
+        .await
+        .status(),
+        200
+    );
+    assert_eq!(
+        call(
+            "PUT",
+            format!("/v1/workspaces/{open}/access-policy"),
+            owner.clone(),
+            json!({"policy":"restricted"})
+        )
+        .await
+        .status(),
+        200
+    );
+    assert_eq!(visible(member.clone()).await, vec![open.clone()]);
+    let policy = response_json(
+        call(
+            "GET",
+            format!("/v1/workspaces/{open}/access-policy"),
+            owner.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(policy["policy"], "restricted");
+    assert_eq!(
+        call(
+            "PUT",
+            format!("/v1/workspaces/{open}/access-policy"),
+            owner,
+            json!({"policy":"anyone"})
+        )
+        .await
+        .status(),
+        400
+    );
+}

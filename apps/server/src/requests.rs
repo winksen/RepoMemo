@@ -55,6 +55,9 @@ pub(crate) struct CreateWorkspaceRequest {
     /// The template the workspace starts with (V0.2.168); none means `general`, with no folders and no choice saved.
     #[serde(default)]
     pub(crate) template_id: Option<String>,
+    /// `shared` (the default) adds everyone in the organization; `restricted` starts with the creator alone.
+    #[serde(default)]
+    pub(crate) access_policy: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
