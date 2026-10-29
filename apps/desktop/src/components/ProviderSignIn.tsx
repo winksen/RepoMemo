@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { IconExternalLink as ExternalLink, IconLogin2 as Login } from "@tabler/icons-react";
 import { openExternal, isDesktopRuntime } from "../lib/desktop";
-import { pollProviderFlow, type ProviderFlow, type TokenResponse } from "../lib/sharedApi";
+import { pollProviderFlow, SharedApiError, type ProviderFlow, type TokenResponse } from "../lib/sharedApi";
 import { apiMessage } from "../web/format";
 import { Button } from "./ui/button";
+import { Field } from "./ui/field";
+import { Input } from "./ui/input";
+import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { Toast } from "./ui/toast";
 
@@ -26,6 +29,8 @@ export function ProviderSignIn({
   const [flow, setFlow] = useState<ProviderFlow | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const alive = useRef(true);
   const done = useRef(onDone);
   done.current = onDone;
@@ -60,6 +65,19 @@ export function ProviderSignIn({
     return () => { stopped = true; window.clearInterval(timer); };
   }, [flow, keepSession]);
 
+  // The code is shown only on the provider's return page, so a sign-in someone else started cannot be finished here.
+  async function confirm() {
+    if (!flow) return;
+    setConfirming(true);
+    try {
+      const session = await pollProviderFlow(flow, keepSession, code);
+      if (session && alive.current) { setFlow(null); setCode(""); done.current(session); }
+    } catch (problem) {
+      if (problem instanceof SharedApiError && problem.status === 409) showToast("error", problem.message);
+      else if (alive.current) { setFlow(null); setCode(""); setError(apiMessage(problem, "Provider sign-in failed. Try again or use local sign-in.")); }
+    } finally { if (alive.current) setConfirming(false); }
+  }
+
   function open(url: string) {
     if (isDesktopRuntime) void openExternal(url).catch(() => undefined);
     else window.open(url, "_blank", "noopener");
@@ -81,10 +99,14 @@ export function ProviderSignIn({
 
   return <div className="shared-auth-provider">
     <Toast kind="error" message={error} />
-    {flow ? <p role="status">
-      Finish signing in on the provider page{isDesktopRuntime ? " in your browser" : ""}, then return here.{" "}
-      <Button onClick={() => open(flow.authorization_url)} type="button" variant="secondary"><ExternalLink size={ICON_SIZE.sm} /> Open it again</Button>{" "}
-      <Button onClick={() => { setFlow(null); setError("Provider sign-in was cancelled."); }} type="button" variant="secondary">Cancel</Button>
-    </p> : <Button busy={busy} onClick={() => void begin()} type="button" variant="secondary"><Login size={ICON_SIZE.md} /> {label}</Button>}
+    {flow ? <form onSubmit={(event) => { event.preventDefault(); void confirm(); }}>
+      <p role="status">
+        Finish signing in on the provider page{isDesktopRuntime ? " in your browser" : ""}. It then shows an eight-digit confirmation code: type it here.{" "}
+        <Button onClick={() => open(flow.authorization_url)} type="button" variant="secondary"><ExternalLink size={ICON_SIZE.sm} /> Open it again</Button>
+      </p>
+      <Field label="Confirmation code" hint="Only type a code from a page you opened here yourself."><Input autoComplete="one-time-code" inputMode="numeric" maxLength={9} onChange={(event) => setCode(event.target.value)} value={code} /></Field>
+      <Button busy={confirming} disabled={code.trim().length < 8} type="submit" variant="main">Finish signing in</Button>{" "}
+      <Button onClick={() => { setFlow(null); setCode(""); setError("Provider sign-in was cancelled."); }} type="button" variant="secondary">Cancel</Button>
+    </form> : <Button busy={busy} onClick={() => void begin()} type="button" variant="secondary"><Login size={ICON_SIZE.md} /> {label}</Button>}
   </div>;
 }

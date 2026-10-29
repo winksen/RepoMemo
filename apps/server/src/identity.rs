@@ -15,6 +15,15 @@ fn random_secret() -> Result<String, ApiError> {
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 
+/// Eight digits shown on the provider return page and typed into the window that began the sign-in.
+fn confirmation_code() -> Result<String, ApiError> {
+    let mut bytes = [0u8; 4];
+    SystemRandom::new()
+        .fill(&mut bytes)
+        .map_err(|_| ApiError::internal("Random generation failed"))?;
+    Ok(format!("{:08}", u32::from_be_bytes(bytes) % 100_000_000))
+}
+
 fn challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(ring::digest::digest(&ring::digest::SHA256, verifier.as_bytes()).as_ref())
 }
@@ -422,6 +431,7 @@ pub(crate) async fn callback(
         exchange(&state, &flow, query.code.as_deref().unwrap_or_default()).await
     };
     let success = result.is_ok();
+    let code = confirmation_code()?;
     if let Err(error) = &result {
         record_identity_event(
             &state,
@@ -431,7 +441,13 @@ pub(crate) async fn callback(
         )
         .await;
     }
-    let result = result.unwrap_or_else(|error| json!({"error":error.message}));
+    let result = match result {
+        Ok(mut result) => {
+            result["confirm"] = json!(repomemo_storage::identity_confirmation_hash(&code));
+            result
+        }
+        Err(error) => json!({"error":error.message}),
+    };
     state
         .storage
         .finish_identity_flow(&query.state, &result, success)
@@ -442,7 +458,15 @@ pub(crate) async fn callback(
             (axum::http::header::CACHE_CONTROL, "no-store"),
             (axum::http::header::REFERRER_POLICY, "no-referrer"),
         ],
-        "Return to RepoMemo to finish signing in. You can close this page.",
+        if success {
+            format!(
+                "Your confirmation code is {} {}. Enter it in RepoMemo to finish signing in, then close this page. If you did not start this sign-in from RepoMemo yourself, close this page and share the code with nobody.",
+                &code[..4],
+                &code[4..]
+            )
+        } else {
+            "Return to RepoMemo to see what happened. You can close this page.".to_owned()
+        },
     )
         .into_response())
 }
@@ -451,6 +475,8 @@ pub(crate) async fn callback(
 pub(crate) struct Complete {
     state: String,
     proof: String,
+    #[serde(default)]
+    code: Option<String>,
 }
 
 pub(crate) async fn complete(
@@ -459,8 +485,29 @@ pub(crate) async fn complete(
     Json(request): Json<Complete>,
 ) -> Result<Response, ApiError> {
     auth::check_auth_quota(&state, &client, auth::AuthAction::Refresh)?;
-    if request.state.len() > 128 || request.proof.len() > 128 {
+    if request.state.len() > 128 || request.proof.len() > 128 || request.code.as_ref().is_some_and(|c| c.len() > 32) {
         return Err(ApiError::unauthorized());
+    }
+    match state
+        .storage
+        .gate_identity_flow(&request.state, &request.proof, request.code.as_deref())
+        .await
+        .map_err(ApiError::internal)?
+    {
+        repomemo_storage::FlowGate::Open => {}
+        repomemo_storage::FlowGate::NeedsCode => {
+            return Ok((StatusCode::ACCEPTED, Json(json!({"status":"confirm"}))).into_response())
+        }
+        repomemo_storage::FlowGate::WrongCode => {
+            return Err(ApiError::conflict(
+                "That confirmation code is not right. Check the provider page and try again.",
+            ))
+        }
+        repomemo_storage::FlowGate::Exhausted => {
+            return Err(ApiError::bad_request(
+                "Too many wrong confirmation codes. Start signing in again.",
+            ))
+        }
     }
     let (phase, result) = state
         .storage
@@ -995,7 +1042,11 @@ pub(crate) async fn backchannel_logout(
     let provider = enabled_provider(&state).await?;
     let keys = fetch_json(&provider.jwks_uri).await?;
     let claims = logout_claims(&request.logout_token, &keys, &provider)?;
-    let exp = claims["exp"].as_i64().unwrap_or(0);
+    // Remembered at least as long as the token stays acceptable by its issue time, with or without an `exp`.
+    let exp = claims["exp"]
+        .as_i64()
+        .unwrap_or(0)
+        .max(claims["iat"].as_i64().unwrap_or(0) + 660);
     if !state
         .storage
         .use_identity_logout_token(claims["jti"].as_str().unwrap_or_default(), exp)

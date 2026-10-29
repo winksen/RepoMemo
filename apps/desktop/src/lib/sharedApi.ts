@@ -460,11 +460,11 @@ export function listProviderLinks(accessToken: string): Promise<{ links: Provide
   return request<{ links: ProviderLink[] }>("/v1/profile/identity", {}, accessToken);
 }
 
-/** Asks once for the outcome of a provider sign-in: null while the provider page is still open. */
-export async function pollProviderFlow(flow: ProviderFlow, keepSession = true): Promise<TokenResponse | null> {
-  const response = await request<TokenResponse | { status: "pending" }>("/v1/auth/identity/complete", {
+/** Asks once for the outcome of a provider sign-in: null while the provider page is open or the confirmation code is still to be typed. */
+export async function pollProviderFlow(flow: ProviderFlow, keepSession = true, code?: string): Promise<TokenResponse | null> {
+  const response = await request<TokenResponse | { status: "pending" | "confirm" }>("/v1/auth/identity/complete", {
     method: "POST",
-    body: JSON.stringify({ state: flow.state, proof: flow.proof }),
+    body: JSON.stringify({ state: flow.state, proof: flow.proof, ...(code ? { code } : {}) }),
   });
   if (!("access_token" in response)) return null;
   if (keepSession) {

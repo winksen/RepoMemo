@@ -207,3 +207,17 @@ export has an **Events** choice: *Identity and sign-in events* (or
 as JSON lines or CSV; the default is still every event. The download itself is
 recorded as before, naming the identity scope. Only full system administrators
 export, as before.
+
+## Confirmation code and the identity review
+
+V0.5.9 closes a review of the identity work
+([findings](../mindmap/security/2026-10-29-identity-review.md)). The one change
+you will see: after you sign in at the provider, its return page shows an
+**eight-digit confirmation code**, and the window that started the sign-in asks
+you to type it. Without it the sign-in is never released, and three wrong codes
+cancel it. This stops a sign-in link that someone else started from handing
+them your session if you complete it. Only type a code from a page you opened
+yourself from RepoMemo. `POST /v1/auth/identity/complete` accepts an optional
+`code` and answers `202 {"status":"confirm"}` until it is given, `409` for a
+wrong code and `400` once three are used. Linking an account from the profile
+uses the same step.

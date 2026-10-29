@@ -63,6 +63,23 @@ pub struct GroupSyncPlan {
     pub keep: Vec<GroupChange>,
 }
 
+/// Whether the holder of a finished handoff may take its result yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowGate {
+    /// Nothing stands in the way (or there is nothing to take): the result may be read.
+    Open,
+    /// The provider step finished; the confirmation code shown on the return page has not been given.
+    NeedsCode,
+    WrongCode,
+    /// Three wrong codes: the handoff is gone.
+    Exhausted,
+}
+
+/// The stored form of the confirmation code shown on the provider return page.
+pub fn identity_confirmation_hash(code: &str) -> String {
+    identity_hash(code.trim())
+}
+
 impl GroupSyncPlan {
     pub fn is_empty(&self) -> bool {
         self.add.is_empty() && self.change.is_empty() && self.remove.is_empty()
@@ -204,6 +221,44 @@ impl StorageEngine {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// A finished sign-in is released only to the client that started it and that also types the confirmation
+    /// code shown on the provider return page, so a link started by someone else and completed by a victim in their
+    /// own browser yields nothing. Three wrong codes destroy the handoff.
+    pub async fn gate_identity_flow(&self, state: &str, proof: &str, code: Option<&str>) -> Result<FlowGate> {
+        let key = identity_hash(state);
+        let mut tx = self.pool.begin().await?;
+        let sealed: Option<String> = sqlx::query_scalar("SELECT payload FROM identity_flows WHERE state_hash=?1 AND proof_hash=?2 AND phase='done' AND expires_at>?3")
+            .bind(&key).bind(identity_hash(proof)).bind(Utc::now().timestamp()).fetch_optional(&mut *tx).await?;
+        let Some(sealed) = sealed else {
+            return Ok(FlowGate::Open);
+        };
+        let aad = format!("identity_flow:{key}");
+        let mut value: Value = serde_json::from_str(&self.secrets.open(&sealed, &aad)?)?;
+        let Some(code) = code.map(str::trim).filter(|c| !c.is_empty()) else {
+            return Ok(FlowGate::NeedsCode);
+        };
+        if value["confirm"].as_str() == Some(identity_hash(code).as_str()) {
+            return Ok(FlowGate::Open);
+        }
+        let attempts = value["attempts"].as_i64().unwrap_or(0) + 1;
+        if attempts >= 3 {
+            sqlx::query("DELETE FROM identity_flows WHERE state_hash=?1")
+                .bind(&key)
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await?;
+            return Ok(FlowGate::Exhausted);
+        }
+        value["attempts"] = Value::from(attempts);
+        sqlx::query("UPDATE identity_flows SET payload=?1 WHERE state_hash=?2")
+            .bind(self.secrets.seal(&value.to_string(), &aad)?)
+            .bind(&key)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(FlowGate::WrongCode)
     }
 
     /// Only the initiating client knows the proof. Terminal results are single-use.
@@ -586,6 +641,61 @@ mod tests {
         assert!(users(Some("unknown"), Some("other")).await.is_empty());
         assert!(storage.use_identity_logout_token("jti", 0).await.unwrap());
         assert!(!storage.use_identity_logout_token("jti", 0).await.unwrap());
+    }
+    #[tokio::test]
+    async fn a_finished_handoff_needs_the_confirmation_code_and_three_wrong_codes_destroy_it() {
+        let dir = std::env::temp_dir().join(format!("repomemo-gate-{}", Uuid::new_v4()));
+        let storage = StorageEngine::open(StorageConfig::new(dir)).await.unwrap();
+        let finish = |state: &'static str| {
+            let storage = storage.clone();
+            async move {
+                storage.create_identity_flow(state, "proof", &json!({})).await.unwrap();
+                storage.take_identity_callback(state).await.unwrap();
+                storage
+                    .finish_identity_flow(
+                        state,
+                        &json!({"user_id":"u","confirm":identity_confirmation_hash("11112222")}),
+                        true,
+                    )
+                    .await
+                    .unwrap();
+            }
+        };
+        finish("one").await;
+        assert_eq!(
+            storage.gate_identity_flow("one", "wrong", None).await.unwrap(),
+            FlowGate::Open
+        );
+        assert_eq!(
+            storage.gate_identity_flow("one", "proof", None).await.unwrap(),
+            FlowGate::NeedsCode
+        );
+        assert_eq!(
+            storage.gate_identity_flow("one", "proof", Some("1")).await.unwrap(),
+            FlowGate::WrongCode
+        );
+        assert_eq!(
+            storage
+                .gate_identity_flow("one", "proof", Some(" 11112222 "))
+                .await
+                .unwrap(),
+            FlowGate::Open
+        );
+        assert!(storage.complete_identity_flow("one", "proof").await.unwrap().is_some());
+        finish("two").await;
+        assert_eq!(
+            storage.gate_identity_flow("two", "proof", Some("1")).await.unwrap(),
+            FlowGate::WrongCode
+        );
+        assert_eq!(
+            storage.gate_identity_flow("two", "proof", Some("2")).await.unwrap(),
+            FlowGate::WrongCode
+        );
+        assert_eq!(
+            storage.gate_identity_flow("two", "proof", Some("3")).await.unwrap(),
+            FlowGate::Exhausted
+        );
+        assert!(storage.complete_identity_flow("two", "proof").await.unwrap().is_none());
     }
     #[tokio::test]
     async fn identity_linking_never_reassigns_email_or_subject() {

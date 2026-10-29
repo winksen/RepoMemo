@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.9 (2026-10-29)
+
+Review the identity work and close its findings.
+
+### Changed
+- A static review of redirects, account linking, discovery, tokens and recovery found 0 high, 1 medium and 1 low finding, both fixed: [the review](mindmap/security/2026-10-29-identity-review.md).
+- Medium: a provider sign-in someone else started could be completed by their target and polled by the starter. The provider return page now shows an eight-digit confirmation code that the starting window must type; three wrong codes cancel the sign-in. Low: a back-channel logout token without `exp` could be replayed; its identifier is now remembered for the whole acceptance window.
+- Four informational findings are accepted and written down (pending-flow pool, group access until the next sign-in, interrupted enrollment, sessions kept when enforcement starts).
+
+### Checks
+- Two storage tests (the code gate) and a changed server test (no code, wrong code, right code, replay) cover the medium; the UI test was rewritten for the code step. Clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- No migration. Provider sign-in now asks for the confirmation code after the provider step; the desktop app and the server must be upgraded together.
+
 ## V0.5.8 (2026-10-29)
 
 Extend the audit trail and its export with identity events.

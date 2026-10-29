@@ -116,7 +116,7 @@
 | POST | `/v1/auth/identity/start` | public | sign-in quota | — | Authorization URL and initiating-client proof; five-minute expiry |
 | POST | `/v1/auth/identity/backchannel-logout` | public | provider-signed logout token | form `logout_token` | Ends every session of the linked account; single-use `jti`, audited, no body |
 | GET | `/v1/auth/identity/callback` | public | state, PKCE, nonce, signature | Callback | Completes a single-use provider response; no session tokens in the page |
-| POST | `/v1/auth/identity/complete` | public | initiating-client proof | Complete | 202 pending or existing session response; result consumed once |
+| POST | `/v1/auth/identity/complete` | public | initiating-client proof + confirmation code | Complete | 202 pending or `confirm`, 409 wrong code, or the existing session once the eight-digit `code` from the return page is given; result consumed once |
 | GET | `/v1/profile/identity` | session | own account | — | Linked issuer and date; no provider subject or secret |
 | POST | `/v1/profile/identity` | session | own account | — | Start explicit identity linking with session-version proof |
 | PUT | `/v1/system/identity` | session | system administrator | ProviderRequest | Save sealed credentials; enabled providers require fresh discovery/key checks; `enforced` needs a linked administrator and 1–5 break-glass system administrators |

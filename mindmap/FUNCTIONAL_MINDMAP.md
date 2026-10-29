@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.9` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.9 — Review the identity work and close its findings.
+
+- A static review of redirects, account linking, discovery, tokens and recovery found 0 high, 1 medium and 1 low finding, both fixed: [the review](security/2026-10-29-identity-review.md).
+- Medium: a provider sign-in someone else started could be completed by their target and polled by the starter. The provider return page now shows an eight-digit confirmation code that the starting window must type; three wrong codes cancel the sign-in. Low: a back-channel logout token without `exp` could be replayed; its identifier is now remembered for the whole acceptance window.
+- Four informational findings are accepted and written down (pending-flow pool, group access until the next sign-in, interrupted enrollment, sessions kept when enforcement starts).
+
+Checks: Two storage tests (the code gate) and a changed server test (no code, wrong code, right code, replay) cover the medium; the UI test was rewritten for the code step. Clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.8 — Extend the audit trail and its export with identity events.
 

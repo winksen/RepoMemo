@@ -25,7 +25,11 @@ async fn identity_completion_issues_the_existing_session_once() {
         .unwrap();
     storage.take_identity_callback("state").await.unwrap();
     storage
-        .finish_identity_flow("state", &json!({"user_id":user,"version":0,"provider":provider}), true)
+        .finish_identity_flow(
+            "state",
+            &json!({"user_id":user,"version":0,"provider":provider,"confirm":repomemo_storage::identity_confirmation_hash("12345678")}),
+            true,
+        )
         .await
         .unwrap();
     let response = app
@@ -37,29 +41,27 @@ async fn identity_completion_issues_the_existing_session_once() {
         .await
         .unwrap();
     assert_eq!(response.status(), 400);
-    let response = app
-        .clone()
-        .oneshot(public_post(
+    let complete = |code: Option<&str>| {
+        public_post(
             "/v1/auth/identity/complete",
-            json!({"state":"state","proof":"proof"}),
-        ))
-        .await
-        .unwrap();
+            json!({"state":"state","proof":"proof","code":code}),
+        )
+    };
+    // The phished-link case: the initiating client holds the proof but never saw the code.
+    let response = app.clone().oneshot(complete(None)).await.unwrap();
+    assert_eq!(response.status(), 202);
+    assert_eq!(response_json(response).await["status"], "confirm");
+    assert_eq!(
+        app.clone().oneshot(complete(Some("00000000"))).await.unwrap().status(),
+        409
+    );
+    let response = app.clone().oneshot(complete(Some("12345678"))).await.unwrap();
     assert_eq!(response.status(), 200);
     let session = response_json(response).await;
     assert!(session["access_token"].is_string());
     assert!(session["refresh_token"].is_string());
     assert_eq!(session["user"]["id"], user);
-    assert_eq!(
-        app.oneshot(public_post(
-            "/v1/auth/identity/complete",
-            json!({"state":"state","proof":"proof"})
-        ))
-        .await
-        .unwrap()
-        .status(),
-        400
-    );
+    assert_eq!(app.oneshot(complete(Some("12345678"))).await.unwrap().status(), 400);
 }
 
 #[tokio::test]
