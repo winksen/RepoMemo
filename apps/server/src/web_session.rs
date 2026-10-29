@@ -43,6 +43,7 @@ const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
 const PRESENTS_TOKEN: &[&str] = &["/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout"];
 /// Responses that issue a session.
 const ISSUES_SESSION: &[&str] = &[
+    "/v1/auth/identity/complete",
     "/v1/auth/register",
     "/v1/auth/login",
     "/v1/auth/refresh",

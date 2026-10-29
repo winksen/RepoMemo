@@ -617,6 +617,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(logout).layer(DefaultBodyLimit::max(PUBLIC_BODY_BYTES)),
         )
         .route("/v1/auth/logout-all", post(logout_everywhere))
+        .route("/v1/auth/identity", get(identity::public_provider))
+        .route("/v1/auth/identity/start", post(identity::start))
+        .route("/v1/auth/identity/callback", get(identity::callback))
+        .route("/v1/auth/identity/complete", post(identity::complete))
         .route(
             "/v1/system/identity",
             get(identity::get_provider).put(identity::save_provider),

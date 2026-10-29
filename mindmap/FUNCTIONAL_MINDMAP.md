@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.2 — Add the OIDC authorization, callback and session handoff.
+
+- Add single-use state, nonce and S256 PKCE, a fixed public callback, bounded token exchange and RS256 validation of issuer, audience, authorized party, expiry and fresh authentication.
+- Only a linked issuer/subject can receive the existing session. A separate initiating-client proof consumes the result once; cancellation, expiry, replay and provider changes refuse sign-in. Browser refresh tokens use the existing HttpOnly cookie.
+- Migration 0046 adds identity pairs and sealed five-minute handoffs with a server-wide cap. Explicit linking and enrollment follow in V0.5.3; no email-only linking is introduced.
+
+Checks: Seven focused Rust tests pass, including real signed token cases, wrong proofs, expiry, replay and session issuance. Cargo check, formatting, migration, version and documentation checks pass. Real-provider/client journeys remain pending.
 
 ---
 

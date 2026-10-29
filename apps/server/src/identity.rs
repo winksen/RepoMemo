@@ -1,9 +1,290 @@
 //! One OIDC provider per server. All egress is HTTPS, same-origin and DNS-pinned.
 //! Provider errors never include response bodies, request URLs or credentials.
 use crate::*;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use repomemo_storage::IdentityProvider;
+use ring::rand::{SecureRandom, SystemRandom};
 use serde_json::{json, Value};
 use url::Url;
+
+fn random_secret() -> Result<String, ApiError> {
+    let mut bytes = [0u8; 32];
+    SystemRandom::new()
+        .fill(&mut bytes)
+        .map_err(|_| ApiError::internal("Random generation failed"))?;
+    Ok(URL_SAFE_NO_PAD.encode(bytes))
+}
+
+fn challenge(verifier: &str) -> String {
+    URL_SAFE_NO_PAD.encode(ring::digest::digest(&ring::digest::SHA256, verifier.as_bytes()).as_ref())
+}
+
+async fn enabled_provider(state: &AppState) -> Result<IdentityProvider, ApiError> {
+    state
+        .storage
+        .identity_provider()
+        .await
+        .map_err(ApiError::internal)?
+        .filter(|p| p.enabled && p.checked_at.is_some())
+        .ok_or_else(|| {
+            ApiError::bad_request(
+                "Provider sign-in is unavailable. Use the local sign-in path or contact an administrator.",
+            )
+        })
+}
+
+pub(crate) async fn public_provider(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let provider = state.storage.identity_provider().await.map_err(ApiError::internal)?;
+    Ok(Json(json!({"name":provider.filter(|p|p.enabled).map(|p|p.name)})))
+}
+
+pub(crate) async fn start(State(state): State<AppState>, client: ClientIp) -> Result<Json<Value>, ApiError> {
+    auth::check_auth_quota(&state, &client, auth::AuthAction::SignIn)?;
+    if setup::setup_pending(&state).await? {
+        return Err(ApiError::forbidden());
+    }
+    let provider = enabled_provider(&state).await?;
+    let callback = state
+        .mail
+        .link("/v1/auth/identity/callback")
+        .ok_or_else(|| ApiError::bad_request("The public server URL is missing."))?;
+    let state_value = random_secret()?;
+    let proof = random_secret()?;
+    let nonce = random_secret()?;
+    let verifier = random_secret()?;
+    let mut url = https_url(&provider.authorization_endpoint)?;
+    url.query_pairs_mut().extend_pairs([
+        ("client_id", provider.client_id.as_str()),
+        ("response_type", "code"),
+        ("scope", "openid email profile"),
+        ("redirect_uri", callback.as_str()),
+        ("state", state_value.as_str()),
+        ("nonce", nonce.as_str()),
+        ("code_challenge", challenge(&verifier).as_str()),
+        ("code_challenge_method", "S256"),
+        ("max_age", "0"),
+    ]);
+    state
+        .storage
+        .create_identity_flow(
+            &state_value,
+            &proof,
+            &json!({"provider":provider,"callback":callback,"nonce":nonce,"verifier":verifier}),
+        )
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(
+        json!({"authorization_url":url.as_str(),"state":state_value,"proof":proof,"expires_in":300}),
+    ))
+}
+
+#[derive(Deserialize)]
+pub(crate) struct Callback {
+    state: String,
+    code: Option<String>,
+    error: Option<String>,
+}
+
+fn token_claims(token: &str, keys: &Value, provider: &IdentityProvider, nonce: &str) -> Result<Value, ApiError> {
+    let invalid = || ApiError::bad_request("The provider identity token could not be verified. Start sign-in again.");
+    let header = jsonwebtoken::decode_header(token).map_err(|_| invalid())?;
+    if header.alg != Algorithm::RS256 {
+        return Err(invalid());
+    }
+    let kid = header.kid.ok_or_else(invalid)?;
+    let keys: jsonwebtoken::jwk::JwkSet = serde_json::from_value(keys.clone()).map_err(|_| invalid())?;
+    if keys
+        .keys
+        .iter()
+        .filter(|k| k.common.key_id.as_ref() == Some(&kid))
+        .count()
+        != 1
+    {
+        return Err(invalid());
+    }
+    let key = keys.find(&kid).ok_or_else(invalid)?;
+    if key
+        .common
+        .public_key_use
+        .as_ref()
+        .is_some_and(|u| *u != jsonwebtoken::jwk::PublicKeyUse::Signature)
+        || key
+            .common
+            .key_algorithm
+            .as_ref()
+            .is_some_and(|a| *a != jsonwebtoken::jwk::KeyAlgorithm::RS256)
+    {
+        return Err(invalid());
+    }
+    let decoding_key = DecodingKey::from_jwk(key).map_err(|_| invalid())?;
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.set_issuer(&[provider.issuer.as_str()]);
+    validation.set_audience(&[provider.client_id.as_str()]);
+    validation.set_required_spec_claims(&["exp", "iss", "aud", "sub", "iat"]);
+    validation.validate_nbf = true;
+    validation.leeway = 30;
+    let claims = decode::<Value>(token, &decoding_key, &validation)
+        .map_err(|_| invalid())?
+        .claims;
+    let now = Utc::now().timestamp();
+    if claims["nonce"].as_str() != Some(nonce)
+        || !claims["sub"].as_str().is_some_and(|s| !s.is_empty() && s.len() <= 255)
+        || !claims["iat"].as_i64().is_some_and(|t| t <= now + 30 && t >= now - 330)
+        || !claims["auth_time"]
+            .as_i64()
+            .is_some_and(|t| t <= now + 30 && t >= now - 330)
+        || (claims["aud"].as_array().is_some_and(|a| a.len() > 1)
+            && claims["azp"].as_str() != Some(provider.client_id.as_str()))
+        || (claims.get("azp").is_some() && claims["azp"].as_str() != Some(provider.client_id.as_str()))
+    {
+        return Err(invalid());
+    }
+    Ok(claims)
+}
+
+async fn exchange(state: &AppState, flow: &Value, code: &str) -> Result<Value, ApiError> {
+    if code.is_empty() || code.len() > 4096 {
+        return Err(ApiError::bad_request("Invalid authorization response."));
+    }
+    let provider = enabled_provider(state).await?;
+    if serde_json::to_value(&provider).map_err(ApiError::internal)? != flow["provider"] {
+        return Err(ApiError::bad_request("Provider settings changed. Start sign-in again."));
+    }
+    let secret = state
+        .storage
+        .identity_secret()
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    let url = https_url(&provider.token_endpoint)?;
+    let response = http_client(&url)
+        .await?
+        .post(url)
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("code", code),
+            ("redirect_uri", flow["callback"].as_str().unwrap_or_default()),
+            ("client_id", provider.client_id.as_str()),
+            ("client_secret", secret.as_str()),
+            ("code_verifier", flow["verifier"].as_str().unwrap_or_default()),
+        ])
+        .send()
+        .await
+        .map_err(|_| ApiError::bad_request("Provider token exchange failed. Start sign-in again."))?;
+    let response = bounded_json(response).await?;
+    let token = response["id_token"]
+        .as_str()
+        .ok_or_else(|| ApiError::bad_request("The provider returned no identity token."))?;
+    let keys = fetch_json(&provider.jwks_uri).await?;
+    let claims = token_claims(token, &keys, &provider, flow["nonce"].as_str().unwrap_or_default())?;
+    let user_id = state
+        .storage
+        .linked_identity_user(&provider.issuer, claims["sub"].as_str().unwrap_or_default())
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| {
+            ApiError::bad_request("This identity is not linked. Sign in locally and explicitly link it first.")
+        })?;
+    Ok(json!({"user_id":user_id,"provider":provider,"claims":claims}))
+}
+
+pub(crate) async fn callback(
+    State(state): State<AppState>,
+    client: ClientIp,
+    Query(query): Query<Callback>,
+) -> Result<Response, ApiError> {
+    auth::check_auth_quota(&state, &client, auth::AuthAction::SignIn)?;
+    if query.state.len() > 128 {
+        return Err(ApiError::bad_request("Invalid sign-in state."));
+    }
+    let flow = state
+        .storage
+        .take_identity_callback(&query.state)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| {
+            ApiError::bad_request("This sign-in expired or was already used. Return to RepoMemo and start again.")
+        })?;
+    let result = if query.error.is_some() {
+        Err(ApiError::bad_request(
+            "Provider sign-in was cancelled or refused. Try again or use local sign-in.",
+        ))
+    } else {
+        exchange(&state, &flow, query.code.as_deref().unwrap_or_default()).await
+    };
+    let success = result.is_ok();
+    let result = result.unwrap_or_else(|error| json!({"error":error.message}));
+    state
+        .storage
+        .finish_identity_flow(&query.state, &result, success)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok((
+        [
+            (axum::http::header::CACHE_CONTROL, "no-store"),
+            (axum::http::header::REFERRER_POLICY, "no-referrer"),
+        ],
+        "Return to RepoMemo to finish signing in. You can close this page.",
+    )
+        .into_response())
+}
+
+#[derive(Deserialize)]
+pub(crate) struct Complete {
+    state: String,
+    proof: String,
+}
+
+pub(crate) async fn complete(
+    State(state): State<AppState>,
+    client: ClientIp,
+    Json(request): Json<Complete>,
+) -> Result<Response, ApiError> {
+    auth::check_auth_quota(&state, &client, auth::AuthAction::Refresh)?;
+    if request.state.len() > 128 || request.proof.len() > 128 {
+        return Err(ApiError::unauthorized());
+    }
+    let (phase, result) = state
+        .storage
+        .complete_identity_flow(&request.state, &request.proof)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::bad_request("This sign-in expired or was already completed. Start again."))?;
+    if phase == "pending" {
+        return Ok((StatusCode::ACCEPTED, Json(json!({"status":"pending"}))).into_response());
+    }
+    if phase == "failed" {
+        return Err(ApiError::bad_request(
+            result["error"].as_str().unwrap_or("Sign-in failed. Try again."),
+        ));
+    }
+    let provider = enabled_provider(&state).await?;
+    if serde_json::to_value(&provider).map_err(ApiError::internal)? != result["provider"] {
+        return Err(ApiError::bad_request("Provider settings changed. Start again."));
+    }
+    let user_id = result["user_id"].as_str().ok_or_else(ApiError::unauthorized)?;
+    if state
+        .storage
+        .user_access(user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .is_none()
+    {
+        return Err(ApiError::unauthorized());
+    }
+    let user = state
+        .storage
+        .find_user(user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(ApiError::unauthorized)?;
+    state
+        .storage
+        .touch_user_connection(user_id)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(auth::issue_session(&state, user).await?).into_response())
+}
 
 const MAX_DOCUMENT: usize = 256 * 1024;
 
@@ -271,6 +552,55 @@ pub(crate) async fn save_provider(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn identity_tokens_require_signature_issuer_audience_nonce_and_freshness() {
+        let provider = IdentityProvider {
+            issuer: "https://id.example.com".into(),
+            client_id: "memo".into(),
+            ..Default::default()
+        };
+        let now = Utc::now().timestamp();
+        let claims = json!({"sub":"subject","iss":provider.issuer,"aud":"memo","iat":now,"auth_time":now,"exp":now+300,"nonce":"nonce"});
+        let keys = json!({"keys":[{"kty":"RSA","kid":"test","alg":"RS256","use":"sig","e":"AQAB","n":"yRE6rHuNR0QbHO3H3Kt2pOKGVhQqGZXInOduQNxXzuKlvQTLUTv4l4sggh5_CYYi_cvI-SXVT9kPWSKXxJXBXd_4LkvcPuUakBoAkfh-eiFVMh2VrUyWyj3MFl0HTVF9KwRXLAcwkREiS3npThHRyIxuy0ZMeZfxVL5arMhw1SRELB8HoGfG_AtH89BIE9jDBHZ9dLelK9a184zAf8LwoPLxvJb3Il5nncqPcSfKDDodMFBIMc4lQzDKL5gvmiXLXB1AGLm8KBjfE8s3L5xqi-yUod-j8MtvIj812dkS4QMiRVN_by2h3ZY8LYVGrqZXZTcgn2ujn8uKjXLZVD5TdQ"}]});
+        let mut header = Header::new(Algorithm::RS256);
+        header.kid = Some("test".into());
+        let sign = |c: &Value| {
+            encode(
+                &header,
+                c,
+                &EncodingKey::from_rsa_der(include_bytes!("tests/fixtures/oidc-test-key.der")),
+            )
+            .unwrap()
+        };
+        assert!(token_claims(&sign(&claims), &keys, &provider, "nonce").is_ok());
+        for (field, value) in [
+            ("iss", json!("https://other.example.com")),
+            ("aud", json!("other")),
+            ("nonce", json!("other")),
+            ("exp", json!(now - 60)),
+            ("iat", json!(now + 60)),
+            ("auth_time", json!(now - 600)),
+            ("azp", json!("other")),
+        ] {
+            let mut invalid = claims.clone();
+            invalid[field] = value;
+            assert!(
+                token_claims(&sign(&invalid), &keys, &provider, "nonce").is_err(),
+                "{field}"
+            );
+        }
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(b"wrong-key"),
+        )
+        .unwrap();
+        assert!(token_claims(&token, &keys, &provider, "nonce").is_err());
+        assert_eq!(
+            challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        );
+    }
     #[test]
     fn identity_urls_refuse_insecure_or_ambiguous_addresses() {
         for url in [

@@ -2,6 +2,67 @@ use super::*;
 use axum::http::StatusCode;
 
 #[tokio::test]
+async fn identity_completion_issues_the_existing_session_once() {
+    let dir = temp_data_dir("identity-complete");
+    let app = router(ServerConfig::for_test(dir.clone())).await.unwrap();
+    let (_, account) = register_account(&app, "identity@example.com").await;
+    let user = account["user"]["id"].as_str().unwrap();
+    let storage = repomemo_storage::StorageEngine::open(repomemo_storage::StorageConfig::new(dir))
+        .await
+        .unwrap();
+    let provider = repomemo_storage::IdentityProvider {
+        enabled: true,
+        checked_at: Some("checked".into()),
+        ..Default::default()
+    };
+    storage
+        .save_identity_provider(&provider, "test-secret", user)
+        .await
+        .unwrap();
+    storage
+        .create_identity_flow("state", "proof", &json!({}))
+        .await
+        .unwrap();
+    storage.take_identity_callback("state").await.unwrap();
+    storage
+        .finish_identity_flow("state", &json!({"user_id":user,"provider":provider}), true)
+        .await
+        .unwrap();
+    let response = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/identity/complete",
+            json!({"state":"state","proof":"wrong"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 400);
+    let response = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/identity/complete",
+            json!({"state":"state","proof":"proof"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let session = response_json(response).await;
+    assert!(session["access_token"].is_string());
+    assert!(session["refresh_token"].is_string());
+    assert_eq!(session["user"]["id"], user);
+    assert_eq!(
+        app.oneshot(public_post(
+            "/v1/auth/identity/complete",
+            json!({"state":"state","proof":"proof"})
+        ))
+        .await
+        .unwrap()
+        .status(),
+        400
+    );
+}
+
+#[tokio::test]
 async fn identity_settings_require_a_system_session_and_never_return_secrets() {
     let app = router(ServerConfig::for_test(temp_data_dir("identity-settings")))
         .await

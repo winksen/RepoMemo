@@ -69,3 +69,30 @@ restore with the same sealing key. Older servers cannot open the migrated
 database: use the pre-upgrade backup for rollback.
 
 Protocol reference: [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html).
+
+## Authorization and handoff API
+
+V0.5.2 implements the code flow for linked `(issuer, subject)` identities.
+Explicit account linking/enrollment and client controls follow in V0.5.3–0.5.4;
+an email match does not sign in to an existing account.
+
+The initiating client posts to `/v1/auth/identity/start`, holds the returned
+state and proof in memory, and opens the authorization URL in a browser.
+The provider returns to the fixed callback. A single-use state, S256 verifier,
+nonce, RS256 signature, exact issuer, audience/authorized party and fresh
+authentication time are required. Token exchange and keys obey the same
+egress and response bounds as discovery. No provider token is returned to a client.
+
+The client posts state and proof to `/v1/auth/identity/complete`: 202 means
+pending, success returns the existing session format, and failure means start
+again. `X-RepoMemo-Client: web` puts the refresh credential in the existing
+HttpOnly cookie. The proof never travels through the provider URL; callback
+pages contain no access or refresh token. Handoffs expire after five minutes,
+are consumed once, and are capped at 1,000 outstanding server-wide. Provider
+configuration changes invalidate pending flows. Cancellation and expired or
+replayed responses cannot issue a session.
+
+Migration 0046 adds linked identities and sealed ephemeral handoffs. Neither
+is included in workspace exports. Full backup restores retain identity links;
+pending handoffs still expire at their original deadline. Live provider,
+browser and desktop evidence remains pending.

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.2 (2026-10-29)
+
+Add the OIDC authorization, callback and session handoff.
+
+### Changed
+- Add single-use state, nonce and S256 PKCE, a fixed public callback, bounded token exchange and RS256 validation of issuer, audience, authorized party, expiry and fresh authentication.
+- Only a linked issuer/subject can receive the existing session. A separate initiating-client proof consumes the result once; cancellation, expiry, replay and provider changes refuse sign-in. Browser refresh tokens use the existing HttpOnly cookie.
+- Migration 0046 adds identity pairs and sealed five-minute handoffs with a server-wide cap. Explicit linking and enrollment follow in V0.5.3; no email-only linking is introduced.
+
+### Checks
+- Seven focused Rust tests pass, including real signed token cases, wrong proofs, expiry, replay and session issuance. Cargo check, formatting, migration, version and documentation checks pass. Real-provider/client journeys remain pending.
+
+### Upgrading
+- Migration 0046 runs automatically. Identity links and ephemeral handoffs are server-level data excluded from workspace archives; rollback uses the pre-upgrade backup.
+
 ## V0.5.1 (2026-10-29)
 
 Configure and check a sealed OpenID Connect provider.
