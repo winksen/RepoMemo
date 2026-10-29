@@ -5,7 +5,12 @@ pub(crate) async fn require_workspace_read(
     subject: &AuthenticatedSubject,
     workspace_id: &str,
 ) -> Result<WorkspaceRole, ApiError> {
-    match effective_workspace_role(state, &subject.user_id, subject.is_system_admin, workspace_id).await? {
+    let role = if subject.token_reaches(workspace_id) {
+        effective_workspace_role(state, &subject.user_id, subject.is_system_admin, workspace_id).await?
+    } else {
+        None
+    };
+    match role {
         Some(role) => Ok(role),
         None => {
             let detail = format!("workspace_id={workspace_id}; reason=no_membership");
@@ -301,6 +306,11 @@ pub(crate) async fn authenticate_personal_token(
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::unauthorized)?;
+    let workspaces = state
+        .storage
+        .token_workspaces(&grant.token_id)
+        .await
+        .map_err(ApiError::internal)?;
     let read_only = !matches!(grant.scope.as_str(), "write" | "admin" | "system");
     let admin = grant.scope == "admin";
     let system = grant.scope == "system";
@@ -319,6 +329,7 @@ pub(crate) async fn authenticate_personal_token(
             read_only,
             admin,
             system,
+            workspaces,
         }),
     })
 }

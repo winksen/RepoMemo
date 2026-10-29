@@ -156,7 +156,12 @@ pub(crate) async fn list_workspaces(
     } else {
         state.storage.list_shared_workspaces_for_user(&subject.user_id).await
     };
-    workspaces.map(Json).map_err(ApiError::internal)
+    workspaces
+        .map(|mut list| {
+            list.retain(|entry| subject.token_reaches(&entry.workspace.id));
+            Json(list)
+        })
+        .map_err(ApiError::internal)
 }
 
 /// The figures the dashboard shows for every workspace the caller can open,
@@ -176,6 +181,10 @@ pub(crate) async fn dashboard(
         state.storage.list_shared_workspaces_for_user(&subject.user_id).await
     }
     .map_err(ApiError::internal)?;
+    let workspaces: Vec<_> = workspaces
+        .into_iter()
+        .filter(|entry| subject.token_reaches(&entry.workspace.id))
+        .collect();
     let ids = workspaces
         .iter()
         .map(|entry| entry.workspace.id.clone())

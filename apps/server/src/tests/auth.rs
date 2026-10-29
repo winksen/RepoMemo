@@ -2238,3 +2238,118 @@ async fn offboarding_hands_over_work_checks_everything_first_and_verifies_revoca
         .to_owned();
     assert_eq!(offboard(&admin, &admin_id, None).await.status(), 409);
 }
+
+#[tokio::test]
+async fn a_token_limited_to_workspaces_cannot_reach_others_and_ends_with_its_owners_access() {
+    let app = router(ServerConfig::for_test(temp_data_dir("token-workspaces")))
+        .await
+        .unwrap();
+    let (admin, _) = register_account(&app, "admin@example.com").await;
+    let (member, member_account) = register_account(&app, "member@example.com").await;
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        async move { app.oneshot(json_request(method, &uri, &who, body)).await.unwrap() }
+    };
+    let first = create_workspace(&app, &admin).await;
+    let second = create_workspace(&app, &admin).await;
+    join(&app, &admin, "workspaces", &first, "member@example.com", "member").await;
+    join(&app, &admin, "workspaces", &second, "member@example.com", "member").await;
+    let make = |who: String, body: Value| async move {
+        let response = call("POST", "/v1/profile/tokens".into(), who, body).await;
+        let status = response.status();
+        (status, response_json(response).await)
+    };
+    let (status, limited) = make(
+        member.clone(),
+        json!({"name":"ci","scope":"write","expires_in_days":30,"workspace_ids":[first]}),
+    )
+    .await;
+    assert_eq!(status, 201);
+    assert_eq!(limited["token"]["workspaces"], json!([first]));
+    let limited_secret = format!("Bearer {}", limited["secret"].as_str().unwrap());
+    let tasks = |who: &str, workspace: &str| {
+        call(
+            "GET",
+            format!("/v1/workspaces/{workspace}/tasks"),
+            who.to_owned(),
+            Value::Null,
+        )
+    };
+    assert_eq!(tasks(&limited_secret, &first).await.status(), 200);
+    assert_eq!(tasks(&limited_secret, &second).await.status(), 403);
+    let listed = response_json(call("GET", "/v1/workspaces".into(), limited_secret.clone(), Value::Null).await).await;
+    assert_eq!(listed.as_array().unwrap().len(), 1);
+    // The same person's session, and an unlimited token, still reach both.
+    assert_eq!(tasks(&member, &second).await.status(), 200);
+    // Limits are refused for workspaces the owner cannot open and for the system scope.
+    let outsider = create_workspace(&app, &admin).await;
+    assert_eq!(
+        make(
+            member.clone(),
+            json!({"name":"x","scope":"read","expires_in_days":7,"workspace_ids":[outsider]})
+        )
+        .await
+        .0,
+        400
+    );
+    assert_eq!(
+        make(
+            member.clone(),
+            json!({"name":"x","scope":"read","expires_in_days":7,"workspace_ids":[]})
+        )
+        .await
+        .0,
+        400
+    );
+    // An older, unlimited token is narrowed in place.
+    let (_, legacy) = make(
+        member.clone(),
+        json!({"name":"old","scope":"write","expires_in_days":30}),
+    )
+    .await;
+    assert!(legacy["token"]["workspaces"].is_null());
+    let legacy_secret = format!("Bearer {}", legacy["secret"].as_str().unwrap());
+    assert_eq!(tasks(&legacy_secret, &second).await.status(), 200);
+    let narrowed = call(
+        "PUT",
+        format!(
+            "/v1/profile/tokens/{}/workspaces",
+            legacy["token"]["id"].as_str().unwrap()
+        ),
+        member.clone(),
+        json!({"workspace_ids":[first]}),
+    )
+    .await;
+    assert_eq!(narrowed.status(), 204);
+    assert_eq!(tasks(&legacy_secret, &second).await.status(), 403);
+    assert_eq!(tasks(&legacy_secret, &first).await.status(), 200);
+    // The inventory is for system administrators and lets them end a token.
+    assert_eq!(
+        call("GET", "/v1/system/tokens".into(), member.clone(), Value::Null)
+            .await
+            .status(),
+        403
+    );
+    let inventory = response_json(call("GET", "/v1/system/tokens".into(), admin.clone(), Value::Null).await).await;
+    assert_eq!(inventory["tokens"].as_array().unwrap().len(), 2);
+    // Losing access to the workspace ends what the token could do there.
+    let member_id = member_account["user"]["id"].as_str().unwrap();
+    assert!(call(
+        "DELETE",
+        format!("/v1/workspaces/{first}/members/{member_id}"),
+        admin.clone(),
+        Value::Null
+    )
+    .await
+    .status()
+    .is_success());
+    assert_eq!(tasks(&limited_secret, &first).await.status(), 403);
+    let id = limited["token"]["id"].as_str().unwrap();
+    assert_eq!(
+        call("DELETE", format!("/v1/system/tokens/{id}"), admin, Value::Null)
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(tasks(&limited_secret, &second).await.status(), 401);
+}

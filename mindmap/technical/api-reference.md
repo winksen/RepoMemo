@@ -50,6 +50,9 @@
 | DELETE | `/v1/invitations/{invitation_id}` | managing | require_workspace_admin, require_organization_admin | — | status |
 | GET | `/v1/profile/tokens` | session | — | — | Vec<PersonalAccessToken |
 | POST | `/v1/profile/tokens` | session | — | CreateTokenRequest | CreatedToken |
+| PUT | `/v1/profile/tokens/{token_id}/workspaces` | session | token owner | `{workspace_ids}` | Limits a token to workspaces the owner can open; one way only |
+| GET | `/v1/system/tokens` | auth | full system administrator | — | Live tokens across accounts with owner, scope, expiry, last use and workspace limit |
+| DELETE | `/v1/system/tokens/{token_id}` | auth | full system administrator, system scope | — | Revokes any token; audited |
 | DELETE | `/v1/profile/tokens/{token_id}` | session | — | — | status |
 | GET | `/v1/session` | auth | — | — | SharedSession |
 | POST | `/v1/auth/verify-email` | public | — | VerifyRequest | VerifiedAnswer (the link in the mail; the address is verified, and a changed address is applied) |

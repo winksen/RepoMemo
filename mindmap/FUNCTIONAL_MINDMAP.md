@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.15` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.15 — Limit API tokens to chosen workspaces and add a token inventory.
+
+- A personal access token can be limited to one to fifty workspaces its owner can open. A limited token cannot read, search, export or stream any other workspace and does not see them in lists, the dashboard, tasks or notices; the system scope cannot be limited. It still ends at its expiry and, because each request checks its owner's current membership, stops working in a workspace as soon as the owner loses access there.
+- Tokens made before this release stay unlimited, as before (migration 0052 adds nothing to them). An owner can narrow one in place with Limit…; a limited token cannot be made unlimited again.
+- System › Users lists every live token with owner, scope, workspace limit, expiry and last use, and lets a full system administrator revoke any of them (audited). Secrets are never shown.
+
+Checks: One server test covers a limited token (allowed and refused workspace, list, creation refusals, narrowing an older token, inventory access, loss of access and administrator revocation); two UI tests cover the picker and the narrowing. Generated types, clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.14 — Unify offboarding with a preview of ownership, tasks and reviews.
 

@@ -109,6 +109,9 @@ pub(crate) async fn search_all_workspaces(
         if !request.workspace_ids.is_empty() && !request.workspace_ids.contains(&workspace.id) {
             continue;
         }
+        if !subject.token_reaches(&workspace.id) {
+            continue;
+        }
         let Some(role) =
             effective_workspace_role(&state, &subject.user_id, subject.is_system_admin, &workspace.id).await?
         else {

@@ -664,6 +664,12 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(access::list_tokens).post(access::create_token),
         )
         .route("/v1/profile/tokens/{token_id}", delete(access::revoke_token))
+        .route(
+            "/v1/profile/tokens/{token_id}/workspaces",
+            put(access::set_token_workspaces),
+        )
+        .route("/v1/system/tokens", get(access::token_inventory))
+        .route("/v1/system/tokens/{token_id}", delete(access::admin_revoke_token))
         .route("/v1/system/overview", get(system::overview))
         .route("/v1/system/usage", get(system::usage))
         .route("/v1/system/users", get(system::list_users))

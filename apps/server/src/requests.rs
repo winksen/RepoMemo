@@ -519,6 +519,19 @@ pub(crate) struct TokenGrant {
     pub(crate) admin: bool,
     /// The `system` scope: also changes in the System area.
     pub(crate) system: bool,
+    /// The only workspaces the token reaches; `None` when it is not limited to chosen ones.
+    pub(crate) workspaces: Option<Vec<String>>,
+}
+
+impl AuthenticatedSubject {
+    /// Whether a request made with this subject may touch the workspace at all: always for a session or an unlimited
+    /// token, and only for the chosen workspaces of a limited one.
+    pub(crate) fn token_reaches(&self, workspace_id: &str) -> bool {
+        self.token
+            .as_ref()
+            .and_then(|grant| grant.workspaces.as_ref())
+            .is_none_or(|allowed| allowed.iter().any(|id| id == workspace_id))
+    }
 }
 
 /// Optional `limit`/`offset` paging for list endpoints. The file list cuts the page in SQL

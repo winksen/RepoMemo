@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../lib/sharedApi", () => ({
   createPersonalToken: vi.fn(),
   listPersonalTokens: vi.fn(),
+  listSharedWorkspaces: vi.fn().mockResolvedValue([]),
+  limitPersonalTokenWorkspaces: vi.fn(),
   revokePersonalToken: vi.fn(),
 }));
 vi.mock("../components/ui/toast", () => ({ showToast: vi.fn() }));

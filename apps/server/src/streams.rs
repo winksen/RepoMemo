@@ -277,7 +277,7 @@ pub(crate) async fn watch_event_stream_access(
         if let Ok(Some(role)) = &role {
             sees_activity.store(sees_activity_feed(role), Ordering::Relaxed);
         }
-        let token_active = token_is_active(&state, &subject).await;
+        let token_active = token_is_active(&state, &subject).await && subject.token_reaches(&workspace_id);
         let closing = state.closing.load(std::sync::atomic::Ordering::SeqCst);
         if expired || !session_valid || !member || !token_active || closing {
             let _ = closer.send(()).await;

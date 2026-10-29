@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.15 (2026-10-29)
+
+Limit API tokens to chosen workspaces and add a token inventory.
+
+### Changed
+- A personal access token can be limited to one to fifty workspaces its owner can open. A limited token cannot read, search, export or stream any other workspace and does not see them in lists, the dashboard, tasks or notices; the system scope cannot be limited. It still ends at its expiry and, because each request checks its owner's current membership, stops working in a workspace as soon as the owner loses access there.
+- Tokens made before this release stay unlimited, as before (migration 0052 adds nothing to them). An owner can narrow one in place with Limit…; a limited token cannot be made unlimited again.
+- System › Users lists every live token with owner, scope, workspace limit, expiry and last use, and lets a full system administrator revoke any of them (audited). Secrets are never shown.
+
+### Checks
+- One server test covers a limited token (allowed and refused workspace, list, creation refusals, narrowing an older token, inventory access, loss of access and administrator revocation); two UI tests cover the picker and the narrowing. Generated types, clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- Migration 0052 runs automatically; no existing token changes. Review the inventory and limit long-lived tokens. Rollback uses the pre-upgrade backup.
+
 ## V0.5.14 (2026-10-29)
 
 Unify offboarding with a preview of ownership, tasks and reviews.

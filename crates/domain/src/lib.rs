@@ -2074,6 +2074,10 @@ pub struct PersonalAccessToken {
     pub created_at: String,
     pub expires_at: String,
     pub last_used_at: Option<String>,
+    /// The workspaces the token is limited to; none means every workspace its owner can open (tokens made before
+    /// V0.5.15 and any token created without a choice).
+    #[serde(default)]
+    pub workspaces: Option<Vec<String>>,
 }
 
 /// How the server reaches its outgoing mail server, as administrators see it.

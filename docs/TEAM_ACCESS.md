@@ -321,3 +321,31 @@ trail records `user_offboarded` with the counts. Anonymizing remains a separate
 step afterwards. The older *Deactivate account* action still works and still
 refuses an owner. `GET /v1/system/users/{user_id}/offboarding` is the preview
 and `POST …/offboard` the action; both are for full system administrators.
+
+## Workspace-limited tokens and the token inventory
+
+V0.5.15 lets a personal access token be **limited to chosen workspaces**.
+When creating a token (Profile › API tokens) switch on *Limit to chosen
+workspaces* and tick the workspaces; each must be one you can open now. A limited
+token cannot read, search, export or stream any other workspace, and does not see
+other workspaces in lists, the dashboard, tasks or notices. A token with the
+`system` scope cannot be limited.
+
+A token never outlives its grant. It still ends at its expiry (7, 30, 90 or 365
+days), and because every request is checked against its owner's current
+membership, it stops working in a workspace the moment its owner loses access
+there (removal, guest expiry, offboarding or a restricted-workspace change), with
+no separate cleanup. Deleting a workspace removes it from every token's list; a
+limited token left with none reaches nothing.
+
+**Existing tokens (migration 0052).** Tokens made before this release are not
+limited: they reach everything their owner can open, as before. Their owner can
+narrow one in place with **Limit…** (`PUT /v1/profile/tokens/{id}/workspaces`);
+a limited token can never be made unlimited again, so create a new token for
+that. Nothing was changed for you automatically.
+
+**Inventory.** System › Users lists every live token with its owner, scope,
+whether it is limited, expiry and last use (`GET /v1/system/tokens`, full
+system administrators), and lets an administrator revoke any of them
+(`DELETE /v1/system/tokens/{id}`, audited as `token_revoked_by_administrator`).
+Secrets are never shown. A per-workspace token view is not included.

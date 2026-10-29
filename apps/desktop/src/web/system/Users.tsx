@@ -45,6 +45,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { showToast } from "../../components/ui/toast";
 import { appLink, SecretDialog } from "../../components/SecretDialog";
 import { OffboardDialog } from "../../components/OffboardDialog";
+import { TokenInventory } from "../../components/TokenInventory";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatTime } from "../format";
 import { useSystemData, count, RefreshButton } from "./shared";
@@ -196,6 +197,7 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
     <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button busy={isBusy} disabled={pending?.kind === "anonymize" && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase()} type="submit" variant={pending && DESTRUCTIVE_KINDS.has(pending.kind) ? "danger" : "main"}>{dialog?.action}</Button></>} onClose={() => setPending(null)} onSubmit={() => void confirm()} open={Boolean(pending)} title={dialog?.title ?? ""}>
       {pending?.kind === "anonymize" ? <Field label="Confirm the email address"><Input autoComplete="off" onChange={(event) => setConfirmText(event.target.value)} placeholder={pending.user.email} value={confirmText} /></Field> : null}
     </Dialog>
+    {session.is_system_admin ? <TokenInventory accessToken={accessToken} /> : null}
     {offboarding ? <OffboardDialog accessToken={accessToken} candidates={users ?? []} onClose={() => setOffboarding(null)} onDone={() => { setOffboarding(null); void reload(); }} user={offboarding} /> : null}
     {resetLink ? <SecretDialog description={`Send this link to ${resetLink.user.display_name} (${resetLink.user.email}) through a channel you trust. It lets whoever opens it choose the account's password, once, until ${formatTime(resetLink.expiresAt)}.`} onClose={() => setResetLink(null)} title="Password reset link" value={resetLink.url} /> : null}
   </>;

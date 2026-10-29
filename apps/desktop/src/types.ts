@@ -960,6 +960,8 @@ export interface PersonalAccessToken {
   created_at: string;
   expires_at: string;
   last_used_at: string | null;
+  /** The workspaces the token is limited to; null means every workspace its owner can open. */
+  workspaces?: string[] | null;
 }
 
 export interface CreatedPersonalToken {

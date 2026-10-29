@@ -54,18 +54,23 @@ pub(crate) async fn list_profile_tasks(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<CollaborationTask>>, ApiError> {
-    state
+    let mut tasks = state
         .storage
         .list_assigned_collaboration_tasks(&subject.user_id)
         .await
-        .map(Json)
-        .map_err(map_storage_error)
+        .map_err(map_storage_error)?;
+    tasks.retain(|task| subject.token_reaches(&task.workspace_id));
+    Ok(Json(tasks))
 }
 
 pub(crate) async fn list_notifications(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<SharedNotification>>, ApiError> {
+    // Notices name things in any workspace, so a token limited to some workspaces is not given them.
+    if subject.token.as_ref().is_some_and(|grant| grant.workspaces.is_some()) {
+        return Ok(Json(Vec::new()));
+    }
     state
         .storage
         .list_shared_notifications(&subject.user_id)

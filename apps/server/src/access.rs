@@ -790,6 +790,9 @@ pub(crate) struct CreateTokenRequest {
     name: String,
     scope: String,
     expires_in_days: i64,
+    /// Limit the token to these workspaces; leave out for every workspace its owner can open.
+    #[serde(default)]
+    workspace_ids: Option<Vec<String>>,
 }
 
 #[derive(Serialize)]
@@ -812,18 +815,123 @@ pub(crate) async fn create_token(
     if !TOKEN_TTL_DAYS.contains(&request.expires_in_days) {
         return Err(ApiError::bad_request("A token lasts 7, 30, 90 or 365 days."));
     }
+    let workspaces = match &request.workspace_ids {
+        Some(ids) => {
+            if request.scope.trim() == "system" {
+                return Err(ApiError::bad_request(
+                    "A token with the system scope is not limited to workspaces. Choose another scope.",
+                ));
+            }
+            Some(checked_token_workspaces(&state, &subject, ids).await?)
+        }
+        None => None,
+    };
     let (token, secret) = state
         .storage
-        .create_personal_token(
+        .create_personal_token_for(
             &subject.user_id,
             &request.name,
             request.scope.trim(),
             request.expires_in_days,
+            workspaces.as_deref(),
         )
         .await
         .map_err(map_storage_error)?;
     tracing::info!(target: "audit", user_id = %subject.user_id, token_id = %token.id, scope = %token.scope, "Personal access token created");
     Ok((StatusCode::CREATED, Json(CreatedToken { token, secret })))
+}
+
+/// The workspaces a token may be limited to: between one and fifty, each one its owner can open now.
+async fn checked_token_workspaces(
+    state: &AppState,
+    subject: &crate::AuthenticatedSubject,
+    ids: &[String],
+) -> Result<Vec<String>, ApiError> {
+    let mut chosen: Vec<String> = Vec::new();
+    for id in ids {
+        if !chosen.contains(id) {
+            chosen.push(id.clone());
+        }
+    }
+    if chosen.is_empty() || chosen.len() > 50 {
+        return Err(ApiError::bad_request(
+            "Choose between one and fifty workspaces for the token.",
+        ));
+    }
+    for id in &chosen {
+        let role =
+            crate::access_control::effective_workspace_role(state, &subject.user_id, subject.is_system_admin, id)
+                .await?;
+        if role.is_none() {
+            return Err(ApiError::bad_request(
+                "A token can only be limited to workspaces you can open.",
+            ));
+        }
+    }
+    Ok(chosen)
+}
+
+#[derive(Deserialize)]
+pub(crate) struct TokenWorkspacesRequest {
+    workspace_ids: Vec<String>,
+}
+
+/// Limits a token you own to chosen workspaces, replacing an earlier choice. It is how a token made before V0.5.15,
+/// which reaches everything its owner can open, is narrowed. A limited token never becomes unlimited again: make a
+/// new token for that.
+pub(crate) async fn set_token_workspaces(
+    SessionSubject(subject): SessionSubject,
+    State(state): State<AppState>,
+    Path(token_id): Path<String>,
+    Json(request): Json<TokenWorkspacesRequest>,
+) -> Result<StatusCode, ApiError> {
+    let workspaces = checked_token_workspaces(&state, &subject, &request.workspace_ids).await?;
+    if !state
+        .storage
+        .set_token_workspaces(&subject.user_id, &token_id, &workspaces)
+        .await
+        .map_err(map_storage_error)?
+    {
+        return Err(ApiError::not_found("Token was not found."));
+    }
+    tracing::info!(target: "audit", user_id = %subject.user_id, token_id = %token_id, workspaces = workspaces.len(), "Personal access token limited to workspaces");
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Every live token on the server with its owner, scope, expiry, last use and workspaces: the access inventory.
+pub(crate) async fn token_inventory(
+    subject: crate::AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    crate::system::require_full_system_admin(&subject)?;
+    let tokens = state.storage.token_inventory().await.map_err(map_storage_error)?;
+    Ok(Json(serde_json::json!({"tokens":tokens})))
+}
+
+/// An administrator ends any token; the owner is told nothing is wrong with their account, the audit trail records it.
+pub(crate) async fn admin_revoke_token(
+    subject: crate::AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(token_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    crate::system::require_full_system_admin(&subject)?;
+    crate::system::require_system_change(&subject)?;
+    let Some(owner) = state
+        .storage
+        .revoke_token_by_id(&token_id)
+        .await
+        .map_err(map_storage_error)?
+    else {
+        return Err(ApiError::not_found("Token was not found."));
+    };
+    crate::system::audit(
+        &state,
+        &subject,
+        "token_revoked_by_administrator",
+        format!("Revoked token {token_id} of user {owner}."),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub(crate) async fn revoke_token(

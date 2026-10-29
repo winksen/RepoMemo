@@ -129,6 +129,7 @@ fn token_from_row((id, name, prefix, scope, created_at, expires_at, last_used_at
         created_at,
         expires_at,
         last_used_at,
+        workspaces: None,
     }
 }
 
@@ -367,6 +368,19 @@ impl StorageEngine {
         scope: &str,
         ttl_days: i64,
     ) -> Result<(PersonalAccessToken, String)> {
+        self.create_personal_token_for(user_id, name, scope, ttl_days, None)
+            .await
+    }
+
+    /// The same, optionally limited to the given workspaces (the caller has checked the owner may open each).
+    pub async fn create_personal_token_for(
+        &self,
+        user_id: &str,
+        name: &str,
+        scope: &str,
+        ttl_days: i64,
+        workspaces: Option<&[String]>,
+    ) -> Result<(PersonalAccessToken, String)> {
         let name = name.trim();
         if name.is_empty() || name.chars().count() > 80 {
             repomemo_domain::bail_invalid!("Token name must be between 1 and 80 characters.");
@@ -387,9 +401,11 @@ impl StorageEngine {
             created_at: now.to_rfc3339(),
             expires_at: (now + Duration::days(ttl_days)).to_rfc3339(),
             last_used_at: None,
+            workspaces: workspaces.map(<[String]>::to_vec),
         };
+        let mut tx = self.pool.begin().await?;
         sqlx::query(
-            "INSERT INTO personal_access_tokens (id, user_id, name, token_hash, prefix, scope, created_at, expires_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO personal_access_tokens (id, user_id, name, token_hash, prefix, scope, created_at, expires_at, restricted) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         )
         .bind(&id)
         .bind(user_id)
@@ -399,9 +415,112 @@ impl StorageEngine {
         .bind(scope)
         .bind(&token.created_at)
         .bind(&token.expires_at)
-        .execute(&self.pool)
+        .bind(i64::from(workspaces.is_some()))
+        .execute(&mut *tx)
         .await?;
+        for workspace in workspaces.unwrap_or_default() {
+            sqlx::query("INSERT OR IGNORE INTO personal_token_workspaces (token_id, workspace_id) VALUES (?1, ?2)")
+                .bind(&id)
+                .bind(workspace)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
         Ok((token, raw))
+    }
+
+    /// The workspaces a token is limited to: `None` when it is not limited.
+    pub async fn token_workspaces(&self, token_id: &str) -> Result<Option<Vec<String>>> {
+        let restricted: Option<i64> = sqlx::query_scalar("SELECT restricted FROM personal_access_tokens WHERE id = ?1")
+            .bind(token_id)
+            .fetch_optional(self.reader())
+            .await?;
+        if restricted != Some(1) {
+            return Ok(None);
+        }
+        Ok(Some(
+            sqlx::query_scalar(
+                "SELECT workspace_id FROM personal_token_workspaces WHERE token_id = ?1 ORDER BY workspace_id",
+            )
+            .bind(token_id)
+            .fetch_all(self.reader())
+            .await?,
+        ))
+    }
+
+    /// Limits one of the user's tokens to these workspaces (replacing an earlier choice). Returns whether it existed.
+    pub async fn set_token_workspaces(&self, user_id: &str, token_id: &str, workspaces: &[String]) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        let changed = sqlx::query(
+            "UPDATE personal_access_tokens SET restricted = 1 WHERE id = ?1 AND user_id = ?2 AND revoked_at IS NULL",
+        )
+        .bind(token_id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+        if changed.rows_affected() == 0 {
+            return Ok(false);
+        }
+        sqlx::query("DELETE FROM personal_token_workspaces WHERE token_id = ?1")
+            .bind(token_id)
+            .execute(&mut *tx)
+            .await?;
+        for workspace in workspaces {
+            sqlx::query("INSERT OR IGNORE INTO personal_token_workspaces (token_id, workspace_id) VALUES (?1, ?2)")
+                .bind(token_id)
+                .bind(workspace)
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(true)
+    }
+
+    /// Every token that is neither revoked nor expired, across all accounts, with its owner and limits: the access
+    /// inventory. Never the secret.
+    pub async fn token_inventory(&self) -> Result<Vec<serde_json::Value>> {
+        type Row = (
+            String,
+            String,
+            Option<String>,
+            String,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            i64,
+        );
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT t.id, u.id, u.email, u.display_name, t.name, t.prefix, t.scope, t.expires_at, t.last_used_at, t.restricted FROM personal_access_tokens t JOIN users u ON u.id = t.user_id WHERE t.revoked_at IS NULL AND t.expires_at > ?1 ORDER BY t.expires_at LIMIT 1000",
+        )
+        .bind(Utc::now().to_rfc3339())
+        .fetch_all(self.reader())
+        .await?;
+        let mut inventory = Vec::new();
+        for (id, user_id, email, name, token_name, prefix, scope, expires_at, last_used_at, restricted) in rows {
+            let workspaces = if restricted == 1 {
+                self.token_workspaces(&id).await?
+            } else {
+                None
+            };
+            inventory.push(serde_json::json!({
+                "id": id, "user_id": user_id, "email": email, "display_name": name, "name": token_name, "prefix": prefix,
+                "scope": scope, "expires_at": expires_at, "last_used_at": last_used_at, "workspaces": workspaces,
+            }));
+        }
+        Ok(inventory)
+    }
+
+    /// Revokes any token by its id, for an administrator. Returns the owner's id when it existed.
+    pub async fn revoke_token_by_id(&self, token_id: &str) -> Result<Option<String>> {
+        Ok(sqlx::query_scalar(
+            "UPDATE personal_access_tokens SET revoked_at = ?1 WHERE id = ?2 AND revoked_at IS NULL RETURNING user_id",
+        )
+        .bind(Utc::now().to_rfc3339())
+        .bind(token_id)
+        .fetch_optional(&self.pool)
+        .await?)
     }
 
     /// The user's tokens that are not revoked, expired ones included (the
@@ -413,7 +532,11 @@ impl StorageEngine {
         .bind(user_id)
         .fetch_all(self.reader())
         .await?;
-        Ok(rows.into_iter().map(token_from_row).collect())
+        let mut tokens: Vec<PersonalAccessToken> = rows.into_iter().map(token_from_row).collect();
+        for token in &mut tokens {
+            token.workspaces = self.token_workspaces(&token.id).await?;
+        }
+        Ok(tokens)
     }
 
     /// Revokes one of the user's tokens. Returns whether it existed.

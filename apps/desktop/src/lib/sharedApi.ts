@@ -2068,11 +2068,16 @@ export function listPersonalTokens(accessToken: string): Promise<PersonalAccessT
 }
 
 /** Creates a personal access token; its secret is returned only now. */
-export function createPersonalToken(accessToken: string, input: { name: string; scope: "read" | "write" | "admin" | "system"; expiresInDays: number }): Promise<CreatedPersonalToken> {
+export function createPersonalToken(accessToken: string, input: { name: string; scope: "read" | "write" | "admin" | "system"; expiresInDays: number; workspaceIds?: string[] }): Promise<CreatedPersonalToken> {
   return request<CreatedPersonalToken>("/v1/profile/tokens", {
     method: "POST",
-    body: JSON.stringify({ name: input.name, scope: input.scope, expires_in_days: input.expiresInDays }),
+    body: JSON.stringify({ name: input.name, scope: input.scope, expires_in_days: input.expiresInDays, ...(input.workspaceIds ? { workspace_ids: input.workspaceIds } : {}) }),
   }, accessToken);
+}
+
+/** Limits a token you own to these workspaces; it cannot be made unlimited again. */
+export function limitPersonalTokenWorkspaces(accessToken: string, tokenId: string, workspaceIds: string[]): Promise<void> {
+  return request<void>(`/v1/profile/tokens/${encodeURIComponent(tokenId)}/workspaces`, { method: "PUT", body: JSON.stringify({ workspace_ids: workspaceIds }) }, accessToken);
 }
 
 export function revokePersonalToken(accessToken: string, tokenId: string): Promise<void> {
