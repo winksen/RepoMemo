@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.5 → 0.6
 
-> **Current:** `V0.5.9` (2026-10-29)
+> **Current:** `V0.5.10` (2026-10-29)
 
 > **Theme:** Team access and identity · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -29,7 +29,7 @@
 | **V0.5.7** | ✅ 2026-10-29 | AI. Team access | 🔒 | Session lifecycle | Add provider logout and supported back-channel logout with an absolute reauthentication deadline | A disabled identity cannot refresh forever; an IdP without logout notifications has a documented, tested maximum access window |
 | **V0.5.8** | ✅ 2026-10-29 | AI. Team access | 🔧 | Audit | Extend the existing audit/export path with identity linking, provider policy, login and group-mapping events | An authorized export explains identity changes and failures without tokens or secrets; no duplicate audit subsystem is created |
 | **V0.5.9** | ✅ 2026-10-29 | AI. Team access | 🔒 | Identity review | Review and close findings on redirects, account linking, discovery, tokens and recovery | No high/medium identity finding remains open and negative cases have regression coverage |
-| **V0.5.10** | 🔜 | AI. Team access | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
+| **V0.5.10** | ✅ 2026-10-29 | AI. Team access | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
 | **V0.5.11** | 🔜 | AI. Team access | ✨ | Workspace access | Add explicit organization-shared versus restricted workspace membership policy | A restricted workspace never auto-enrolls a new org member; existing memberships migrate without silent loss or expansion and server-admin powers are explicit |
 | **V0.5.12** | 🔜 | AI. Team access | 🔧 | Access UX | Show effective access and its origin before membership or group-policy changes | An administrator can explain every grant and preview affected people; search, counts and direct URLs reveal no restricted workspace to unauthorized users |
 | **V0.5.13** | 🔜 | AI. Team access | ✨ | Guests | Add expiry and renewal to existing direct guest membership | An expired guest loses read, search, export, event and token access at the deadline; renewals and expiry are auditable |

@@ -221,3 +221,14 @@ yourself from RepoMemo. `POST /v1/auth/identity/complete` accepts an optional
 `code` and answers `202 {"status":"confirm"}` until it is given, `409` for a
 wrong code and `400` once three are used. Linking an account from the profile
 uses the same step.
+
+## Rehearsing the provider journeys
+
+V0.5.10 closes the identity track as built but **not live-validated**: no real
+provider was available. The [evidence record](../mindmap/technical/release-evidence-0.5.10.md)
+has a ten-step rehearsal for an administrator with a test provider tenant
+(configure, link, browser and desktop sign-in with the confirmation code,
+enrollment, group mapping, required sign-in with break-glass, outage recovery,
+logout and the session limit, and the container path) and a result sheet whose
+cells are all pending. Do the outage-recovery step before relying on required
+provider sign-in.

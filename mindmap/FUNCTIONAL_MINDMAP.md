@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.9` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.10` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,13 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.10 — Close the identity track with an evidence record and a provider rehearsal.
+
+- Record what V0.5.1–V0.5.9 deliver and how each is evidenced in [the V0.5.10 record](technical/release-evidence-0.5.10.md). No live provider was available, so provider sign-in, the desktop and container paths and outage recovery are written as a ten-step rehearsal with a result sheet that is entirely pending; nothing is claimed as passed.
+- The record notes an existing, unrelated clippy failure in the templates crate (a newer-toolchain lint) and that no test was executed by the author. The identity track closes as built and compiled, not live-validated; no distribution is newly certified.
+
+Checks: Version, migration lock, generated types, styles, accessibility, documentation and TypeScript checks pass; clippy for the storage and server crates (all targets) passes. No test was executed; live provider journeys are pending.
 
 ## V0.5.9 — Review the identity work and close its findings.
 

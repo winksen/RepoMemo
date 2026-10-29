@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.10 (2026-10-29)
+
+Close the identity track with an evidence record and a provider rehearsal.
+
+### Changed
+- Record what V0.5.1–V0.5.9 deliver and how each is evidenced in [the V0.5.10 record](mindmap/technical/release-evidence-0.5.10.md). No live provider was available, so provider sign-in, the desktop and container paths and outage recovery are written as a ten-step rehearsal with a result sheet that is entirely pending; nothing is claimed as passed.
+- The record notes an existing, unrelated clippy failure in the templates crate (a newer-toolchain lint) and that no test was executed by the author. The identity track closes as built and compiled, not live-validated; no distribution is newly certified.
+
+### Checks
+- Version, migration lock, generated types, styles, accessibility, documentation and TypeScript checks pass; clippy for the storage and server crates (all targets) passes. No test was executed; live provider journeys are pending.
+
+### Upgrading
+- No change to the product. Do the rehearsal's outage-recovery step before requiring provider sign-in.
+
 ## V0.5.9 (2026-10-29)
 
 Review the identity work and close its findings.
