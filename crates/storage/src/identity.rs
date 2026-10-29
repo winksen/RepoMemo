@@ -30,6 +30,9 @@ pub struct IdentityProvider {
     pub group_claim: String,
     #[serde(default)]
     pub group_mappings: Vec<GroupMapping>,
+    /// Hours a provider-started session may be refreshed before signing in at the provider again; 0 means 12.
+    #[serde(default)]
+    pub max_session_hours: u32,
 }
 
 /// An allowlisted provider group and the one membership it grants. Ownership is never mapped.
@@ -364,6 +367,85 @@ impl StorageEngine {
         Ok(plan)
     }
 
+    /// Marks a freshly issued refresh token as one that began with the provider.
+    pub async fn attach_identity_session(
+        &self,
+        refresh_token: &str,
+        issuer: &str,
+        sid: Option<&str>,
+        reauth_by: &str,
+    ) -> Result<()> {
+        sqlx::query("UPDATE refresh_tokens SET idp_issuer=?1, idp_sid=?2, reauth_by=?3 WHERE token_hash=?4")
+            .bind(issuer)
+            .bind(sid)
+            .bind(reauth_by)
+            .bind(hash_refresh_token(refresh_token))
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// The provider session of a refresh token: issuer, provider session id and the absolute reauthentication deadline.
+    pub async fn identity_session(&self, refresh_token: &str) -> Result<Option<(String, Option<String>, String)>> {
+        Ok(sqlx::query_as(
+            "SELECT idp_issuer, idp_sid, reauth_by FROM refresh_tokens WHERE token_hash=?1 AND idp_issuer IS NOT NULL AND reauth_by IS NOT NULL",
+        )
+        .bind(hash_refresh_token(refresh_token))
+        .fetch_optional(&self.pool)
+        .await?)
+    }
+
+    /// Accounts whose provider session the provider says has ended: the linked account for a subject, and the
+    /// accounts holding a refresh token tied to a provider session id.
+    pub async fn identity_logout_users(
+        &self,
+        issuer: &str,
+        subject: Option<&str>,
+        sid: Option<&str>,
+    ) -> Result<Vec<String>> {
+        let mut users: Vec<String> = Vec::new();
+        if let Some(subject) = subject {
+            users.extend(
+                sqlx::query_scalar::<_, String>("SELECT user_id FROM linked_identities WHERE issuer=?1 AND subject=?2")
+                    .bind(issuer)
+                    .bind(subject)
+                    .fetch_all(&self.pool)
+                    .await?,
+            );
+        }
+        if let Some(sid) = sid {
+            users.extend(
+                sqlx::query_scalar::<_, String>(
+                    "SELECT DISTINCT user_id FROM refresh_tokens WHERE idp_issuer=?1 AND idp_sid=?2",
+                )
+                .bind(issuer)
+                .bind(sid)
+                .fetch_all(&self.pool)
+                .await?,
+            );
+        }
+        users.sort();
+        users.dedup();
+        Ok(users)
+    }
+
+    /// Records a logout token's identifier; false when it was already used.
+    pub async fn use_identity_logout_token(&self, jti: &str, expires_at: i64) -> Result<bool> {
+        let now = Utc::now().timestamp();
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM identity_logout_tokens WHERE expires_at<=?1")
+            .bind(now)
+            .execute(&mut *tx)
+            .await?;
+        let inserted = sqlx::query("INSERT OR IGNORE INTO identity_logout_tokens (jti_hash,expires_at) VALUES (?1,?2)")
+            .bind(identity_hash(jti))
+            .bind(expires_at.max(now + 60))
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(inserted.rows_affected() == 1)
+    }
+
     pub async fn identity_provider(&self) -> Result<Option<IdentityProvider>> {
         let row: Option<String> = sqlx::query_scalar("SELECT configuration FROM identity_provider WHERE id=1")
             .fetch_optional(self.reader())
@@ -469,6 +551,41 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(role(&owner.id).await, Some(OrganizationRole::Owner));
+    }
+    #[tokio::test]
+    async fn provider_logout_finds_accounts_and_refuses_a_repeated_token() {
+        let dir = std::env::temp_dir().join(format!("repomemo-logout-{}", Uuid::new_v4()));
+        let storage = StorageEngine::open(StorageConfig::new(dir)).await.unwrap();
+        let a = storage.create_user("a@example.com", "A", "hash").await.unwrap();
+        let b = storage.create_user("b@example.com", "B", "hash").await.unwrap();
+        storage
+            .link_identity("https://id.example.com", "subject-a", &a.id, 0)
+            .await
+            .unwrap();
+        let token = storage.create_refresh_token(&b.id, 30).await.unwrap();
+        storage
+            .attach_identity_session(
+                &token,
+                "https://id.example.com",
+                Some("sid-b"),
+                "2999-01-01T00:00:00+00:00",
+            )
+            .await
+            .unwrap();
+        let users = |subject, sid| {
+            let storage = storage.clone();
+            async move {
+                storage
+                    .identity_logout_users("https://id.example.com", subject, sid)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(users(Some("subject-a"), None).await, vec![a.id.clone()]);
+        assert_eq!(users(None, Some("sid-b")).await, vec![b.id.clone()]);
+        assert!(users(Some("unknown"), Some("other")).await.is_empty());
+        assert!(storage.use_identity_logout_token("jti", 0).await.unwrap());
+        assert!(!storage.use_identity_logout_token("jti", 0).await.unwrap());
     }
     #[tokio::test]
     async fn identity_linking_never_reassigns_email_or_subject() {

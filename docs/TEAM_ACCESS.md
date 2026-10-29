@@ -167,3 +167,23 @@ an owner, is kept as it is, and one whose role someone changed after the sync
 is released from the sync rather than overwritten. A failed sync never blocks
 sign-in. A sign-in that changes memberships records one system audit event.
 Memberships are not re-evaluated between sign-ins (see session lifecycle).
+
+## Provider logout and the session limit
+
+V0.5.7 gives every session that began with the provider an **absolute
+reauthentication deadline**: 12 hours by default, 1 to 720 hours in System
+settings (*Provider session limit*). Renewing a session carries the deadline on
+unchanged, so a person disabled at the provider cannot stay signed in by
+refreshing; once it passes they must sign in at the provider again. This is the
+documented maximum access window when a provider sends no logout notice.
+
+Signing out of RepoMemo after a provider sign-in also leads the browser to the
+provider's end-session page when the provider advertises one (the desktop app
+opens the system browser). The provider can also end sessions itself with
+OpenID Connect **back-channel logout**: register
+`<public URL>/v1/auth/identity/backchannel-logout` with the provider. A signed,
+single-use logout token for a known subject or session ends every session of the
+linked account at once, because access tokens are not tracked individually. A
+bad, unsigned, wrong-audience, expired or repeated token changes nothing. Front-
+channel logout is not supported. Migration 0049 holds the session fields and the
+used-token record; it is server-level data excluded from workspace archives.

@@ -14,7 +14,7 @@ import { PanelHeading } from "./ui/panel-heading";
 import { showToast } from "./ui/toast";
 import { useUnsavedChanges } from "../lib/unsavedChanges";
 
-interface Provider { name: string; issuer: string; client_id: string; enabled: boolean; allowed_domains: string[]; checked_at?: string | null; enforced?: boolean; group_claim?: string; group_mappings?: Mapping[] }
+interface Provider { name: string; issuer: string; client_id: string; enabled: boolean; allowed_domains: string[]; checked_at?: string | null; enforced?: boolean; group_claim?: string; group_mappings?: Mapping[]; max_session_hours?: number }
 interface Mapping { group: string; scope: string; target_id: string; role: string }
 interface Change { scope: string; target_id: string; role: string; group: string }
 interface Plan { add: Change[]; change: Change[]; remove: Change[]; keep: Change[] }
@@ -86,6 +86,7 @@ export function IdentitySettings({ accessToken }: { accessToken: string }) {
         <Switch label="Enable provider" checked={draft.enabled} onCheckedChange={enabled => edit({ enabled, ...(enabled ? {} : { enforced: false }) })} />
         <Switch label="Require provider sign-in" checked={Boolean(draft.enforced)} disabled={!draft.enabled} onCheckedChange={enforced => edit({ enforced })} />
         {draft.enforced ? <Field label="Break-glass administrators" required hint="One to five active system administrators, comma-separated, who keep password sign-in. You must have linked your own account to this provider first. Each use is recorded in the audit trail."><Input required value={breakGlass} onChange={event => { setBreakGlass(event.target.value); setDirty(true); }} /></Field> : null}
+        <Field label="Provider session limit (hours)" hint="How long a provider sign-in can be renewed before the person must sign in at the provider again (1 to 720, default 12). This is the longest a disabled provider identity keeps access if the provider sends no logout notice."><Input type="number" min={1} max={720} value={draft.max_session_hours || 12} onChange={event => edit({ max_session_hours: Number(event.target.value) })} /></Field>
         <Field label="Group claim" hint="The ID-token claim that lists the person's groups. Leave empty for “groups”. A token without it changes no memberships."><Input maxLength={64} value={draft.group_claim ?? ""} onChange={event => edit({ group_claim: event.target.value })} /></Field>
         <Field label="Group mappings" hint="One per line: group | organization or workspace | target ID | role. Roles: admin or member for an organization; admin, member or viewer for a workspace. Ownership is never mapped, and memberships set directly are never changed or removed."><Textarea rows={4} value={mappings} onChange={event => { setMappings(event.target.value); setDirty(true); }} /></Field>
         <Field label="Preview for a person" hint="Shows what signing in with these groups would add, change or remove, without doing it."><Input type="email" placeholder="person@example.com" value={previewEmail} onChange={event => setPreviewEmail(event.target.value)} /></Field>

@@ -112,8 +112,9 @@
 | GET | `/v1/system/mail/outbox` | auth | require_system_admin | `limit` query | Vec<MailOutboxEntry> (recipient, subject, kind, state, attempts; never the body or a link) |
 | POST | `/v1/system/mail/test` | auth | require_full_system_admin, require_system_change | TestMailRequest | MailOutboxEntry (queued; refused while 50 are waiting) |
 | GET | `/v1/system/identity` | session | system administrator | — | Redacted provider settings and callback URL |
-| GET | `/v1/auth/identity` | public | — | — | Enabled provider display name and whether it is required |
+| GET | `/v1/auth/identity` | public | — | — | Enabled provider display name, whether it is required and its end-session address |
 | POST | `/v1/auth/identity/start` | public | sign-in quota | — | Authorization URL and initiating-client proof; five-minute expiry |
+| POST | `/v1/auth/identity/backchannel-logout` | public | provider-signed logout token | form `logout_token` | Ends every session of the linked account; single-use `jti`, audited, no body |
 | GET | `/v1/auth/identity/callback` | public | state, PKCE, nonce, signature | Callback | Completes a single-use provider response; no session tokens in the page |
 | POST | `/v1/auth/identity/complete` | public | initiating-client proof | Complete | 202 pending or existing session response; result consumed once |
 | GET | `/v1/profile/identity` | session | own account | — | Linked issuer and date; no provider subject or secret |

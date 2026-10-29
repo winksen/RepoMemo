@@ -91,7 +91,7 @@ import type {
 } from "../types";
 
 import { queryClient } from "./queryClient";
-import { sessionStore } from "./desktop";
+import { openExternal, sessionStore } from "./desktop";
 import { browserTransport, type Transport } from "./transport";
 
 let API_URL = (import.meta.env.VITE_REPOMEMO_API_URL ?? "http://127.0.0.1:3020").replace(/\/$/, "");
@@ -185,8 +185,22 @@ function forgetSession(keepStoredToken = false) {
   if (desktopSession && !keepStoredToken) void sessionStore.clear().catch(() => undefined);
 }
 
+/** Ends the provider's own session too, when the provider has an end-session page: this window leaves for it, the desktop app opens the system browser. */
+async function endProviderSession() {
+  try {
+    const { logoutUrl } = await fetchSignInProvider();
+    if (!logoutUrl) return;
+    if (desktopSession) await openExternal(logoutUrl);
+    else window.location.assign(logoutUrl);
+  } catch {
+    // The local session is already gone; the provider session simply ends at its own deadline.
+  }
+}
+
 /** Forgets the local session. Best-effort revokes the refresh token on the server, which also clears the cookie (in the desktop app, the credential store entry). */
 export function clearSharedSession() {
+  const providerSession = readStorage("localStorage", PROVIDER_SESSION_KEY) !== null;
+  writeStorage("localStorage", PROVIDER_SESSION_KEY, null);
   const hadSession = readStorage("localStorage", SESSION_MARKER_KEY) !== null || readStorage("localStorage", REFRESH_STORAGE_KEY) !== null;
   const legacyToken = readStorage("localStorage", REFRESH_STORAGE_KEY);
   // The stored token is read before it is forgotten, so the server can be told to end that session.
@@ -203,7 +217,8 @@ export function clearSharedSession() {
           body: JSON.stringify(token ? { refresh_token: token } : {}),
         }).catch(() => undefined);
       })
-      .finally(() => { if (desktopSession) void sessionStore.clear().catch(() => undefined); });
+      .finally(() => { if (desktopSession) void sessionStore.clear().catch(() => undefined); })
+      .then(() => (providerSession ? endProviderSession() : undefined));
   }
 }
 
@@ -423,10 +438,12 @@ export type ProviderFlow = { authorization_url: string; state: string; proof: st
 export type ProviderLink = [issuer: string, linkedAt: string];
 
 /** The enabled sign-in provider's display name (null when the server offers password sign-in only) and whether it replaces passwords. */
-export async function fetchSignInProvider(): Promise<{ name: string | null; enforced: boolean }> {
-  const answer = await request<{ name: string | null; enforced?: boolean }>("/v1/auth/identity");
-  return { name: answer.name ?? null, enforced: Boolean(answer.name && answer.enforced) };
+export async function fetchSignInProvider(): Promise<{ name: string | null; enforced: boolean; logoutUrl: string | null }> {
+  const answer = await request<{ name: string | null; enforced?: boolean; logout_url?: string | null }>("/v1/auth/identity");
+  return { name: answer.name ?? null, enforced: Boolean(answer.name && answer.enforced), logoutUrl: answer.logout_url ?? null };
 }
+
+const PROVIDER_SESSION_KEY = "repomemo-provider-session";
 
 export function startProviderFlow(invitationToken?: string): Promise<ProviderFlow> {
   return request<ProviderFlow>("/v1/auth/identity/start", {
@@ -450,7 +467,10 @@ export async function pollProviderFlow(flow: ProviderFlow, keepSession = true): 
     body: JSON.stringify({ state: flow.state, proof: flow.proof }),
   });
   if (!("access_token" in response)) return null;
-  if (keepSession) storeTokens(response);
+  if (keepSession) {
+    storeTokens(response);
+    writeStorage("localStorage", PROVIDER_SESSION_KEY, "1");
+  }
   return response;
 }
 

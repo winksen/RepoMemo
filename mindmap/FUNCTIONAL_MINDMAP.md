@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.6` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.7` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.7 — Add provider logout, back-channel logout and an absolute reauthentication deadline.
+
+- Every session that began with the provider carries a hard reauthentication deadline (12 hours by default, 1–720 in System settings) that refresh rotation never extends, so a disabled provider identity cannot refresh forever. Without logout notices that deadline is the documented maximum access window.
+- Signing out after a provider sign-in leads to the provider's end-session page when it has one (the system browser on desktop). OpenID Connect back-channel logout at `/v1/auth/identity/backchannel-logout` validates the signed token (signature, issuer, audience, events, no nonce, freshness, single-use `jti`) and ends every session of the linked account; each use is audited.
+- Migration 0049 stores the provider session fields on refresh tokens and the used logout-token identifiers. Front-channel logout is not supported.
+
+Checks: One server test (deadline enforced, carried through rotation) and one storage test (logout lookup, repeated-token refusal) were written; clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed; no real provider logout was exercised.
 
 ## V0.5.6 — Map allowlisted provider groups to existing memberships without inferring ownership.
 

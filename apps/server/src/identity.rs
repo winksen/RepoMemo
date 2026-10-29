@@ -37,7 +37,7 @@ pub(crate) async fn public_provider(State(state): State<AppState>) -> Result<Jso
     let provider = state.storage.identity_provider().await.map_err(ApiError::internal)?;
     let provider = provider.filter(|p| p.enabled);
     Ok(Json(
-        json!({"name":provider.as_ref().map(|p|&p.name),"enforced":provider.is_some_and(|p|p.enforced)}),
+        json!({"name":provider.as_ref().map(|p|&p.name),"enforced":provider.as_ref().is_some_and(|p|p.enforced),"logout_url":provider.as_ref().and_then(logout_url)}),
     ))
 }
 
@@ -181,7 +181,7 @@ pub(crate) struct Callback {
     error: Option<String>,
 }
 
-fn token_claims(token: &str, keys: &Value, provider: &IdentityProvider, nonce: &str) -> Result<Value, ApiError> {
+fn signing_key(token: &str, keys: &Value) -> Result<DecodingKey, ApiError> {
     let invalid = || ApiError::bad_request("The provider identity token could not be verified. Start sign-in again.");
     let header = jsonwebtoken::decode_header(token).map_err(|_| invalid())?;
     if header.alg != Algorithm::RS256 {
@@ -212,7 +212,12 @@ fn token_claims(token: &str, keys: &Value, provider: &IdentityProvider, nonce: &
     {
         return Err(invalid());
     }
-    let decoding_key = DecodingKey::from_jwk(key).map_err(|_| invalid())?;
+    DecodingKey::from_jwk(key).map_err(|_| invalid())
+}
+
+fn token_claims(token: &str, keys: &Value, provider: &IdentityProvider, nonce: &str) -> Result<Value, ApiError> {
+    let invalid = || ApiError::bad_request("The provider identity token could not be verified. Start sign-in again.");
+    let decoding_key = signing_key(token, keys)?;
     let mut validation = Validation::new(Algorithm::RS256);
     validation.set_issuer(&[provider.issuer.as_str()]);
     validation.set_audience(&[provider.client_id.as_str()]);
@@ -480,7 +485,19 @@ pub(crate) async fn complete(
         .touch_user_connection(user_id)
         .await
         .map_err(ApiError::internal)?;
-    Ok(Json(auth::issue_session(&state, user).await?).into_response())
+    let session = auth::issue_session(&state, user).await?;
+    let reauth_by = (Utc::now() + chrono::Duration::hours(session_hours(&provider))).to_rfc3339();
+    state
+        .storage
+        .attach_identity_session(
+            &session.refresh_token,
+            &provider.issuer,
+            result["claims"]["sid"].as_str(),
+            &reauth_by,
+        )
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(Json(session).into_response())
 }
 
 const MAX_DOCUMENT: usize = 256 * 1024;
@@ -504,6 +521,8 @@ pub(crate) struct ProviderRequest {
     group_claim: String,
     #[serde(default)]
     group_mappings: Vec<GroupMapping>,
+    #[serde(default)]
+    max_session_hours: u32,
 }
 
 fn https_url(value: &str) -> Result<Url, ApiError> {
@@ -638,6 +657,7 @@ fn configuration(request: &ProviderRequest) -> Result<IdentityProvider, ApiError
         || request.client_secret.len() > 16384
         || request.allowed_domains.len() > 50
         || request.group_claim.len() > 64
+        || request.max_session_hours > 720
         || request
             .group_claim
             .bytes()
@@ -666,6 +686,7 @@ fn configuration(request: &ProviderRequest) -> Result<IdentityProvider, ApiError
             request.group_claim.trim().into()
         },
         group_mappings: request.group_mappings.clone(),
+        max_session_hours: request.max_session_hours,
         ..Default::default()
     })
 }
@@ -890,6 +911,95 @@ pub(crate) async fn preview_groups(
         .await
         .map_err(ApiError::internal)?;
     Ok(Json(json!({"plan":plan})))
+}
+
+/// The longest a provider-started session lasts without signing in at the provider again.
+fn session_hours(provider: &IdentityProvider) -> i64 {
+    match provider.max_session_hours {
+        0 => 12,
+        hours => i64::from(hours),
+    }
+}
+
+/// Where the browser should go to end the provider's own session, when the provider offers one.
+fn logout_url(provider: &IdentityProvider) -> Option<String> {
+    let mut url = https_url(provider.end_session_endpoint.as_deref()?).ok()?;
+    url.query_pairs_mut().append_pair("client_id", &provider.client_id);
+    Some(url.to_string())
+}
+
+#[derive(Deserialize)]
+pub(crate) struct BackChannelLogout {
+    logout_token: String,
+}
+
+fn logout_claims(token: &str, keys: &Value, provider: &IdentityProvider) -> Result<Value, ApiError> {
+    let invalid = || ApiError::bad_request("The logout token could not be verified.");
+    let key = signing_key(token, keys).map_err(|_| invalid())?;
+    let mut validation = Validation::new(Algorithm::RS256);
+    validation.set_issuer(&[provider.issuer.as_str()]);
+    validation.set_audience(&[provider.client_id.as_str()]);
+    validation.set_required_spec_claims(&["iss", "aud", "iat"]);
+    validation.leeway = 30;
+    let claims = decode::<Value>(token, &key, &validation).map_err(|_| invalid())?.claims;
+    let now = Utc::now().timestamp();
+    let has = |name: &str| claims[name].as_str().is_some_and(|s| !s.is_empty() && s.len() <= 255);
+    if !claims["events"]["http://schemas.openid.net/event/backchannel-logout"].is_object()
+        || claims.get("nonce").is_some()
+        || !has("jti")
+        || !(has("sub") || has("sid"))
+        || !claims["iat"].as_i64().is_some_and(|t| t <= now + 30 && t >= now - 600)
+    {
+        return Err(invalid());
+    }
+    Ok(claims)
+}
+
+/// OpenID Connect back-channel logout: the provider says a person's session ended. Every session of the linked
+/// account ends at once (access tokens stop with the new session version), and a repeated token is refused.
+pub(crate) async fn backchannel_logout(
+    State(state): State<AppState>,
+    client: ClientIp,
+    axum::Form(request): axum::Form<BackChannelLogout>,
+) -> Result<Response, ApiError> {
+    auth::check_auth_quota(&state, &client, auth::AuthAction::Refresh)?;
+    if request.logout_token.len() > 8192 {
+        return Err(ApiError::bad_request("The logout token could not be verified."));
+    }
+    let provider = enabled_provider(&state).await?;
+    let keys = fetch_json(&provider.jwks_uri).await?;
+    let claims = logout_claims(&request.logout_token, &keys, &provider)?;
+    let exp = claims["exp"].as_i64().unwrap_or(0);
+    if !state
+        .storage
+        .use_identity_logout_token(claims["jti"].as_str().unwrap_or_default(), exp)
+        .await
+        .map_err(ApiError::internal)?
+    {
+        return Err(ApiError::bad_request("The logout token was already used."));
+    }
+    let users = state
+        .storage
+        .identity_logout_users(&provider.issuer, claims["sub"].as_str(), claims["sid"].as_str())
+        .await
+        .map_err(ApiError::internal)?;
+    for user in &users {
+        state
+            .storage
+            .end_user_sessions(user)
+            .await
+            .map_err(ApiError::internal)?;
+    }
+    state
+        .storage
+        .record_system_event(
+            None,
+            "identity_backchannel_logout",
+            &format!("The provider ended the sessions of {} account(s)", users.len()),
+        )
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(([(axum::http::header::CACHE_CONTROL, "no-store")], StatusCode::OK).into_response())
 }
 
 async fn provider_overview(state: &AppState, provider: Option<IdentityProvider>) -> Result<Json<Value>, ApiError> {

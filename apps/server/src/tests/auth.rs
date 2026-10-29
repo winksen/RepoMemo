@@ -1724,3 +1724,41 @@ async fn enforced_provider_sign_in_leaves_only_break_glass_password_access() {
         .unwrap();
     assert_eq!(status(login("member@example.com")).await, 200);
 }
+
+#[tokio::test]
+async fn provider_sessions_refresh_only_until_their_absolute_deadline() {
+    let dir = temp_data_dir("identity-deadline");
+    let app = router(ServerConfig::for_test(dir.clone())).await.unwrap();
+    let (_, account) = register_account(&app, "deadline@example.com").await;
+    let storage = repomemo_storage::StorageEngine::open(repomemo_storage::StorageConfig::new(dir))
+        .await
+        .unwrap();
+    let refresh = |token: String| public_post("/v1/auth/refresh", json!({"refresh_token":token}));
+    let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+    let token = account["refresh_token"].as_str().unwrap().to_owned();
+    storage
+        .attach_identity_session(&token, "https://id.example.com", Some("sid-1"), &future)
+        .await
+        .unwrap();
+    let response = app.clone().oneshot(refresh(token)).await.unwrap();
+    assert_eq!(response.status(), 200);
+    let renewed = response_json(response).await["refresh_token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let carried = storage.identity_session(&renewed).await.unwrap().unwrap();
+    assert_eq!(
+        (carried.0.as_str(), carried.1.as_deref(), carried.2.as_str()),
+        ("https://id.example.com", Some("sid-1"), future.as_str())
+    );
+    let past = (chrono::Utc::now() - chrono::Duration::seconds(5)).to_rfc3339();
+    storage
+        .attach_identity_session(&renewed, "https://id.example.com", Some("sid-1"), &past)
+        .await
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(refresh(renewed.clone())).await.unwrap().status(),
+        401
+    );
+    assert_eq!(app.oneshot(refresh(renewed)).await.unwrap().status(), 401);
+}

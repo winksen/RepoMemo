@@ -363,6 +363,22 @@ pub(crate) async fn refresh_session(
     Json(request): Json<RefreshRequest>,
 ) -> Result<Json<TokenResponse>, ApiError> {
     check_auth_quota(&state, &client, AuthAction::Refresh)?;
+    // A session that began with the provider can be renewed only until its absolute deadline.
+    let identity_session = state
+        .storage
+        .identity_session(&request.refresh_token)
+        .await
+        .map_err(ApiError::internal)?;
+    if let Some((_, _, reauth_by)) = &identity_session {
+        if *reauth_by < Utc::now().to_rfc3339() {
+            state
+                .storage
+                .revoke_refresh_token(&request.refresh_token)
+                .await
+                .map_err(ApiError::internal)?;
+            return Err(ApiError::unauthorized());
+        }
+    }
     let user_id = match state
         .storage
         .consume_refresh_token(&request.refresh_token)
@@ -385,7 +401,15 @@ pub(crate) async fn refresh_session(
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::unauthorized)?;
-    Ok(Json(issue_session(&state, user).await?))
+    let session = issue_session(&state, user).await?;
+    if let Some((issuer, sid, reauth_by)) = identity_session {
+        state
+            .storage
+            .attach_identity_session(&session.refresh_token, &issuer, sid.as_deref(), &reauth_by)
+            .await
+            .map_err(ApiError::internal)?;
+    }
+    Ok(Json(session))
 }
 
 pub(crate) async fn logout(

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.7 (2026-10-29)
+
+Add provider logout, back-channel logout and an absolute reauthentication deadline.
+
+### Changed
+- Every session that began with the provider carries a hard reauthentication deadline (12 hours by default, 1–720 in System settings) that refresh rotation never extends, so a disabled provider identity cannot refresh forever. Without logout notices that deadline is the documented maximum access window.
+- Signing out after a provider sign-in leads to the provider's end-session page when it has one (the system browser on desktop). OpenID Connect back-channel logout at `/v1/auth/identity/backchannel-logout` validates the signed token (signature, issuer, audience, events, no nonce, freshness, single-use `jti`) and ends every session of the linked account; each use is audited.
+- Migration 0049 stores the provider session fields on refresh tokens and the used logout-token identifiers. Front-channel logout is not supported.
+
+### Checks
+- One server test (deadline enforced, carried through rotation) and one storage test (logout lookup, repeated-token refusal) were written; clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed; no real provider logout was exercised.
+
+### Upgrading
+- Migration 0049 runs automatically. Existing sessions have no provider deadline; sessions started with the provider after the upgrade do. Register the back-channel URL at the provider if it supports it.
+
 ## V0.5.6 (2026-10-29)
 
 Map allowlisted provider groups to existing memberships without inferring ownership.
