@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.3 — Link provider identities to accounts only by explicit proof or invitation.
+
+- An authenticated session can start linking its own account (`GET`/`POST /v1/profile/identity`); the callback requires the provider proof and that session's unchanged version. A provider subject cannot be moved to another account, and an email change never changes the account behind an issuer/subject pair.
+- New-account enrollment takes an `invitation_token` on sign-in start, a verified provider email matching the invitation and the domain allowlist. An email already in use is refused with a pointer to explicit linking, never merged.
+- Migration 0047 adds an enrollment confirmation flag: a new identity cannot sign in until invitation acceptance completes. The sign-in session carries the account's session version, so a session revoked mid-flow is refused.
+
+Checks: One new storage test covers subject reassignment, email takeover, revoked-session linking and unconfirmed enrollment; clippy (server, storage), formatting, migration, version and documentation checks pass. Tests were compiled but not executed; real-provider journeys remain pending.
 
 ## V0.5.2 — Add the OIDC authorization, callback and session handoff.
 

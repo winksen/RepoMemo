@@ -38,12 +38,51 @@ pub(crate) async fn public_provider(State(state): State<AppState>) -> Result<Jso
     Ok(Json(json!({"name":provider.filter(|p|p.enabled).map(|p|p.name)})))
 }
 
-pub(crate) async fn start(State(state): State<AppState>, client: ClientIp) -> Result<Json<Value>, ApiError> {
-    auth::check_auth_quota(&state, &client, auth::AuthAction::SignIn)?;
-    if setup::setup_pending(&state).await? {
+#[derive(Default, Deserialize)]
+pub(crate) struct StartRequest {
+    #[serde(default)]
+    invitation_token: Option<String>,
+}
+
+pub(crate) async fn links(
+    SessionSubject(subject): SessionSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(
+        json!({"links":state.storage.identity_links(&subject.user_id).await.map_err(ApiError::internal)?}),
+    ))
+}
+
+pub(crate) async fn start_link(
+    SessionSubject(subject): SessionSubject,
+    State(state): State<AppState>,
+    client: ClientIp,
+) -> Result<Json<Value>, ApiError> {
+    begin(
+        &state,
+        &client,
+        json!({"link_user":subject.user_id,"link_version":subject.session_version}),
+    )
+    .await
+}
+
+pub(crate) async fn start(
+    State(state): State<AppState>,
+    client: ClientIp,
+    Json(request): Json<StartRequest>,
+) -> Result<Json<Value>, ApiError> {
+    if request.invitation_token.as_ref().is_some_and(|s| s.len() > 512) {
+        return Err(ApiError::bad_request("Invalid invitation."));
+    }
+    begin(&state, &client, json!({"invitation_token":request.invitation_token})).await
+}
+
+async fn begin(state: &AppState, client: &ClientIp, context: Value) -> Result<Json<Value>, ApiError> {
+    auth::check_auth_quota(state, client, auth::AuthAction::SignIn)?;
+    if setup::setup_pending(state).await? {
         return Err(ApiError::forbidden());
     }
-    let provider = enabled_provider(&state).await?;
+    let provider = enabled_provider(state).await?;
     let callback = state
         .mail
         .link("/v1/auth/identity/callback")
@@ -69,7 +108,7 @@ pub(crate) async fn start(State(state): State<AppState>, client: ClientIp) -> Re
         .create_identity_flow(
             &state_value,
             &proof,
-            &json!({"provider":provider,"callback":callback,"nonce":nonce,"verifier":verifier}),
+            &json!({"provider":provider,"callback":callback,"nonce":nonce,"verifier":verifier,"context":context}),
         )
         .await
         .map_err(map_storage_error)?;
@@ -177,15 +216,115 @@ async fn exchange(state: &AppState, flow: &Value, code: &str) -> Result<Value, A
         .ok_or_else(|| ApiError::bad_request("The provider returned no identity token."))?;
     let keys = fetch_json(&provider.jwks_uri).await?;
     let claims = token_claims(token, &keys, &provider, flow["nonce"].as_str().unwrap_or_default())?;
-    let user_id = state
+    let user_id = resolve_identity(state, &provider, &claims, &flow["context"]).await?;
+    let version = state
         .storage
-        .linked_identity_user(&provider.issuer, claims["sub"].as_str().unwrap_or_default())
+        .user_session_version(&user_id)
         .await
         .map_err(ApiError::internal)?
-        .ok_or_else(|| {
-            ApiError::bad_request("This identity is not linked. Sign in locally and explicitly link it first.")
-        })?;
-    Ok(json!({"user_id":user_id,"provider":provider,"claims":claims}))
+        .ok_or_else(ApiError::unauthorized)?;
+    Ok(json!({"user_id":user_id,"version":version,"provider":provider,"claims":claims}))
+}
+
+async fn resolve_identity(
+    state: &AppState,
+    provider: &IdentityProvider,
+    claims: &Value,
+    context: &Value,
+) -> Result<String, ApiError> {
+    let subject = claims["sub"].as_str().ok_or_else(ApiError::unauthorized)?;
+    let linked = state
+        .storage
+        .linked_identity_user(&provider.issuer, subject)
+        .await
+        .map_err(ApiError::internal)?;
+    if let Some(user) = context["link_user"].as_str() {
+        let version = context["link_version"].as_i64().ok_or_else(ApiError::unauthorized)?;
+        if linked.as_deref() == Some(user) {
+            if state
+                .storage
+                .user_access(user)
+                .await
+                .map_err(ApiError::internal)?
+                .is_none_or(|a| a.session_version != version)
+            {
+                return Err(ApiError::unauthorized());
+            }
+            return Ok(user.into());
+        }
+        state
+            .storage
+            .link_identity(&provider.issuer, subject, user, version)
+            .await
+            .map_err(map_storage_error)?;
+        return Ok(user.into());
+    }
+    if let Some(user) = linked {
+        return Ok(user);
+    }
+    let email = claims["email"]
+        .as_str()
+        .filter(|_| claims["email_verified"] == true)
+        .ok_or_else(|| ApiError::bad_request("New enrollment requires a verified provider email and an invitation."))?
+        .trim()
+        .to_lowercase();
+    if state
+        .storage
+        .find_user_by_email(&email)
+        .await
+        .map_err(ApiError::internal)?
+        .is_some()
+    {
+        return Err(ApiError::conflict(
+            "An account already uses this email. Sign in locally and explicitly link the provider.",
+        ));
+    }
+    if !provider.allowed_domains.is_empty()
+        && !email
+            .rsplit_once('@')
+            .is_some_and(|(_, d)| provider.allowed_domains.iter().any(|allowed| allowed == d))
+    {
+        return Err(ApiError::forbidden_because(
+            "This email domain is not allowed for provider enrollment.",
+        ));
+    }
+    let invitation = context["invitation_token"].as_str().ok_or_else(|| {
+        ApiError::bad_request("Ask an administrator for an invitation before enrolling this identity.")
+    })?;
+    access::invitation_allows_registration(state, invitation, &email).await?;
+    let password_hash = auth::hash_password(&random_secret()?).await?;
+    let name = claims["name"]
+        .as_str()
+        .unwrap_or(&email)
+        .chars()
+        .take(200)
+        .collect::<String>();
+    let user = state
+        .storage
+        .create_identity_user(&provider.issuer, subject, &email, &name, &password_hash)
+        .await
+        .map_err(map_storage_error)?;
+    let subject = AuthenticatedSubject {
+        user_id: user.id.clone(),
+        expires_at: (Utc::now().timestamp() + 300) as u64,
+        session_version: 0,
+        is_system_admin: false,
+        is_app_admin: false,
+        token: None,
+    };
+    let token = serde_json::from_value(json!({"token":invitation})).map_err(ApiError::internal)?;
+    let _ = access::accept_invitation(SessionSubject(subject), State(state.clone()), Json(token)).await?;
+    state
+        .storage
+        .confirm_identity_enrollment(&user.id)
+        .await
+        .map_err(ApiError::internal)?;
+    state
+        .storage
+        .mark_email_verified(&user.id)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(user.id)
 }
 
 pub(crate) async fn callback(
@@ -268,7 +407,7 @@ pub(crate) async fn complete(
         .user_access(user_id)
         .await
         .map_err(ApiError::internal)?
-        .is_none()
+        .is_none_or(|a| Some(a.session_version) != result["version"].as_i64())
     {
         return Err(ApiError::unauthorized());
     }

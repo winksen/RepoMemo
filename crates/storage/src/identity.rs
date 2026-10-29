@@ -22,8 +22,76 @@ pub struct IdentityProvider {
 }
 
 impl StorageEngine {
+    pub async fn link_identity(&self, issuer: &str, subject: &str, user: &str, version: i64) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        let inserted=sqlx::query("INSERT INTO linked_identities (issuer,subject,user_id,created_at) SELECT ?1,?2,id,?3 FROM users WHERE id=?4 AND session_version=?5 AND deactivated_at IS NULL ON CONFLICT DO UPDATE SET confirmed=1 WHERE linked_identities.user_id=excluded.user_id AND linked_identities.subject=excluded.subject AND linked_identities.issuer=excluded.issuer")
+            .bind(issuer).bind(subject).bind(Utc::now().to_rfc3339()).bind(user).bind(version).execute(&mut *tx).await?;
+        if inserted.rows_affected() != 1 {
+            repomemo_domain::bail_conflict!(
+                "The identity or account is already linked, or the authorizing session ended. No link was changed."
+            );
+        }
+        sqlx::query("INSERT INTO system_audit_events (id,created_at,actor_user_id,action,detail) VALUES (?1,?2,?3,'identity_linked','Provider identity linked after explicit account proof')")
+            .bind(Uuid::new_v4().to_string()).bind(Utc::now().to_rfc3339()).bind(user).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// New-account enrollment is insert-only. A concurrent email registration cannot be linked.
+    pub async fn create_identity_user(
+        &self,
+        issuer: &str,
+        subject: &str,
+        email: &str,
+        name: &str,
+        password_hash: &str,
+    ) -> Result<SharedUser> {
+        let email = normalize_new_email(email)?;
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        let inserted=sqlx::query("INSERT INTO users (id,email,display_name,password_hash,created_at,updated_at) VALUES (?1,?2,?3,?4,?5,?5) ON CONFLICT DO NOTHING")
+            .bind(&id).bind(&email).bind(name).bind(password_hash).bind(&now).execute(&mut *tx).await?;
+        if inserted.rows_affected() != 1 {
+            repomemo_domain::bail_conflict!(
+                "An account already uses this email. Sign in to that account and explicitly link the provider."
+            );
+        }
+        sqlx::query(
+            "INSERT INTO linked_identities (issuer,subject,user_id,created_at,confirmed) VALUES (?1,?2,?3,?4,0)",
+        )
+        .bind(issuer)
+        .bind(subject)
+        .bind(&id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(SharedUser {
+            id,
+            email: Some(email),
+            display_name: name.into(),
+        })
+    }
+
+    pub async fn identity_links(&self, user: &str) -> Result<Vec<(String, String)>> {
+        Ok(
+            sqlx::query_as("SELECT issuer,created_at FROM linked_identities WHERE user_id=?1")
+                .bind(user)
+                .fetch_all(self.reader())
+                .await?,
+        )
+    }
+
+    pub async fn confirm_identity_enrollment(&self, user: &str) -> Result<()> {
+        sqlx::query("UPDATE linked_identities SET confirmed=1 WHERE user_id=?1")
+            .bind(user)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
     pub async fn linked_identity_user(&self, issuer: &str, subject: &str) -> Result<Option<String>> {
-        Ok(sqlx::query_scalar("SELECT i.user_id FROM linked_identities i JOIN users u ON u.id=i.user_id WHERE issuer=?1 AND subject=?2 AND u.deactivated_at IS NULL")
+        Ok(sqlx::query_scalar("SELECT i.user_id FROM linked_identities i JOIN users u ON u.id=i.user_id WHERE issuer=?1 AND subject=?2 AND confirmed=1 AND u.deactivated_at IS NULL")
             .bind(issuer).bind(subject).fetch_optional(self.reader()).await?)
     }
 
@@ -138,6 +206,65 @@ fn identity_hash(value: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+    #[tokio::test]
+    async fn identity_linking_never_reassigns_email_or_subject() {
+        let dir = std::env::temp_dir().join(format!("repomemo-link-{}", Uuid::new_v4()));
+        let storage = StorageEngine::open(StorageConfig::new(dir)).await.unwrap();
+        let a = storage.create_user("a@example.com", "A", "hash").await.unwrap();
+        let b = storage.create_user("b@example.com", "B", "hash").await.unwrap();
+        storage
+            .link_identity("https://id.example.com", "subject-a", &a.id, 0)
+            .await
+            .unwrap();
+        assert!(storage
+            .link_identity("https://id.example.com", "subject-a", &b.id, 0)
+            .await
+            .is_err());
+        assert!(storage
+            .link_identity("https://id.example.com", "subject-b", &a.id, 0)
+            .await
+            .is_err());
+        assert!(storage
+            .create_identity_user(
+                "https://id.example.com",
+                "new-subject",
+                "a@example.com",
+                "Attacker",
+                "hash"
+            )
+            .await
+            .is_err());
+        assert_eq!(
+            storage
+                .linked_identity_user("https://id.example.com", "subject-a")
+                .await
+                .unwrap(),
+            Some(a.id)
+        );
+        storage.end_user_sessions(&b.id).await.unwrap();
+        assert!(storage
+            .link_identity("https://id.example.com", "subject-b", &b.id, 0)
+            .await
+            .is_err());
+        let c = storage
+            .create_identity_user("https://id.example.com", "subject-c", "c@example.com", "C", "hash")
+            .await
+            .unwrap();
+        assert!(storage
+            .linked_identity_user("https://id.example.com", "subject-c")
+            .await
+            .unwrap()
+            .is_none());
+        storage.confirm_identity_enrollment(&c.id).await.unwrap();
+        assert_eq!(
+            storage
+                .linked_identity_user("https://id.example.com", "subject-c")
+                .await
+                .unwrap(),
+            Some(c.id)
+        );
+        assert_eq!(storage.count_users().await.unwrap(), 3);
+    }
     #[tokio::test]
     async fn identity_handoffs_refuse_replay_wrong_proof_and_expiry() {
         let dir = std::env::temp_dir().join(format!("repomemo-flow-{}", Uuid::new_v4()));

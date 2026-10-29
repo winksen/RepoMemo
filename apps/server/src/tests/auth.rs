@@ -25,7 +25,7 @@ async fn identity_completion_issues_the_existing_session_once() {
         .unwrap();
     storage.take_identity_callback("state").await.unwrap();
     storage
-        .finish_identity_flow("state", &json!({"user_id":user,"provider":provider}), true)
+        .finish_identity_flow("state", &json!({"user_id":user,"version":0,"provider":provider}), true)
         .await
         .unwrap();
     let response = app

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.3 (2026-10-29)
+
+Link provider identities to accounts only by explicit proof or invitation.
+
+### Changed
+- An authenticated session can start linking its own account (`GET`/`POST /v1/profile/identity`); the callback requires the provider proof and that session's unchanged version. A provider subject cannot be moved to another account, and an email change never changes the account behind an issuer/subject pair.
+- New-account enrollment takes an `invitation_token` on sign-in start, a verified provider email matching the invitation and the domain allowlist. An email already in use is refused with a pointer to explicit linking, never merged.
+- Migration 0047 adds an enrollment confirmation flag: a new identity cannot sign in until invitation acceptance completes. The sign-in session carries the account's session version, so a session revoked mid-flow is refused.
+
+### Checks
+- One new storage test covers subject reassignment, email takeover, revoked-session linking and unconfirmed enrollment; clippy (server, storage), formatting, migration, version and documentation checks pass. Tests were compiled but not executed; real-provider journeys remain pending.
+
+### Upgrading
+- Migration 0047 runs automatically; existing links stay confirmed. Rollback uses the pre-upgrade backup.
+
 ## V0.5.2 (2026-10-29)
 
 Add the OIDC authorization, callback and session handoff.

@@ -96,3 +96,25 @@ Migration 0046 adds linked identities and sealed ephemeral handoffs. Neither
 is included in workspace exports. Full backup restores retain identity links;
 pending handoffs still expire at their original deadline. Live provider,
 browser and desktop evidence remains pending.
+
+## Link an existing account or enroll an invited person
+
+V0.5.3 adds `GET /v1/profile/identity` and `POST /v1/profile/identity` for a
+signed-in session to inspect or explicitly start linking its own account.
+The callback requires both that session's authorization and provider proof;
+session revocation invalidates the link request. A provider subject already
+linked to another account cannot be moved. Changing the provider email does
+not change the account behind an established issuer/subject pair.
+
+For new enrollment, supply `invitation_token` in the JSON body of
+`POST /v1/auth/identity/start`. The signed ID token must carry a verified email
+matching the valid invitation and any configured domain allowlist. An email
+already in use requires signing in to that existing account and linking it,
+even when the provider calls the email verified. The existing invitation
+acceptance path rechecks the inviter's authority and applies ordinary grants.
+
+Migration 0047 adds the enrollment confirmation state. A concurrent callback
+cannot sign in using a new identity before invitation acceptance finishes.
+If enrollment was interrupted after account creation, the account remains
+unconfirmed; recover its local account through the normal reset process and
+explicitly link again. No support bypass or automatic email merge exists.

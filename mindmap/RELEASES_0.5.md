@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.5 → 0.6
 
-> **Current:** `V0.5.2` (2026-10-29)
+> **Current:** `V0.5.3` (2026-10-29)
 
 > **Theme:** Team access and identity · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -22,7 +22,7 @@
 | **V0.5.0** | ✅ 2026-10-29 | AI. Team access | 📘 | Opening | Open the expanded team-access line and reconcile capability claims against code, including existing citation editing, guests, owner transfer and audit export | The release index, access model and guide agree; no shipped capability is planned as a new implementation |
 | **V0.5.1** | ✅ 2026-10-29 | AI. Team access | ✨ | Identity | Configure and check one OIDC provider with sealed credentials and bounded discovery | An administrator can diagnose discovery/configuration errors without exposing secrets or enabling an untested provider |
 | **V0.5.2** | ✅ 2026-10-29 | AI. Team access | ✨ | Identity | Implement the OIDC authorization and callback flow with state, nonce, PKCE and token validation | Valid sign-in issues the existing session; replay, wrong issuer/audience, expired tokens and mismatched state are refused |
-| **V0.5.3** | 🔜 | AI. Team access | 🔒 | Identity | Link accounts by issuer/subject, requiring explicit proof for an existing account rather than trusting an email match alone | A matching or reassigned email cannot take over an existing account; authenticated linking and invited new-account enrollment both work |
+| **V0.5.3** | ✅ 2026-10-29 | AI. Team access | 🔒 | Identity | Link accounts by issuer/subject, requiring explicit proof for an existing account rather than trusting an email match alone | A matching or reassigned email cannot take over an existing account; authenticated linking and invited new-account enrollment both work |
 | **V0.5.4** | 🔜 | AI. Team access | ✨ | Sign-in UX | Add provider sign-in in the browser and a system-browser handoff for desktop | Success, cancellation, expired handoff and provider failure return to the correct client with a recoverable next action |
 | **V0.5.5** | 🔜 | AI. Team access | 🔒 | Identity policy | Allow enforced SSO with tested break-glass access and guarded password disablement | An administrator cannot disable the last working access path; password-only deployments remain usable |
 | **V0.5.6** | 🔜 | AI. Team access | ✨ | Membership | Map allowlisted provider groups to existing organization/workspace memberships, retaining grant origins | Mappings preview additions/removals, never infer ownership, preserve direct grants and cannot silently demote the last owner |
