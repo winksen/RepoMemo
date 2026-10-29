@@ -32,6 +32,7 @@ mod load;
 mod logs;
 mod mail;
 mod maintenance;
+mod mfa;
 mod organizations;
 mod profile;
 mod quotas;
@@ -619,6 +620,12 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/auth/logout-all", post(logout_everywhere))
         .route("/v1/auth/identity", get(identity::public_provider))
         .route("/v1/auth/identity/start", post(identity::start))
+        .route("/v1/profile/mfa", get(mfa::status))
+        .route("/v1/profile/mfa/start", post(mfa::start))
+        .route("/v1/profile/mfa/confirm", post(mfa::confirm))
+        .route("/v1/profile/mfa/disable", post(mfa::disable))
+        .route("/v1/profile/mfa/recovery-codes", post(mfa::regenerate_codes))
+        .route("/v1/system/users/{user_id}/mfa-reset", post(mfa::admin_reset))
         .route("/v1/auth/identity/callback", get(identity::callback))
         .route(
             "/v1/auth/identity/backchannel-logout",

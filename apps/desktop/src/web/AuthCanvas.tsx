@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { IconArrowRight as ArrowRight, IconKey as Key, IconShieldLock as Shield, IconUsers as Users } from "@tabler/icons-react";
 import { DesktopServerNote } from "../components/DesktopServerNote";
-import { fetchSignInProvider, loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser, startProviderFlow } from "../lib/sharedApi";
+import { SharedApiError, fetchSignInProvider, loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser, startProviderFlow } from "../lib/sharedApi";
 import { Button } from "../components/ui/button";
 import { Field } from "../components/ui/field";
 import { SegmentedControl } from "../components/ui/segmented-control";
@@ -35,6 +35,8 @@ export function AuthCanvas({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(initialError);
   const [forgotOpen, setForgotOpen] = useState(false);
+  const [needsCode, setNeedsCode] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
   const [provider, setProvider] = useState<string | null>(null);
   const [enforced, setEnforced] = useState(false);
   const [breakGlass, setBreakGlass] = useState(false);
@@ -66,9 +68,11 @@ export function AuthCanvas({
         }
         return;
       }
-      const response = await loginSharedUser({ email, password });
+      const response = await loginSharedUser({ email, password, ...(needsCode && mfaCode.trim() ? { mfa_code: mfaCode.trim() } : {}) });
       onAuthenticated(response.access_token);
     } catch (requestError) {
+      // The password was right; the account also needs its second factor.
+      if (requestError instanceof SharedApiError && requestError.code === "mfa_required") { setNeedsCode(true); setMfaCode(""); }
       setError(apiMessage(requestError));
     } finally {
       setIsSubmitting(false);
@@ -118,6 +122,7 @@ export function AuthCanvas({
         {mode === "sign-up" ? <Field label="Display name" required><Input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} placeholder="Ada Lovelace" value={displayName} /></Field> : null}
         <Field label="Email" required><Input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" type="email" value={email} /></Field>
         <Field label="Password" required><Input autoComplete={mode === "sign-up" ? "new-password" : "current-password"} minLength={12} onChange={(event) => setPassword(event.target.value)} placeholder="At least 12 characters" type="password" value={password} /></Field>
+        {mode === "sign-in" && needsCode ? <Field label="Authentication code" hint="From your authenticator app, or one of your recovery codes." required><Input autoComplete="one-time-code" autoFocus onChange={(event) => setMfaCode(event.target.value)} value={mfaCode} /></Field> : null}
         <Toast kind="error" message={error} />
         <Button busy={isSubmitting} type="submit" variant="main">
           <ArrowRight size={ICON_SIZE.md} />

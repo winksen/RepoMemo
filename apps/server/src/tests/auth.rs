@@ -2353,3 +2353,148 @@ async fn a_token_limited_to_workspaces_cannot_reach_others_and_ends_with_its_own
     );
     assert_eq!(tasks(&limited_secret, &second).await.status(), 401);
 }
+
+#[tokio::test]
+async fn a_password_alone_never_opens_a_session_of_an_account_with_two_step_sign_in() {
+    let app = router(ServerConfig::for_test(temp_data_dir("mfa"))).await.unwrap();
+    let (admin, _) = register_account(&app, "admin@example.com").await;
+    let (person, account) = register_account(&app, "person@example.com").await;
+    let person_id = account["user"]["id"].as_str().unwrap().to_owned();
+    let call = |method: &'static str, uri: &str, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let login = |code: Option<&str>| {
+        let app = app.clone();
+        let request = public_post(
+            "/v1/auth/login",
+            json!({"email":"person@example.com","password":"not-a-real-password","mfa_code":code}),
+        );
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    // Off by default: the password is enough.
+    assert_eq!(login(None).await.status(), 200);
+    let started = response_json(call("POST", "/v1/profile/mfa/start", &person, json!({})).await).await;
+    let secret = crate::mfa::base32_decode(started["secret"].as_str().unwrap()).unwrap();
+    assert!(started["otpauth_url"]
+        .as_str()
+        .unwrap()
+        .starts_with("otpauth://totp/RepoMemo:"));
+    // Pending is not on.
+    assert_eq!(login(None).await.status(), 200);
+    let step = crate::mfa::current_step();
+    let code = |step: i64| format!("{:06}", crate::mfa::totp(&secret, step));
+    assert_eq!(
+        call("POST", "/v1/profile/mfa/confirm", &person, json!({"code":"000000"}))
+            .await
+            .status(),
+        401
+    );
+    let confirmed = call("POST", "/v1/profile/mfa/confirm", &person, json!({"code":code(step)})).await;
+    assert_eq!(confirmed.status(), 200);
+    let recovery: Vec<String> = response_json(confirmed).await["recovery_codes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(recovery.len(), 10);
+    // Password only: refused, and the refusal says what is missing.
+    let refused = login(None).await;
+    assert_eq!(refused.status(), 403);
+    assert_eq!(response_json(refused).await["error"]["code"], "mfa_required");
+    assert_eq!(login(Some("000000")).await.status(), 401);
+    // The step used to confirm cannot be used again; the next one works once.
+    assert_eq!(login(Some(&code(step))).await.status(), 401);
+    let next = code(step + 1);
+    assert_eq!(login(Some(&next)).await.status(), 200);
+    assert_eq!(login(Some(&next)).await.status(), 401, "a seen code cannot be replayed");
+    // A recovery code works once, in any case and with or without its dash.
+    let lower = recovery[0].to_lowercase().replace('-', "");
+    assert_eq!(login(Some(&lower)).await.status(), 200);
+    assert_eq!(
+        login(Some(&recovery[0])).await.status(),
+        401,
+        "a recovery code is single-use"
+    );
+    // A reset link alone does not open a session either.
+    let issued = response_json(
+        call(
+            "POST",
+            &format!("/v1/system/users/{person_id}/password-reset"),
+            &admin,
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    let reset = issued["token"].as_str().unwrap().to_owned();
+    let complete = |code: Option<&str>| {
+        let app = app.clone();
+        let request = public_post(
+            "/v1/auth/password-reset",
+            json!({"token":reset,"password":"a-brand-new-password","mfa_code":code}),
+        );
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    assert_eq!(complete(None).await.status(), 403);
+    assert_eq!(complete(Some("000000")).await.status(), 401);
+    let completed = complete(Some(&recovery[1])).await;
+    assert_eq!(completed.status(), 200);
+    let fresh = format!(
+        "Bearer {}",
+        response_json(completed).await["access_token"].as_str().unwrap()
+    );
+    // Two recovery codes are used up; an administrator can remove the second factor for someone who lost both.
+    let status = response_json(call("GET", "/v1/profile/mfa", &fresh, Value::Null).await).await;
+    assert_eq!(status["recovery_codes_remaining"], 8);
+    assert_eq!(
+        call(
+            "POST",
+            &format!("/v1/system/users/{person_id}/mfa-reset"),
+            &fresh,
+            json!({})
+        )
+        .await
+        .status(),
+        403
+    );
+    let wrong = call(
+        "POST",
+        "/v1/profile/mfa/disable",
+        &fresh,
+        json!({"password":"a-brand-new-password","code":"000000"}),
+    )
+    .await;
+    assert_eq!(wrong.status(), 401);
+    assert_eq!(
+        call(
+            "POST",
+            &format!("/v1/system/users/{person_id}/mfa-reset"),
+            &admin,
+            json!({})
+        )
+        .await
+        .status(),
+        204
+    );
+    assert_eq!(
+        call("GET", "/v1/profile/mfa", &fresh, Value::Null).await.status(),
+        401,
+        "their sessions ended"
+    );
+    let again = app
+        .clone()
+        .oneshot(public_post(
+            "/v1/auth/login",
+            json!({"email":"person@example.com","password":"a-brand-new-password"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        again.status(),
+        200,
+        "without the second factor the password is enough again"
+    );
+}

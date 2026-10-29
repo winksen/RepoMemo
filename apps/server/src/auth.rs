@@ -332,6 +332,21 @@ pub(crate) async fn login(
         ));
     }
     identity::password_sign_in_allowed(&state, &user.id).await?;
+    // A correct password alone never opens a session of an account with two-step sign-in.
+    if !mfa::check_second_factor(&state, &user.id, request.mfa_code.as_deref()).await? {
+        // `|`, not `||`: both counters must see every failure.
+        let locked = state
+            .guards
+            .logins
+            .record_failure(&pair_key, settings.login_max_failures, settings.login_lockout)
+            | state.guards.logins.record_failure(
+                &account_key,
+                settings.login_max_failures.saturating_mul(5),
+                settings.login_lockout,
+            );
+        tracing::warn!(target: "audit", email = ?email, client = %client.0, locked, "Sign-in failed: wrong second factor");
+        return Err(mfa::wrong_code());
+    }
     state.guards.logins.clear(&pair_key);
     state
         .storage

@@ -34,6 +34,7 @@ mod jobs;
 mod mail;
 mod memory;
 mod mentions;
+mod mfa;
 mod organizations;
 mod providers;
 mod repo;
@@ -56,6 +57,7 @@ pub use identity::{
 };
 pub use mail::{DigestCandidate, DigestNotice, MailOutboxCounts, MailSettingsUpdate, QueuedMail, StoredMailSettings};
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
+pub use mfa::recovery_code_hash;
 pub use organizations::StarterSetup;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};

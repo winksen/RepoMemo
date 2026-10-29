@@ -323,11 +323,14 @@ async function authFetch(input: string, init: RequestInit): Promise<Response> {
 
 export class SharedApiError extends Error {
   readonly status: number;
+  /** The server's machine-readable reason, such as `mfa_required`. */
+  readonly code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = "SharedApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -358,12 +361,10 @@ export async function request<T>(
   // Credentials: the session cookie travels to the API, which may sit on another port of the same site.
   const response = await authFetch(`${API_URL}${path}`, { ...options, headers, credentials: "include" });
   onResponse?.(response);
-  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | T | null;
+  const payload = await response.json().catch(() => null) as { error?: { message?: string; code?: string } } | T | null;
   if (!response.ok) {
-    const message = payload && typeof payload === "object" && "error" in payload
-      ? payload.error?.message
-      : null;
-    throw new SharedApiError(response.status, message ?? `The shared API returned ${response.status}.`);
+    const detail = payload && typeof payload === "object" && "error" in payload ? payload.error : null;
+    throw new SharedApiError(response.status, detail?.message ?? `The shared API returned ${response.status}.`, detail?.code);
   }
   return payload as T;
 }
@@ -423,6 +424,8 @@ export async function signUpSharedUser(input: {
 export async function loginSharedUser(input: {
   email: string;
   password: string;
+  /** The authenticator app's current code or an unused recovery code, when the account has two-step sign-in. */
+  mfa_code?: string;
 }): Promise<TokenResponse> {
   // The session cookie, when this browser still has one, shows it is one of
   // the account's own devices, which gets past a lockout others caused.

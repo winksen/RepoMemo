@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.5 → 0.6
 
-> **Current:** `V0.5.15` (2026-10-29)
+> **Current:** `V0.5.16` (2026-10-29)
 
 > **Theme:** Team access and identity · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -35,7 +35,7 @@
 | **V0.5.13** | ✅ 2026-10-29 | AI. Team access | ✨ | Guests | Add expiry and renewal to existing direct guest membership | An expired guest loses read, search, export, event and token access at the deadline; renewals and expiry are auditable |
 | **V0.5.14** | ✅ 2026-10-29 | AI. Team access | 🔧 | Offboarding | Unify existing deactivation and ownership transfer with a preview of outstanding tasks and reviews | An admin reassigns work, preserves attribution and verifies revocation; the flow refuses orphaning the last owner |
 | **V0.5.15** | ✅ 2026-10-29 | AI. Team access | 🔒 | API access | Constrain integration/PAT access to explicitly selected workspaces with expiry and an access inventory | A token cannot reach a different workspace, cannot outlive its grant and stops working when its owner loses access; existing-token migration is documented |
-| **V0.5.16** | 🔜 | AI. Team access | 🔒 | Local MFA | Add optional TOTP enforcement for local-password accounts, with hashed single-use recovery codes | Password alone cannot bypass enabled MFA through browser, token issuance or alternate login routes; replay and recovery reuse are refused |
+| **V0.5.16** | ✅ 2026-10-29 | AI. Team access | 🔒 | Local MFA | Add optional TOTP enforcement for local-password accounts, with hashed single-use recovery codes | Password alone cannot bypass enabled MFA through browser, token issuance or alternate login routes; replay and recovery reuse are refused |
 | **V0.5.17** | 🔜 | AI. Team access | ✨ | MFA UX | Add enrollment, recovery and administrator-policy screens for local MFA | Enrollment requires a successful code, recovery codes are shown once, reset requires verified authority and a user can recover without a support backdoor |
 | **V0.5.18** | 🔜 | AI. Team access | 🔒 | Access verification | Exercise the complete role, guest, token, MFA and restricted-workspace matrix | Denied access stays denied across caches, events, previews, exports and retrieval; upgrades retain intentional existing grants |
 | **V0.5.19** | 🔜 | AI. Team access | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |

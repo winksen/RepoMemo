@@ -20,7 +20,7 @@ resolver = "2"
 # The product version: the server reports it (System › Overview, the console).
 # Set it everywhere at once with `npm run version:set -- <version>`; CI checks
 # that Cargo.toml, Cargo.lock, package.json and tauri.conf.json agree.
-version = "0.5.15"
+version = "0.5.16"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/repomemo/repomemo"

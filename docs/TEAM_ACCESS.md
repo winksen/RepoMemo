@@ -349,3 +349,35 @@ whether it is limited, expiry and last use (`GET /v1/system/tokens`, full
 system administrators), and lets an administrator revoke any of them
 (`DELETE /v1/system/tokens/{id}`, audited as `token_revoked_by_administrator`).
 Secrets are never shown. A per-workspace token view is not included.
+
+## Two-step sign-in for local accounts
+
+V0.5.16 adds optional **time-based one-time passwords (TOTP)** for accounts that
+sign in with a local password. The enrollment screens arrive in V0.5.17; this
+release delivers the enforcement and the API, and the sign-in page already asks
+for the code when an account needs one.
+
+Turning it on: `POST /v1/profile/mfa/start` returns a new secret and the
+`otpauth://` address an authenticator app scans; `POST /v1/profile/mfa/confirm`
+with a first valid code turns it on and returns **ten recovery codes, shown
+once** and kept only as hashes. Until confirmed, an unconfirmed secret enforces
+nothing. `GET /v1/profile/mfa` says whether it is on and how many recovery codes
+remain.
+
+From then on a correct password alone never opens a session. Local sign-in, and
+the sign-in that ends a password reset (`mfa_code` in the body), answer
+`403 mfa_required` until a current six-digit code or an unused recovery code is
+sent. Each time step is accepted once, so a code that was seen cannot be
+replayed; a recovery code works once, in any case and with or without its dash.
+A wrong code counts as a failed sign-in and locks the account like a wrong
+password. Turning it off or replacing the recovery codes needs the password and a
+code. Sessions, refresh tokens and API tokens that already exist are not asked
+again, and creating a token needs a signed-in session; sign-in through the
+identity provider is not covered, because the provider is responsible for its
+own second factor.
+
+A person who lost both the device and the codes is helped by a full system
+administrator with `POST /v1/system/users/{user_id}/mfa-reset`: it removes the
+second factor, ends the person's sessions and is audited
+(`mfa_reset_by_administrator`). There is no other bypass. Migration 0053 holds
+the sealed secret, the last accepted step and the recovery code hashes.

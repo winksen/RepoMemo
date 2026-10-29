@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.15` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.16` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,14 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.16 — Add optional TOTP enforcement for local-password accounts with single-use recovery codes.
+
+- An account can turn on time-based one-time passwords (RFC 6238, SHA-1, six digits): `start` returns a sealed-at-rest secret and the `otpauth://` address, `confirm` with a first valid code turns it on and returns ten recovery codes once, kept only as hashes. Unconfirmed secrets enforce nothing.
+- With it on, a correct password alone never opens a session: sign-in and the sign-in that ends a password reset answer `403 mfa_required` until a current code or an unused recovery code is sent. Each time step is accepted once, so a seen code is refused on replay; a recovery code works once. Wrong codes count as failed sign-ins and lock the account. Turning it off or replacing the codes needs the password and a code.
+- A full system administrator can remove a second factor for someone who lost both device and codes; it ends their sessions and is audited. The sign-in page asks for the code when needed. Enrollment and recovery screens follow in V0.5.17; identity-provider sign-in is not covered and stays the provider's responsibility. Migration 0053 holds the sealed secret, the last step and the recovery hashes.
+
+Checks: Two server unit tests (RFC 6238 vectors, step window and replay), one storage test (sealed secret, step and recovery single use) and one server journey test (no code, wrong code, replay, recovery code, reset link, administrator reset) were written. Clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.15 — Limit API tokens to chosen workspaces and add a token inventory.
 

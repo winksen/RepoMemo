@@ -48,6 +48,12 @@
 | POST | `/v1/invitations/preview` | public | — | TokenBody | InvitationPreview |
 | POST | `/v1/invitations/accept` | session | — | TokenBody | AcceptedInvitation |
 | DELETE | `/v1/invitations/{invitation_id}` | managing | require_workspace_admin, require_organization_admin | — | status |
+| GET | `/v1/profile/mfa` | session | own account | — | Whether two-step sign-in is on and how many recovery codes remain |
+| POST | `/v1/profile/mfa/start` | session | own account | — | New TOTP secret and `otpauth://` address; not enforced until confirmed |
+| POST | `/v1/profile/mfa/confirm` | session | own account, throttled | `{code}` | Turns it on; returns ten recovery codes once |
+| POST | `/v1/profile/mfa/disable` | session | own account, throttled | `{password, code}` | Turns it off |
+| POST | `/v1/profile/mfa/recovery-codes` | session | own account, throttled | `{password, code}` | Replaces the recovery codes; returned once |
+| POST | `/v1/system/users/{user_id}/mfa-reset` | auth | full system administrator, system scope | — | Removes someone's second factor and ends their sessions; audited |
 | GET | `/v1/profile/tokens` | session | — | — | Vec<PersonalAccessToken |
 | POST | `/v1/profile/tokens` | session | — | CreateTokenRequest | CreatedToken |
 | PUT | `/v1/profile/tokens/{token_id}/workspaces` | session | token owner | `{workspace_ids}` | Limits a token to workspaces the owner can open; one way only |

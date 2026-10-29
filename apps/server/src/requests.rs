@@ -19,6 +19,9 @@ pub(crate) struct LoginRequest {
     /// sign-in comes from a device the account already uses (review L10).
     #[serde(default)]
     pub(crate) refresh_token: Option<String>,
+    /// The current code of the account's authenticator app, or an unused recovery code, when two-step sign-in is on.
+    #[serde(default)]
+    pub(crate) mfa_code: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

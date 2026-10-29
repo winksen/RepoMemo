@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.16 (2026-10-29)
+
+Add optional TOTP enforcement for local-password accounts with single-use recovery codes.
+
+### Changed
+- An account can turn on time-based one-time passwords (RFC 6238, SHA-1, six digits): `start` returns a sealed-at-rest secret and the `otpauth://` address, `confirm` with a first valid code turns it on and returns ten recovery codes once, kept only as hashes. Unconfirmed secrets enforce nothing.
+- With it on, a correct password alone never opens a session: sign-in and the sign-in that ends a password reset answer `403 mfa_required` until a current code or an unused recovery code is sent. Each time step is accepted once, so a seen code is refused on replay; a recovery code works once. Wrong codes count as failed sign-ins and lock the account. Turning it off or replacing the codes needs the password and a code.
+- A full system administrator can remove a second factor for someone who lost both device and codes; it ends their sessions and is audited. The sign-in page asks for the code when needed. Enrollment and recovery screens follow in V0.5.17; identity-provider sign-in is not covered and stays the provider's responsibility. Migration 0053 holds the sealed secret, the last step and the recovery hashes.
+
+### Checks
+- Two server unit tests (RFC 6238 vectors, step window and replay), one storage test (sealed secret, step and recovery single use) and one server journey test (no code, wrong code, replay, recovery code, reset link, administrator reset) were written. Clippy (server, storage), formatting, migration, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- Migration 0053 runs automatically; nobody has two-step sign-in until they turn it on. Rollback uses the pre-upgrade backup.
+
 ## V0.5.15 (2026-10-29)
 
 Limit API tokens to chosen workspaces and add a token inventory.

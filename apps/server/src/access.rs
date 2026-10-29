@@ -686,6 +686,9 @@ pub(crate) async fn preview_password_reset(
 pub(crate) struct CompletePasswordReset {
     token: String,
     password: String,
+    /// Needed when the account has two-step sign-in: a reset link alone never opens a session.
+    #[serde(default)]
+    mfa_code: Option<String>,
 }
 
 /// Public: sets the new password, ends every session of the account, lifts
@@ -712,6 +715,9 @@ pub(crate) async fn complete_password_reset(
         .map_err(map_storage_error)?
     {
         crate::identity::password_sign_in_allowed(&state, &user.user.id).await?;
+        if !crate::mfa::check_second_factor(&state, &user.user.id, request.mfa_code.as_deref()).await? {
+            return Err(crate::mfa::wrong_code());
+        }
     }
     let user_id = state
         .storage
