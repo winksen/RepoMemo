@@ -93,7 +93,7 @@
 | GET | `/v1/system/logs/files` | auth | require_system_admin | — | LogFilesResponse |
 | GET | `/v1/system/logs/files/{day}` | auth | require_full_system_admin | — | — |
 | GET | `/v1/system/audit` | auth | require_system_admin | — | Vec<SystemAuditEvent |
-| GET | `/v1/system/audit/export` | auth | require_full_system_admin, require_system_change | `format`, `from`, `to` query | file stream |
+| GET | `/v1/system/audit/export` | auth | require_full_system_admin, require_system_change | `format`, `from`, `to`, `scope=identity` query | file stream; `scope=identity` returns only identity, sign-in and break-glass events |
 | GET | `/v1/system/jobs` | auth | require_system_admin | — | Vec<SystemJob |
 | GET | `/v1/system/maintenance` | auth | require_system_admin | — | MaintenanceStatus |
 | POST | `/v1/system/maintenance/run` | auth | require_system_admin, require_system_change | — | MaintenanceStatus |

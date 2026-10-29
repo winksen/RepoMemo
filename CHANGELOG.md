@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.5.8 (2026-10-29)
+
+Extend the audit trail and its export with identity events.
+
+### Changed
+- Provider enrollment, sign-in and failed sign-in, provider enable/disable/replacement, domain, group-mapping and session-limit changes join the existing linking, enforcement, break-glass, group-sync and back-channel logout events in the one system audit trail. Details are fixed sentences with no token, code, secret, subject or provider response.
+- The audit export gains `scope=identity` (System › Audit › Events) for only the identity and sign-in events as JSON lines or CSV; the default is unchanged and the download is still itself audited, naming the scope. No second audit store is created.
+
+### Checks
+- One storage test covers the identity scope for pages and counts (including a look-alike action); clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
+
+### Upgrading
+- No migration. Existing exports are unchanged unless `scope=identity` is asked for.
+
 ## V0.5.7 (2026-10-29)
 
 Add provider logout, back-channel logout and an absolute reauthentication deadline.

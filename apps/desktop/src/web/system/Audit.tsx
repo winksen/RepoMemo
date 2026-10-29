@@ -26,11 +26,12 @@ export function AuditSection({ accessToken, canExport }: { accessToken: string; 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [identityOnly, setIdentityOnly] = useState(false);
 
   async function exportTrail() {
     setIsExporting(true);
     try {
-      const { blob, filename, count } = await downloadSystemAuditExport(accessToken, { format, from, to });
+      const { blob, filename, count } = await downloadSystemAuditExport(accessToken, { format, from, to, identityOnly });
       // The export is recorded by the server when it is sent; the toast says so only once the file is saved.
       if (await saveBlob(blob, filename)) showToast("success", `Downloaded ${count.toLocaleString()} audit event${count === 1 ? "" : "s"}. The download is recorded in the trail.`);
       void reload();
@@ -46,6 +47,7 @@ export function AuditSection({ accessToken, canExport }: { accessToken: string; 
         <Field label="Format">{(control) => <Dropdown id={control.id} onValueChange={(value) => setFormat(value === "csv" ? "csv" : "jsonl")} options={[{ label: "JSON lines", value: "jsonl" }, { label: "CSV", value: "csv" }]} value={format} />}</Field>
         <Field label="From"><Input max={to || undefined} onChange={(event) => setFrom(event.target.value)} type="date" value={from} /></Field>
         <Field label="To"><Input min={from || undefined} onChange={(event) => setTo(event.target.value)} type="date" value={to} /></Field>
+        <Field label="Events">{(control) => <Dropdown id={control.id} onValueChange={(value) => setIdentityOnly(value === "identity")} options={[{ label: "Every event", value: "all" }, { label: "Identity and sign-in events", value: "identity" }]} value={identityOnly ? "identity" : "all"} />}</Field>
         <Button busy={isExporting} onClick={() => void exportTrail()} variant="secondary"><Download size={ICON_SIZE.md} /> Download</Button>
       </div>
     </section> : null}

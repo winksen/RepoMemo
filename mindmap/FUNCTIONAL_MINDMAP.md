@@ -2,7 +2,7 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.7` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.5.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 
@@ -27,6 +27,13 @@ Checks: Version, documentation and release-note checks pass. This release change
 - Migration 0045 stores server identity settings outside workspace archives. Configuration changes use the existing audit trail; the team-access guide records protocol and provider limitations.
 
 Checks: Four focused Rust tests and two UI tests pass. TypeScript, generated types, styles, accessibility, migration, version and documentation checks pass. Static UI review fixes applied. Live provider and visual validation remain pending.
+
+## V0.5.8 — Extend the audit trail and its export with identity events.
+
+- Provider enrollment, sign-in and failed sign-in, provider enable/disable/replacement, domain, group-mapping and session-limit changes join the existing linking, enforcement, break-glass, group-sync and back-channel logout events in the one system audit trail. Details are fixed sentences with no token, code, secret, subject or provider response.
+- The audit export gains `scope=identity` (System › Audit › Events) for only the identity and sign-in events as JSON lines or CSV; the default is unchanged and the download is still itself audited, naming the scope. No second audit store is created.
+
+Checks: One storage test covers the identity scope for pages and counts (including a look-alike action); clippy (server, storage), formatting, TypeScript, styles, accessibility, version and documentation checks pass. Tests were compiled but not executed.
 
 ## V0.5.7 — Add provider logout, back-channel logout and an absolute reauthentication deadline.
 

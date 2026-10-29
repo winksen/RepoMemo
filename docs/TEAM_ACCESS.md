@@ -187,3 +187,23 @@ linked account at once, because access tokens are not tracked individually. A
 bad, unsigned, wrong-audience, expired or repeated token changes nothing. Front-
 channel logout is not supported. Migration 0049 holds the session fields and the
 used-token record; it is server-level data excluded from workspace archives.
+
+## Identity audit events
+
+V0.5.8 records identity activity in the one existing system audit trail; there
+is no second audit store. Events are `identity_linked`, `identity_enrolled`,
+`identity_sign_in`, `identity_sign_in_failed`, `identity_provider_enabled`,
+`identity_provider_disabled`, `identity_provider_replaced`,
+`identity_domains_updated`, `identity_group_mappings_updated`,
+`identity_session_limit_updated`, `identity_provider_updated`,
+`identity_enforcement_changed`, `identity_groups_synced`,
+`identity_backchannel_logout` and `break_glass_sign_in`.
+
+Details are fixed sentences. They never contain tokens, authorization codes,
+client secrets, provider subjects or raw provider responses, and a failed
+sign-in records the same refusal text the person saw. In System › Audit, the
+export has an **Events** choice: *Identity and sign-in events* (or
+`?scope=identity` on `GET /v1/system/audit/export`) returns only these events
+as JSON lines or CSV; the default is still every event. The download itself is
+recorded as before, naming the identity scope. Only full system administrators
+export, as before.

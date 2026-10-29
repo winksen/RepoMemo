@@ -550,6 +550,19 @@ impl StorageEngine {
         after: Option<(&str, &str)>,
         limit: i64,
     ) -> Result<Vec<SystemAuditEvent>> {
+        self.list_system_events_scoped(from, until, after, limit, false).await
+    }
+
+    /// The same page, optionally only the identity events: provider configuration, linking, sign-in, enforcement,
+    /// break-glass use, group mapping and provider logout.
+    pub async fn list_system_events_scoped(
+        &self,
+        from: Option<&str>,
+        until: Option<&str>,
+        after: Option<(&str, &str)>,
+        limit: i64,
+        identity_only: bool,
+    ) -> Result<Vec<SystemAuditEvent>> {
         let rows = sqlx::query(
             r#"
             SELECT e.id, e.created_at, e.action, e.detail, u.id AS user_id, u.email, u.display_name
@@ -557,6 +570,7 @@ impl StorageEngine {
             WHERE (?1 IS NULL OR e.created_at >= ?1)
               AND (?2 IS NULL OR e.created_at < ?2)
               AND (?3 IS NULL OR e.created_at > ?3 OR (e.created_at = ?3 AND e.id > ?4))
+              AND (?6 = 0 OR e.action LIKE 'identity\_%' ESCAPE '\' OR e.action = 'break_glass_sign_in')
             ORDER BY e.created_at ASC, e.id ASC LIMIT ?5
             "#,
         )
@@ -565,6 +579,7 @@ impl StorageEngine {
         .bind(after.map(|(at, _)| at))
         .bind(after.map(|(_, id)| id))
         .bind(limit.clamp(1, 5000))
+        .bind(i64::from(identity_only))
         .fetch_all(self.reader())
         .await?;
         Ok(rows
@@ -585,11 +600,21 @@ impl StorageEngine {
 
     /// How many audit events fall in the same range.
     pub async fn count_system_events(&self, from: Option<&str>, until: Option<&str>) -> Result<i64> {
+        self.count_system_events_scoped(from, until, false).await
+    }
+
+    pub async fn count_system_events_scoped(
+        &self,
+        from: Option<&str>,
+        until: Option<&str>,
+        identity_only: bool,
+    ) -> Result<i64> {
         Ok(sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM system_audit_events e WHERE (?1 IS NULL OR e.created_at >= ?1) AND (?2 IS NULL OR e.created_at < ?2)",
+            "SELECT COUNT(*) FROM system_audit_events e WHERE (?1 IS NULL OR e.created_at >= ?1) AND (?2 IS NULL OR e.created_at < ?2) AND (?3 = 0 OR e.action LIKE 'identity\\_%' ESCAPE '\\' OR e.action = 'break_glass_sign_in')",
         )
         .bind(from)
         .bind(until)
+        .bind(i64::from(identity_only))
         .fetch_one(self.reader())
         .await?)
     }
@@ -638,6 +663,41 @@ mod tests {
         seen
     }
 
+    #[tokio::test]
+    async fn the_identity_scope_exports_only_provider_and_sign_in_events() {
+        let dir = std::env::temp_dir().join(format!("repomemo-audit-scope-{}", uuid::Uuid::new_v4()));
+        let storage = StorageEngine::open(StorageConfig::new(dir)).await.unwrap();
+        for action in [
+            "identity_linked",
+            "audit_exported",
+            "break_glass_sign_in",
+            "identity_sign_in_failed",
+            "identityXsign_in",
+            "password_reset_used",
+        ] {
+            storage
+                .record_system_event(None, action, "fixed sentence")
+                .await
+                .unwrap();
+        }
+        let all = storage
+            .list_system_events_scoped(None, None, None, 100, false)
+            .await
+            .unwrap();
+        let identity = storage
+            .list_system_events_scoped(None, None, None, 100, true)
+            .await
+            .unwrap();
+        assert_eq!(all.len(), 6);
+        let mut actions: Vec<_> = identity.iter().map(|e| e.action.as_str()).collect();
+        actions.sort_unstable();
+        assert_eq!(
+            actions,
+            ["break_glass_sign_in", "identity_linked", "identity_sign_in_failed"]
+        );
+        assert_eq!(storage.count_system_events_scoped(None, None, true).await.unwrap(), 3);
+        assert_eq!(storage.count_system_events_scoped(None, None, false).await.unwrap(), 6);
+    }
     #[tokio::test]
     async fn the_audit_trail_is_read_in_pages_oldest_first_within_a_range() {
         let data_dir = std::env::temp_dir().join(format!("repomemo-audit-pages-{}", uuid::Uuid::new_v4()));

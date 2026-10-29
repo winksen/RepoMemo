@@ -81,6 +81,8 @@ pub(crate) struct ExportQuery {
     from: Option<String>,
     /// The last day to include (`2026-10-15`), or the moment (RFC 3339) to stop before.
     to: Option<String>,
+    /// `identity` for the provider and sign-in events only; the default is every event.
+    scope: Option<String>,
 }
 
 /// A day, or a moment, as the RFC 3339 time stored events are compared with.
@@ -113,6 +115,15 @@ pub(crate) async fn export_audit(
     // The whole trail is sensitive: a token needs the system scope, as for any System change.
     require_system_change(&subject)?;
     let format = Format::parse(query.format.as_deref())?;
+    let identity_only = match query.scope.as_deref().map(str::trim) {
+        None | Some("") | Some("all") => false,
+        Some("identity") => true,
+        Some(other) => {
+            return Err(ApiError::bad_request(format!(
+                "The scope must be all or identity, not {other}."
+            )))
+        }
+    };
     let now = Utc::now().to_rfc3339_opts(SecondsFormat::AutoSi, false);
     let from = query
         .from
@@ -156,17 +167,22 @@ pub(crate) async fn export_audit(
         &state,
         &subject,
         "audit_exported",
-        format!("Exported the audit trail from {described} as {}.", format.extension()),
+        format!(
+            "Exported the {}audit trail from {described} as {}.",
+            if identity_only { "identity " } else { "" },
+            format.extension()
+        ),
     )
     .await;
     let total = state
         .storage
-        .count_system_events(from.as_deref(), Some(&until))
+        .count_system_events_scoped(from.as_deref(), Some(&until), identity_only)
         .await
         .map_err(map_storage_error)?;
 
     let filename = format!(
-        "repomemo-audit-{}-{}.{}",
+        "repomemo-{}audit-{}-{}.{}",
+        if identity_only { "identity-" } else { "" },
         short_day(query.from.as_deref(), "start"),
         short_day(query.to.as_deref(), "now"),
         format.extension()
@@ -174,7 +190,7 @@ pub(crate) async fn export_audit(
     let (sender, receiver) = tokio::sync::mpsc::channel::<Piece>(PIPELINE_DEPTH);
     let storage = state.storage.clone();
     tokio::spawn(async move {
-        if let Err(error) = stream_events(&storage, from.as_deref(), &until, format, &sender).await {
+        if let Err(error) = stream_events(&storage, from.as_deref(), &until, format, identity_only, &sender).await {
             tracing::error!(error = %format!("{error:#}"), "An audit export stopped half-way");
             let _ = sender.send(Err(std::io::Error::other(error.to_string()))).await;
         }
@@ -216,6 +232,7 @@ async fn stream_events(
     from: Option<&str>,
     until: &str,
     format: Format,
+    identity_only: bool,
     sender: &Sender<Piece>,
 ) -> anyhow::Result<()> {
     if format == Format::Csv && sender.send(Ok(CSV_HEADER.as_bytes().to_vec())).await.is_err() {
@@ -224,11 +241,12 @@ async fn stream_events(
     let mut after: Option<(String, String)> = None;
     loop {
         let page = storage
-            .list_system_events_page(
+            .list_system_events_scoped(
                 from,
                 Some(until),
                 after.as_ref().map(|(at, id)| (at.as_str(), id.as_str())),
                 PAGE,
+                identity_only,
             )
             .await?;
         let Some(last) = page.last() else {

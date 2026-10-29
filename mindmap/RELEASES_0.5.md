@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.5 → 0.6
 
-> **Current:** `V0.5.7` (2026-10-29)
+> **Current:** `V0.5.8` (2026-10-29)
 
 > **Theme:** Team access and identity · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -27,7 +27,7 @@
 | **V0.5.5** | ✅ 2026-10-29 | AI. Team access | 🔒 | Identity policy | Allow enforced SSO with tested break-glass access and guarded password disablement | An administrator cannot disable the last working access path; password-only deployments remain usable |
 | **V0.5.6** | ✅ 2026-10-29 | AI. Team access | ✨ | Membership | Map allowlisted provider groups to existing organization/workspace memberships, retaining grant origins | Mappings preview additions/removals, never infer ownership, preserve direct grants and cannot silently demote the last owner |
 | **V0.5.7** | ✅ 2026-10-29 | AI. Team access | 🔒 | Session lifecycle | Add provider logout and supported back-channel logout with an absolute reauthentication deadline | A disabled identity cannot refresh forever; an IdP without logout notifications has a documented, tested maximum access window |
-| **V0.5.8** | 🔜 | AI. Team access | 🔧 | Audit | Extend the existing audit/export path with identity linking, provider policy, login and group-mapping events | An authorized export explains identity changes and failures without tokens or secrets; no duplicate audit subsystem is created |
+| **V0.5.8** | ✅ 2026-10-29 | AI. Team access | 🔧 | Audit | Extend the existing audit/export path with identity linking, provider policy, login and group-mapping events | An authorized export explains identity changes and failures without tokens or secrets; no duplicate audit subsystem is created |
 | **V0.5.9** | 🔜 | AI. Team access | 🔒 | Identity review | Review and close findings on redirects, account linking, discovery, tokens and recovery | No high/medium identity finding remains open and negative cases have regression coverage |
 | **V0.5.10** | 🔜 | AI. Team access | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
 | **V0.5.11** | 🔜 | AI. Team access | ✨ | Workspace access | Add explicit organization-shared versus restricted workspace membership policy | A restricted workspace never auto-enrolls a new org member; existing memberships migrate without silent loss or expansion and server-admin powers are explicit |

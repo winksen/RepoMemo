@@ -1727,10 +1727,13 @@ export async function downloadSystemAuditExport(accessToken: string, input: {
   from?: string;
   /** The last day to include; empty for now. */
   to?: string;
+  /** Only the provider, linking, sign-in, enforcement and group-mapping events. */
+  identityOnly?: boolean;
 }): Promise<{ blob: Blob; filename: string; count: number }> {
   const query = new URLSearchParams({ format: input.format });
   if (input.from) query.set("from", input.from);
   if (input.to) query.set("to", input.to);
+  if (input.identityOnly) query.set("scope", "identity");
   const response = await authFetch(`${API_URL}/v1/system/audit/export?${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });

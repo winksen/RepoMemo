@@ -387,6 +387,13 @@ async fn resolve_identity(
         .mark_email_verified(&user.id)
         .await
         .map_err(ApiError::internal)?;
+    record_identity_event(
+        state,
+        Some(&user.id),
+        "identity_enrolled",
+        "Account created from an invitation through the provider",
+    )
+    .await;
     Ok(user.id)
 }
 
@@ -415,6 +422,15 @@ pub(crate) async fn callback(
         exchange(&state, &flow, query.code.as_deref().unwrap_or_default()).await
     };
     let success = result.is_ok();
+    if let Err(error) = &result {
+        record_identity_event(
+            &state,
+            None,
+            "identity_sign_in_failed",
+            &format!("Provider sign-in failed: {}", error.message),
+        )
+        .await;
+    }
     let result = result.unwrap_or_else(|error| json!({"error":error.message}));
     state
         .storage
@@ -486,6 +502,13 @@ pub(crate) async fn complete(
         .await
         .map_err(ApiError::internal)?;
     let session = auth::issue_session(&state, user).await?;
+    record_identity_event(
+        &state,
+        Some(user_id),
+        "identity_sign_in",
+        "Signed in through the provider",
+    )
+    .await;
     let reauth_by = (Utc::now() + chrono::Duration::hours(session_hours(&provider))).to_rfc3339();
     state
         .storage
@@ -786,6 +809,9 @@ pub(crate) async fn save_provider(
         .save_identity_provider(&provider, &secret, &subject.user_id)
         .await
         .map_err(ApiError::internal)?;
+    for (action, detail) in policy_changes(old.as_ref(), &provider) {
+        record_identity_event(&state, Some(&subject.user_id), action, &detail).await;
+    }
     if was_enforced != provider.enforced {
         state
             .storage
@@ -1000,6 +1026,55 @@ pub(crate) async fn backchannel_logout(
         .await
         .map_err(ApiError::internal)?;
     Ok(([(axum::http::header::CACHE_CONTROL, "no-store")], StatusCode::OK).into_response())
+}
+
+/// Identity events are recorded in the one system audit trail. Details are fixed sentences: never a token, code,
+/// secret, subject or provider response.
+async fn record_identity_event(state: &AppState, actor: Option<&str>, action: &str, detail: &str) {
+    if let Err(error) = state.storage.record_system_event(actor, action, detail).await {
+        tracing::error!(error = %error, "Failed to record a system audit event");
+    }
+}
+
+/// What changed in the provider policy, as fixed sentences for the audit trail.
+fn policy_changes(old: Option<&IdentityProvider>, new: &IdentityProvider) -> Vec<(&'static str, String)> {
+    let mut events = Vec::new();
+    let was_enabled = old.is_some_and(|p| p.enabled);
+    if was_enabled != new.enabled {
+        events.push((
+            if new.enabled {
+                "identity_provider_enabled"
+            } else {
+                "identity_provider_disabled"
+            },
+            format!("Provider sign-in {}", if new.enabled { "enabled" } else { "disabled" }),
+        ));
+    }
+    if old.is_some_and(|p| p.issuer != new.issuer || p.client_id != new.client_id) {
+        events.push((
+            "identity_provider_replaced",
+            "The provider issuer or client ID changed".to_owned(),
+        ));
+    }
+    if old.is_some_and(|p| p.allowed_domains != new.allowed_domains) {
+        events.push((
+            "identity_domains_updated",
+            format!("Allowed enrollment domains now number {}", new.allowed_domains.len()),
+        ));
+    }
+    if old.map(|p| (&p.group_claim, &p.group_mappings)) != Some((&new.group_claim, &new.group_mappings)) {
+        events.push((
+            "identity_group_mappings_updated",
+            format!("Provider group mappings now number {}", new.group_mappings.len()),
+        ));
+    }
+    if old.is_some_and(|p| p.max_session_hours != new.max_session_hours) {
+        events.push((
+            "identity_session_limit_updated",
+            format!("Provider session limit is now {} hours", session_hours(new)),
+        ));
+    }
+    events
 }
 
 async fn provider_overview(state: &AppState, provider: Option<IdentityProvider>) -> Result<Json<Value>, ApiError> {
