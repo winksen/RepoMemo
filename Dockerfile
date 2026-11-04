@@ -58,7 +58,7 @@ RUN cargo build --release --locked -p repomemo-server \
 # the compose file runs it in the `converter` stage below, a container of its own with no network, and
 # reaches it through repomemo-soffice-wrapper. `--build-arg WITH_LIBREOFFICE=true` still puts it in this
 # image, for a plain `docker run`.
-FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS server
+FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4 AS server
 ARG WITH_LIBREOFFICE=false
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git socat \
@@ -104,7 +104,7 @@ ENTRYPOINT ["repomemo-entrypoint"]
 # socket on a volume it shares with the server, sees only the previews volume, and has no network.
 # Debian 13's LibreOffice may be older than the fixed releases the server insists on; the server says so in
 # System > Overview and converts nothing until it is a release at or past them.
-FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS converter
+FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4 AS converter
 RUN apt-get update \
     && apt-get install -y --no-install-recommends bash socat libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/* \
