@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.7 (2026-11-01)
+
+Remind reviewers when a review date has passed, through the channels they already chose.
+
+### Added
+- A reviewer whose item is past its review date gets **one reminder per week for that item**, from the hourly maintenance pass. It goes where the person's new **A review assigned to you is overdue** preference says: the inbox, mail, both (the default) or neither. Reminders in the inbox also reach people who turned on the daily digest, which carries unread inbox notices.
+- Predictable rules: a review is due from 00:00 UTC on its date, whatever the reviewer's time zone; **snoozing** the item in the Review queue silences it for that person until the snooze ends; changing the date allows a new reminder at once; a reviewer who left the workspace, can no longer edit or was deactivated gets none; when mail is not set up (or no public address is known) the inbox copy is still made, and a person who chose *mail only* is retried at the next pass instead of being marked as reminded.
+- Migration 0057 records the last reminder per item and reviewer.
+
+### Checks
+- Version, migration lock (57 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, server, all targets) and formatting pass. One storage test (one reminder per window, a moved date, snooze, viewers, future dates, a departed reviewer) and one text unit test were written and compile; neither was executed. No mail was sent and nothing was built or run.
+
+### Upgrading
+- One additive migration. Nobody receives reminders until a reviewer and a review date are set (V0.6.6).
+
 ## V0.6.6 (2026-11-01)
 
 Give evidence and memory cards an accountable reviewer and a next-review date.

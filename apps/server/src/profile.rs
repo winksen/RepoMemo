@@ -124,8 +124,9 @@ pub(crate) async fn update_profile(
 
 /// The kinds of notice a person chooses a channel for. Security notices
 /// (password resets) always reach the app and the mail: they are not here.
-const CHOOSABLE_KINDS: [(&str, &str); 3] = [
+const CHOOSABLE_KINDS: [(&str, &str); 4] = [
     ("task_assigned", "A task is assigned to you"),
+    ("review_due", "A review assigned to you is overdue"),
     (
         "evidence_mention",
         "You are mentioned in a comment, a task or a memory card",
@@ -146,7 +147,7 @@ fn default_channel(kind: &str) -> &'static str {
 }
 
 /// Where a notice of `kind` goes for this person: `(in the app, by mail)`.
-async fn delivery(state: &AppState, user_id: &str, kind: &str) -> (bool, bool) {
+pub(crate) async fn delivery(state: &AppState, user_id: &str, kind: &str) -> (bool, bool) {
     if !CHOOSABLE_KINDS.iter().any(|(known, _)| *known == kind) || kind == "daily_digest" {
         return (true, true);
     }

@@ -66,7 +66,7 @@ pub use mfa::recovery_code_hash;
 pub use organizations::StarterSetup;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};
-pub use review_assignments::{DueReview, ReviewAssignment};
+pub use review_assignments::{DueReview, ReminderCandidate, ReviewAssignment};
 mod newer;
 use secrets::SecretBox;
 pub use secrets::{restrict_to_owner, KEY_FILE_NAME as SECRET_KEY_FILE_NAME, MIN_MASTER_KEY_CHARS};

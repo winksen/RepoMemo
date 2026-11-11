@@ -144,6 +144,10 @@ If a memory card edit is interrupted (a reload, a failed save), the card offers 
 
 Open a file or a memory card and use **Reviewer** to say who is accountable for checking it and when it is next due. **Mark reviewed** records the review and sets the next date. In **Review**, each item says why it is there (marked, evidence changed, or overdue) and who its reviewer is. If a reviewer leaves the workspace the item says so, and someone else should be chosen. Items assigned to you and past due also appear in **My work**.
 
+### Review reminders
+
+When a review you are accountable for is past its date, RepoMemo reminds you once a week for that item: in your inbox, by mail, or both, as you set under **Profile › Notifications › A review assigned to you is overdue** (the daily digest also lists unread inbox notices). A review is due from midnight UTC on its date. Snoozing the item in **Review** pauses its reminders; moving the date starts them again. Without a mail server you still get the inbox reminder.
+
 ### Workflow 3: understand the index state
 
 **Who:** everyone who can read the workspace.

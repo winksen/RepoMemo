@@ -3117,3 +3117,157 @@ async fn access_added_after_0_5_leaves_every_existing_grant_as_it_was() {
         .is_some());
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_due_review_is_reminded_once_per_window_and_skips_snoozed_viewers_and_departed_reviewers() {
+    use repomemo_domain::WorkspaceRole;
+    let (storage, data_dir) = temp_storage("review-reminders").await;
+    let owner = storage
+        .create_user("owner-rem@example.com", "Owner", "hash")
+        .await
+        .unwrap();
+    let ada = storage.create_user("ada-rem@example.com", "Ada", "hash").await.unwrap();
+    let viewer = storage
+        .create_user("viewer-rem@example.com", "Viewer", "hash")
+        .await
+        .unwrap();
+    let organization = storage.create_organization(&owner.id, "Org").await.unwrap();
+    let workspace = storage
+        .create_shared_workspace(&owner.id, &organization.id, "Shared")
+        .await
+        .unwrap()
+        .workspace
+        .id;
+    for (email, role) in [
+        ("ada-rem@example.com", WorkspaceRole::Member),
+        ("viewer-rem@example.com", WorkspaceRole::Viewer),
+    ] {
+        storage.upsert_workspace_member(&workspace, email, role).await.unwrap();
+    }
+    let card = storage
+        .create_memory_card(&workspace, "Refund window", "Fourteen days.", "test", None, &[])
+        .await
+        .unwrap();
+    let other = storage
+        .create_memory_card(&workspace, "Shipping", "Weekdays.", "test", None, &[])
+        .await
+        .unwrap();
+    let past = (chrono::Utc::now() - chrono::Duration::days(3)).to_rfc3339();
+    let future = (chrono::Utc::now() + chrono::Duration::days(3)).to_rfc3339();
+    storage
+        .set_review_assignment(
+            &workspace,
+            "memory_card",
+            &card.id,
+            Some(&ada.id),
+            Some(&past),
+            &owner.id,
+        )
+        .await
+        .unwrap();
+    // A reviewer who cannot edit, and an item not yet due, are not reminded.
+    storage
+        .set_review_assignment(
+            &workspace,
+            "memory_card",
+            &other.id,
+            Some(&viewer.id),
+            Some(&past),
+            &owner.id,
+        )
+        .await
+        .unwrap();
+    let candidates = storage.reminder_candidates(7).await.unwrap();
+    assert_eq!(candidates.len(), 1);
+    assert_eq!(candidates[0].user_id, ada.id);
+    assert_eq!(candidates[0].item_id, card.id);
+
+    // Once sent, no second reminder inside the window, however many passes run.
+    storage.record_reminder(&candidates[0]).await.unwrap();
+    assert!(storage.reminder_candidates(7).await.unwrap().is_empty());
+    assert!(storage.reminder_candidates(7).await.unwrap().is_empty());
+    // A shorter window than the age of the reminder would allow another, which is how the window is the policy.
+    assert!(storage
+        .reminder_candidates(0)
+        .await
+        .unwrap()
+        .iter()
+        .any(|c| c.item_id == card.id));
+
+    // Moving the date makes a reminder possible at once.
+    let earlier = (chrono::Utc::now() - chrono::Duration::days(1)).to_rfc3339();
+    storage
+        .set_review_assignment(
+            &workspace,
+            "memory_card",
+            &card.id,
+            Some(&ada.id),
+            Some(&earlier),
+            &owner.id,
+        )
+        .await
+        .unwrap();
+    assert_eq!(storage.reminder_candidates(7).await.unwrap().len(), 1);
+    storage
+        .record_reminder(&storage.reminder_candidates(7).await.unwrap()[0])
+        .await
+        .unwrap();
+
+    // A snooze silences it for that person until it ends.
+    let later = (chrono::Utc::now() + chrono::Duration::days(2)).to_rfc3339();
+    storage
+        .set_review_assignment(
+            &workspace,
+            "memory_card",
+            &card.id,
+            Some(&ada.id),
+            Some(&past),
+            &owner.id,
+        )
+        .await
+        .unwrap();
+    storage
+        .snooze_review_item(&ada.id, &workspace, "memory_card", &card.id, &later)
+        .await
+        .unwrap();
+    assert!(storage.reminder_candidates(7).await.unwrap().is_empty());
+    storage
+        .unsnooze_review_item(&ada.id, &workspace, "memory_card", &card.id)
+        .await
+        .unwrap();
+    assert_eq!(storage.reminder_candidates(7).await.unwrap().len(), 1);
+
+    // A date in the future is not due; a reviewer who left gets nothing.
+    storage
+        .set_review_assignment(
+            &workspace,
+            "memory_card",
+            &card.id,
+            Some(&ada.id),
+            Some(&future),
+            &owner.id,
+        )
+        .await
+        .unwrap();
+    assert!(storage.reminder_candidates(7).await.unwrap().is_empty());
+    storage
+        .set_review_assignment(
+            &workspace,
+            "memory_card",
+            &card.id,
+            Some(&ada.id),
+            Some(&past),
+            &owner.id,
+        )
+        .await
+        .unwrap();
+    storage.remove_workspace_member(&workspace, &ada.id).await.unwrap();
+    assert!(storage.reminder_candidates(7).await.unwrap().is_empty());
+    let assignment = storage
+        .review_assignment("memory_card", &card.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(assignment.reviewer_departed);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -179,6 +179,13 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         Err(error) => failed(&mut report, "refresh tokens", error),
     }
 
+    // Reviewers whose items are past their review date get a reminder, once per window.
+    match crate::review_reminders::send_due(state).await {
+        Ok(0) => {}
+        Ok(count) => tracing::info!(count, "Review reminders were sent"),
+        Err(error) => failed(&mut report, "review reminders", error),
+    }
+
     // Access to a workspace ends at a guest's end date whether or not this has run; it writes the end to the trail.
     if let Err(error) = storage.record_expired_guests().await {
         failed(&mut report, "guest expiry", error);

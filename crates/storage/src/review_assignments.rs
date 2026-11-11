@@ -221,3 +221,85 @@ fn due_review(row: &SqliteRow) -> DueReview {
         next_review_at: row.get("next_review_at"),
     }
 }
+
+/// A reviewer who is owed a reminder for an item whose date has passed (V0.6.7).
+#[derive(Debug, Clone)]
+pub struct ReminderCandidate {
+    pub item_kind: String,
+    pub item_id: String,
+    pub workspace_id: String,
+    pub user_id: String,
+    pub email: String,
+    pub display_name: String,
+    pub title: String,
+    pub next_review_at: String,
+}
+
+impl StorageEngine {
+    /// Reviewers owed a reminder now: the item is due, the reviewer is an active member who can edit and has not
+    /// snoozed it, and no reminder about this date went out in the last `window_days`. Moving the date makes the item
+    /// eligible again at once.
+    pub async fn reminder_candidates(&self, window_days: i64) -> Result<Vec<ReminderCandidate>> {
+        let now = Utc::now();
+        let rows = sqlx::query(
+            r#"
+            SELECT a.item_kind, a.item_id, a.workspace_id, a.reviewer_user_id AS user_id, u.email, u.display_name,
+                   COALESCE(artifact.title, card.title) AS title, a.next_review_at
+            FROM review_assignments AS a
+            JOIN users AS u ON u.id = a.reviewer_user_id AND u.deactivated_at IS NULL
+            JOIN workspace_memberships AS m
+              ON m.workspace_id = a.workspace_id AND m.user_id = a.reviewer_user_id AND m.role != 'viewer'
+             AND (m.expires_at IS NULL OR m.expires_at > ?1)
+            LEFT JOIN artifacts AS artifact ON a.item_kind = 'evidence' AND artifact.id = a.item_id
+            LEFT JOIN memory_cards AS card ON a.item_kind = 'memory_card' AND card.id = a.item_id
+            LEFT JOIN review_reminders AS r
+              ON r.item_kind = a.item_kind AND r.item_id = a.item_id AND r.user_id = a.reviewer_user_id
+            WHERE a.next_review_at IS NOT NULL AND a.next_review_at <= ?1
+              AND COALESCE(artifact.id, card.id) IS NOT NULL
+              AND (r.last_sent_at IS NULL OR r.due_at IS NOT a.next_review_at OR r.last_sent_at <= ?2)
+              AND NOT EXISTS (
+                SELECT 1 FROM review_snoozes AS s
+                WHERE s.user_id = a.reviewer_user_id AND s.workspace_id = a.workspace_id
+                  AND s.item_kind = a.item_kind AND s.item_id = a.item_id AND s.until > ?1)
+            ORDER BY a.next_review_at ASC, a.item_id ASC
+            LIMIT 500
+            "#,
+        )
+        .bind(now.to_rfc3339())
+        .bind((now - chrono::Duration::days(window_days)).to_rfc3339())
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|row| ReminderCandidate {
+                item_kind: row.get("item_kind"),
+                item_id: row.get("item_id"),
+                workspace_id: row.get("workspace_id"),
+                user_id: row.get("user_id"),
+                email: row.get("email"),
+                display_name: row.get("display_name"),
+                title: row.get("title"),
+                next_review_at: row.get("next_review_at"),
+            })
+            .collect())
+    }
+
+    /// Notes that a reminder about this date went to this reviewer now.
+    pub async fn record_reminder(&self, candidate: &ReminderCandidate) -> Result<()> {
+        sqlx::query(
+            r#"INSERT INTO review_reminders (item_kind, item_id, user_id, workspace_id, due_at, last_sent_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+               ON CONFLICT(item_kind, item_id, user_id) DO UPDATE SET
+                 due_at = excluded.due_at, last_sent_at = excluded.last_sent_at"#,
+        )
+        .bind(&candidate.item_kind)
+        .bind(&candidate.item_id)
+        .bind(&candidate.user_id)
+        .bind(&candidate.workspace_id)
+        .bind(&candidate.next_review_at)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+}

@@ -60,3 +60,4 @@
 0.6.1  0054_onboarding_dismissals.sql  ff2f1529ecadbbf4068d28658ac789e1e14ba6834ce5cbb478ab20fd1da8a398
 0.6.3  0055_memory_revisions.sql  0dd4a53df5b4f33abf33c17936a6a24ab835ae35dd7ceac6f36e138e90a75b5e
 0.6.6  0056_review_assignments.sql  5d52332f0f4b27a1a39ab58f51bfa6ffbeb2a9bab750e17516c0817e9fdfe446
+0.6.7  0057_review_reminders.sql  c5d1b8680a8dc09903588afd0b3dc2017bdd61ffdca8f38da11998e31e451070

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.6` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.7` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.7 — Remind reviewers when a review date has passed, through the channels they already chose.
+
+- A due review produces one reminder per week per item, in the inbox and/or by mail as the reviewer chose, and in the digest for those who use it. Snoozing, moving the date, leaving the workspace and muted mail all behave as stated rather than by accident.
+
+Checks: Storage and unit tests written and compiled, not executed; static checks pass.
 
 ## V0.6.6 — Give evidence and memory cards an accountable reviewer and a next-review date.
 
