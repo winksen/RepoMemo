@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.9 (2026-11-01)
+
+Show what changed behind a memory card's "needs review" flag.
+
+### Added
+- **What changed** on a card that needs review: for each reason it names the cited source and, when an earlier version of an uploaded file is kept, shows the earlier text against the current one line by line (the version that was current when the card was last written against the one now). Otherwise it says plainly why no text is shown: the file was only marked outdated or superseded (its text did not change), the cited passage or file no longer exists (removed text is not kept), or no earlier version is kept (repository files follow their commits).
+- From each change a reviewer can **Open the file** or **Remove this citation** (or *the missing citation*), which saves the card as a new revision that keeps the rest of its evidence. Anyone who can read the card sees the explanation; only editors see the remove buttons.
+- `GET /v1/memory-cards/{id}/changes`. No migration.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (retired and missing evidence, guest reading, cleared by new citations, outsider) was written and compiles; it was not executed, and the line-by-line comparison of a replaced upload is covered only by the existing version-comparison code. Nothing was built or run.
+
+### Upgrading
+- No migration or access change.
+
 ## V0.6.8 (2026-11-01)
 
 Add optional approval of a memory card, tied to one revision.

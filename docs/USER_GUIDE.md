@@ -152,6 +152,10 @@ When a review you are accountable for is past its date, RepoMemo reminds you onc
 
 On a memory card, **Approval** shows whether the current revision is approved. A reviewer reads the card and chooses **Approve revision N**; if anyone edits the card afterwards, the new revision is not approved until it is approved again. Workspace owners and administrators can **Require independent review**, so the person who made a revision cannot approve it. Decisions, including withdrawals, stay listed with their author.
 
+### Why a memory card needs review
+
+A card that needs review now shows **What changed**: the earlier and current text of a cited file when an earlier version is kept, or the reason it cannot be shown. From there you can open the file or remove a citation that no longer holds; the card keeps a revision of the change.
+
 ### Workflow 3: understand the index state
 
 **Who:** everyone who can read the workspace.

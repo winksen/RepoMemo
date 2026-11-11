@@ -1668,6 +1668,25 @@ export interface MemoryRestoreResult {
   skipped_citations: MemoryRevisionCitation[];
 }
 
+/** One reason a card needs review, explained with the evidence change behind it (V0.6.9). */
+export interface MemoryChange {
+  /** `missing`, `retired` or `changed`, as in the review reasons. */
+  kind: string;
+  artifact_id: string | null;
+  title: string;
+  summary: string;
+  /** The earlier and current text of the cited file, line by line, when an earlier version is kept. */
+  comparison: VersionComparison | null;
+  /** Why no text comparison is shown, when there is none. */
+  unavailable_reason: string | null;
+}
+
+/** What changed behind a card's "needs review" flag. */
+export interface MemoryChanges {
+  revision: number;
+  changes: MemoryChange[];
+}
+
 /**
  * A job the workspace assistant knows how to do. The assistant only ever runs
  * one of these; a message that matches none of them gets a plain reply.

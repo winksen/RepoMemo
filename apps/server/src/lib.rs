@@ -1111,6 +1111,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/approval-policy",
             get(approvals::get_policy).put(approvals::set_policy),
         )
+        .route("/v1/memory-cards/{card_id}/changes", get(memory_history::card_changes))
         .route(
             "/v1/memory-cards/{card_id}/revisions",
             get(memory_history::list_revisions),

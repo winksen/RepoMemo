@@ -30,6 +30,7 @@ import { ViewAtCommit } from "./common";
 import { MemoryHistoryPanel } from "../components/MemoryHistoryPanel";
 import { ReviewOwnershipPanel } from "../components/ReviewOwnershipPanel";
 import { MemoryApprovalPanel } from "../components/MemoryApprovalPanel";
+import { MemoryChangesPanel } from "../components/MemoryChangesPanel";
 import { discardDraft, loadDraft, saveDraft } from "../lib/drafts";
 import { sharedApiUrl } from "../lib/sharedApi";
 
@@ -243,6 +244,18 @@ export function SharedMemoryCardDetail({
     } finally { setIsMutating(false); }
   }
 
+  /** Removes the citation that no longer holds (all of a file's citations, or the missing ones), as a new revision. */
+  async function dropCitation(artifactId: string | null) {
+    if (!card) return;
+    setIsMutating(true); setError(null);
+    try {
+      const kept = citedEvidence.filter((entry) => artifactId === null || entry.artifact_id !== artifactId);
+      await updateSharedMemoryCard(accessToken, cardId, { title: card.card.title, bodyMarkdown: card.card.body_markdown, source: card.card.source, citations: kept, expectedRevision: card.revision });
+      await load();
+      showToast("success", "Citation removed. The card keeps the rest of its evidence.");
+    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+  }
+
   async function removeCard() {
     if (!(await confirm({ action: "Delete", danger: true, description: "This cannot be undone.", title: `Delete ${card?.card.title ?? "this memory card"}?` }))) return;
     setIsMutating(true); setError(null);
@@ -259,6 +272,7 @@ export function SharedMemoryCardDetail({
       {isEditing && hasConflict && card ? <section aria-live="polite" className="shared-record-panel shared-review-panel" role="alert"><h2>Someone else saved this card</h2><p className="shared-muted-copy">Your changes were not saved. The card is now at revision {card.revision}; you started from revision {baseRevision}. Your text is still in the form below.</p><details open><summary>Their version</summary><p><strong>{card.card.title}</strong></p><pre className="shared-version-text">{card.card.body_markdown}</pre></details><div className="shared-detail-actions"><Button onClick={useTheirs} type="button" variant="secondary">Use their version</Button><Button onClick={keepMine} type="button" variant="secondary">Keep mine and save over theirs</Button></div></section> : null}
       <section className="shared-record-panel"><h2>Durable statement</h2>{isEditing ? <form className="shared-record-edit-form" onSubmit={saveCard}><Field label="Title" required><Input onChange={(event) => setTitle(event.target.value)} value={title} /></Field><Field label="Source" required><Input onChange={(event) => setSource(event.target.value)} value={source} /></Field><Field hint={submitHint("saves")} label="Statement" required><MentionTextarea accessToken={accessToken} onValueChange={setBodyMarkdown} value={bodyMarkdown} workspaceId={workspaceId} /></Field><fieldset className="shared-memory-citations"><legend>Evidence this card cites</legend>{citations.length ? <ul>{citations.map((citation, index) => <li key={`${citation.artifact_id}-${citation.chunk_id ?? "file"}-${index}`}><span>{citation.title}{citation.chunk_id ? citationLines(citation) : " (whole file)"}</span><Button onClick={() => setCitations((current) => current.filter((_, position) => position !== index))} variant="secondary">Remove</Button></li>)}</ul> : <EmptyState title="No evidence is cited" />}<div className="shared-memory-citation-add"><Field label="Evidence to add">{(control) => <Combobox aria-label="Evidence to add" emptyLabel="No file matches" id={control.id} onSearch={picker.search} onValueChange={setAddArtifactId} options={picker.files.filter((artifact) => !artifact.repository_id).map((artifact) => ({ label: artifact.title, value: artifact.id }))} placeholder="Add a file…" value={addArtifactId} />}</Field><Button disabled={!addArtifactId} onClick={addCitation} variant="secondary">Add</Button></div></fieldset><Button busy={isMutating} type="submit" variant="main"><Pencil size={ICON_SIZE.md} /> Save memory</Button></form> : <div className="shared-markdown shared-memory-body"><SafeMarkdown>{card?.card.body_markdown ?? ""}</SafeMarkdown></div>}</section>
       <section className="shared-record-panel"><h2>Linked evidence</h2>{card?.evidence.length ? <div className="shared-evidence-links">{card.evidence.map((evidence) => <article key={evidence.link_id}>{evidence.artifact_id && evidence.exists ? <button className="shared-assistant-citation shared-evidence-link-title" onClick={() => onOpenArtifact(evidence.artifact_id!)} type="button"><strong>{evidence.title ?? "Untitled evidence"}</strong></button> : <strong>{evidence.title ?? "Untitled evidence"}{evidence.exists ? "" : " (missing)"}</strong>}<span>{evidence.path ?? evidence.target_id}{citationLines(evidence)}</span>{evidence.artifact_id && evidence.exists ? <ViewAtCommit accessToken={accessToken} citation={{ artifact_id: evidence.artifact_id, commit: evidence.commit, end_line: evidence.end_line, path: evidence.path ?? "", start_line: evidence.start_line }} /> : null}</article>)}</div> : <EmptyState title="This memory card currently has no linked evidence" />}</section>
+      {card?.review.length ? <MemoryChangesPanel accessToken={accessToken} canWrite={canWrite} cardId={cardId} isBusy={isMutating} onOpenArtifact={onOpenArtifact} onRemoveCitation={(artifactId) => void dropCitation(artifactId)} updatedAt={card.card.updated_at} /> : null}
       {card ? <MemoryApprovalPanel accessToken={accessToken} cardId={cardId} isAdmin={workspace.role === "owner" || workspace.role === "admin"} updatedAt={card.card.updated_at} workspaceId={workspaceId} /> : null}
       {card ? <ReviewOwnershipPanel accessToken={accessToken} canWrite={canWrite} itemId={cardId} kind="memory_card" workspaceId={workspaceId} /> : null}
       {card ? <MemoryHistoryPanel accessToken={accessToken} canWrite={canWrite} cardId={cardId} onRestored={() => void load()} updatedAt={card.card.updated_at} /> : null}

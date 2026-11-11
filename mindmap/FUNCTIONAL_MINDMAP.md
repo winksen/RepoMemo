@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.9` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.9 — Show what changed behind a memory card's "needs review" flag.
+
+- A reviewer sees the previous and current passages of a changed file, or an explicit reason why they cannot be shown, and can remove a citation that no longer holds without leaving the card.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.8 — Add optional approval of a memory card, tied to one revision.
 

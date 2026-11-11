@@ -232,3 +232,4 @@ th > .rm-badge,
 .rm-my-work-item { width: 100%; justify-content: space-between; text-align: left; }
 .rm-my-work-list small { display: block; color: var(--color-text-muted); }
 .rm-approval-policy { display: flex; gap: 8px; align-items: center; }
+.rm-change-list { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }

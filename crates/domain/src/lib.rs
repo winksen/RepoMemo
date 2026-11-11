@@ -1962,6 +1962,27 @@ pub struct MemoryRestoreResult {
     pub skipped_citations: Vec<MemoryRevisionCitation>,
 }
 
+/// One reason a card needs review, explained with the evidence change behind it (V0.6.9).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryChange {
+    /// `missing`, `retired` or `changed`, as in the review reasons.
+    pub kind: String,
+    pub artifact_id: Option<String>,
+    pub title: String,
+    pub summary: String,
+    /// The earlier and current text of the cited file, line by line, when an earlier version is kept.
+    pub comparison: Option<VersionComparison>,
+    /// Why no text comparison is shown, when there is none.
+    pub unavailable_reason: Option<String>,
+}
+
+/// What changed behind a card's "needs review" flag.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryChanges {
+    pub revision: i64,
+    pub changes: Vec<MemoryChange>,
+}
+
 /// A job the workspace assistant knows how to do. The assistant only ever runs
 /// one of these; a message that matches none of them gets a plain reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

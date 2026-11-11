@@ -2161,3 +2161,8 @@ export function getSharedApprovalPolicy(accessToken: string, workspaceId: string
 export function setSharedApprovalPolicy(accessToken: string, workspaceId: string, independentReview: boolean): Promise<{ independent_review: boolean }> {
   return request<{ independent_review: boolean }>(`/v1/workspaces/${workspaceId}/approval-policy`, { method: "PUT", body: JSON.stringify({ independent_review: independentReview }) }, accessToken);
 }
+
+/** The evidence changes behind a memory card's "needs review" flag, with earlier and current text when kept (V0.6.9). */
+export function getSharedMemoryChanges(accessToken: string, cardId: string): Promise<import("../types").MemoryChanges> {
+  return request<import("../types").MemoryChanges>(`/v1/memory-cards/${cardId}/changes`, {}, accessToken);
+}

@@ -232,3 +232,30 @@ fn stored_revision(row: &SqliteRow) -> StoredMemoryRevision {
         restored_from: row.get("restored_from"),
     }
 }
+
+impl StorageEngine {
+    /// Citations of the card's newest revision whose passage or file no longer exists, as that revision kept them
+    /// (title and path as they were). Used to explain a "missing" review reason when the old text is not available.
+    pub async fn missing_cited_targets(&self, card_id: &str) -> Result<Vec<RevisionCitation>> {
+        let Some(newest) = self.memory_revisions(card_id).await?.into_iter().next() else {
+            return Ok(Vec::new());
+        };
+        let mut missing = Vec::new();
+        for citation in newest.citations {
+            let table = if citation.target_type == "chunk" {
+                "chunks"
+            } else {
+                "artifacts"
+            };
+            let exists = sqlx::query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM {table} WHERE id = ?1"))
+                .bind(&citation.target_id)
+                .fetch_one(self.reader())
+                .await?
+                > 0;
+            if !exists {
+                missing.push(citation);
+            }
+        }
+        Ok(missing)
+    }
+}
