@@ -148,6 +148,10 @@ Open a file or a memory card and use **Reviewer** to say who is accountable for 
 
 When a review you are accountable for is past its date, RepoMemo reminds you once a week for that item: in your inbox, by mail, or both, as you set under **Profile › Notifications › A review assigned to you is overdue** (the daily digest also lists unread inbox notices). A review is due from midnight UTC on its date. Snoozing the item in **Review** pauses its reminders; moving the date starts them again. Without a mail server you still get the inbox reminder.
 
+### Approving a memory card
+
+On a memory card, **Approval** shows whether the current revision is approved. A reviewer reads the card and chooses **Approve revision N**; if anyone edits the card afterwards, the new revision is not approved until it is approved again. Workspace owners and administrators can **Require independent review**, so the person who made a revision cannot approve it. Decisions, including withdrawals, stay listed with their author.
+
 ### Workflow 3: understand the index state
 
 **Who:** everyone who can read the workspace.

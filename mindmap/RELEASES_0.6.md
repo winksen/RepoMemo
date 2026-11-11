@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.6 → 0.7 (proposed)
 
-> **Current:** `V0.6.7` (2026-11-01)
+> **Current:** `V0.6.8` (2026-11-01)
 
 > **Theme:** Trusted knowledge in daily work · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -27,7 +27,7 @@
 | **V0.6.5** | ✅ 2026-11-01 | AJ. Daily knowledge | 🔧 | Draft recovery | Recover interrupted note/memory drafts without publishing them automatically | Reload or a failed save preserves the draft; logout, server switch and revoked access cannot reveal it to another session |
 | **V0.6.6** | ✅ 2026-11-01 | AJ. Daily knowledge | ✨ | Review ownership | Add an accountable reviewer and next-review date to evidence and memory cards | Owners can delegate review, departed owners are surfaced, and the queue distinguishes overdue review from changed evidence |
 | **V0.6.7** | ✅ 2026-11-01 | AJ. Daily knowledge | 🔧 | Review reminders | Schedule review reminders through existing preferences, inbox and digest delivery | A due review produces one deduplicated reminder per policy window; timezone, snooze and muted-mail behavior are predictable |
-| **V0.6.8** | 🔜 | AJ. Daily knowledge | ✨ | Approval workflow | Add optional reviewer approval tied to a specific knowledge revision | Editing approved content invalidates its approval; configured independent review cannot be self-approved and decisions retain attribution |
+| **V0.6.8** | ✅ 2026-11-01 | AJ. Daily knowledge | ✨ | Approval workflow | Add optional reviewer approval tied to a specific knowledge revision | Editing approved content invalidates its approval; configured independent review cannot be self-approved and decisions retain attribution |
 | **V0.6.9** | 🔜 | AJ. Daily knowledge | 🔧 | Change explanation | Show the evidence changes that caused a memory card to need review | The reviewer can inspect previous/current passages or an explicit unavailable-source reason and resolve the affected citation in context |
 | **V0.6.10** | 🔜 | AJ. Daily knowledge | 🔧 | Citation durability | Bind saved references and portable exports to inspectable content revisions | A source update cannot silently make a historical citation appear current; unavailable snapshots and access refusals are stated accurately |
 | **V0.6.11** | 🔜 | AJ. Daily knowledge | ✨ | Deletion recovery | Add bounded trash and restore for locally authored/uploaded evidence and memory | Accidental deletion can be undone with references restored; purge is explicit and audited; remotely revoked or removed source content is not resurrected by trash |

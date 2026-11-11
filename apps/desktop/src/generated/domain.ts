@@ -1565,6 +1565,32 @@ export interface MyWorkReview {
   since: string;
 }
 
+/** One decision about a revision of a memory card (V0.6.8). */
+export interface MemoryApprovalDecision {
+  revision: number;
+  /** `approved` or `withdrawn`. */
+  decision: string;
+  user: SharedUser | null;
+  note: string;
+  created_at: string;
+}
+
+/** Whether the newest revision of a card is approved, who may decide, and the decisions so far. */
+export interface MemoryApprovalStatus {
+  /** The newest revision, the one a decision would be about. */
+  revision: number;
+  approved: boolean;
+  approved_by: SharedUser | null;
+  approved_at: string | null;
+  /** The workspace requires that the person who made a revision cannot approve it. */
+  independent_review: boolean;
+  can_approve: boolean;
+  /** Why the caller cannot approve, in a sentence. */
+  cannot_approve_reason: string | null;
+  /** Newest first, including decisions about earlier revisions. */
+  history: MemoryApprovalDecision[];
+}
+
 /** Who is accountable for reviewing one item and when it is next due (V0.6.6). */
 export interface ReviewAssignmentView {
   /** `evidence` or `memory_card`. */

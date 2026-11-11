@@ -2139,3 +2139,25 @@ export function setSharedReviewAssignment(accessToken: string, workspaceId: stri
 export function completeSharedReview(accessToken: string, workspaceId: string, input: { kind: string; id: string; next_review_at: string | null }): Promise<import("../types").ReviewAssignmentView> {
   return request<import("../types").ReviewAssignmentView>(`/v1/workspaces/${workspaceId}/review-assignment/complete`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
+
+/** Whether the newest revision of a memory card is approved, and who may decide (V0.6.8). */
+export function getSharedMemoryApproval(accessToken: string, cardId: string): Promise<import("../types").MemoryApprovalStatus> {
+  return request<import("../types").MemoryApprovalStatus>(`/v1/memory-cards/${cardId}/approval`, {}, accessToken);
+}
+
+/** Approves the revision the reviewer read; refused when the card has moved on. */
+export function approveSharedMemoryCard(accessToken: string, cardId: string, revision: number, note = ""): Promise<import("../types").MemoryApprovalStatus> {
+  return request<import("../types").MemoryApprovalStatus>(`/v1/memory-cards/${cardId}/approval`, { method: "POST", body: JSON.stringify({ revision, note }) }, accessToken);
+}
+
+export function withdrawSharedMemoryApproval(accessToken: string, cardId: string): Promise<import("../types").MemoryApprovalStatus> {
+  return request<import("../types").MemoryApprovalStatus>(`/v1/memory-cards/${cardId}/approval`, { method: "DELETE" }, accessToken);
+}
+
+export function getSharedApprovalPolicy(accessToken: string, workspaceId: string): Promise<{ independent_review: boolean }> {
+  return request<{ independent_review: boolean }>(`/v1/workspaces/${workspaceId}/approval-policy`, {}, accessToken);
+}
+
+export function setSharedApprovalPolicy(accessToken: string, workspaceId: string, independentReview: boolean): Promise<{ independent_review: boolean }> {
+  return request<{ independent_review: boolean }>(`/v1/workspaces/${workspaceId}/approval-policy`, { method: "PUT", body: JSON.stringify({ independent_review: independentReview }) }, accessToken);
+}

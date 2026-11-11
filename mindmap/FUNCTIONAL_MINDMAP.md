@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.7` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.8 — Add optional approval of a memory card, tied to one revision.
+
+- A reviewer can approve the exact text they read. Editing the card invalidates the approval by making a new, unapproved revision. A workspace can require that nobody approves their own revision. Every decision is kept with who made it.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.7 — Remind reviewers when a review date has passed, through the channels they already chose.
 

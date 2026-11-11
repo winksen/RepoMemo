@@ -5,6 +5,7 @@ mod access_control;
 mod agent;
 mod ai;
 mod ai_access;
+mod approvals;
 mod artifacts;
 mod audit_export;
 mod auth;
@@ -1100,6 +1101,16 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(get_memory_card).put(update_memory_card).delete(delete_memory_card),
         )
         .route("/v1/memory-cards/{card_id}/export", get(export_memory_card))
+        .route(
+            "/v1/memory-cards/{card_id}/approval",
+            get(approvals::status)
+                .post(approvals::approve)
+                .delete(approvals::withdraw),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/approval-policy",
+            get(approvals::get_policy).put(approvals::set_policy),
+        )
         .route(
             "/v1/memory-cards/{card_id}/revisions",
             get(memory_history::list_revisions),

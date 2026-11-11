@@ -1857,6 +1857,34 @@ pub struct MyWorkReview {
     pub since: String,
 }
 
+/// One decision about a revision of a memory card (V0.6.8).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryApprovalDecision {
+    pub revision: i64,
+    /// `approved` or `withdrawn`.
+    pub decision: String,
+    pub user: Option<SharedUser>,
+    pub note: String,
+    pub created_at: String,
+}
+
+/// Whether the newest revision of a card is approved, who may decide, and the decisions so far.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryApprovalStatus {
+    /// The newest revision, the one a decision would be about.
+    pub revision: i64,
+    pub approved: bool,
+    pub approved_by: Option<SharedUser>,
+    pub approved_at: Option<String>,
+    /// The workspace requires that the person who made a revision cannot approve it.
+    pub independent_review: bool,
+    pub can_approve: bool,
+    /// Why the caller cannot approve, in a sentence.
+    pub cannot_approve_reason: Option<String>,
+    /// Newest first, including decisions about earlier revisions.
+    pub history: Vec<MemoryApprovalDecision>,
+}
+
 /// Who is accountable for reviewing one item and when it is next due (V0.6.6).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewAssignmentView {

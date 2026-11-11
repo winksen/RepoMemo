@@ -61,3 +61,4 @@
 0.6.3  0055_memory_revisions.sql  0dd4a53df5b4f33abf33c17936a6a24ab835ae35dd7ceac6f36e138e90a75b5e
 0.6.6  0056_review_assignments.sql  5d52332f0f4b27a1a39ab58f51bfa6ffbeb2a9bab750e17516c0817e9fdfe446
 0.6.7  0057_review_reminders.sql  c5d1b8680a8dc09903588afd0b3dc2017bdd61ffdca8f38da11998e31e451070
+0.6.8  0058_memory_approvals.sql  0e7c89de7ce43e3d2035f08ffdbcae0e21b0edd16dc2cc9857846e9a2d381556

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.8 (2026-11-01)
+
+Add optional approval of a memory card, tied to one revision.
+
+### Added
+- **Approval** panel on the memory card page: *Approve revision N* records who approved, when and an optional note. The approval belongs to that revision. Any edit or restore makes a new revision, which shows *not approved* until a reviewer reads and approves it; the earlier decision stays in the list of decisions. *Withdraw approval* (the approver or an administrator) adds a decision rather than deleting one.
+- Approving is refused (`409`) when the card has moved past the revision the reviewer read, and when the revision is already approved.
+- Who may approve: anyone who can edit, unless the card has an accountable reviewer (V0.6.6), in which case that reviewer or a workspace administrator.
+- **Require independent review** (workspace owner or administrator, shown on the panel): the person who made a revision cannot approve it, administrators included. Existing approvals are not changed. Revisions with no recorded author (made before V0.6.3) are not blocked.
+- `GET`/`POST`/`DELETE /v1/memory-cards/{id}/approval` and `GET`/`PUT /v1/workspaces/{id}/approval-policy`; migration 0058.
+
+### Checks
+- Version, migration lock (58 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (read-only refusal, independent review, invalidation by edit, stale approval, withdrawal and history) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- One additive migration. Nothing is approved and independent review is off until someone turns it on.
+
 ## V0.6.7 (2026-11-01)
 
 Remind reviewers when a review date has passed, through the channels they already chose.
