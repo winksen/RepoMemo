@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.3 (2026-11-01)
+
+Keep attributed revisions of a memory card's text and citations, with compare and restore.
+
+### Added
+- Every save of a memory card (create, edit, citation change, restore) writes a numbered **revision** with the statement, source, confidence and the full citation set as it was, and who saved it. Cards that already exist start at revision 1 with their present state and no author; a card made by an import gets its present state recorded before its first edit.
+- **Revision history** on the card page once it has two revisions: *What changed* (text difference, citations added and removed), *Compare with current*, and *Restore*. A restore adds a new revision that names the one it brought back; no earlier revision is edited or removed. A cited passage or file that no longer exists is left out and named, never invented back.
+- `GET /v1/memory-cards/{id}/revisions`, `GET .../revisions/compare?from=&to=` and `POST .../revisions/{n}/restore` (restore needs write access; a guest who can read can read the history). Migration 0055.
+
+### Checks
+- Version, migration lock (55 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (attribution, compare, restore after a deleted source, guest and outsider access) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- One additive migration that backfills revision 1 for each existing card. Revisions go with their card.
+
 ## V0.6.2 (2026-11-01)
 
 Add **My work**, a permission-filtered personal list on the Dashboard.

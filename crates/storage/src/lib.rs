@@ -34,6 +34,7 @@ mod jobs;
 mod knowledge;
 mod mail;
 mod memory;
+mod memory_revisions;
 mod mentions;
 mod mfa;
 mod organizations;
@@ -58,6 +59,7 @@ pub use identity::{
 };
 pub use knowledge::{OnboardingFacts, OwnedReview};
 pub use mail::{DigestCandidate, DigestNotice, MailOutboxCounts, MailSettingsUpdate, QueuedMail, StoredMailSettings};
+pub use memory_revisions::{MemoryRestore, RevisionCitation, StoredMemoryRevision};
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;
 pub use organizations::StarterSetup;

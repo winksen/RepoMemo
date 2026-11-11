@@ -1843,6 +1843,54 @@ pub struct MyWork {
     pub total_count: i64,
 }
 
+/// A cited passage or file as a memory revision kept it (V0.6.3).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryRevisionCitation {
+    /// `chunk` (a passage) or `artifact` (a whole file).
+    pub target_type: String,
+    pub target_id: String,
+    pub title: String,
+    pub path: String,
+    pub confidence: Option<f64>,
+}
+
+/// One saved version of a memory card: its text and the citations it had, who saved it and when. Revisions are never
+/// edited; a restore adds a new one that names the revision it brought back.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryRevision {
+    pub revision: i64,
+    pub title: String,
+    pub body_markdown: String,
+    pub source: String,
+    pub confidence: Option<f64>,
+    pub citations: Vec<MemoryRevisionCitation>,
+    /// None for a revision that predates attribution or whose author was removed.
+    pub author: Option<SharedUser>,
+    pub created_at: String,
+    pub restored_from: Option<i64>,
+}
+
+/// Two revisions side by side: the text difference and which citations were added or dropped.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryRevisionComparison {
+    pub from_revision: i64,
+    pub to_revision: i64,
+    pub from_title: String,
+    pub to_title: String,
+    pub body: VersionComparison,
+    pub citations_added: Vec<MemoryRevisionCitation>,
+    pub citations_removed: Vec<MemoryRevisionCitation>,
+}
+
+/// The answer to a restore: the card as it is now, the number of the revision the restore created, and the citations
+/// that could not be brought back because the cited passage or file no longer exists.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryRestoreResult {
+    pub card: MemoryCard,
+    pub revision: i64,
+    pub skipped_citations: Vec<MemoryRevisionCitation>,
+}
+
 /// A job the workspace assistant knows how to do. The assistant only ever runs
 /// one of these; a message that matches none of them gets a plain reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

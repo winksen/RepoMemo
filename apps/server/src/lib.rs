@@ -32,6 +32,7 @@ mod load;
 mod logs;
 mod mail;
 mod maintenance;
+mod memory_history;
 mod mfa;
 mod my_work;
 mod onboarding;
@@ -1089,6 +1090,18 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(get_memory_card).put(update_memory_card).delete(delete_memory_card),
         )
         .route("/v1/memory-cards/{card_id}/export", get(export_memory_card))
+        .route(
+            "/v1/memory-cards/{card_id}/revisions",
+            get(memory_history::list_revisions),
+        )
+        .route(
+            "/v1/memory-cards/{card_id}/revisions/compare",
+            get(memory_history::compare_revisions),
+        )
+        .route(
+            "/v1/memory-cards/{card_id}/revisions/{revision}/restore",
+            post(memory_history::restore_revision),
+        )
         // Every route above answers within the request timeout (review N7).
         // Event streams are added below it: they are meant to stay open.
         .route_layer(TimeoutLayer::with_status_code(

@@ -239,6 +239,9 @@
 | PUT | `/v1/memory-cards/{card_id}` | auth | require_workspace_write | UpdateMemoryCardBody | MemoryCard |
 | DELETE | `/v1/memory-cards/{card_id}` | auth | require_workspace_write | — | status |
 | GET | `/v1/memory-cards/{card_id}/export` | auth | require_workspace_read | — | — |
+| GET | `/v1/memory-cards/{card_id}/revisions` | auth | — | — | Vec<MemoryRevision |
+| GET | `/v1/memory-cards/{card_id}/revisions/compare` | auth | — | — | MemoryRevisionComparison |
+| POST | `/v1/memory-cards/{card_id}/revisions/{revision}/restore` | auth | — | — | MemoryRestoreResult |
 
 ## Repositories
 

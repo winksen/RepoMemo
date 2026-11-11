@@ -38,6 +38,10 @@ impl StorageEngine {
         for citation in citations {
             insert_citation_link(&self.pool, workspace_id, &id, citation, &now).await?;
         }
+        {
+            let mut connection = self.pool.acquire().await?;
+            crate::memory_revisions::snapshot_memory_card(&mut connection, &id, None).await?;
+        }
 
         self.get_memory_card(&id).await.map(|detail| detail.card)
     }
@@ -65,6 +69,15 @@ impl StorageEngine {
             None => None,
         };
         let mut tx = self.pool.begin().await?;
+        // A card made before revisions were kept (an import, say) gets its present state recorded first, so the edit
+        // below is not its only revision.
+        let kept = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM memory_card_revisions WHERE card_id = ?1")
+            .bind(card_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        if kept == 0 {
+            crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None).await?;
+        }
         let changed = sqlx::query(
             r#"
             UPDATE memory_cards
@@ -94,6 +107,7 @@ impl StorageEngine {
                 insert_citation_link(&mut *tx, workspace_id, card_id, citation, &now).await?;
             }
         }
+        crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None).await?;
         tx.commit().await?;
         self.get_memory_card(card_id).await.map(|detail| detail.card)
     }

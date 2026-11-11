@@ -1557,6 +1557,54 @@ export interface MyWork {
   total_count: number;
 }
 
+/** A cited passage or file as a memory revision kept it (V0.6.3). */
+export interface MemoryRevisionCitation {
+  /** `chunk` (a passage) or `artifact` (a whole file). */
+  target_type: string;
+  target_id: string;
+  title: string;
+  path: string;
+  confidence: number | null;
+}
+
+/**
+ * One saved version of a memory card: its text and the citations it had, who saved it and when. Revisions are never
+ * edited; a restore adds a new one that names the revision it brought back.
+ */
+export interface MemoryRevision {
+  revision: number;
+  title: string;
+  body_markdown: string;
+  source: string;
+  confidence: number | null;
+  citations: MemoryRevisionCitation[];
+  /** None for a revision that predates attribution or whose author was removed. */
+  author: SharedUser | null;
+  created_at: string;
+  restored_from: number | null;
+}
+
+/** Two revisions side by side: the text difference and which citations were added or dropped. */
+export interface MemoryRevisionComparison {
+  from_revision: number;
+  to_revision: number;
+  from_title: string;
+  to_title: string;
+  body: VersionComparison;
+  citations_added: MemoryRevisionCitation[];
+  citations_removed: MemoryRevisionCitation[];
+}
+
+/**
+ * The answer to a restore: the card as it is now, the number of the revision the restore created, and the citations
+ * that could not be brought back because the cited passage or file no longer exists.
+ */
+export interface MemoryRestoreResult {
+  card: MemoryCard;
+  revision: number;
+  skipped_citations: MemoryRevisionCitation[];
+}
+
 /**
  * A job the workspace assistant knows how to do. The assistant only ever runs
  * one of these; a message that matches none of them gets a plain reply.

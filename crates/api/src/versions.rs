@@ -116,7 +116,7 @@ impl RepoMemoCore {
 
 /// Compares two texts line by line. The result has only the changed lines and
 /// a few unchanged ones around each, with gaps in between.
-pub(crate) fn compare_texts(old_text: &str, new_text: &str) -> VersionComparison {
+pub fn compare_texts(old_text: &str, new_text: &str) -> VersionComparison {
     let mut old_lines = old_text.lines().collect::<Vec<_>>();
     let mut new_lines = new_text.lines().collect::<Vec<_>>();
     let truncated = old_lines.len() > DIFF_MAX_LINES || new_lines.len() > DIFF_MAX_LINES;

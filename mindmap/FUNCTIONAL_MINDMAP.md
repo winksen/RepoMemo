@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.3 — Keep attributed revisions of a memory card's text and citations, with compare and restore.
+
+- An earlier conclusion and the evidence it rested on can be inspected: each save is a numbered revision with its author and citation set. Compare any revision with the current one and restore it; a restore is a new revision, so history only grows.
+- Restoring tells you which cited sources are gone instead of silently dropping them.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.2 — Add My work, a permission-filtered personal list on the Dashboard.
 

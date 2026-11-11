@@ -2102,3 +2102,17 @@ export async function setSharedOnboardingDismissed(accessToken: string, workspac
 export function getSharedMyWork(accessToken: string): Promise<import("../types").MyWork> {
   return request<import("../types").MyWork>("/v1/profile/work", {}, accessToken);
 }
+
+/** The saved revisions of a memory card, newest first (V0.6.3). */
+export function listSharedMemoryRevisions(accessToken: string, cardId: string): Promise<import("../types").MemoryRevision[]> {
+  return request<import("../types").MemoryRevision[]>(`/v1/memory-cards/${cardId}/revisions`, {}, accessToken);
+}
+
+export function compareSharedMemoryRevisions(accessToken: string, cardId: string, from: number, to: number): Promise<import("../types").MemoryRevisionComparison> {
+  return request<import("../types").MemoryRevisionComparison>(`/v1/memory-cards/${cardId}/revisions/compare?from=${from}&to=${to}`, {}, accessToken);
+}
+
+/** Brings an earlier revision back as a new revision; history is kept. */
+export function restoreSharedMemoryRevision(accessToken: string, cardId: string, revision: number): Promise<import("../types").MemoryRestoreResult> {
+  return request<import("../types").MemoryRestoreResult>(`/v1/memory-cards/${cardId}/revisions/${revision}/restore`, { method: "POST" }, accessToken);
+}

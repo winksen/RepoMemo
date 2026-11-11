@@ -35,6 +35,7 @@ mod repo_stack;
 mod repo_sync;
 mod template;
 mod versions;
+pub use versions::compare_texts;
 
 pub use agent::{
     agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET,

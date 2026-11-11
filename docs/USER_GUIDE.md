@@ -120,6 +120,10 @@ Each workflow says **who can do it**, the steps, and **what you should see** whe
 
 **Expected:** the new items appear in the folder list with their type and size. A file uploaded twice is stored once. A file over the limit or of an unsupported kind is refused with a message naming the reason.
 
+### Memory card history
+
+Every save of a memory card is kept as a numbered revision with who saved it and the citations it had. Open a card and use **Revision history** to see *What changed*, *Compare with current* or *Restore*. A restore adds a new revision, so nothing is lost; a cited source that has since been deleted is named and left out.
+
 ### My work
 
 The Dashboard opens with **My work**: tasks assigned to you, files you own that need review and unread mentions, from every workspace you can open, with the overdue count. Choosing an item opens where it is handled. Work in a workspace you no longer belong to does not appear and is not counted.

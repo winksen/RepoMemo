@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.6 → 0.7 (proposed)
 
-> **Current:** `V0.6.2` (2026-11-01)
+> **Current:** `V0.6.3` (2026-11-01)
 
 > **Theme:** Trusted knowledge in daily work · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -22,7 +22,7 @@
 | **V0.6.0** | ✅ 2026-11-01 | AJ. Daily knowledge | 📘 | Opening | Define the first-value and knowledge-review journeys with representative fixtures and clear state terminology | Fixtures cover no AI, no mail, stale evidence, missing sources and a guest; ownership and approval meanings are agreed in the plan |
 | **V0.6.1** | ✅ 2026-11-01 | AJ. Daily knowledge | ✨ | Onboarding | Add a dismissible workspace checklist using the chosen template and real source readiness | A new member adds evidence, finds it and saves a cited memory without configuring AI; progress follows completed actions rather than clicks |
 | **V0.6.2** | ✅ 2026-11-01 | AJ. Daily knowledge | ✨ | My work | Add a permission-filtered personal view of assigned tasks, due reviews and mentions across workspaces | A returning user reaches the next action from one view; inaccessible work and counts disappear after revocation |
-| **V0.6.3** | 🔜 | AJ. Daily knowledge | ✨ | Memory history | Keep attributed revisions of memory content and its citation set, with compare and restore | An earlier conclusion and its evidence can be inspected; restore creates a new revision and never rewrites history |
+| **V0.6.3** | ✅ 2026-11-01 | AJ. Daily knowledge | ✨ | Memory history | Keep attributed revisions of memory content and its citation set, with compare and restore | An earlier conclusion and its evidence can be inspected; restore creates a new revision and never rewrites history |
 | **V0.6.4** | 🔜 | AJ. Daily knowledge | 🔒 | Concurrent editing | Reject stale note and memory writes using a version precondition | Two editors cannot silently overwrite each other; the losing editor retains their text and can compare or reload explicitly |
 | **V0.6.5** | 🔜 | AJ. Daily knowledge | 🔧 | Draft recovery | Recover interrupted note/memory drafts without publishing them automatically | Reload or a failed save preserves the draft; logout, server switch and revoked access cannot reveal it to another session |
 | **V0.6.6** | 🔜 | AJ. Daily knowledge | ✨ | Review ownership | Add an accountable reviewer and next-review date to evidence and memory cards | Owners can delegate review, departed owners are surfaced, and the queue distinguishes overdue review from changed evidence |

@@ -430,6 +430,11 @@ pub(crate) async fn create_memory_card(
         })
         .await
         .map_err(map_core_error)?;
+    state
+        .storage
+        .attribute_memory_revision(&card.id, &subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
     crate::notify_mentions(
         &state,
         &subject.user_id,
@@ -491,6 +496,11 @@ pub(crate) async fn update_memory_card(
         })
         .await
         .map_err(map_core_error)?;
+    state
+        .storage
+        .attribute_memory_revision(&card.id, &subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
     crate::notify_mentions(
         &state,
         &subject.user_id,
