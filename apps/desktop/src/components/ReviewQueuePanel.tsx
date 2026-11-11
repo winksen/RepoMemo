@@ -38,6 +38,13 @@ export function snoozeUntil(days: number, now = new Date()): string {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + days, 0, 0, 0).toISOString();
 }
 
+/** Why an item is in the queue, and who is accountable for it (V0.6.6). */
+function ownershipLine(item: ReviewItem) {
+  const cause = item.cause === "overdue" ? "Review overdue" : item.cause === "changed_evidence" ? "Evidence changed" : item.cause === "marked" ? "Marked for review" : "";
+  const parts = [cause, item.overdue && item.cause !== "overdue" ? "also overdue" : "", item.reviewer ? `Reviewer: ${item.reviewer.display_name}${item.reviewer_departed ? " (has left)" : ""}` : ""].filter(Boolean);
+  return parts.join(" · ");
+}
+
 function since(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -142,6 +149,7 @@ export function ReviewQueuePanel({
             <h3>{item.title}</h3>
             <p>{item.reason}</p>
             {item.detail ? <p className="rm-map-muted">{item.detail}</p> : null}
+            {ownershipLine(item) ? <p className="rm-map-muted">{ownershipLine(item)}</p> : null}
           </div>
           <div className="rm-health-actions">
             <Button onClick={() => open(item)} type="button" variant="secondary">{kind.open}</Button>

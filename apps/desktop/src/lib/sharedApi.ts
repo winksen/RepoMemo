@@ -2125,3 +2125,17 @@ export function compareSharedMemoryRevisions(accessToken: string, cardId: string
 export function restoreSharedMemoryRevision(accessToken: string, cardId: string, revision: number): Promise<import("../types").MemoryRestoreResult> {
   return request<import("../types").MemoryRestoreResult>(`/v1/memory-cards/${cardId}/revisions/${revision}/restore`, { method: "POST" }, accessToken);
 }
+
+/** Who is accountable for reviewing a file or memory card, and when it is due (V0.6.6). */
+export function getSharedReviewAssignment(accessToken: string, workspaceId: string, kind: string, id: string): Promise<import("../types").ReviewAssignmentView> {
+  return request<import("../types").ReviewAssignmentView>(`/v1/workspaces/${workspaceId}/review-assignment?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}`, {}, accessToken);
+}
+
+export function setSharedReviewAssignment(accessToken: string, workspaceId: string, input: { kind: string; id: string; reviewer_user_id: string | null; next_review_at: string | null }): Promise<import("../types").ReviewAssignmentView> {
+  return request<import("../types").ReviewAssignmentView>(`/v1/workspaces/${workspaceId}/review-assignment`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+/** Records that the item was reviewed now, and sets or clears its next date. */
+export function completeSharedReview(accessToken: string, workspaceId: string, input: { kind: string; id: string; next_review_at: string | null }): Promise<import("../types").ReviewAssignmentView> {
+  return request<import("../types").ReviewAssignmentView>(`/v1/workspaces/${workspaceId}/review-assignment/complete`, { method: "POST", body: JSON.stringify(input) }, accessToken);
+}

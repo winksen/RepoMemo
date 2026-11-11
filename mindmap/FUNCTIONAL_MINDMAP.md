@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.5` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.6` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.6 — Give evidence and memory cards an accountable reviewer and a next-review date.
+
+- Every file and memory card can name who is accountable for checking it and when. The queue separates "marked", "evidence changed" and "overdue", and shows who is on the hook; a reviewer who left is called out so the review is not silently orphaned.
+- Reviews assigned to you and past due appear in My work.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.5 — Recover an interrupted note or memory-card edit without ever saving it for the person.
 

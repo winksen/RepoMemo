@@ -12,8 +12,10 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Duration, NaiveDate, Utc};
-use repomemo_domain::{HealthDetector, ReviewItem, ReviewItemKind, ReviewQueue, ReviewResolver};
+use repomemo_domain::{HealthDetector, ReviewItem, ReviewItemKind, ReviewQueue, ReviewResolver, SharedUser};
+use repomemo_storage::ReviewAssignment;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 use crate::{
     consume_heavy_quota, health::cached_workspace_health, map_storage_error, record_timing, require_workspace_read,
@@ -22,6 +24,31 @@ use crate::{
 
 /// Files a finding names before the rest are counted.
 const FINDING_FILES_SHOWN: usize = 3;
+
+/// What the queue shows of an item's accountable reviewer and due date (V0.6.6).
+struct Ownership {
+    reviewer: Option<SharedUser>,
+    departed: bool,
+    next: Option<String>,
+    overdue: bool,
+}
+
+fn ownership(assignments: &HashMap<(String, String), ReviewAssignment>, kind: &str, id: &str, now: &str) -> Ownership {
+    match assignments.get(&(kind.to_owned(), id.to_owned())) {
+        Some(found) => Ownership {
+            reviewer: found.reviewer.clone(),
+            departed: found.reviewer_departed,
+            next: found.next_review_at.clone(),
+            overdue: found.next_review_at.as_deref().is_some_and(|due| due <= now),
+        },
+        None => Ownership {
+            reviewer: None,
+            departed: false,
+            next: None,
+            overdue: false,
+        },
+    }
+}
 
 /// The id the template uses for a kind of item.
 fn source_of(kind: ReviewItemKind) -> &'static str {
@@ -195,11 +222,28 @@ pub(crate) async fn review_queue(
         .await
         .map_err(map_storage_error)?;
     let health = cached_workspace_health(&state, &workspace_id).await?;
+    let assignments = state
+        .storage
+        .review_assignments(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let due = state
+        .storage
+        .due_reviews(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let now = chrono::Utc::now().to_rfc3339();
 
     let mut items = Vec::new();
     for (artifact_id, title, path, note, since) in evidence {
         let note = note.trim();
+        let owned = ownership(&assignments, "evidence", &artifact_id, &now);
         items.push(ReviewItem {
+            cause: "marked".to_owned(),
+            reviewer: owned.reviewer,
+            reviewer_departed: owned.departed,
+            next_review_at: owned.next,
+            overdue: owned.overdue,
             kind: ReviewItemKind::Evidence,
             id: artifact_id.clone(),
             title,
@@ -217,6 +261,7 @@ pub(crate) async fn review_queue(
     }
     for (card, reasons) in cards {
         let first = reasons.first().map(|reason| reason.detail.clone()).unwrap_or_default();
+        let owned = ownership(&assignments, "memory_card", &card.id, &now);
         let reason = match reasons.len() {
             0 | 1 => first,
             more => format!(
@@ -226,6 +271,11 @@ pub(crate) async fn review_queue(
             ),
         };
         items.push(ReviewItem {
+            cause: "changed_evidence".to_owned(),
+            reviewer: owned.reviewer,
+            reviewer_departed: owned.departed,
+            next_review_at: owned.next,
+            overdue: owned.overdue,
             kind: ReviewItemKind::MemoryCard,
             id: card.id,
             title: card.title,
@@ -257,6 +307,11 @@ pub(crate) async fn review_queue(
             names.push(format!("and {} more", finding.files.len() - FINDING_FILES_SHOWN));
         }
         items.push(ReviewItem {
+            cause: "finding".to_owned(),
+            reviewer: None,
+            reviewer_departed: false,
+            next_review_at: None,
+            overdue: false,
             kind: ReviewItemKind::HealthFinding,
             id: finding.fingerprint,
             title: finding.title,
@@ -265,6 +320,40 @@ pub(crate) async fn review_queue(
             artifact_id: finding.files.first().map(|file| file.artifact_id.clone()),
             since: None,
             resolver: ReviewResolver::Admin,
+            snoozed_until: None,
+        });
+    }
+    // An item whose review date passed is waiting even when nothing changed (V0.6.6); one already listed above is not
+    // listed twice.
+    for found in due {
+        let kind = if found.item_kind == "memory_card" {
+            ReviewItemKind::MemoryCard
+        } else {
+            ReviewItemKind::Evidence
+        };
+        if items.iter().any(|item| item.kind == kind && item.id == found.item_id) {
+            continue;
+        }
+        let owned = ownership(&assignments, &found.item_kind, &found.item_id, &now);
+        let day = found
+            .next_review_at
+            .get(..10)
+            .unwrap_or(&found.next_review_at)
+            .to_owned();
+        items.push(ReviewItem {
+            cause: "overdue".to_owned(),
+            reviewer: owned.reviewer,
+            reviewer_departed: owned.departed,
+            next_review_at: owned.next,
+            overdue: true,
+            kind,
+            id: found.item_id,
+            title: found.title,
+            reason: format!("Its review was due on {day}."),
+            detail: found.detail,
+            artifact_id: found.artifact_id,
+            since: Some(found.next_review_at),
+            resolver: ReviewResolver::Writer,
             snoozed_until: None,
         });
     }
@@ -287,8 +376,10 @@ pub(crate) async fn review_queue(
         waiting(ReviewItemKind::MemoryCard),
         waiting(ReviewItemKind::HealthFinding),
     );
+    let overdue_count = items.iter().filter(|item| item.overdue).count() as i64;
     record_timing("review_queue", &workspace_id, started, items.len());
     Ok(Json(ReviewQueue {
+        overdue_count,
         items,
         evidence_count,
         memory_card_count,
@@ -312,6 +403,11 @@ mod tests {
             since: since.map(str::to_owned),
             resolver: ReviewResolver::Writer,
             snoozed_until: None,
+            cause: String::new(),
+            reviewer: None,
+            reviewer_departed: false,
+            next_review_at: None,
+            overdue: false,
         }
     }
 

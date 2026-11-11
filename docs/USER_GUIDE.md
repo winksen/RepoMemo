@@ -140,6 +140,10 @@ The Overview opens with a **Getting started** checklist: add evidence, make it s
 
 If a memory card edit is interrupted (a reload, a failed save), the card offers **Continue editing** or **Discard it** the next time you open it, and the note you were writing in Evidence is refilled. The draft stays in that browser tab only, is never saved for you, and is removed when you sign out, switch server or close the tab. Cited evidence is not part of a draft.
 
+### Reviewers and review dates
+
+Open a file or a memory card and use **Reviewer** to say who is accountable for checking it and when it is next due. **Mark reviewed** records the review and sets the next date. In **Review**, each item says why it is there (marked, evidence changed, or overdue) and who its reviewer is. If a reviewer leaves the workspace the item says so, and someone else should be chosen. Items assigned to you and past due also appear in **My work**.
+
 ### Workflow 3: understand the index state
 
 **Who:** everyone who can read the workspace.

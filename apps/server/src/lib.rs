@@ -43,6 +43,7 @@ mod repositories;
 mod requests;
 mod retrieval;
 mod review;
+mod review_ownership;
 mod runner;
 mod security;
 mod serve;
@@ -796,6 +797,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/onboarding",
             get(onboarding::get_onboarding).put(onboarding::set_onboarding_dismissed),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/review-assignment",
+            get(review_ownership::get_assignment).put(review_ownership::assign),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/review-assignment/complete",
+            post(review_ownership::complete),
         )
         .route(
             "/v1/workspaces/{workspace_id}/review/snoozes",

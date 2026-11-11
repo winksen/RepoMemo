@@ -1498,6 +1498,18 @@ export interface ReviewItem {
   resolver: ReviewResolver;
   /** When a snoozed item comes back to the person's list (V0.3.10); `None` for an item that is waiting now. */
   snoozed_until: string | null;
+  /**
+   * Why it is in the queue (V0.6.6): `marked` (set to needs review), `changed_evidence` (a cited source changed),
+   * `overdue` (its review date passed) or `finding` (a health finding).
+   */
+  cause: string;
+  /** The accountable reviewer, when one is assigned. */
+  reviewer: SharedUser | null;
+  /** The reviewer's account is gone, deactivated or no longer in the workspace. */
+  reviewer_departed: boolean;
+  next_review_at: string | null;
+  /** The review date has passed, whatever else put the item here. */
+  overdue: boolean;
 }
 
 /**
@@ -1514,6 +1526,8 @@ export interface ReviewQueue {
   finding_count: number;
   /** What the person snoozed and that is still waiting, soonest to come back first. Each has `snoozed_until`. */
   snoozed: ReviewItem[];
+  /** Items waiting only because, or also because, their review date passed (V0.6.6). */
+  overdue_count: number;
 }
 
 /**
@@ -1541,12 +1555,28 @@ export interface WorkspaceOnboarding {
 
 /** A file waiting for the person's review, in the workspace it is in (V0.6.2). */
 export interface MyWorkReview {
+  /** `evidence` or `memory_card` (V0.6.6). */
+  kind: string;
   workspace_id: string;
   workspace_name: string;
   artifact_id: string;
   title: string;
   reason: string;
   since: string;
+}
+
+/** Who is accountable for reviewing one item and when it is next due (V0.6.6). */
+export interface ReviewAssignmentView {
+  /** `evidence` or `memory_card`. */
+  kind: string;
+  item_id: string;
+  reviewer: SharedUser | null;
+  reviewer_departed: boolean;
+  /** The name the reviewer had when assigned, for a reviewer who has left. */
+  reviewer_label: string | null;
+  next_review_at: string | null;
+  last_reviewed_at: string | null;
+  overdue: boolean;
 }
 
 /**

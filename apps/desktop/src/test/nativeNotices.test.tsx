@@ -12,7 +12,7 @@ import type { ReviewQueue, SharedNotification } from "../types";
 const notice = (id: string, over: Partial<SharedNotification> = {}): SharedNotification => ({
   id, workspace_id: "w1", notification_type: "mention", title: `Notice ${id}`, body: `Body ${id}`, href: `/n/${id}`, read_at: null, created_at: `2026-10-26T10:0${id}:00Z`, ...over,
 });
-const queue = (items: number): ReviewQueue => ({ items: Array.from({ length: items }, (_, index) => ({ id: `i${index}` })) as unknown as ReviewQueue["items"], evidence_count: items, memory_card_count: 0, finding_count: 0, snoozed: [] });
+const queue = (items: number): ReviewQueue => ({ items: Array.from({ length: items }, (_, index) => ({ id: `i${index}` })) as unknown as ReviewQueue["items"], evidence_count: items, memory_card_count: 0, finding_count: 0, snoozed: [], overdue_count: 0 });
 
 describe("looking at the notices", () => {
   it("tells about nothing at the first look, only counts", () => {

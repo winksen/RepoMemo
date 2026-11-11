@@ -25,6 +25,7 @@ pub(crate) async fn my_work(
         .into_iter()
         .filter(|review| subject.token_reaches(&review.workspace_id))
         .map(|review| MyWorkReview {
+            kind: "evidence".to_owned(),
             workspace_id: review.workspace_id,
             workspace_name: review.workspace_name,
             artifact_id: review.artifact_id,
@@ -33,6 +34,30 @@ pub(crate) async fn my_work(
             since: review.since,
         })
         .collect();
+    // Reviews assigned to the person whose date has passed; a file already listed above is not listed twice.
+    let mut reviews = reviews;
+    for (due, workspace_name) in state
+        .storage
+        .due_reviews_for(&subject.user_id)
+        .await
+        .map_err(map_storage_error)?
+    {
+        let listed = reviews
+            .iter()
+            .any(|review| review.kind == due.item_kind && review.artifact_id == due.item_id);
+        if listed || !subject.token_reaches(&due.workspace_id) {
+            continue;
+        }
+        reviews.push(MyWorkReview {
+            kind: due.item_kind,
+            workspace_id: due.workspace_id,
+            workspace_name,
+            artifact_id: due.item_id,
+            title: due.title,
+            reason: "Its review date has passed.".to_owned(),
+            since: due.next_review_at,
+        });
+    }
     // A token limited to some workspaces gets no mentions, as with notifications: they may name any workspace.
     let mentions = if subject.token.as_ref().is_some_and(|grant| grant.workspaces.is_some()) {
         Vec::new()

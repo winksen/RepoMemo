@@ -218,6 +218,9 @@
 | GET | `/v1/workspaces/{workspace_id}/review` | auth | require_workspace_read | — | ReviewQueue |
 | GET | `/v1/workspaces/{workspace_id}/onboarding` | auth | require_workspace_read | — | WorkspaceOnboarding |
 | PUT | `/v1/workspaces/{workspace_id}/onboarding` | auth | require_workspace_read | DismissRequest | status |
+| GET | `/v1/workspaces/{workspace_id}/review-assignment` | auth | require_workspace_read | — | ReviewAssignmentView |
+| PUT | `/v1/workspaces/{workspace_id}/review-assignment` | auth | require_workspace_write | AssignRequest | ReviewAssignmentView |
+| POST | `/v1/workspaces/{workspace_id}/review-assignment/complete` | auth | require_workspace_write | CompleteRequest | ReviewAssignmentView |
 | PUT | `/v1/workspaces/{workspace_id}/review/snoozes` | auth | require_workspace_read | — | — |
 | DELETE | `/v1/workspaces/{workspace_id}/review/snoozes` | auth | require_workspace_read | — | — |
 | GET | `/v1/workspaces/{workspace_id}/health` | auth | require_workspace_read | — | WorkspaceHealth |

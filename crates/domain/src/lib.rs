@@ -1784,6 +1784,21 @@ pub struct ReviewItem {
     /// When a snoozed item comes back to the person's list (V0.3.10); `None` for an item that is waiting now.
     #[serde(default)]
     pub snoozed_until: Option<String>,
+    /// Why it is in the queue (V0.6.6): `marked` (set to needs review), `changed_evidence` (a cited source changed),
+    /// `overdue` (its review date passed) or `finding` (a health finding).
+    #[serde(default)]
+    pub cause: String,
+    /// The accountable reviewer, when one is assigned.
+    #[serde(default)]
+    pub reviewer: Option<SharedUser>,
+    /// The reviewer's account is gone, deactivated or no longer in the workspace.
+    #[serde(default)]
+    pub reviewer_departed: bool,
+    #[serde(default)]
+    pub next_review_at: Option<String>,
+    /// The review date has passed, whatever else put the item here.
+    #[serde(default)]
+    pub overdue: bool,
 }
 
 /// Everything in a workspace that needs a person's attention, in one list:
@@ -1800,6 +1815,9 @@ pub struct ReviewQueue {
     /// What the person snoozed and that is still waiting, soonest to come back first. Each has `snoozed_until`.
     #[serde(default)]
     pub snoozed: Vec<ReviewItem>,
+    /// Items waiting only because, or also because, their review date passed (V0.6.6).
+    #[serde(default)]
+    pub overdue_count: i64,
 }
 
 /// One step of the first-value checklist. A step is done when the thing it asks for exists in the workspace, not when a
@@ -1828,12 +1846,30 @@ pub struct WorkspaceOnboarding {
 /// A file waiting for the person's review, in the workspace it is in (V0.6.2).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MyWorkReview {
+    /// `evidence` or `memory_card` (V0.6.6).
+    #[serde(default)]
+    pub kind: String,
     pub workspace_id: String,
     pub workspace_name: String,
     pub artifact_id: String,
     pub title: String,
     pub reason: String,
     pub since: String,
+}
+
+/// Who is accountable for reviewing one item and when it is next due (V0.6.6).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewAssignmentView {
+    /// `evidence` or `memory_card`.
+    pub kind: String,
+    pub item_id: String,
+    pub reviewer: Option<SharedUser>,
+    pub reviewer_departed: bool,
+    /// The name the reviewer had when assigned, for a reviewer who has left.
+    pub reviewer_label: Option<String>,
+    pub next_review_at: Option<String>,
+    pub last_reviewed_at: Option<String>,
+    pub overdue: bool,
 }
 
 /// What waits for one person across the workspaces they can open: assigned tasks that are not done, files they own

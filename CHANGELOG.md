@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.6 (2026-11-01)
+
+Give evidence and memory cards an accountable reviewer and a next-review date.
+
+### Added
+- **Reviewer** panel on every file and memory card page: choose the accountable reviewer (a workspace member who can edit, who may differ from the file's owner), set the **Next review** date, and **Mark reviewed** (records the time and sets or clears the next date). Anyone who can edit assigns an item nobody reviews yet; changing or removing an existing reviewer needs that reviewer or a workspace administrator, and only the reviewer or an administrator can mark an item reviewed.
+- The **Review** queue tells the reasons apart. Each item says *Marked for review*, *Evidence changed* or *Review overdue*, names its reviewer, and an item whose date passed while its evidence also changed says *also overdue*. An item whose date passed with nothing else wrong is now listed (before, only changed or marked items were), and the queue reports an `overdue_count`.
+- A reviewer who has left the workspace, was deactivated or was deleted is shown as having left ("Ada (has left)", or on the item's page "has left this workspace, so nobody is accountable"), instead of showing nobody.
+- **My work** also lists items assigned to you whose review date has passed.
+- `GET`/`PUT /v1/workspaces/{id}/review-assignment` and `POST .../review-assignment/complete`; migration 0056.
+
+### Checks
+- Version, migration lock (56 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (refused viewer reviewer, overdue versus changed evidence, My work, permission to reassign and complete, departed reviewer) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- One additive migration. Existing review behaviour is unchanged until a reviewer or date is set.
+
 ## V0.6.5 (2026-11-01)
 
 Recover an interrupted note or memory-card edit without ever saving it for the person.

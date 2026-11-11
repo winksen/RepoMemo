@@ -223,6 +223,9 @@ th > .rm-badge,
 .rm-checklist-state { color: var(--color-text-muted); font-size: 12px; }
 .rm-checklist-collapsed { margin: 12px 0; }
 
+/* Review ownership (V0.6.6) */
+.rm-review-owner-form { display: grid; gap: 12px; max-width: 480px; }
+
 /* My work (V0.6.2) */
 .rm-my-work { display: grid; gap: 10px; margin: 16px 0; }
 .rm-my-work-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }

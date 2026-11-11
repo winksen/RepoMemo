@@ -17,11 +17,12 @@ const queue: ReviewQueue = {
   memory_card_count: 1,
   finding_count: 1,
   items: [
-    { kind: "evidence", id: "a1", title: "Runbook", reason: "Steps changed in 2.1", detail: "docs/runbook.md", artifact_id: "a1", since: "2026-10-01T10:00:00Z", resolver: "writer", snoozed_until: null },
-    { kind: "memory_card", id: "c1", title: "Uploads back off", reason: "Retry notes is marked outdated.", detail: "Cites 1 piece of evidence", artifact_id: "a2", since: "2026-10-02T10:00:00Z", resolver: "writer", snoozed_until: null },
-    { kind: "health_finding", id: "f1", title: "Two files are identical", reason: "Copy one and Copy two have the same content.", detail: "Copy one, Copy two", artifact_id: "a3", since: null, resolver: "admin", snoozed_until: null },
+    { kind: "evidence", id: "a1", title: "Runbook", reason: "Steps changed in 2.1", detail: "docs/runbook.md", artifact_id: "a1", since: "2026-10-01T10:00:00Z", resolver: "writer", snoozed_until: null, cause: "marked", reviewer: null, reviewer_departed: false, next_review_at: null, overdue: false },
+    { kind: "memory_card", id: "c1", title: "Uploads back off", reason: "Retry notes is marked outdated.", detail: "Cites 1 piece of evidence", artifact_id: "a2", since: "2026-10-02T10:00:00Z", resolver: "writer", snoozed_until: null, cause: "marked", reviewer: null, reviewer_departed: false, next_review_at: null, overdue: false },
+    { kind: "health_finding", id: "f1", title: "Two files are identical", reason: "Copy one and Copy two have the same content.", detail: "Copy one, Copy two", artifact_id: "a3", since: null, resolver: "admin", snoozed_until: null, cause: "marked", reviewer: null, reviewer_departed: false, next_review_at: null, overdue: false },
   ],
   snoozed: [],
+  overdue_count: 0,
 };
 
 const handlers = { onOpenArtifact: vi.fn(), onOpenHealth: vi.fn(), onOpenMemoryCard: vi.fn() };
@@ -70,7 +71,7 @@ describe("ReviewQueuePanel", () => {
   });
 
   it("shows an empty queue as nothing waiting", async () => {
-    vi.mocked(getSharedReviewQueue).mockResolvedValue({ items: [], evidence_count: 0, memory_card_count: 0, finding_count: 0, snoozed: [] });
+    vi.mocked(getSharedReviewQueue).mockResolvedValue({ items: [], evidence_count: 0, memory_card_count: 0, finding_count: 0, snoozed: [], overdue_count: 0 });
     panel();
     await waitFor(() => expect(screen.getByText("Nothing is waiting for review")).toBeTruthy());
     expect(screen.queryByRole("list", { name: "Review queue" })).toBeNull();
