@@ -1,3 +1,4 @@
+import { clearAllDrafts } from "./drafts";
 import type {
   ArchiveImportReport,
   ServerSetupStatus,
@@ -120,6 +121,8 @@ export function configureWebApi(apiUrl: string) {
  * response, and it is kept in the operating system's credential store instead of the page.
  */
 export function configureDesktopApi(serverUrl: string, transport: Transport) {
+  // Drafts belong to one server: another one never sees them (V0.6.5).
+  if (serverUrl.replace(/\/$/, "") !== API_URL) clearAllDrafts();
   API_URL = serverUrl.replace(/\/$/, "");
   sharedApiUrl = API_URL;
   clientName = "desktop";
@@ -179,6 +182,7 @@ function storeTokens(response: { access_token: string; refresh_token?: string })
 function forgetSession(keepStoredToken = false) {
   // Nothing of the account may outlive its session in this tab.
   queryClient.clear();
+  clearAllDrafts();
   writeStorage("sessionStorage", SHARED_SESSION_STORAGE_KEY, null);
   writeStorage("localStorage", SESSION_MARKER_KEY, null);
   writeStorage("localStorage", REFRESH_STORAGE_KEY, null);

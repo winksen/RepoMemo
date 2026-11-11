@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.5 (2026-11-01)
+
+Recover an interrupted note or memory-card edit without ever saving it for the person.
+
+### Added
+- A memory card edit is kept as a **draft** in the browser tab while it has unsaved changes. After a reload, or a save that failed, the card page offers **Continue editing** or **Discard it**; continuing restores the title, statement and source, and keeps the revision the edit started from, so a conflict with someone else's later save is still detected (V0.6.4). The cited evidence is not part of a draft.
+- The note being written in Evidence is kept the same way and refilled after a reload with a message that it has not been stored. Storing it, or emptying both fields, removes the draft.
+- Drafts live in the tab's session storage only: they are never sent to the server, never published, and are gone when the tab closes. Each is keyed by server and person, signing out or the session ending removes every draft, a change of server in the desktop app removes them, and a card that answers 403 or 404 takes its draft with it.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links and TypeScript pass. A UI test of the draft store (scope, discard, sign-out, bad data) was written and type-checks; it was not executed. Nothing was built or run.
+
+### Upgrading
+- No migration or server change.
+
 ## V0.6.4 (2026-11-01)
 
 Refuse a save that was based on an older version, so two editors cannot silently overwrite each other.

@@ -18,6 +18,8 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { DOCUMENT_ACCEPT, isDocumentArtifact } from "../../lib/documents";
 import { DocumentViewer, RichNoteEditor } from "../lazy";
 import { showToast } from "../../components/ui/toast";
+import { discardDraft, loadDraft, saveDraft } from "../../lib/drafts";
+import { sharedApiUrl } from "../../lib/sharedApi";
 import { type ArtifactViewMode, FILE_CATEGORIES, type FileCategory, type ItemDialog, MAX_FOLDER_DEPTH, UPLOAD_CONCURRENCY, UPLOAD_EXTENSIONS, type UploadProgress } from "../constants";
 import { apiMessage, artifactKindLabel, documentKindLabel, fileCategory, formatBytes } from "../format";
 import { selectUploads } from "../../lib/uploadFilter";
@@ -62,6 +64,22 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
     keepsOn: (to) => { const route = parseRoute(to.split("?")[0]); return route.name === "workspace" && route.workspaceId === page.workspaceId; },
     subject: "the note you are writing",
   });
+  // A note being written survives a reload or a failed save in this tab (V0.6.5); storing it is still the person's act.
+  const noteDraftScope = { server: sharedApiUrl, userId: page.session.user.id };
+  const noteDraftId = page.workspaceId;
+  useEffect(() => {
+    const draft = loadDraft<{ title: string; content: string }>(noteDraftScope, "note", noteDraftId);
+    if (draft && !noteTitle.trim() && !noteContent.trim()) {
+      setNoteTitle(draft.value.title);
+      setNoteContent(draft.value.content);
+      showToast("success", "Restored the note you were writing. It has not been stored.");
+    }
+  }, [noteDraftId]);
+  useEffect(() => {
+    if (!noteTitle.trim() && !noteContent.trim()) { discardDraft(noteDraftScope, "note", noteDraftId); return; }
+    const timer = window.setTimeout(() => saveDraft(noteDraftScope, "note", noteDraftId, { title: noteTitle, content: noteContent }), 400);
+    return () => window.clearTimeout(timer);
+  }, [noteTitle, noteContent, noteDraftId]);
   const [uploadFiles, setUploadFiles] = useS<File[]>("uploadFiles", []);
   const [uploadProgress, setUploadProgress] = useS<UploadProgress | null>("uploadProgress", null);
   const [selectedDocumentId, setSelectedDocumentId] = useS<string | null>("selectedDocumentId", null);
@@ -160,6 +178,7 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
         folder_id: activeFolderId,
       });
       setNoteTitle(""); setNoteContent("");
+      discardDraft(noteDraftScope, "note", noteDraftId);
       await load();
       showToast("success", "Note stored. It is indexed in the background.");
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }

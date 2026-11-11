@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.4` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.5` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.5 — Recover an interrupted note or memory-card edit without ever saving it for the person.
+
+- Reloading, or a save that fails, no longer loses what was typed: the card offers to continue the edit or discard it, and the note form refills. Nothing is published until the person saves.
+- Another account, another server, signing out or lost access never reveals a draft.
+
+Checks: Draft store test written and type-checked, not executed; static checks pass.
 
 ## V0.6.4 — Refuse a save that was based on an older version, so two editors cannot silently overwrite each other.
 

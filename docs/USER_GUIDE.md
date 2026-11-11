@@ -136,6 +136,10 @@ The Dashboard opens with **My work**: tasks assigned to you, files you own that 
 
 The Overview opens with a **Getting started** checklist: add evidence, make it searchable, save a memory card that cites it and (optionally) bring in a teammate. A step is checked when the thing exists in the workspace, so it works without an AI provider or mail. **Hide for now** hides it for you only; **Show the getting-started checklist** brings it back.
 
+### Recovering an unsaved edit
+
+If a memory card edit is interrupted (a reload, a failed save), the card offers **Continue editing** or **Discard it** the next time you open it, and the note you were writing in Evidence is refilled. The draft stays in that browser tab only, is never saved for you, and is removed when you sign out, switch server or close the tab. Cited evidence is not part of a draft.
+
 ### Workflow 3: understand the index state
 
 **Who:** everyone who can read the workspace.
