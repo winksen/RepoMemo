@@ -17,6 +17,7 @@ mod compression;
 mod connectors;
 mod connectors_gitlab;
 mod cross_search;
+mod edit_conflicts;
 mod evidence;
 mod evidence_tools;
 mod knowledge_fixture;

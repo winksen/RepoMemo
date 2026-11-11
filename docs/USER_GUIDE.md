@@ -120,6 +120,10 @@ Each workflow says **who can do it**, the steps, and **what you should see** whe
 
 **Expected:** the new items appear in the folder list with their type and size. A file uploaded twice is stored once. A file over the limit or of an unsupported kind is refused with a message naming the reason.
 
+### Two people editing one card
+
+When you save a memory card that someone else saved after you opened it, RepoMemo refuses the save and keeps your text in the form. You can use their version or keep yours and save over it; both stay in the revision history. Replacing an uploaded file that changed after you opened it is refused the same way.
+
 ### Memory card history
 
 Every save of a memory card is kept as a numbered revision with who saved it and the citations it had. Open a card and use **Revision history** to see *What changed*, *Compare with current* or *Restore*. A restore adds a new revision, so nothing is lost; a cited source that has since been deleted is named and left out.

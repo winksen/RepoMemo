@@ -121,7 +121,7 @@ export function SharedArtifactDetail({
   async function uploadVersion(file: File) {
     setIsMutating(true); setError(null);
     try {
-      await uploadSharedArtifactVersion(accessToken, artifactId, file);
+      await uploadSharedArtifactVersion(accessToken, artifactId, file, artifact?.summary.updated_at);
       showToast("success", "New version stored. It is being indexed again.");
       await load();
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }

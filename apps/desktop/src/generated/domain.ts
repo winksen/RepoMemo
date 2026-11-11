@@ -1053,6 +1053,8 @@ export interface MemoryCardDetail {
   evidence: MemoryEvidence[];
   /** Empty when the card is up to date with its evidence. */
   review: MemoryReviewReason[];
+  /** The newest revision number (V0.6.4); an editor sends it back as `expected_revision`. */
+  revision: number;
 }
 
 export interface CreateMemoryCardRequest {
@@ -1072,6 +1074,11 @@ export interface UpdateMemoryCardRequest {
   confidence: number | null;
   /** Replaces the cited evidence when given; `None` keeps it. */
   citations: Citation[] | null;
+  /**
+   * The revision the writer started from (V0.6.4). When given and no longer the newest, the write is refused so
+   * it cannot silently overwrite a later save; `None` writes without the check.
+   */
+  expected_revision: number | null;
 }
 
 export interface AppSettings {

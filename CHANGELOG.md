@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.4 (2026-11-01)
+
+Refuse a save that was based on an older version, so two editors cannot silently overwrite each other.
+
+### Changed
+- **Memory cards:** the card page now reports its newest `revision`. Saving sends the revision the editor started from; if the card has a newer one the save is refused with `409` and changes nothing (no revision is added). The check and the write share one transaction. Clients that send no revision keep the old behaviour.
+- The edit form keeps what was typed. A save that loses shows **Someone else saved this card** with their version, and the editor chooses **Use their version** (their own text is dropped) or **Keep mine and save over theirs** (the next save replaces theirs knowingly, and both stay in the revision history). A teammate's save arriving while you edit no longer replaces the text in the form.
+- **Uploaded files and notes:** a new-version upload may send `X-RepoMemo-Expected-Updated-At`; a file changed since it was opened is refused with `409`. The web upload sends it. This check is made just before the write, not in the same transaction.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (stale card save, retry from the newer revision, unchecked clients, stale file upload) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- No migration. Old clients keep working; they just are not protected.
+
 ## V0.6.3 (2026-11-01)
 
 Keep attributed revisions of a memory card's text and citations, with compare and restore.

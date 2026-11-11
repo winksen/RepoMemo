@@ -426,6 +426,9 @@ pub(crate) struct UpdateMemoryCardBody {
     /// Replaces the cited evidence when given.
     #[serde(default)]
     pub(crate) citations: Option<Vec<repomemo_domain::Citation>>,
+    /// The revision the editor started from; a newer one makes the write fail with 409 (V0.6.4).
+    #[serde(default)]
+    pub(crate) expected_revision: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]

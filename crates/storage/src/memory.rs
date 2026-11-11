@@ -55,6 +55,23 @@ impl StorageEngine {
         confidence: Option<f64>,
         citations: Option<&[Citation]>,
     ) -> Result<MemoryCard> {
+        self.update_memory_card_expecting(card_id, title, body_markdown, source, confidence, citations, None)
+            .await
+    }
+
+    /// Like `update_memory_card`, but refuses with a conflict when `expected_revision` is given and the card's newest
+    /// revision is another one. The check and the write share one transaction.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn update_memory_card_expecting(
+        &self,
+        card_id: &str,
+        title: &str,
+        body_markdown: &str,
+        source: &str,
+        confidence: Option<f64>,
+        citations: Option<&[Citation]>,
+        expected_revision: Option<i64>,
+    ) -> Result<MemoryCard> {
         let now = Utc::now().to_rfc3339();
         // New citations are checked before anything changes, against the
         // card's own workspace.
@@ -69,6 +86,19 @@ impl StorageEngine {
             None => None,
         };
         let mut tx = self.pool.begin().await?;
+        if let Some(expected) = expected_revision {
+            let newest = sqlx::query_scalar::<_, i64>(
+                "SELECT COALESCE(MAX(revision), 0) FROM memory_card_revisions WHERE card_id = ?1",
+            )
+            .bind(card_id)
+            .fetch_one(&mut *tx)
+            .await?;
+            if newest != expected {
+                repomemo_domain::bail_conflict!(
+                    "This card was saved again (revision {newest}) while you were editing revision {expected}. Your text was not saved."
+                );
+            }
+        }
         // A card made before revisions were kept (an import, say) gets its present state recorded first, so the edit
         // below is not its only revision.
         let kept = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM memory_card_revisions WHERE card_id = ?1")
@@ -182,10 +212,17 @@ impl StorageEngine {
             .await?
             .remove(card_id)
             .unwrap_or_default();
+        let revision = sqlx::query_scalar::<_, i64>(
+            "SELECT COALESCE(MAX(revision), 0) FROM memory_card_revisions WHERE card_id = ?1",
+        )
+        .bind(card_id)
+        .fetch_one(self.reader())
+        .await?;
         Ok(MemoryCardDetail {
             card: MemoryCard::from(row),
             evidence: evidence_rows.into_iter().map(MemoryEvidence::from).collect(),
             review,
+            revision,
         })
     }
 

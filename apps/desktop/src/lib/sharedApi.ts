@@ -1255,12 +1255,14 @@ export function compareSharedArtifactVersions(accessToken: string, artifactId: s
   return request<import("../types").VersionComparison>(`/v1/artifacts/${artifactId}/compare?from=${from}&to=${to}`, {}, accessToken);
 }
 
-export async function uploadSharedArtifactVersion(accessToken: string, artifactId: string, file: File): Promise<ArtifactSummary> {
+export async function uploadSharedArtifactVersion(accessToken: string, artifactId: string, file: File, expectedUpdatedAt?: string): Promise<ArtifactSummary> {
   const response = await authFetch(`${API_URL}/v1/artifacts/${artifactId}/versions`, {
     method: "POST",
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${accessToken}`,
+      // The state of the file the person started from; a changed file is refused instead of overwritten (V0.6.4).
+      ...(expectedUpdatedAt ? { "X-RepoMemo-Expected-Updated-At": expectedUpdatedAt } : {}),
       "Content-Type": file.type || "application/octet-stream",
       "X-RepoMemo-Filename": encodeURIComponent(file.name),
     },
@@ -1478,6 +1480,8 @@ export function updateSharedMemoryCard(accessToken: string, cardId: string, inpu
   bodyMarkdown: string;
   source: string;
   confidence?: number | null;
+  /** The revision the editor started from; the server refuses the save (409) when the card has a newer one (V0.6.4). */
+  expectedRevision?: number;
   /** Replaces the cited evidence; leave out to keep it. */
   citations?: Array<{
     artifact_id: string;
@@ -1496,6 +1500,7 @@ export function updateSharedMemoryCard(accessToken: string, cardId: string, inpu
       body_markdown: input.bodyMarkdown,
       source: input.source,
       confidence: input.confidence ?? null,
+      ...(input.expectedRevision === undefined ? {} : { expected_revision: input.expectedRevision }),
       ...(input.citations ? { citations: input.citations } : {}),
     }),
   }, accessToken);

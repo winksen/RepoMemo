@@ -1343,6 +1343,17 @@ pub(crate) async fn upload_artifact_version(
     let current = writable_artifact_summary(&state, &subject, &artifact_id).await?;
     let workspace_id = current.workspace_id;
     repositories::ensure_not_repository_file(&state, &artifact_id).await?;
+    // The editor says which state of the file it started from; a file changed since is not overwritten (V0.6.4).
+    if let Some(seen) = headers
+        .get("x-repomemo-expected-updated-at")
+        .and_then(|value| value.to_str().ok())
+    {
+        if seen != current.updated_at {
+            return Err(ApiError::conflict(
+                "This file was changed after you opened it. Reload it to see the newer version, then upload again.",
+            ));
+        }
+    }
     let filename = headers
         .get("x-repomemo-filename")
         .and_then(decode_filename_header)

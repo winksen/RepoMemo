@@ -1186,6 +1186,9 @@ pub struct MemoryCardDetail {
     pub evidence: Vec<MemoryEvidence>,
     /// Empty when the card is up to date with its evidence.
     pub review: Vec<MemoryReviewReason>,
+    /// The newest revision number (V0.6.4); an editor sends it back as `expected_revision`.
+    #[serde(default)]
+    pub revision: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1208,6 +1211,10 @@ pub struct UpdateMemoryCardRequest {
     /// Replaces the cited evidence when given; `None` keeps it.
     #[serde(default)]
     pub citations: Option<Vec<Citation>>,
+    /// The revision the writer started from (V0.6.4). When given and no longer the newest, the write is refused so
+    /// it cannot silently overwrite a later save; `None` writes without the check.
+    #[serde(default)]
+    pub expected_revision: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

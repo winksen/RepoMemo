@@ -669,13 +669,14 @@ impl RepoMemoCore {
     pub async fn update_memory_card(&self, request: UpdateMemoryCardRequest) -> Result<MemoryCard> {
         validate_memory_card_fields(&request.title, &request.body_markdown, &request.source)?;
         self.storage
-            .update_memory_card(
+            .update_memory_card_expecting(
                 &request.card_id,
                 &request.title,
                 &request.body_markdown,
                 &request.source,
                 request.confidence,
                 request.citations.as_deref(),
+                request.expected_revision,
             )
             .await
     }

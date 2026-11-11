@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.4` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.4 — Refuse a save that was based on an older version, so two editors cannot silently overwrite each other.
+
+- Two people editing the same memory card: the second save is refused, their text stays in the form, and they choose to take the other version or to save over it. Nothing is merged silently and a refused save leaves no trace in the history.
+- Replacing an uploaded file that changed after it was opened is refused the same way.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.3 — Keep attributed revisions of a memory card's text and citations, with compare and restore.
 

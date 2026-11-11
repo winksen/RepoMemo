@@ -552,6 +552,8 @@ export interface MemoryCardDetail {
   evidence: MemoryEvidence[];
   /** Why the card needs another look; empty when it is up to date. */
   review: MemoryReviewReason[];
+  /** The newest revision; an editor sends it back so a save based on an older one is refused (V0.6.4). */
+  revision: number;
 }
 
 export interface RepoSource {

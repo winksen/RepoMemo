@@ -1,7 +1,7 @@
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../components/SafeMarkdown";
 import { IconArrowLeft as ArrowLeft, IconFileText as FileText, IconMarkdown as Markdown, IconPencil as Pencil, IconTrash as Trash } from "@tabler/icons-react";
-import { deleteSharedMemoryCard, exportSharedMemoryCard, getSharedMemoryCard, updateSharedMemoryCard } from "../lib/sharedApi";
+import { deleteSharedMemoryCard, exportSharedMemoryCard, getSharedMemoryCard, SharedApiError, updateSharedMemoryCard } from "../lib/sharedApi";
 import { type ArtifactSummary, type MemoryCardDetail, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
 import { PageHeader } from "../components/ui/page-header";
@@ -86,6 +86,9 @@ export function SharedMemoryCardDetail({
   // Evidence being edited: what the card will cite once saved.
   const [citations, setCitations] = useState<EditableCitation[]>([]);
   const [addArtifactId, setAddArtifactId] = useState("");
+  // The revision the editor started from, and whether a save found a newer one (V0.6.4).
+  const [baseRevision, setBaseRevision] = useState(0);
+  const [hasConflict, setHasConflict] = useState(false);
   const canWrite = workspace.role !== "viewer";
   // The evidence the card cites now, which editing starts from.
   const citedEvidence: EditableCitation[] = (card?.evidence ?? []).filter((entry) => entry.artifact_id && entry.exists).map((entry) => ({
@@ -129,14 +132,37 @@ export function SharedMemoryCardDetail({
     }, LIVE_REFRESH_DELAY_MS);
   }, liveHub);
   useEffect(() => {
+    // Text typed into the form is never replaced by someone else's save arriving meanwhile.
+    if (isEditing) return;
     setTitle(card?.card.title ?? "");
     setBodyMarkdown(card?.card.body_markdown ?? "");
     setSource(card?.card.source ?? "");
-  }, [card?.card.body_markdown, card?.card.source, card?.card.title]);
+  }, [card?.card.body_markdown, card?.card.source, card?.card.title, isEditing]);
 
   function startEditing() {
+    setTitle(card?.card.title ?? "");
+    setBodyMarkdown(card?.card.body_markdown ?? "");
+    setSource(card?.card.source ?? "");
     setCitations(citedEvidence);
+    setBaseRevision(card?.revision ?? 0);
+    setHasConflict(false);
     setIsEditing(true);
+  }
+
+  /** The newer version is taken as it is and the person's unsaved text is dropped. */
+  function useTheirs() {
+    setTitle(card?.card.title ?? "");
+    setBodyMarkdown(card?.card.body_markdown ?? "");
+    setSource(card?.card.source ?? "");
+    setCitations(citedEvidence);
+    setBaseRevision(card?.revision ?? 0);
+    setHasConflict(false);
+  }
+
+  /** The person's text stays, based on the newer revision: the next save replaces it knowingly. */
+  function keepMine() {
+    setBaseRevision(card?.revision ?? 0);
+    setHasConflict(false);
   }
 
   function addCitation() {
@@ -170,11 +196,17 @@ export function SharedMemoryCardDetail({
     event.preventDefault();
     setIsMutating(true); setError(null);
     try {
-      await updateSharedMemoryCard(accessToken, cardId, { title, bodyMarkdown, source, citations });
+      await updateSharedMemoryCard(accessToken, cardId, { title, bodyMarkdown, source, citations, expectedRevision: baseRevision });
       setIsEditing(false);
       await load();
       showToast("success", "Memory card saved.");
-    } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsMutating(false); }
+    } catch (requestError) {
+      if (requestError instanceof SharedApiError && requestError.status === 409) {
+        // Not saved, and nothing typed is lost: the form keeps the text while the newer version is fetched.
+        setHasConflict(true);
+        await load();
+      } else setError(apiMessage(requestError));
+    } finally { setIsMutating(false); }
   }
 
   async function removeCard() {
@@ -189,6 +221,7 @@ export function SharedMemoryCardDetail({
       <Toast kind="error" message={error} />
       {!card && isLoading ? <LoadingState label="Loading the memory card" /> : null}
       {card?.review.length ? <section className="shared-record-panel shared-review-panel"><h2>Needs review</h2><p className="shared-muted-copy">Evidence this card cites has changed since it was written. Check what it says, edit it or its evidence, or confirm it as it is.</p><ul>{card.review.map((reason, index) => <li key={`${reason.kind}-${index}`}>{reason.detail}{reason.artifact_id ? <> <button className="shared-assistant-citation" onClick={() => onOpenArtifact(reason.artifact_id!)} type="button">Open</button></> : null}</li>)}</ul>{canWrite ? <Button busy={isMutating} onClick={() => void confirmCard()} variant="secondary">Confirm as it is</Button> : null}</section> : null}
+      {isEditing && hasConflict && card ? <section aria-live="polite" className="shared-record-panel shared-review-panel" role="alert"><h2>Someone else saved this card</h2><p className="shared-muted-copy">Your changes were not saved. The card is now at revision {card.revision}; you started from revision {baseRevision}. Your text is still in the form below.</p><details open><summary>Their version</summary><p><strong>{card.card.title}</strong></p><pre className="shared-version-text">{card.card.body_markdown}</pre></details><div className="shared-detail-actions"><Button onClick={useTheirs} type="button" variant="secondary">Use their version</Button><Button onClick={keepMine} type="button" variant="secondary">Keep mine and save over theirs</Button></div></section> : null}
       <section className="shared-record-panel"><h2>Durable statement</h2>{isEditing ? <form className="shared-record-edit-form" onSubmit={saveCard}><Field label="Title" required><Input onChange={(event) => setTitle(event.target.value)} value={title} /></Field><Field label="Source" required><Input onChange={(event) => setSource(event.target.value)} value={source} /></Field><Field hint={submitHint("saves")} label="Statement" required><MentionTextarea accessToken={accessToken} onValueChange={setBodyMarkdown} value={bodyMarkdown} workspaceId={workspaceId} /></Field><fieldset className="shared-memory-citations"><legend>Evidence this card cites</legend>{citations.length ? <ul>{citations.map((citation, index) => <li key={`${citation.artifact_id}-${citation.chunk_id ?? "file"}-${index}`}><span>{citation.title}{citation.chunk_id ? citationLines(citation) : " (whole file)"}</span><Button onClick={() => setCitations((current) => current.filter((_, position) => position !== index))} variant="secondary">Remove</Button></li>)}</ul> : <EmptyState title="No evidence is cited" />}<div className="shared-memory-citation-add"><Field label="Evidence to add">{(control) => <Combobox aria-label="Evidence to add" emptyLabel="No file matches" id={control.id} onSearch={picker.search} onValueChange={setAddArtifactId} options={picker.files.filter((artifact) => !artifact.repository_id).map((artifact) => ({ label: artifact.title, value: artifact.id }))} placeholder="Add a file…" value={addArtifactId} />}</Field><Button disabled={!addArtifactId} onClick={addCitation} variant="secondary">Add</Button></div></fieldset><Button busy={isMutating} type="submit" variant="main"><Pencil size={ICON_SIZE.md} /> Save memory</Button></form> : <div className="shared-markdown shared-memory-body"><SafeMarkdown>{card?.card.body_markdown ?? ""}</SafeMarkdown></div>}</section>
       <section className="shared-record-panel"><h2>Linked evidence</h2>{card?.evidence.length ? <div className="shared-evidence-links">{card.evidence.map((evidence) => <article key={evidence.link_id}>{evidence.artifact_id && evidence.exists ? <button className="shared-assistant-citation shared-evidence-link-title" onClick={() => onOpenArtifact(evidence.artifact_id!)} type="button"><strong>{evidence.title ?? "Untitled evidence"}</strong></button> : <strong>{evidence.title ?? "Untitled evidence"}{evidence.exists ? "" : " (missing)"}</strong>}<span>{evidence.path ?? evidence.target_id}{citationLines(evidence)}</span>{evidence.artifact_id && evidence.exists ? <ViewAtCommit accessToken={accessToken} citation={{ artifact_id: evidence.artifact_id, commit: evidence.commit, end_line: evidence.end_line, path: evidence.path ?? "", start_line: evidence.start_line }} /> : null}</article>)}</div> : <EmptyState title="This memory card currently has no linked evidence" />}</section>
       {card ? <MemoryHistoryPanel accessToken={accessToken} canWrite={canWrite} cardId={cardId} onRestored={() => void load()} updatedAt={card.card.updated_at} /> : null}

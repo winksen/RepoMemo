@@ -493,6 +493,7 @@ pub(crate) async fn update_memory_card(
             source: request.source,
             confidence: request.confidence,
             citations: request.citations,
+            expected_revision: request.expected_revision,
         })
         .await
         .map_err(map_core_error)?;
