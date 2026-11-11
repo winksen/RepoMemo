@@ -1818,6 +1818,31 @@ pub struct WorkspaceOnboarding {
     pub template_name: String,
 }
 
+/// A file waiting for the person's review, in the workspace it is in (V0.6.2).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MyWorkReview {
+    pub workspace_id: String,
+    pub workspace_name: String,
+    pub artifact_id: String,
+    pub title: String,
+    pub reason: String,
+    pub since: String,
+}
+
+/// What waits for one person across the workspaces they can open: assigned tasks that are not done, files they own
+/// that need review and unread mentions. Everything is filtered by current access, so work in a workspace the person
+/// lost is neither listed nor counted.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MyWork {
+    pub tasks: Vec<CollaborationTask>,
+    pub reviews: Vec<MyWorkReview>,
+    pub mentions: Vec<SharedNotification>,
+    /// Tasks with a due date before now.
+    pub overdue_task_count: i64,
+    /// Tasks, reviews and mentions together.
+    pub total_count: i64,
+}
+
 /// A job the workspace assistant knows how to do. The assistant only ever runs
 /// one of these; a message that matches none of them gets a plain reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

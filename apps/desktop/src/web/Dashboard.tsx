@@ -14,6 +14,7 @@ import { apiMessage } from "./format";
 import { navigate } from "./router";
 import { useOrganizationNavigation } from "./navigation";
 import { CrossWorkspaceSearch } from "./CrossSearch";
+import { MyWorkPanel } from "../components/MyWorkPanel";
 import { OrganizationAdministration, OrganizationRail } from "./Organization";
 import { useTemplateCatalogue } from "./workspace/data";
 import { cardFigures, headlineText, templateName, useDashboardFigures } from "./dashboardFigures";
@@ -61,6 +62,7 @@ export function SharedDashboard({
         <div><dt>Evidence</dt><dd>{isLoading ? "—" : summary.artifacts}</dd><span>stored artifacts</span></div>
         <div><dt>Memory</dt><dd>{isLoading ? "—" : summary.memory}</dd><span>durable team records</span></div>
       </dl>
+      <MyWorkPanel accessToken={accessToken} userId={session.user.id} />
       {workspaces.length ? <CrossWorkspaceSearch accessToken={accessToken} /> : null}
       <section className="shared-dashboard-ledger" aria-label="Organization workspaces">
         {organizations.length ? organizations.map((organization) => {

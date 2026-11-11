@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.2 (2026-11-01)
+
+Add **My work**, a permission-filtered personal list on the Dashboard.
+
+### Added
+- **My work** on the Dashboard: tasks assigned to you that are not done, files you own that are marked *needs review*, and unread mentions, across every workspace you can open, with the overdue task count. Each opens where it is handled.
+- Only current access counts: work in a workspace you left, were removed from, or whose guest access ended is neither listed nor counted, and a token limited to some workspaces sees only those (and no mentions, as with notifications).
+- `GET /v1/profile/work` (nothing is stored).
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, server, all targets) and formatting pass. One server test (listing, overdue count, revocation) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- No migration or access change.
+
 ## V0.6.1 (2026-11-01)
 
 Add a getting-started checklist to the workspace Overview that follows real progress.

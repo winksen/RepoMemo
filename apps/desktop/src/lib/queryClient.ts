@@ -74,6 +74,7 @@ export const accountKeys = {
   dashboard: (workspaceIds: string) => ["dashboard", workspaceIds] as const,
   profile: (userId: string) => ["account", userId, "profile"] as const,
   profileTasks: (userId: string) => ["account", userId, "profile-tasks"] as const,
+  myWork: (userId: string) => ["account", userId, "my-work"] as const,
   notifications: (userId: string) => ["account", userId, "notifications"] as const,
   notificationPreferences: (userId: string) => ["account", userId, "notification-preferences"] as const,
 };

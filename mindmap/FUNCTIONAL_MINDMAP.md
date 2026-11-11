@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.2 — Add My work, a permission-filtered personal list on the Dashboard.
+
+- A returning person reaches their next action from one list: assigned tasks, files they own that need review and unread mentions, across workspaces. Review items for memory cards join it once cards have reviewers (V0.6.6).
+- Revoking access removes the work and the count at once; nothing is cached per person.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.1 — Add a getting-started checklist to the workspace Overview that follows real progress.
 

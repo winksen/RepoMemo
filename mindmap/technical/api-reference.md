@@ -71,6 +71,7 @@
 | PUT | `/v1/profile` | auth | — | UpdateProfileRequest | SharedUser |
 | POST | `/v1/profile/password` | session | — | ChangePasswordRequest | TokenResponse |
 | GET | `/v1/profile/tasks` | auth | — | — | Vec<CollaborationTask |
+| GET | `/v1/profile/work` | auth | — | — | MyWork |
 | GET | `/v1/notifications` | auth | — | — | Vec<SharedNotification |
 | POST | `/v1/notifications/read-all` | auth | — | — | status |
 | POST | `/v1/notifications/{notification_id}/read` | auth | — | — | SharedNotification |

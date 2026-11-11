@@ -2097,3 +2097,8 @@ export function getSharedOnboarding(accessToken: string, workspaceId: string): P
 export async function setSharedOnboardingDismissed(accessToken: string, workspaceId: string, dismissed: boolean): Promise<void> {
   await request<void>(`/v1/workspaces/${workspaceId}/onboarding`, { method: "PUT", body: JSON.stringify({ dismissed }) }, accessToken);
 }
+
+/** What waits for the person across their workspaces: assigned tasks, files they own that need review, unread mentions (V0.6.2). */
+export function getSharedMyWork(accessToken: string): Promise<import("../types").MyWork> {
+  return request<import("../types").MyWork>("/v1/profile/work", {}, accessToken);
+}

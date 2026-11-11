@@ -1532,6 +1532,31 @@ export interface WorkspaceOnboarding {
   template_name: string;
 }
 
+/** A file waiting for the person's review, in the workspace it is in (V0.6.2). */
+export interface MyWorkReview {
+  workspace_id: string;
+  workspace_name: string;
+  artifact_id: string;
+  title: string;
+  reason: string;
+  since: string;
+}
+
+/**
+ * What waits for one person across the workspaces they can open: assigned tasks that are not done, files they own
+ * that need review and unread mentions. Everything is filtered by current access, so work in a workspace the person
+ * lost is neither listed nor counted.
+ */
+export interface MyWork {
+  tasks: CollaborationTask[];
+  reviews: MyWorkReview[];
+  mentions: SharedNotification[];
+  /** Tasks with a due date before now. */
+  overdue_task_count: number;
+  /** Tasks, reviews and mentions together. */
+  total_count: number;
+}
+
 /**
  * A job the workspace assistant knows how to do. The assistant only ever runs
  * one of these; a message that matches none of them gets a plain reply.

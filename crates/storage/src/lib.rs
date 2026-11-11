@@ -56,7 +56,7 @@ pub use environment::{inspect_environment, inspect_environment_split, Environmen
 pub use identity::{
     identity_confirmation_hash, valid_group_role, FlowGate, GroupChange, GroupMapping, GroupSyncPlan, IdentityProvider,
 };
-pub use knowledge::OnboardingFacts;
+pub use knowledge::{OnboardingFacts, OwnedReview};
 pub use mail::{DigestCandidate, DigestNotice, MailOutboxCounts, MailSettingsUpdate, QueuedMail, StoredMailSettings};
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;

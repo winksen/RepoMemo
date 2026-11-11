@@ -33,6 +33,7 @@ mod logs;
 mod mail;
 mod maintenance;
 mod mfa;
+mod my_work;
 mod onboarding;
 mod organizations;
 mod profile;
@@ -735,6 +736,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(profile::get_notification_preferences).put(profile::set_notification_preference),
         )
         .route("/v1/profile/tasks", get(list_profile_tasks))
+        .route("/v1/profile/work", get(my_work::my_work))
         .merge(avatars::routes())
         .route("/v1/notifications", get(list_notifications))
         .route("/v1/notifications/read-all", post(mark_all_notifications_read))
