@@ -2087,3 +2087,13 @@ export function revokePersonalToken(accessToken: string, tokenId: string): Promi
   return request<void>(`/v1/profile/tokens/${encodeURIComponent(tokenId)}`, { method: "DELETE" }, accessToken);
 }
 
+
+/** The first-value checklist for this person (V0.6.1): steps derived from what exists, and whether they hid it. */
+export function getSharedOnboarding(accessToken: string, workspaceId: string): Promise<import("../types").WorkspaceOnboarding> {
+  return request<import("../types").WorkspaceOnboarding>(`/v1/workspaces/${workspaceId}/onboarding`, {}, accessToken);
+}
+
+/** Hides the checklist for the person (`true`) or shows it again (`false`). */
+export async function setSharedOnboardingDismissed(accessToken: string, workspaceId: string, dismissed: boolean): Promise<void> {
+  await request<void>(`/v1/workspaces/${workspaceId}/onboarding`, { method: "PUT", body: JSON.stringify({ dismissed }) }, accessToken);
+}

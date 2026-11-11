@@ -120,6 +120,10 @@ Each workflow says **who can do it**, the steps, and **what you should see** whe
 
 **Expected:** the new items appear in the folder list with their type and size. A file uploaded twice is stored once. A file over the limit or of an unsupported kind is refused with a message naming the reason.
 
+### Getting started in a new workspace
+
+The Overview opens with a **Getting started** checklist: add evidence, make it searchable, save a memory card that cites it and (optionally) bring in a teammate. A step is checked when the thing exists in the workspace, so it works without an AI provider or mail. **Hide for now** hides it for you only; **Show the getting-started checklist** brings it back.
+
 ### Workflow 3: understand the index state
 
 **Who:** everyone who can read the workspace.

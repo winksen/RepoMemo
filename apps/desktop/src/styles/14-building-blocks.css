@@ -213,3 +213,12 @@ th > .rm-badge,
 .rm-template-adjust-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .rm-mention-links { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .rm-option > svg { flex: none; }
+
+/* The getting-started checklist (V0.6.1) */
+.rm-checklist { display: grid; gap: 12px; margin: 16px 0; padding: 16px 0; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+.rm-checklist-steps { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.rm-checklist-steps li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; }
+.rm-checklist-steps li > div { display: grid; gap: 2px; }
+.rm-checklist-steps li[data-done="true"] strong { color: var(--color-text-muted); }
+.rm-checklist-state { color: var(--color-text-muted); font-size: 12px; }
+.rm-checklist-collapsed { margin: 12px 0; }

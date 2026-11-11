@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.1 — Add a getting-started checklist to the workspace Overview that follows real progress.
+
+- Overview opens with four steps: add evidence, make it searchable, save a cited memory card, bring in a teammate. Each is done when the workspace contains the thing, so a new member who adds a note and saves a card sees the checklist advance without configuring AI or mail.
+- A person can hide the checklist for themselves and bring it back; it never changes anyone else's view.
+
+Checks: Server test written and compiled, not executed; three UI tests pass; static checks pass.
 
 ## V0.6.0 — Open the trusted-knowledge line with its journeys, vocabulary and a shared test fixture.
 

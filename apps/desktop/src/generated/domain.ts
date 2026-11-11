@@ -1510,6 +1510,29 @@ export interface ReviewQueue {
 }
 
 /**
+ * One step of the first-value checklist. A step is done when the thing it asks for exists in the workspace, not when a
+ * button was clicked (V0.6.1).
+ */
+export interface OnboardingStep {
+  /** `add_evidence`, `searchable`, `cited_memory` or `invite`. */
+  id: string;
+  title: string;
+  detail: string;
+  done: boolean;
+}
+
+/** The workspace checklist for one person: derived steps plus whether this person hid it. */
+export interface WorkspaceOnboarding {
+  steps: OnboardingStep[];
+  done_count: number;
+  total_count: number;
+  /** This person dismissed the checklist; the steps are still returned so it can be shown again. */
+  dismissed: boolean;
+  /** The name of the workspace's template, which words the steps. */
+  template_name: string;
+}
+
+/**
  * A job the workspace assistant knows how to do. The assistant only ever runs
  * one of these; a message that matches none of them gets a plain reply.
  */

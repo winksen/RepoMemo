@@ -33,6 +33,7 @@ mod logs;
 mod mail;
 mod maintenance;
 mod mfa;
+mod onboarding;
 mod organizations;
 mod profile;
 mod quotas;
@@ -789,6 +790,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(suggest_mentions),
         )
         .route("/v1/workspaces/{workspace_id}/review", get(review::review_queue))
+        .route(
+            "/v1/workspaces/{workspace_id}/onboarding",
+            get(onboarding::get_onboarding).put(onboarding::set_onboarding_dismissed),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/review/snoozes",
             put(review::snooze_review_item).delete(review::bring_back_review_item),

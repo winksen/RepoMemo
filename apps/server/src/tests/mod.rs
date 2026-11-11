@@ -22,6 +22,7 @@ mod evidence_tools;
 mod knowledge_fixture;
 mod load;
 mod memory;
+mod onboarding;
 mod operations;
 mod performance;
 mod system;

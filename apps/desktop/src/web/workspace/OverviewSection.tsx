@@ -9,6 +9,7 @@ import { pulseCard, pulseCardIds } from "./pulseCards";
 import { EvidenceUsed, MetricBars, MetricTimeline } from "../common";
 import { useCapabilities, useMetrics, useOverview, useTemplate } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
+import { OnboardingChecklist } from "../../components/OnboardingChecklist";
 import { ICON_SIZE } from "../../components/ui/icon";
 
 export function OverviewSection({ page }: { page: WorkspacePage }) {
@@ -26,6 +27,7 @@ export function OverviewSection({ page }: { page: WorkspacePage }) {
 
   return (
 <>
+        <OnboardingChecklist accessToken={accessToken} key={workspaceId} workspaceId={workspaceId} />
         <><div className="shared-evidence-summary">
           <span><strong>{overview?.artifact_count ?? "—"}</strong> artifacts</span>{canInspectIndex ? <span><strong>{overview?.chunk_count ?? "—"}</strong> indexed chunks</span> : null}<span><strong>{overview?.memory_card_count ?? "—"}</strong> memory cards</span>
         </div>

@@ -215,6 +215,8 @@
 | POST | `/v1/workspaces/{workspace_id}/ask` | reading | require_workspace_read, authorize_ai_use | AskWorkspaceRequest | AskAnswer |
 | GET | `/v1/workspaces/{workspace_id}/knowledge-map` | auth | require_workspace_read | — | KnowledgeMap |
 | GET | `/v1/workspaces/{workspace_id}/review` | auth | require_workspace_read | — | ReviewQueue |
+| GET | `/v1/workspaces/{workspace_id}/onboarding` | auth | require_workspace_read | — | WorkspaceOnboarding |
+| PUT | `/v1/workspaces/{workspace_id}/onboarding` | auth | require_workspace_read | DismissRequest | status |
 | PUT | `/v1/workspaces/{workspace_id}/review/snoozes` | auth | require_workspace_read | — | — |
 | DELETE | `/v1/workspaces/{workspace_id}/review/snoozes` | auth | require_workspace_read | — | — |
 | GET | `/v1/workspaces/{workspace_id}/health` | auth | require_workspace_read | — | WorkspaceHealth |

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.1 (2026-11-01)
+
+Add a getting-started checklist to the workspace Overview that follows real progress.
+
+### Added
+- **Getting started** on a workspace's Overview: add the first piece of evidence, make it searchable, save a memory card that cites it, bring in a teammate. A step is done because the thing exists (an artifact, an indexed file, a card with a citation, a second member), never because a button was clicked, and no step needs an AI provider or a mail server. The heading names the workspace's template.
+- **Hide for now** hides the checklist for the person who chose it; **Show the getting-started checklist** brings it back. Nobody else's view changes. Once every step is done the hidden checklist leaves no button behind.
+- `GET` and `PUT /v1/workspaces/{id}/onboarding` (any member who can read); migration 0054 stores only the dismissal.
+
+### Checks
+- Version, migration lock (54 files), generated types, styles, accessibility, documentation links, TypeScript and formatting pass. One server test (progress, personal dismissal, empty workspace, outsider) was written and compiles; it was not executed. The three new UI tests pass. Nothing was built or run.
+
+### Upgrading
+- One additive migration (a table of dismissals). Nothing else changes.
+
 ## V0.6.0 (2026-11-01)
 
 Open the trusted-knowledge line with its journeys, vocabulary and a shared test fixture.

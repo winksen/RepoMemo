@@ -1795,6 +1795,29 @@ pub struct ReviewQueue {
     pub snoozed: Vec<ReviewItem>,
 }
 
+/// One step of the first-value checklist. A step is done when the thing it asks for exists in the workspace, not when a
+/// button was clicked (V0.6.1).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OnboardingStep {
+    /// `add_evidence`, `searchable`, `cited_memory` or `invite`.
+    pub id: String,
+    pub title: String,
+    pub detail: String,
+    pub done: bool,
+}
+
+/// The workspace checklist for one person: derived steps plus whether this person hid it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkspaceOnboarding {
+    pub steps: Vec<OnboardingStep>,
+    pub done_count: i64,
+    pub total_count: i64,
+    /// This person dismissed the checklist; the steps are still returned so it can be shown again.
+    pub dismissed: bool,
+    /// The name of the workspace's template, which words the steps.
+    pub template_name: String,
+}
+
 /// A job the workspace assistant knows how to do. The assistant only ever runs
 /// one of these; a message that matches none of them gets a plain reply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
