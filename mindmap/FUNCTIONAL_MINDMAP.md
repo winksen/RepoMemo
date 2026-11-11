@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.5.19` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.0 — Open the trusted-knowledge line with its journeys, vocabulary and a shared test fixture.
+
+- The plan fixes two journeys (first value without AI or mail; knowledge review) and the words for knowledge state: a *revision* is an attributed saved version, a *draft* is unsaved text that only its author's session holds, *needs review* is not "wrong", *overdue* is not "changed evidence", an *approval* belongs to one revision.
+- Ownership and approval are separate: the owner keeps an item and may delegate its review; independent review means the person who made a revision cannot approve it.
+
+Checks: Version, documentation and release-note checks pass. No behavior changes.
 
 ## V0.4.105 — Record the final 0.4 candidate and the limits of its validation.
 

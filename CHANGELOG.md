@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.0 (2026-11-01)
+
+Open the trusted-knowledge line with its journeys, vocabulary and a shared test fixture.
+
+### Changed
+- New [0.6 plan](mindmap/plans/2026-11-01-0.6-trusted-knowledge.md): the first-value and knowledge-review journeys, a table of state words (revision, draft, needs review, overdue, changed evidence, approved, reviewer, trash, conflict) with what each does not mean, and who owns versus who approves.
+- A representative test fixture (no AI provider, no mail, an owner, a member and a guest, current, retired and deleted evidence with cards citing them) that later 0.6 tests start from.
+
+### Checks
+- Version, documentation and release-note checks pass; the fixture and its test compile and lint. The test was not executed. No runtime behavior changes.
+
+### Upgrading
+- No migration or access change.
+
 ## V0.5.19 (2026-10-29)
 
 Close the team-access line with operating guides and a walkthrough record.
