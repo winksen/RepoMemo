@@ -231,4 +231,4 @@ When a release ships, set its status to ✅ with the date and make *What changes
 | **V0.2.191** | ✅ 2026-10-22 |N. Workspace templates |✨ Feature | Templates | A workspace's adjusted setup downloaded as a template file | The file passes the checker and gives the same sections, labels and boosts elsewhere |
 | **V0.2.192** | ✅ 2026-10-22 |N. Workspace templates |🔒 Security | Security | Security pass on the new surface | No high or medium finding open |
 | **V0.2.193** | ✅ 2026-10-22 |N. Workspace templates |📘 Update | Release | Release checks repeated after workspace templates; the freeze restored | Every check passes |
-| **V0.3.0** | ✅ 2026-10-24 | — | 📘 Update | Connected | The version set to `0.3.0` and tagged `v0.3.0`, after tracks K, L, M and N and the clean-machine install, whose tests the maintainer reported good | Tag `v0.3.0` |
+| **V0.3.0** | ✅ 2026-10-24 | — | 📘 Update | Connected | The version set to `0.3.0` and tagged `RM-V0.3.0`, after tracks K, L, M and N and the clean-machine install, whose tests the maintainer reported good | Tag `RM-V0.3.0` |

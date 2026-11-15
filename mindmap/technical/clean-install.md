@@ -96,7 +96,7 @@ Read once more at V0.3.4. Each open box of a 0.2.x release is one of three thing
 | 2026-10-24 | the maintainer's | not recorded | the maintainer | none reported | | **Reported good** for the release `V0.3.0`; the result of each step of §2 was not written down, so none of §3 below is ticked on it |
 | *next run* | | | | | | *fill in the result of each step of §2, then tick what it shows* |
 
-When the run passes with no workaround, record it here and in the roadmap's R6 and R12 lines, tick §3, set the version to `0.3.0` (`npm run version:set -- 0.3.0`), write the changelog's `V0.3.0` entry from the releases V0.2.1 to V0.2.129 (the [release index](../RELEASES_0.2.md) is the list; §5 has the notes for the polish track), and tag `v0.3.0`.
+When the run passes with no workaround, record it here and in the roadmap's R6 and R12 lines, tick §3, set the version to `0.3.0` (`npm run version:set -- 0.3.0`), write the changelog's `V0.3.0` entry from the releases V0.2.1 to V0.2.129 (the [release index](../RELEASES_0.2.md) is the list; §5 has the notes for the polish track), and tag it (`RM-V0.3.0` was made; releases since V0.6.17 use `vX.Y.Z`).
 
 ## 5. Notes for the V0.3.0 changelog: the frontend polish (V0.2.57–V0.2.129)
 

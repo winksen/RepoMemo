@@ -239,6 +239,16 @@ Record what changed in `CHANGELOG.md` under the new version. The page of a relea
 by hand: `npm run notes` prints it for the version in `package.json` (or `-- --version 0.4.39`), and `npm run notes:test` tests the
 script. The release workflows use the same script when a `v*` tag is pushed.
 
+### Release tags
+
+A release tag is `v` plus the version in `package.json`: `v0.6.17` for 0.6.17. That is the one form the release workflows start
+from (`tags: ["v*"]`) and the one whose version they check (the tag must equal `v` plus the package version, or the run stops). Before
+pushing one, `npm run tag:check -- v0.6.17` says whether it can start a release, and `npm run tag:check -- --existing` lists the tags in your
+clone and which of them could (`npm run tag:test` tests the script). Neither creates or pushes anything.
+
+The tags `RM-V0.2.0`, `RM-V0.3.0` and `RM-V0.4.0` were made in an earlier form. They stay as history and start no workflow, so no release
+image, archive or installer was built from them. No release has been tagged in the `v` form yet.
+
 ## Run It In Containers
 
 The server and a Caddy front door (TLS and the web app) as two containers, with the data in a volume:

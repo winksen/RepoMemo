@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.16` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.17 — Use one release tag format, `vX.Y.Z`, across the workflows, the guides and the record.
+
+- A release is tagged `vX.Y.Z`, the same version the product reports; the older `RM-V` tags are history. The record says which tags exist and none of them built a release.
+
+Checks: Script run by hand; its tests were not executed.
 
 ## V0.6.16 — Correct the stale claims in the release record and add a "built, not validated" status.
 
@@ -849,7 +855,7 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 | Single sign-on (OIDC, SAML) and provisioning from an identity provider | **Proposed** as the 0.5.x theme ([plan](plans/2026-10-27-0.5-single-sign-on.md)); sign-in is email and password only |
 | Scale-out: PostgreSQL, object storage, more than one server | **Not built**; one server, SQLite and a file store |
 | A hosted RepoMemo service | **Not offered**; self-hosted only |
-| Published releases, signed installers and signed updates | **Not yet**: the only 0.4 tag, `RM-V0.4.0`, does not match the `v*` form the release workflows start from (V0.6.17), so release images, archives and installers are built by CI on a tag but not yet published or validated end to end; signing keys do not exist yet ([evidence](technical/release-evidence-0.4.73.md)) |
+| Published releases, signed installers and signed updates | **Not yet**: the only 0.4 tag, `RM-V0.4.0`, does not match the `vX.Y.Z` form the release workflows start from (documented in V0.6.17), so release images, archives and installers are built by CI on a tag but not yet published or validated end to end; signing keys do not exist yet ([evidence](technical/release-evidence-0.4.73.md)) |
 | Linux arm64 builds; signed updates for Linux and macOS | **Left out of 0.4** on purpose |
 | Live browser, zoom (200%) and screen-reader validation of the web client | **Open**: automated keyboard, contrast and layout checks pass; the manual checks await a reachable preview (V0.4.90, V0.4.91) |
 | Organization-defined workspace templates, per-user layouts | **Not built** (see the template table below) |

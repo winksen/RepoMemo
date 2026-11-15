@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.1 → 0.2
 
-> **Line:** `V0.1.0` (2026-05-31) to `V0.2.0` *Team-ready* (2026-10-14) · **Status:** complete; the `v0.2.0` tag waits for the clean-machine install (R6)
+> **Line:** `V0.1.0` (2026-05-31) to `V0.2.0` *Team-ready* (2026-10-14) · **Status:** complete; the `v0.2.0` tag waits for the clean-machine install (R6); it was made as `RM-V0.2.0`
 > **Next line:** [Releases 0.2 → 0.3](RELEASES_0.2.md) · **Related:** [Roadmap](ROADMAP.md) · [Changelog](../CHANGELOG.md) · [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md)
 
 Every release of the 0.1 line, one row each, from the desktop skeleton to the first team-ready server. Each row comes from the release's commit (`Update V0.1.N`), the [changelog](../CHANGELOG.md) from V0.1.63 on, and the roadmap's *Delivered* tables before that.
@@ -108,7 +108,7 @@ Every release of the 0.1 line, one row each, from the desktop skeleton to the fi
 | **V0.1.76** | 2026-10-14 | Road to V0.2.0 | 📘 Update, 🔒 Security | Release candidate | Feature freeze; third security pass with no high or medium finding (R2-1 and R2-2 fixed); upgrade test from V0.1.40, V0.1.52 and V0.1.65 schemas; release-build timings at 50,000 passages; `UPGRADING.md`, API reference, smoke test |
 | **V0.1.77** | 2026-10-14 | Planning and release | 📘 Update | Roadmap | Road to V0.3.0 *Connected* proposed (documentation only; the code stays 0.1.76) |
 | **V0.1.78** | 2026-10-14 | Planning and release | 📘 Update | Roadmap | Road to V0.3.0 revised into 56 single-purpose releases in tracks A–J, decisions 7–14 (documentation only) |
-| **V0.2.0** | 2026-10-14 | Planning and release | 📘 Update | Team-ready | The version set to `0.2.0` everywhere and the changelog entry mapping each promise to its release; the `v0.2.0` tag waits for the clean-machine install (R6) |
+| **V0.2.0** | 2026-10-14 | Planning and release | 📘 Update | Team-ready | The version set to `0.2.0` everywhere and the changelog entry mapping each promise to its release; the `v0.2.0` tag waits for the clean-machine install (R6); it was made as `RM-V0.2.0` |
 
 ---
 

@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.17 (2026-11-17)
+
+Use one release tag format, `vX.Y.Z`, across the workflows, the guides and the record.
+
+### Added
+- **`npm run tag:check -- v0.6.17`** says whether a tag can start a release: it must be `v` plus the version in `package.json`, the one form the release workflows start from and check. `npm run tag:check -- --existing` lists the tags in the clone and which of them could start a release. Neither creates or pushes a tag, and `npm run tag:test` tests the script.
+- A **Release tags** section in the development commands names the format and says that `RM-V0.2.0`, `RM-V0.3.0` and `RM-V0.4.0` are history that start no workflow, so no release image, archive or installer was built from them and no release has been tagged in the `v` form yet.
+
+### Fixed
+- The roadmap, the 0.1 and 0.2 indexes and the clean-install page said the releases were tagged `v0.3.0` (or that no `v0.2.0` tag was made); they now name the tags that exist.
+- The workflows are unchanged: they already require `v` plus the package version. Nothing is published or tagged by this release.
+
+### Checks
+- Version, documentation links, TypeScript and formatting pass, and the new script ran against this clone's tags and refused `RM-V0.4.0` as expected. Its tests were written, not executed. Nothing was built or run.
+
+### Upgrading
+- Nothing to do. The next tag to create is `v0.6.17`-style, never `RM-V…`.
+
 ## V0.6.16 (2026-11-17)
 
 Correct the stale claims in the release record and add a "built, not validated" status.
