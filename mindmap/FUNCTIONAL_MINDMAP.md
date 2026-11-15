@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.25` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.26` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.26 — Keep focus and layout usable in the first-value, My work and review journeys, and record the manual checks owed.
+
+- The getting-started checklist, My work and the review panels work from the keyboard without losing the place, and wrap on a narrow screen. Whether they pass at 200% zoom and in both themes is for the maintainer to record on a sheet.
+
+Checks: Web test written and compiled, not executed; manual checks pending.
 
 ## V0.6.25 — Capture an unanswered question or an unhelpful result as a request the owners can answer.
 

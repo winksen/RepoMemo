@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconCircle as Circle, IconCircleCheck as CircleCheck, IconListCheck as ListCheck } from "@tabler/icons-react";
 import { getSharedOnboarding, setSharedOnboardingDismissed } from "../lib/sharedApi";
 import type { WorkspaceOnboarding } from "../types";
@@ -20,6 +20,8 @@ const CHECKLIST_ACTIONS = /^(artifact_|evidence_|memory_|repository_|member_|inv
 export function OnboardingChecklist({ accessToken, workspaceId }: { accessToken: string; workspaceId: string }) {
   const [onboarding, setOnboarding] = useState<WorkspaceOnboarding | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  // Hiding or showing replaces the button that was pressed, so focus goes to its replacement instead of being lost (V0.6.26).
+  const refocus = useRef(false);
 
   async function load() {
     try {
@@ -31,11 +33,17 @@ export function OnboardingChecklist({ accessToken, workspaceId }: { accessToken:
 
   useEffect(() => { setOnboarding(null); void load(); }, [accessToken, workspaceId]);
   useLiveRefresh(() => void load(), CHECKLIST_ACTIONS);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    document.querySelector<HTMLElement>("[data-onboarding-toggle]")?.focus();
+  }, [onboarding?.dismissed]);
 
   async function setDismissed(dismissed: boolean) {
     setIsSaving(true);
     try {
       await setSharedOnboardingDismissed(accessToken, workspaceId, dismissed);
+      refocus.current = true;
       setOnboarding((current) => (current ? { ...current, dismissed } : current));
     } catch (error) {
       showToast("error", apiMessage(error, "That could not be saved."));
@@ -47,7 +55,7 @@ export function OnboardingChecklist({ accessToken, workspaceId }: { accessToken:
   if (!onboarding) return null;
   const complete = onboarding.done_count === onboarding.total_count;
   if (onboarding.dismissed) {
-    return complete ? null : <div className="rm-checklist-collapsed"><Button disabled={isSaving} onClick={() => void setDismissed(false)} type="button" variant="secondary"><ListCheck size={ICON_SIZE.md} /> Show the getting-started checklist ({onboarding.done_count} of {onboarding.total_count})</Button></div>;
+    return complete ? null : <div className="rm-checklist-collapsed"><Button data-onboarding-toggle disabled={isSaving} onClick={() => void setDismissed(false)} type="button" variant="secondary"><ListCheck size={ICON_SIZE.md} /> Show the getting-started checklist ({onboarding.done_count} of {onboarding.total_count})</Button></div>;
   }
   return (
     <section aria-labelledby="onboarding-heading" className="rm-checklist">
@@ -61,7 +69,7 @@ export function OnboardingChecklist({ accessToken, workspaceId }: { accessToken:
           </li>
         ))}
       </ol>
-      <Button disabled={isSaving} onClick={() => void setDismissed(true)} type="button" variant="secondary">{complete ? "Hide, all done" : "Hide for now"}</Button>
+      <Button data-onboarding-toggle disabled={isSaving} onClick={() => void setDismissed(true)} type="button" variant="secondary">{complete ? "Hide, all done" : "Hide for now"}</Button>
     </section>
   );
 }

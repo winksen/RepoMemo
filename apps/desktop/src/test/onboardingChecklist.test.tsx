@@ -47,6 +47,18 @@ describe("OnboardingChecklist", () => {
     expect(await screen.findByText("Make it searchable")).toBeTruthy();
   });
 
+  it("keeps keyboard focus on the button that replaces the one that was pressed", async () => {
+    vi.mocked(getSharedOnboarding).mockResolvedValue(onboarding());
+    vi.mocked(setSharedOnboardingDismissed).mockResolvedValue(undefined);
+    render(<OnboardingChecklist accessToken="t" workspaceId="w1" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Hide for now" }));
+    const show = await screen.findByRole("button", { name: /Show the getting-started checklist/ });
+    await waitFor(() => expect(document.activeElement).toBe(show));
+    fireEvent.click(show);
+    const hide = await screen.findByRole("button", { name: "Hide for now" });
+    await waitFor(() => expect(document.activeElement).toBe(hide));
+  });
+
   it("stays out of the way once finished and dismissed", async () => {
     vi.mocked(getSharedOnboarding).mockResolvedValue(onboarding({ dismissed: true, done_count: 4, steps: onboarding().steps.map((step) => ({ ...step, done: true })) }));
     const { container } = render(<OnboardingChecklist accessToken="t" workspaceId="w1" />);

@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.26 (2026-11-17)
+
+Keep focus and layout usable in the first-value, My work and review journeys, and record the manual checks owed.
+
+### Fixed
+- **Keyboard focus is no longer lost on the first-value checklist.** Pressing *Hide for now* or *Show the getting-started checklist* replaced the button that had focus, which dropped focus to the page. Focus now moves to the button that replaces it.
+- **Narrow screens and 200% zoom.** At 640 px and narrower, My work rows wrap long titles instead of clipping them, the checklist's *Done* or *To do* moves under its step, the reviewer form uses the full width, the search-request form stacks, and version, trash and request lists put their actions under the text, so none of these journeys needs sideways scrolling.
+
+### Added
+- **[A journey check sheet](mindmap/technical/journey-checks-0.6.26.md)** for the maintainer: the three journeys (first value, My work, review) against keyboard only, 200% zoom, 360 px, light and dark themes and a lost connection. Every result is pending. A web test checks the focus behaviour of the checklist.
+- No route, setting or migration changes.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links and TypeScript pass. **No browser, screen reader or device was used and the new web test was not executed**: the manual checks this row asks for are not recorded, so the row stays 🧪 until the maintainer fills the sheet in. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.6.25 (2026-11-17)
 
 Capture an unanswered question or an unhelpful result as a request the owners can answer.

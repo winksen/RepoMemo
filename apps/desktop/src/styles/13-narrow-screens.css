@@ -101,3 +101,14 @@
   .shared-palette { top: 12px; }
   .shared-palette-list { max-height: min(52dvh, 420px); }
 }
+
+/* The 0.6 journeys (V0.6.26): first-value checklist, My work, the review panels. Long titles wrap, rows stack, nothing scrolls sideways. */
+@media (max-width: 640px) {
+  .rm-my-work-item { height: auto; min-height: 44px; white-space: normal; overflow-wrap: anywhere; }
+  .rm-checklist-steps li { grid-template-columns: auto minmax(0, 1fr); }
+  .rm-checklist-steps .rm-checklist-state { grid-column: 2; }
+  .rm-review-owner-form { max-width: none; }
+  .rm-search-feedback-form { display: grid; gap: 12px; }
+  .shared-version-list li { align-items: stretch; }
+  .shared-version-list li > .shared-version-actions { width: 100%; }
+}
