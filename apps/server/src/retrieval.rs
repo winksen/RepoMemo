@@ -534,7 +534,7 @@ pub(crate) async fn delete_memory_card(
     let title = current.card.title;
     state
         .core
-        .delete_memory_card(card_id.clone())
+        .delete_memory_card_by(card_id.clone(), &subject.user_id)
         .await
         .map_err(map_core_error)?;
     record_workspace_activity(

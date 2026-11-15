@@ -2171,3 +2171,17 @@ export function getSharedMemoryChanges(accessToken: string, cardId: string): Pro
 export function getSharedCitedSource(accessToken: string, cardId: string, revision: number, index: number): Promise<import("../types").CitedSource> {
   return request<import("../types").CitedSource>(`/v1/memory-cards/${cardId}/revisions/${revision}/source?index=${index}`, {}, accessToken);
 }
+
+/** Deleted memory cards and uploaded files that can still be put back (V0.6.15). */
+export function listSharedTrash(accessToken: string, workspaceId: string): Promise<import("../types").TrashItem[]> {
+  return request<import("../types").TrashItem[]>(`/v1/workspaces/${workspaceId}/trash`, {}, accessToken);
+}
+
+export function restoreSharedTrashItem(accessToken: string, workspaceId: string, trashId: string): Promise<import("../types").TrashRestoreResult> {
+  return request<import("../types").TrashRestoreResult>(`/v1/workspaces/${workspaceId}/trash/${trashId}/restore`, { method: "POST" }, accessToken);
+}
+
+/** Removes an item for good; administrators only. */
+export function purgeSharedTrashItem(accessToken: string, workspaceId: string, trashId: string): Promise<void> {
+  return request<void>(`/v1/workspaces/${workspaceId}/trash/${trashId}`, { method: "DELETE" }, accessToken);
+}

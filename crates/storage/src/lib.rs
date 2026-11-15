@@ -48,6 +48,7 @@ mod setup;
 mod staging;
 mod stats;
 mod system;
+mod trash;
 mod users;
 mod vectors;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
@@ -76,6 +77,7 @@ pub use setup::SetupState;
 pub use staging::{StagedBlob, StagedBlobWriter};
 pub use stats::{ArtifactQuery, ArtifactStats, DashboardCount, DashboardCounts, KindFilter};
 pub use system::{StoredSystemSetting, UserAccess};
+pub use trash::{RestoredCitation, StoredTrashItem, TrashRestore, TRASH_MAX_ITEMS, TRASH_RETENTION_DAYS};
 pub use users::RefreshOutcome;
 
 /// The database file inside an environment folder.

@@ -404,7 +404,7 @@ pub(crate) async fn delete_folder(
     for artifact_id in &artifact_ids {
         state
             .core
-            .delete_artifact(artifact_id.clone())
+            .delete_artifact_by(artifact_id.clone(), &subject.user_id)
             .await
             .map_err(map_core_error)?;
     }
@@ -897,7 +897,7 @@ pub(crate) async fn delete_artifact(
     let workspace_id = current.workspace_id;
     state
         .core
-        .delete_artifact(artifact_id.clone())
+        .delete_artifact_by(artifact_id.clone(), &subject.user_id)
         .await
         .map_err(map_core_error)?;
     record_workspace_activity(
@@ -1271,7 +1271,7 @@ pub(crate) async fn bulk_artifacts(
                     repositories::ensure_not_repository_file(&state, artifact_id).await?;
                     state
                         .core
-                        .delete_artifact(artifact_id.clone())
+                        .delete_artifact_by(artifact_id.clone(), &subject.user_id)
                         .await
                         .map_err(map_core_error)
                 }

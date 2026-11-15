@@ -1579,6 +1579,30 @@ export interface MemoryApprovalDecision {
   created_at: string;
 }
 
+/** One deleted memory card or file that can still be put back (V0.6.15). */
+export interface TrashItem {
+  id: string;
+  /** `memory_card` or `artifact`. */
+  kind: string;
+  title: string;
+  deleted_by: SharedUser | null;
+  deleted_at: string;
+  /** After this the item is removed for good. */
+  expires_at: string;
+}
+
+/** What putting an item back brought with it (V0.6.15). */
+export interface TrashRestoreResult {
+  kind: string;
+  /** The restored card's or file's id, the same it had before. */
+  item_id: string;
+  title: string;
+  /** Citations of a card left out because the file or passage they cite no longer exists. */
+  skipped_citations: number;
+  /** Citations of a file that were to a passage and came back as the file, because the passage could not be found. */
+  widened_citations: number;
+}
+
 /**
  * An approval decision that came with an imported workspace archive (V0.6.14): a record of what was decided on another
  * server, kept for reading. It never counts as an approval here.

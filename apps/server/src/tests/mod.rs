@@ -35,6 +35,7 @@ mod review_ownership;
 mod revision_attribution;
 mod system;
 mod templates;
+mod trash;
 mod workspaces;
 
 pub(super) async fn wait_for_indexed_artifacts(

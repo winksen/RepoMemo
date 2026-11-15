@@ -53,6 +53,7 @@ mod setup;
 mod streams;
 mod system;
 mod templates;
+mod trash;
 mod verification;
 mod web_files;
 mod web_session;
@@ -799,6 +800,15 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/onboarding",
             get(onboarding::get_onboarding).put(onboarding::set_onboarding_dismissed),
+        )
+        .route("/v1/workspaces/{workspace_id}/trash", get(trash::list_trash))
+        .route(
+            "/v1/workspaces/{workspace_id}/trash/{trash_id}",
+            delete(trash::purge_trash_item),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/trash/{trash_id}/restore",
+            post(trash::restore_trash_item),
         )
         .route(
             "/v1/workspaces/{workspace_id}/review-assignment",

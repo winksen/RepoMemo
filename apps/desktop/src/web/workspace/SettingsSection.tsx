@@ -12,6 +12,7 @@ import { AiPolicySettings } from "../../components/AiPolicySettings";
 import { AiProviderForm } from "../../components/AiProviderForm";
 import { ConnectorSettings } from "../../components/ConnectorsPanel";
 import { WorkspaceExportSettings } from "../../components/WorkspaceExportSettings";
+import { WorkspaceTrashSettings } from "../../components/WorkspaceTrashSettings";
 import { WorkspaceIconSettings } from "../../components/WorkspaceIconSettings";
 import { TemplateSettings } from "../../components/TemplateSettings";
 import { RepositorySettings } from "../lazy";
@@ -102,6 +103,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
               <RepositorySettings accessToken={accessToken} key={`repositories-${workspace.workspace.id}`} onChanged={() => void load()} workspaceId={workspace.workspace.id} />
               <ConnectorSettings accessToken={accessToken} key={`connectors-${workspace.workspace.id}`} onChanged={() => void load()} workspaceId={workspace.workspace.id} />
               <WorkspaceExportSettings accessToken={accessToken} key={`export-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
+              <WorkspaceTrashSettings accessToken={accessToken} canPurge={canManageWorkspace} key={`trash-${workspace.workspace.id}`} onRestored={() => void load()} workspaceId={workspace.workspace.id} />
               {canManageWorkspace ? <section className="shared-settings-group">
                 <PanelHeading description="owner only" icon={Settings} title="Workspace ownership" />
                 <p className="shared-muted-copy">Rename this workspace or remove it permanently. Deletion removes its shared evidence, memory, and memberships.</p>

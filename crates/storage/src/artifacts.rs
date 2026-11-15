@@ -154,6 +154,7 @@ impl StorageEngine {
             WHERE created_at < ?1
               AND NOT EXISTS (SELECT 1 FROM artifacts WHERE artifacts.content_hash = blobs.hash)
               AND NOT EXISTS (SELECT 1 FROM artifact_versions WHERE artifact_versions.content_hash = blobs.hash)
+              AND NOT EXISTS (SELECT 1 FROM trash_items WHERE trash_items.content_hash = blobs.hash)
             LIMIT ?2
             "#,
         )
@@ -173,6 +174,7 @@ impl StorageEngine {
                 WHERE hash = ?1 AND created_at < ?2
                   AND NOT EXISTS (SELECT 1 FROM artifacts WHERE artifacts.content_hash = ?1)
                   AND NOT EXISTS (SELECT 1 FROM artifact_versions WHERE artifact_versions.content_hash = ?1)
+                  AND NOT EXISTS (SELECT 1 FROM trash_items WHERE trash_items.content_hash = ?1)
                 "#,
             )
             .bind(&hash)
@@ -596,8 +598,14 @@ impl StorageEngine {
     }
 
     pub async fn delete_artifact(&self, artifact_id: &str) -> Result<()> {
+        self.delete_artifact_by(artifact_id, None).await
+    }
+
+    /// Deletes a file, keeping an uploaded or authored one in trash (V0.6.15) under `deleted_by`'s name.
+    pub async fn delete_artifact_by(&self, artifact_id: &str, deleted_by: Option<&str>) -> Result<()> {
         let summary = self.get_artifact_summary(artifact_id).await?;
         let mut tx = self.pool.begin().await?;
+        crate::trash::trash_artifact(&mut tx, artifact_id, deleted_by).await?;
         sqlx::query(
             "DELETE FROM links WHERE workspace_id = ?1 AND (to_id = ?2 OR (to_type = 'chunk' AND to_id IN (SELECT id FROM chunks WHERE artifact_id = ?2)))",
         )

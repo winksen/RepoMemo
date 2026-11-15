@@ -185,8 +185,14 @@ impl StorageEngine {
     }
 
     pub async fn delete_memory_card(&self, card_id: &str) -> Result<()> {
+        self.delete_memory_card_by(card_id, None).await
+    }
+
+    /// Deletes a card, keeping it in trash with its history (V0.6.15) under `deleted_by`'s name.
+    pub async fn delete_memory_card_by(&self, card_id: &str, deleted_by: Option<&str>) -> Result<()> {
         let detail = self.get_memory_card(card_id).await?;
         let mut tx = self.pool.begin().await?;
+        crate::trash::trash_memory_card(&mut tx, card_id, deleted_by).await?;
         sqlx::query("DELETE FROM links WHERE workspace_id = ?1 AND from_type = 'memory_card' AND from_id = ?2")
             .bind(&detail.card.workspace_id)
             .bind(card_id)

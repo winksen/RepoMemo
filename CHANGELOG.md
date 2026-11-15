@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.15 (2026-11-17)
+
+Add a bounded trash with restore for memory cards and uploaded files.
+
+### Added
+- **Trash** in **Settings › Trash**. Deleting a memory card or an uploaded or pasted file keeps it for 30 days (200 items per workspace at most, oldest first). *Restore* puts it back under the same id.
+- A restored **card** brings its revisions, approvals, imported approval records, review assignment and the citations whose targets still exist; citations whose file is gone are counted and left out. A restored **file** is indexed again, and the cards that cited it cite it again: a passage is found by its text, and one that cannot be found comes back as the whole file (the toast says how many).
+- **Purging is explicit and audited.** Only an administrator can *Remove for good*; the workspace activity records who and what. Items expire on their own after 30 days.
+- Only what was authored or uploaded here is kept. Files from a repository, a connector or a local folder are never put in trash, so remotely removed or revoked content is not resurrected. Comments, tasks, lifecycle history and earlier versions of a deleted file are not kept. Blob collection leaves a trashed file's content alone.
+- `GET /v1/workspaces/{id}/trash`, `POST /v1/workspaces/{id}/trash/{trash_id}/restore`, `DELETE /v1/workspaces/{id}/trash/{trash_id}`; migration 0061.
+
+### Checks
+- Version, migration lock (61 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (card and file delete, restore, history, approval, guest and member refusals, double restore, purge) was written and compiles; it was not executed, and neither was the migration. Nothing was built or run.
+
+### Upgrading
+- One additive migration. Nothing deleted before this release is in the trash.
+
 ## V0.6.14 (2026-11-17)
 
 Carry memory card revisions, citation records, approvals and review in workspace archives (format 3).

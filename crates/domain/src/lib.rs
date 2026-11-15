@@ -1874,6 +1874,32 @@ pub struct MemoryApprovalDecision {
     pub created_at: String,
 }
 
+/// One deleted memory card or file that can still be put back (V0.6.15).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrashItem {
+    pub id: String,
+    /// `memory_card` or `artifact`.
+    pub kind: String,
+    pub title: String,
+    pub deleted_by: Option<SharedUser>,
+    pub deleted_at: String,
+    /// After this the item is removed for good.
+    pub expires_at: String,
+}
+
+/// What putting an item back brought with it (V0.6.15).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrashRestoreResult {
+    pub kind: String,
+    /// The restored card's or file's id, the same it had before.
+    pub item_id: String,
+    pub title: String,
+    /// Citations of a card left out because the file or passage they cite no longer exists.
+    pub skipped_citations: u64,
+    /// Citations of a file that were to a passage and came back as the file, because the passage could not be found.
+    pub widened_citations: u64,
+}
+
 /// An approval decision that came with an imported workspace archive (V0.6.14): a record of what was decided on another
 /// server, kept for reading. It never counts as an approval here.
 #[derive(Debug, Clone, Serialize, Deserialize)]

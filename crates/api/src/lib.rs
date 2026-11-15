@@ -522,6 +522,11 @@ impl RepoMemoCore {
         self.storage.delete_artifact(&artifact_id).await
     }
 
+    /// Deletes a file and keeps an uploaded one in trash under `deleted_by`'s name (V0.6.15).
+    pub async fn delete_artifact_by(&self, artifact_id: String, deleted_by: &str) -> Result<()> {
+        self.storage.delete_artifact_by(&artifact_id, Some(deleted_by)).await
+    }
+
     pub async fn index_artifact(&self, artifact_id: String) -> Result<IndexingJobStatus> {
         let pending = self.begin_index_artifact(artifact_id).await?;
         self.finish_index_artifact(pending).await
@@ -688,6 +693,14 @@ impl RepoMemoCore {
             repomemo_domain::bail_invalid!("Memory card id is required.");
         }
         self.storage.delete_memory_card(&card_id).await
+    }
+
+    /// Deletes a card and keeps it in trash with its history under `deleted_by`'s name (V0.6.15).
+    pub async fn delete_memory_card_by(&self, card_id: String, deleted_by: &str) -> Result<()> {
+        if card_id.trim().is_empty() {
+            repomemo_domain::bail_invalid!("Memory card id is required.");
+        }
+        self.storage.delete_memory_card_by(&card_id, Some(deleted_by)).await
     }
 
     pub async fn list_memory_cards(&self, workspace_id: String) -> Result<Vec<MemoryCardSummary>> {
