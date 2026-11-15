@@ -146,20 +146,47 @@ pub(crate) fn load_catalogue(folder: Option<&std::path::Path>) -> (Catalogue, Te
     )
 }
 
-/// The templates this server offers, `general` first.
+/// The organizations a person belongs to, for the templates that are an organization's own (V0.6.23).
+async fn member_organizations(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+) -> Result<std::collections::HashSet<String>, ApiError> {
+    Ok(state
+        .storage
+        .list_organizations_for_user(&subject.user_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .map(|organization| organization.id)
+        .collect())
+}
+
+/// The templates this server offers, `general` first: the built-in and operator templates, and the ones saved by an
+/// organization the person belongs to. Another organization's templates are not listed.
 pub(crate) async fn list_templates(
-    _subject: AuthenticatedSubject,
+    subject: AuthenticatedSubject,
     State(state): State<AppState>,
-) -> Json<Vec<TemplateSummary>> {
-    Json(state.core.template_summaries())
+) -> Result<Json<Vec<TemplateSummary>>, ApiError> {
+    let organizations = member_organizations(&state, &subject).await?;
+    Ok(Json(state.core.template_summaries_for(&organizations)))
 }
 
 /// A template of the catalogue as a person looks at it before choosing it (V0.2.177): what it arranges and names.
 pub(crate) async fn template_detail(
-    _subject: AuthenticatedSubject,
+    subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(template_id): Path<String>,
 ) -> Result<Json<TemplateDetail>, ApiError> {
+    // Another organization's template is as good as absent.
+    let organizations = member_organizations(&state, &subject).await?;
+    if !state
+        .core
+        .template_summaries_for(&organizations)
+        .iter()
+        .any(|listed| listed.id == template_id)
+    {
+        return Err(ApiError::not_found("That template was not found."));
+    }
     state
         .core
         .template_detail(&template_id)
@@ -221,6 +248,17 @@ pub(crate) async fn update_workspace_template(
     Json(request): Json<UpdateWorkspaceTemplateRequest>,
 ) -> Result<Json<WorkspaceTemplateView>, ApiError> {
     require_workspace_admin(&state, &subject, &workspace_id).await?;
+    if let Some(id) = request.template_id.as_deref() {
+        // An organization's own template can be adopted only by a workspace of that organization.
+        let organization = state
+            .storage
+            .workspace_organization(&workspace_id)
+            .await
+            .map_err(map_storage_error)?;
+        if !state.core.template_allowed(id, organization.as_deref()) {
+            return Err(ApiError::not_found("That template was not found."));
+        }
+    }
     let change = state
         .core
         .set_workspace_template(

@@ -6,8 +6,8 @@
 //! template this server lacks or one saved by a newer server all give
 //! `general`, and the answer says why.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, RwLock};
 
 use anyhow::Result;
 use repomemo_domain::*;
@@ -176,7 +176,13 @@ pub struct TemplateChange {
 
 #[derive(Debug, Clone)]
 pub(crate) struct TemplateResolver {
-    catalogue: Arc<Catalogue>,
+    /// The built-in templates and the operator's folder: what organization templates are added to.
+    base: Arc<Catalogue>,
+    /// The catalogue in force: `base` and the templates of every organization (V0.6.23). Replaced whole when an
+    /// organization saves a template, so a change is seen without a restart.
+    current: Arc<RwLock<Arc<Catalogue>>>,
+    /// Which organization owns each organization template id.
+    owners: Arc<RwLock<HashMap<String, String>>>,
     /// Per workspace: the saved choice the answer was made for, and the answer.
     kept: Arc<Mutex<HashMap<String, KeptAnswer>>>,
 }
@@ -186,13 +192,23 @@ type KeptAnswer = (Option<WorkspaceTemplateRef>, EffectiveTemplate);
 impl Default for TemplateResolver {
     fn default() -> Self {
         Self {
-            catalogue: Arc::new(Catalogue::builtin().clone()),
+            base: Arc::new(Catalogue::builtin().clone()),
+            current: Arc::new(RwLock::new(Arc::new(Catalogue::builtin().clone()))),
+            owners: Arc::default(),
             kept: Arc::default(),
         }
     }
 }
 
 impl TemplateResolver {
+    /// The catalogue in force right now.
+    pub(crate) fn catalogue(&self) -> Arc<Catalogue> {
+        self.current
+            .read()
+            .map(|current| current.clone())
+            .unwrap_or_else(|_| self.base.clone())
+    }
+
     fn resolve(&self, workspace_id: &str, reference: Option<WorkspaceTemplateRef>) -> EffectiveTemplate {
         if let Ok(kept) = self.kept.lock() {
             if let Some((made_for, answer)) = kept.get(workspace_id) {
@@ -204,7 +220,8 @@ impl TemplateResolver {
         let chosen = reference
             .as_ref()
             .map(|reference| (reference.id.as_str(), reference.version));
-        let resolution = self.catalogue.resolve(chosen);
+        let catalogue = self.catalogue();
+        let resolution = catalogue.resolve(chosen);
         // The adjustments saved on the workspace's own template are laid over it; those saved on a template this
         // server could not use are not applied.
         let mut template = resolution.template;
@@ -214,7 +231,7 @@ impl TemplateResolver {
                 template = template.with_overrides(&overrides);
             }
         }
-        let custom = matches!(resolution.origin, Origin::Workspace) && self.catalogue.is_custom(template.id());
+        let custom = matches!(resolution.origin, Origin::Workspace) && catalogue.is_custom(template.id());
         let answer = EffectiveTemplate {
             template,
             origin: resolution.origin,
@@ -268,7 +285,7 @@ impl RepoMemoCore {
         template.meta.id = id.trim().to_owned();
         template.meta.name = name.trim().to_owned();
         template.meta.version = 1;
-        if self.templates.catalogue.get(&template.meta.id).is_some() {
+        if self.templates.catalogue().get(&template.meta.id).is_some() {
             repomemo_domain::bail_conflict!(
                 "The id {} is already a template of this server. Choose another id for the new template.",
                 template.meta.id
@@ -284,24 +301,104 @@ impl RepoMemoCore {
     }
 
     /// The templates this server offers, `general` first.
-    pub fn template_catalogue(&self) -> &Catalogue {
-        &self.templates.catalogue
+    pub fn template_catalogue(&self) -> Arc<Catalogue> {
+        self.templates.catalogue()
     }
 
     /// Replaces the templates this server offers (the operator's folder, tests). The answers already kept are dropped.
     pub fn with_template_catalogue(mut self, catalogue: Catalogue) -> Self {
+        let catalogue = Arc::new(catalogue);
         self.templates = TemplateResolver {
-            catalogue: Arc::new(catalogue),
+            base: catalogue.clone(),
+            current: Arc::new(RwLock::new(catalogue)),
+            owners: Arc::default(),
             kept: Arc::default(),
         };
         self
+    }
+
+    /// Rebuilds the catalogue from the built-in and operator templates and the newest saved version of every
+    /// organization's template (V0.6.23). Called at start and after a save, so a saved template is offered at once.
+    /// A saved template that no longer passes the rules (a newer rule) is left out and returned as a problem.
+    pub async fn reload_organization_templates(&self) -> Result<Vec<repomemo_templates::SourceProblem>> {
+        let saved = self.storage.latest_organization_templates(None).await?;
+        let sources: Vec<(String, String)> = saved
+            .iter()
+            .map(|template| {
+                (
+                    format!("organization:{}:{}", template.organization_id, template.template_id),
+                    template.definition.clone(),
+                )
+            })
+            .collect();
+        let (catalogue, problems) = self
+            .templates
+            .base
+            .extended(sources.iter().map(|(label, text)| (label.as_str(), text.as_str())));
+        let owners: HashMap<String, String> = saved
+            .iter()
+            .filter(|template| catalogue.get(&template.template_id).is_some())
+            .map(|template| (template.template_id.clone(), template.organization_id.clone()))
+            .collect();
+        if let (Ok(mut current), Ok(mut held), Ok(mut kept)) = (
+            self.templates.current.write(),
+            self.templates.owners.write(),
+            self.templates.kept.lock(),
+        ) {
+            *current = Arc::new(catalogue);
+            *held = owners;
+            kept.clear();
+        }
+        Ok(problems)
+    }
+
+    /// Checks the text of a template against the rules every template file is held to, and against the ids the server
+    /// already has (the built-in and operator templates, and other organizations' templates), before it is saved.
+    pub fn check_organization_template(
+        &self,
+        organization_id: &str,
+        text: &str,
+    ) -> std::result::Result<TemplateDefinition, Vec<String>> {
+        let template = TemplateDefinition::parse(text)
+            .map_err(|issues| issues.iter().map(ToString::to_string).collect::<Vec<_>>())?;
+        if self.templates.base.get(template.id()).is_some() {
+            return Err(vec![format!(
+                "The id {} is already a template of this server. Choose another id.",
+                template.id()
+            )]);
+        }
+        let owner = self
+            .templates
+            .owners
+            .read()
+            .ok()
+            .and_then(|owners| owners.get(template.id()).cloned());
+        if owner.as_deref().is_some_and(|owner| owner != organization_id) {
+            return Err(vec![format!(
+                "The id {} belongs to another organization. Choose another id.",
+                template.id()
+            )]);
+        }
+        Ok(template)
+    }
+
+    /// Whether a workspace of `organization_id` may use the template: every template of the server except another
+    /// organization's own.
+    pub fn template_allowed(&self, template_id: &str, organization_id: Option<&str>) -> bool {
+        match self.templates.owners.read() {
+            Ok(owners) => owners
+                .get(template_id)
+                .is_none_or(|owner| Some(owner.as_str()) == organization_id),
+            Err(_) => false,
+        }
     }
 
     /// What a workspace made from the template starts with (the choice to save and the folders to make), or `None`
     /// when the catalogue has no such template. Nothing is written: the caller hands it to the storage with the
     /// workspace, so the workspace and its folders are made together or not at all.
     pub fn workspace_starter(&self, template_id: &str) -> Option<StarterSetup> {
-        let template = self.templates.catalogue.get(template_id)?;
+        let catalogue = self.templates.catalogue();
+        let template = catalogue.get(template_id)?;
         Some(StarterSetup {
             reference: WorkspaceTemplateRef {
                 id: template.meta.id.clone(),
@@ -368,7 +465,7 @@ impl RepoMemoCore {
 
     /// A template of the catalogue as a person looks at it before choosing it, or `None` when there is no such one.
     pub fn template_detail(&self, template_id: &str) -> Option<TemplateDetail> {
-        let catalogue = &self.templates.catalogue;
+        let catalogue = self.templates.catalogue();
         catalogue
             .get(template_id)
             .map(|template| detail_of(template, catalogue.is_custom(template_id)))
@@ -376,10 +473,32 @@ impl RepoMemoCore {
 
     /// The catalogue as a picker lists it.
     pub fn template_summaries(&self) -> Vec<TemplateSummary> {
-        let catalogue = &self.templates.catalogue;
+        let catalogue = self.templates.catalogue();
         catalogue
             .list()
             .iter()
+            .map(|template| summary_of(template, catalogue.is_custom(template.id())))
+            .collect()
+    }
+
+    /// The catalogue as a person who belongs to `organizations` sees it: every template except the ones other
+    /// organizations saved for themselves (V0.6.23).
+    pub fn template_summaries_for(&self, organizations: &HashSet<String>) -> Vec<TemplateSummary> {
+        let owners = self
+            .templates
+            .owners
+            .read()
+            .map(|owners| owners.clone())
+            .unwrap_or_default();
+        let catalogue = self.templates.catalogue();
+        catalogue
+            .list()
+            .iter()
+            .filter(|template| {
+                owners
+                    .get(template.id())
+                    .is_none_or(|owner| organizations.contains(owner))
+            })
             .map(|template| summary_of(template, catalogue.is_custom(template.id())))
             .collect()
     }
@@ -397,7 +516,8 @@ impl RepoMemoCore {
         let after = match template_id {
             None => None,
             Some(id) => {
-                let Some(template) = self.templates.catalogue.get(id) else {
+                let catalogue = self.templates.catalogue();
+                let Some(template) = catalogue.get(id) else {
                     repomemo_domain::bail_not_found!("That template was not found.");
                 };
                 let overrides = match overrides {
@@ -979,11 +1099,11 @@ mod tests {
     #[test]
     fn a_template_can_be_looked_at_before_it_is_chosen() {
         let resolver = TemplateResolver::default();
-        let general = detail_of(&resolver.catalogue.get(GENERAL_ID).unwrap().clone(), false);
+        let general = detail_of(&resolver.catalogue().get(GENERAL_ID).unwrap().clone(), false);
         assert_eq!(general.template.id, GENERAL_ID);
         assert_eq!(general.sections.primary.len(), 12);
         assert_eq!(general.overview.cards.len(), 9);
-        for template in resolver.catalogue.list() {
+        for template in resolver.catalogue().list() {
             let detail = detail_of(template, false);
             assert_eq!(detail.template.id, template.id());
             assert_eq!(

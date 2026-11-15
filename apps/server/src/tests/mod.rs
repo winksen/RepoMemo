@@ -30,6 +30,7 @@ mod memory_history;
 mod my_work;
 mod onboarding;
 mod operations;
+mod organization_templates;
 mod performance;
 mod review_ownership;
 mod revision_attribution;

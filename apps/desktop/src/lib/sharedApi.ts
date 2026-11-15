@@ -2192,3 +2192,38 @@ export function restoreSharedTrashItem(accessToken: string, workspaceId: string,
 export function purgeSharedTrashItem(accessToken: string, workspaceId: string, trashId: string): Promise<void> {
   return request<void>(`/v1/workspaces/${workspaceId}/trash/${trashId}`, { method: "DELETE" }, accessToken);
 }
+
+/** A template an organization saved (V0.6.23): the newest version of one id. */
+export interface OrganizationTemplate {
+  id: string;
+  name: string;
+  summary: string;
+  version: number;
+  saved_by: import("../types").SharedUser | null;
+  saved_at: string;
+  note: string;
+  versions: number;
+}
+
+export interface OrganizationTemplateVersion {
+  version: number;
+  saved_by: import("../types").SharedUser | null;
+  saved_at: string;
+  note: string;
+  definition: string;
+}
+
+export function listSharedOrganizationTemplates(accessToken: string, organizationId: string): Promise<OrganizationTemplate[]> {
+  return request<OrganizationTemplate[]>(`/v1/organizations/${organizationId}/templates`, {}, accessToken);
+}
+
+/** Every saved version of one template, newest first, with its file; for the organization's administrators. */
+export function getSharedOrganizationTemplateVersions(accessToken: string, organizationId: string, templateId: string): Promise<OrganizationTemplateVersion[]> {
+  return request<OrganizationTemplateVersion[]>(`/v1/organizations/${organizationId}/templates/${templateId}/versions`, {}, accessToken);
+}
+
+/** Saves a template file as the next version of its id. */
+export function saveSharedOrganizationTemplate(accessToken: string, organizationId: string, definition: string, note: string): Promise<OrganizationTemplate> {
+  return request<OrganizationTemplate>(`/v1/organizations/${organizationId}/templates`, { method: "PUT", body: JSON.stringify({ definition, note }) }, accessToken);
+}
+

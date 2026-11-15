@@ -14,6 +14,7 @@ import { IconButton } from "../components/ui/icon-button";
 import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
 import { InviteMembers } from "../components/InviteMembers";
+import { OrganizationTemplatesPanel } from "../components/OrganizationTemplatesPanel";
 import { WorkspaceMoreMenu } from "../components/WorkspaceMoreMenu";
 import { arrangeSections } from "./templateSections";
 import { useReviewQueue, useTemplate } from "./workspace/data";
@@ -99,6 +100,7 @@ export function OrganizationAdministration({
       const email = member.user.email ?? "";
       return <article key={member.user.id}><div className="shared-person"><UserAvatar name={member.user.display_name} size={32} userId={member.user.id} /><div><strong>{member.user.display_name}</strong><span>{email}</span></div></div><div className="shared-organization-member-actions">{organization.role === "owner" && !isOwner ? <Button disabled={isSaving} onClick={() => void makeOwner(member)} type="button" variant="secondary">Make owner</Button> : null}{isOwner ? <Badge>Owner</Badge> : <Dropdown aria-label={`Role for ${member.user.display_name}`} disabled={protectedMember || isSaving} onValueChange={(value) => void saveMember(email, value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={member.role} />}{!protectedMember ? <IconButton disabled={isSaving} label={`Remove ${member.user.display_name} from ${organization.name}`} onClick={() => void removeMember(member)}><Trash size={ICON_SIZE.sm} /></IconButton> : null}</div></article>;
     })}</div>
+    <OrganizationTemplatesPanel accessToken={accessToken} canManage={organization.role === "owner" || organization.role === "admin"} key={`templates-${organization.id}`} organizationId={organization.id} />
     <InviteMembers accessToken={accessToken} initialEmail={inviteEmail} key={`invite-${organization.id}`} roleOptions={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} targetId={organization.id} targetLabel="organization" targetType="organization" />
   </section>;
 }

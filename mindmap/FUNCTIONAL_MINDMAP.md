@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.22` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.23` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.23 — Let organization administrators save and version templates that their workspaces can preview and adopt.
+
+- An organization can keep its own templates, versioned, and its workspaces preview and adopt them like the built-in ones. Other organizations never see them, and a template cannot change access or move content.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.22 — Record the deferral of local OCR and say plainly what is and is not searchable.
 

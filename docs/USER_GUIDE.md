@@ -231,6 +231,8 @@ When a workspace is created, you can pick a **template**. A template doesn't add
 
 For example, an *Operations* workspace opens on the Review queue, calls Tasks "Actions" and Memory "Lessons", favours recent runbooks in search, and flags runbooks nobody has touched in 90 days. Admins can switch templates in **Settings › Template** after seeing a preview, and nothing stored is moved or deleted.
 
+**Your organization's own templates.** An organization owner or administrator can save templates for the whole organization (**Organization administration › Organization templates**): paste a template file (a workspace's setup can be exported as one in **Settings › Template**) and save it. Each save is the next **version**, with a note for the history, and the earlier versions stay readable. A saved template is offered at once, with no restart, but **only to workspaces of that organization**: other organizations neither see nor can adopt it. A workspace previews it and adopts it from **Settings › Template**, like any other. A template never changes who can see or do anything and never moves or removes content; saving a newer version updates how the workspaces that use it look, and each keeps its own adjustments (starter folders are made only when a workspace is created).
+
 ---
 
 ## 5. Adding evidence

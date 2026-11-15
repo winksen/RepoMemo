@@ -14,6 +14,7 @@ pub(crate) async fn create_workspace(
             state
                 .core
                 .workspace_starter(id)
+                .filter(|_| state.core.template_allowed(id, Some(&request.organization_id)))
                 .ok_or_else(|| ApiError::bad_request("That template was not found."))?,
         ),
     };

@@ -161,6 +161,9 @@
 | PUT | `/v1/workspaces/{workspace_id}/icon` | managing | require_workspace_admin | UpdateWorkspaceIconRequest | WorkspaceIconResponse |
 | GET | `/v1/templates` | auth | — | — | Vec<TemplateSummary> |
 | GET | `/v1/templates/{template_id}` | auth | — | — | TemplateDetail |
+| GET | `/v1/organizations/{organization_id}/templates` | auth | require_organization_read | — | Vec<OrganizationTemplateView> |
+| PUT | `/v1/organizations/{organization_id}/templates` | auth | require_organization_admin | SaveOrganizationTemplate | OrganizationTemplateView |
+| GET | `/v1/organizations/{organization_id}/templates/{template_id}/versions` | auth | require_organization_admin | — | Vec<OrganizationTemplateVersion> |
 | GET | `/v1/workspaces/{workspace_id}/template` | auth | require_workspace_read | — | WorkspaceTemplateView |
 | PUT | `/v1/workspaces/{workspace_id}/template` | managing | require_workspace_admin | UpdateWorkspaceTemplateRequest | WorkspaceTemplateView |
 | GET | `/v1/workspaces/{workspace_id}/template/file` | auth | require_workspace_admin | query: id, name | a template file (JSON download) |

@@ -38,6 +38,7 @@ mod memory;
 mod memory_revisions;
 mod mentions;
 mod mfa;
+mod organization_templates;
 mod organizations;
 mod providers;
 mod repo;
@@ -68,6 +69,7 @@ pub use memory_revisions::{
 };
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;
+pub use organization_templates::StoredOrganizationTemplate;
 pub use organizations::StarterSetup;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};

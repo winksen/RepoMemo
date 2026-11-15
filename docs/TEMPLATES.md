@@ -51,6 +51,10 @@ A folder pattern (a ranking `path`, a repository `include` or `exclude`) is name
 
 The exact lists and numbers are in the Rust source of [`crates/templates`](../crates/templates/src), which is where the checker reads them from. If the checker and this page disagree, the source wins; please correct the page.
 
+## Organization templates
+
+An organization's owners and administrators can also save templates for their organization (V0.6.23: **Organization administration › Organization templates**, `PUT /v1/organizations/{id}/templates`). The text is held to every rule on this page, its `id` must not be one the server already has (built-in, operator folder or another organization), and each save must carry `meta.version` one higher than the newest saved (1 for a new template), so two administrators cannot overwrite each other. Earlier versions stay readable. A saved template is offered at once with no restart and only to workspaces of its organization. It still cannot grant, widen or hide a right or move content, and the checker above does not read it: the server does, when it is saved.
+
 ## Who sees a template
 
 Every account that can sign in to the server can read every template it offers, the custom ones included: the picker needs them, and the preview in Settings › Template shows each block. A workspace's administrators can choose a template and adjust the section it opens on, what is under *More* and the suggested questions, but they cannot edit its file, so what is in the file is the operator's text. Two of its texts travel further than the page: the `focus` line is added to the system prompt of Ask and goes to the AI provider the workspace uses, and a phrase or a suggested question is typed into the assistant like any message. **A template holds no secrets, no names of customers or people and no addresses**, only the kind of material a workspace is for. Files copied from somewhere else deserve the same reading you would give a script: the checker proves a file is within bounds, not that its words are yours.

@@ -37,6 +37,7 @@ mod memory_history;
 mod mfa;
 mod my_work;
 mod onboarding;
+mod organization_templates;
 mod organizations;
 mod profile;
 mod quotas;
@@ -428,6 +429,16 @@ async fn build_state(
         .with_template_catalogue(template_catalogue)
         .with_repo_link_policy(repo_policy)
         .with_remote_git_policy(remote_git_policy);
+    // The templates the organizations saved are offered from the first request (V0.6.23). One that no longer passes
+    // the rules is left out and named in the log; it never stops the server.
+    match core.reload_organization_templates().await {
+        Ok(problems) => {
+            for problem in problems {
+                tracing::warn!(source = %problem.source, "An organization template was left out of the catalogue");
+            }
+        }
+        Err(error) => tracing::warn!(error = %error, "Organization templates could not be read at start"),
+    }
     runtime.share_background_limit(core.background_ai_budget().limit_handle());
     runtime.share_clone_limits(core.clone_limit_handles());
 
@@ -767,6 +778,15 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             put(update_workspace).delete(delete_workspace),
         )
         .route("/v1/workspaces/{workspace_id}/icon", put(update_workspace_icon))
+        .route(
+            "/v1/organizations/{organization_id}/templates",
+            get(organization_templates::list_organization_templates)
+                .put(organization_templates::save_organization_template),
+        )
+        .route(
+            "/v1/organizations/{organization_id}/templates/{template_id}/versions",
+            get(organization_templates::organization_template_versions),
+        )
         .route("/v1/templates", get(templates::list_templates))
         .route("/v1/templates/{template_id}", get(templates::template_detail))
         .route(

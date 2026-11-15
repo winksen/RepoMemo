@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.6 → 0.7 (proposed)
 
-> **Current:** `V0.6.22` (2026-11-17)
+> **Current:** `V0.6.23` (2026-11-17)
 
 > **Theme:** Trusted knowledge in daily work · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -42,7 +42,7 @@
 | **V0.6.20** | 🧪 2026-11-17 | AJ. Daily knowledge | 🔧 | Panel tests | Add web tests for the memory history, approval, review ownership, changes and My work panels | Each panel's loading, refusal, conflict and empty states have a test; the tests compile and lint here and the maintainer's run records their result |
 | **V0.6.21** | ✅ 2026-11-17 | AJ. Daily knowledge | 🔧 | Image intake | Allow image storage and preview with no AI provider, showing its searchability state | A screenshot can be kept and found by metadata without leaving the server; later optional vision indexing never implies it was already text-searchable |
 | **V0.6.22** | ✅ 2026-11-17 | AJ. Daily knowledge | 📘 | Local OCR (deferred) | Record that local OCR is not built, because no pilot owner exists, and say plainly what is and is not searchable | The guides state that scanned PDFs and pictures of text are kept and previewed but not read, name what works instead, and list what a pilot owner must bring to reopen the row |
-| **V0.6.23** | 🔜 | AJ. Daily knowledge | ✨ | Organization templates | Let organization admins save and version templates using the existing validated template model | A workspace previews and adopts an org template without restart; template updates never change access or silently move existing content |
+| **V0.6.23** | ✅ 2026-11-17 | AJ. Daily knowledge | ✨ | Organization templates | Let organization admins save and version templates using the existing validated template model | A workspace previews and adopts an org template without restart; template updates never change access or silently move existing content |
 | **V0.6.24** | 🔜 | AJ. Daily knowledge | 🔧 | Folders | Add a preview of descendants and preserved references to the existing folder move | Cycles and depth overflow stay refused; paths update consistently and citations/comments remain attached |
 | **V0.6.25** | 🔜 | AJ. Daily knowledge | ✨ | Search feedback | Capture an unanswered question or unhelpful result as a permission-scoped improvement request | The user can submit without losing query context; an owner can resolve it to evidence or a memory, and query retention is explicit |
 | **V0.6.26** | 🔜 | AJ. Daily knowledge | 🔧 | Journey UX | Make the onboarding, personal queue and review flow keyboard/narrow-screen usable | Focus, context and drafts survive navigation, retry and reconnect; the specified journeys work at 200% zoom and in both themes with recorded manual checks |

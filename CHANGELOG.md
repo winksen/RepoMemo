@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.23 (2026-11-17)
+
+Let organization administrators save and version templates that their workspaces can preview and adopt.
+
+### Added
+- **Organization templates** in **Organization administration**. An owner or administrator pastes a template file (the one a workspace's setup is exported as) and saves it. The text is held to every rule of a template file, its id must not be one the server already has (built-in, operator folder or another organization), and the first organization to save an id owns it.
+- **Versions.** Each save must carry `meta.version` one higher than the newest saved (1 for a new template), checked in the transaction that writes, so two administrators editing from the same version cannot overwrite each other (`409`). Earlier versions stay readable, with who saved them and a note. *New version* in the list opens the newest file with its version raised.
+- **Offered at once.** The server rebuilds its catalogue when a template is saved and when it starts, so a saved template is previewed and adopted from **Settings › Template** (or chosen when creating a workspace) with no restart.
+- **Only to its own organization.** Another organization neither lists nor reads the template (`404`) and cannot adopt it for a workspace or when creating one.
+- **A template still changes no right and moves no content.** Saving a newer version updates how the workspaces on it look, each keeping its own adjustments; starter folders are made only when a workspace is created.
+- `GET`/`PUT /v1/organizations/{id}/templates`, `GET /v1/organizations/{id}/templates/{template}/versions`; migration 0062.
+
+### Checks
+- Version, migration lock (62 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (member refused, save, listing, repeated version refused, next version, versions, built-in id and invalid file refused, adoption, an outsider's list, read and adoption) was written and compiles; it was not executed, and neither was the migration. Nothing was built or run.
+
+### Upgrading
+- One additive migration. No template exists until an administrator saves one.
+
 ## V0.6.22 (2026-11-17)
 
 Record the deferral of local OCR and say plainly what is and is not searchable.
