@@ -6,7 +6,7 @@
 Every release of the 0.3 line, planned and later shipped, one row each. The plan comes from the [Road to V0.4.0](ROADMAP.md#-road-to-v040), proposed on 2026-10-24: **one change per release**, each shippable alone, committed as `Update V0.3.N`. Decisions 29–32 of the roadmap are taken as proposed (V0.3.1); decision 33, the theme of V0.4.0, is recorded in V0.3.27.
 
 **Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, dependencies, release).
-**Status:** ✅ shipped (with its date) · 🔄 in progress · 🔜 planned
+**Status:** ✅ shipped (with its date) · 🧪 built, not validated (committed with static checks only; the live evidence, walkthrough or run its row asks for is still owed) · 🔄 in progress · 🔜 planned
 
 When a release ships, set its status to ✅ with the date and make *What changes* say what was built.
 

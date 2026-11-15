@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.6.15` (2026-11-17) · **Next:** V0.6.16 release record.6.15 deletion recovery.6.14 knowledge archives.6.13 test checkpoint.6.12 imported card history.6.11 revision attribution.6.10 citation durability. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.6.16` (2026-11-17) · **Next:** V0.6.17 release tags.6.16 release record.6.15 deletion recovery.6.14 knowledge archives.6.13 test checkpoint.6.12 imported card history.6.11 revision attribution.6.10 citation durability. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `v0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -92,8 +92,8 @@ timeline
 | Road to V0.4.0 (V0.3.1–V0.3.27, tracks O to T) | ✅ Built and closed on 2026-10-24 at V0.3.27: fixes and the record, the local edition removed, small gaps closed, portability and connector depth, operations, security pass and release checks; decisions 29–32 taken as proposed, 33 recorded as a proposal |
 | The 0.4.x line: preparation for deployment, server and client, containers first (V0.4.0–V0.4.67) | ✅ Closed on 2026-10-27 by V0.4.67 (opened on 2026-10-25 by V0.4.0; 67 releases planned in eight tracks (configuration, the server image, the web image, compose and tests, direct install, registry, the desktop app on the web client, documents and security); [plan](plans/2026-10-25-deployment.md), [index](RELEASES_0.4.md); decisions 33–40 proposed, then 41–44 for the next line); the maintainer's clean-install run is what is left |
 | 0.4.x continuation (V0.4.68–V0.4.105, tracks AC–AH) | V0.4.68–V0.4.105 committed; [candidate evidence](technical/release-evidence-0.4.105.md) records pending live validation and authorized implementation overlap. [Gap audit and tracks](#proposed-04x-continuation-gap-audit), [one row per release](RELEASES_0.4.md#proposed-continuation-close-the-gaps-before-05x) |
-| 0.5.x team access and identity | 🔜 Expanded proposal: preserves the OIDC sequence and adds restricted workspaces, guest expiry, offboarding and MFA; [index](RELEASES_0.5.md) |
-| 0.6.x trusted daily knowledge | 🔜 Activation, personal work, safe editing, review accountability and recovery; [index](RELEASES_0.6.md) |
+| 0.5.x team access and identity | 🧪 Built (V0.5.0–V0.5.19): one OIDC provider, restricted workspaces, guest expiry, offboarding and two-step sign-in; the identity checkpoint and the closing walkthroughs have no recorded result yet; [index](RELEASES_0.5.md) |
+| 0.6.x trusted daily knowledge | 🔄 Built so far: activation, personal work, safe editing, review accountability, history, approvals, citation durability, archives and recovery; [index](RELEASES_0.6.md) |
 | Gap audit 2026-11-04 | 🔜 Twelve findings against V0.6.9, scheduled in twelve new 0.6 and 0.8 rows and in changes to existing rows; [findings](#gap-audit-of-2026-11-04) |
 | 0.7.x evidence-backed projects | 🔜 Projects, milestones, task discussion, dependencies, views and updates; [index](RELEASES_0.7.md) |
 | 0.8.x connections and community knowledge | 🔜 Connector trust, tracker/chat adoption, migration and curated publication; [index](RELEASES_0.8.md) |
@@ -691,7 +691,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] `REPOMEMO_GIT_ALLOWED_HOSTS` in `config.rs` (unset: remote links off), the *Remote repository hosts* server check and overview fact
 - [x] Migration 0031 `repo_credentials`; `crates/storage/src/credentials.rs`: `set_repo_credential`, `repo_credential_info`, `open_repo_credential` (only for the sync engine), `clear_repo_credential`; sealed with context `repo_credentials:{source}:secret`; `RepoSecret` hides its value in `Debug` and has no `Serialize`
 - [x] Tests: three in `remote_policy` (off by default, forms accepted and refused, metadata and private addresses), `a_credential_is_sealed_never_shown_and_dies_with_its_link`
-- [ ] The git version check (2.50.1 or later), the clone itself and the credential endpoints are V0.2.20
+- [x] The git version check (2.50.1 or later), the clone itself and the credential endpoints were V0.2.20
 
 #### V0.2.20: Remote repositories over https
 
@@ -699,7 +699,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] `crates/api/src/remote_repo.rs`: `check_remote_repo_link`, `connect_remote_repo` (token stored sealed, link removed if that fails), `set_repo_token`, `clear_repo_token`; the address goes through `RemoteGitPolicy` on every use; `RepoSource.remote` and `has_credential`; metadata `remote.url`
 - [x] `PUT`/`DELETE /v1/repositories/{id}/token`; web: link form with token fields, remote and token tags, *Remove the token*
 - [x] Tests: `a_bare_partial_clone_is_read_like_any_repository`, the remote git unit tests, `remote_links_are_off_until_hosts_are_named_and_a_token_is_never_echoed`
-- [ ] `ssh` and deploy keys are V0.2.21; clone limits V0.2.22; a clone against a real host is for the maintainer to try
+- [x] `ssh` and deploy keys were V0.2.21 and clone limits V0.2.22; a clone against a real host is for the maintainer to try
 
 #### V0.2.21: Remote repositories over ssh
 
@@ -707,7 +707,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] `RemoteLink.host_key`; `remote_target` picks token or deploy key by the address; both required for `ssh`; `set_repo_deploy_key` tries the key first
 - [x] `PUT /v1/repositories/{id}/deploy-key`; web: deploy key and host key fields for `ssh` addresses, *deploy key* tag
 - [x] Tests: `host_keys_are_pinned_to_the_host_and_port_of_the_link`, `a_deploy_key_lives_in_a_private_file_and_never_on_the_command_line`, the link-refusal list now includes an `ssh` address without a key
-- [ ] A connection to a real host is for the maintainer to try; clone limits are V0.2.22
+- [x] Clone limits were V0.2.22; a connection to a real host is for the maintainer to try
 
 #### V0.2.22: Clone limits
 
@@ -755,7 +755,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] `RemoteGitPolicy::check_api_host`; the token in `repo_credentials`; `apps/server/src/connectors.rs` (runner, polling on the repository interval, routes)
 - [x] Web: Settings › Issues (check, connect, sync now, replace token, remove)
 - [x] Tests: link forms, markdown rendering, `Link` header, and `github_issues_become_evidence_that_follows_the_tracker` against a stand-in GitHub (pull request skipped, closed → outdated, bearer token only, `since` asked, reopen → active, removal)
-- [ ] Pull requests are V0.2.28; webhooks and rate-limit pauses V0.2.31
+- [x] Pull requests were V0.2.28; webhooks and rate-limit pauses V0.2.31
 
 #### V0.2.28: GitHub pull requests as evidence
 
@@ -763,7 +763,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] `ArtifactType::Pr`, path `pulls/{n}`, state `open`, `closed` or `merged`; merged stays active, closed → *outdated*; counts treat merged as closed
 - [x] A budget of 500 requests per sync, resumed from the cursor (`more_to_fetch`)
 - [x] Tests: `a_pull_request_becomes_markdown_with_its_commits_and_reviews`, the connector test with a pull request (opened, then merged, commits kept, still active)
-- [ ] Links from pull requests to files and symbols are V0.2.30
+- [x] Links from pull requests to files and symbols were V0.2.30
 
 #### V0.2.29: GitLab issues and merge requests
 
@@ -771,7 +771,7 @@ Proposed and started on 2026-10-22, with decisions 24–28 taken as proposed. Ev
 - [x] `parse_tracker_link` (provider by choice or by address), `check_tracker_link`, `connect_tracker`; the client sends `PRIVATE-TOKEN` and no GitHub headers for GitLab; `finish_connector_sync` shared
 - [x] Routes take `provider`; web: *Tracker* field and wording
 - [x] Tests: project addresses and record reshaping, `gitlab_issues_and_merge_requests_follow_the_same_model` against a stand-in GitLab (needs the provider chosen, PRIVATE-TOKEN only, closed issue outdated, merged request active with its commits, `updated_after` on the next sync)
-- [ ] Approvals are not read; links from items to files are V0.2.30
+- [x] Links from items to files were V0.2.30 (approvals on pull requests are read since V0.3.21)
 
 #### V0.2.30: Links from issues and pull requests to code
 
@@ -1791,7 +1791,7 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.5.7** ✅ 2026-10-29 | 🔒 | Session lifecycle | Add provider logout and supported back-channel logout with an absolute reauthentication deadline | G02 | A disabled identity cannot refresh forever; an IdP without logout notifications has a documented, tested maximum access window |
 | **V0.5.8** ✅ 2026-10-29 | 🔧 | Audit | Extend the existing audit/export path with identity linking, provider policy, login and group-mapping events | G02, G03 | An authorized export explains identity changes and failures without tokens or secrets; no duplicate audit subsystem is created |
 | **V0.5.9** ✅ 2026-10-29 | 🔒 | Identity review | Review and close findings on redirects, account linking, discovery, tokens and recovery | G02 | No high/medium identity finding remains open and negative cases have regression coverage |
-| **V0.5.10** ✅ 2026-10-29 | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | G01, G02 | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
+| **V0.5.10** 🧪 2026-10-29 | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | G01, G02 | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
 | **V0.5.11** ✅ 2026-10-29 | ✨ | Workspace access | Add explicit organization-shared versus restricted workspace membership policy | G02 | A restricted workspace never auto-enrolls a new org member; existing memberships migrate without silent loss or expansion and server-admin powers are explicit |
 | **V0.5.12** ✅ 2026-10-29 | 🔧 | Access UX | Show effective access and its origin before membership or group-policy changes | G02 | An administrator can explain every grant and preview affected people; search, counts and direct URLs reveal no restricted workspace to unauthorized users |
 | **V0.5.13** ✅ 2026-10-29 | ✨ | Guests | Add expiry and renewal to existing direct guest membership | G02, G03 | An expired guest loses read, search, export, event and token access at the deadline; renewals and expiry are auditable |
@@ -1800,7 +1800,7 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.5.16** ✅ 2026-10-29 | 🔒 | Local MFA | Add optional TOTP enforcement for local-password accounts, with hashed single-use recovery codes | G02 | Password alone cannot bypass enabled MFA through browser, token issuance or alternate login routes; replay and recovery reuse are refused |
 | **V0.5.17** ✅ 2026-10-29 | ✨ | MFA UX | Add enrollment, recovery and administrator-policy screens for local MFA | G02 | Enrollment requires a successful code, recovery codes are shown once, reset requires verified authority and a user can recover without a support backdoor |
 | **V0.5.18** ✅ 2026-10-29 | 🔒 | Access verification | Exercise the complete role, guest, token, MFA and restricted-workspace matrix | G02, G03 | Denied access stays denied across caches, events, previews, exports and retrieval; upgrades retain intentional existing grants |
-| **V0.5.19** ✅ 2026-10-29 | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | G01–G03 | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |
+| **V0.5.19** 🧪 2026-10-29 | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | G01–G03 | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |
 
 ### Gap audit of 2026-11-04
 
@@ -1866,10 +1866,10 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.6.10** ✅ 2026-11-17 | 🔧 | Citation durability | Bind saved references and portable exports to inspectable content revisions, and keep a citation's recorded content through restores and edits | G06, G16 | A source update cannot silently make a historical citation appear current, including after a restore or an edit that leaves the citation alone; unavailable snapshots and access refusals are stated accurately; a database error is never reported as a missing source and a replaced passage is never described as predating the binding; Ask answer exports say what content they cited |
 | **V0.6.11** ✅ 2026-11-17 | 🐞 | Revision attribution | Write a revision's author in the same transaction as the revision | G17 | Two near-simultaneous saves credit each person with their own revision; a new revision cannot be left without an author, so independent review cannot be passed by the person who made it; only revisions from before V0.6.3 stay unattributed |
 | **V0.6.12** ✅ 2026-11-17 | 🐞 | Imported card history | Give every imported memory card revision 1 with its imported text and citations, and repair cards already imported without one | G18 | An imported card cannot be approved at revision 0; its first edit becomes revision 2 and the imported text stays in the history; the repair adds a revision only to cards that have none |
-| **V0.6.13** ✅ 2026-11-17 | 📘 | Test checkpoint | Record the maintainer's full Rust and web test run, and CI on the pushed commit | G19 | Every test added since V0.4.105 has a recorded result; each failure becomes a numbered fix row and no test is skipped or removed to pass; a check that was not run stays marked unrun |
+| **V0.6.13** 🧪 2026-11-17 | 📘 | Test checkpoint | Record the maintainer's full Rust and web test run, and CI on the pushed commit | G19 | Every test added since V0.4.105 has a recorded result; each failure becomes a numbered fix row and no test is skipped or removed to pass; a check that was not run stays marked unrun |
 | **V0.6.14** ✅ 2026-11-17 | 🔧 | Knowledge archives | Carry memory revisions, citation bindings, approvals, review assignments and the independent-review setting in workspace archives (format 3) | G05, G06, G20 | An export imported elsewhere shows the same history, bound citations, review dates and policy; identities are rechecked and an approval returns as a historical record, never as a trusted local decision; format 2 archives still import |
 | **V0.6.15** ✅ 2026-11-17 | ✨ | Deletion recovery | Add bounded trash and restore for locally authored/uploaded evidence and memory | G05 | Accidental deletion can be undone with references restored, including a card's revisions and approvals and a file's citation links; purge is explicit and audited; remotely revoked or removed source content is not resurrected by trash |
-| **V0.6.16** 🔜 | 📘 | Release record | Correct the stale claims the gap audit lists and add a "built, not validated" status | G21 | Those documents agree with the code and `git tag`; a row with pending live evidence no longer reads as accepted, and the status legend and the documentation check accept the new status |
+| **V0.6.16** ✅ 2026-11-17 | 📘 | Release record | Correct the stale claims the gap audit lists and add a "built, not validated" status | G21 | Those documents agree with the code and `git tag`; a row with pending live evidence no longer reads as accepted, and the status legend and the documentation check accept the new status |
 | **V0.6.17** 🔜 | 🐞 | Release tags | Use one release tag format across the workflows, guides and the record | G01, G22 | The documented tag passes the workflows' tag and version checks; statements about which tags exist match `git tag`; this row publishes nothing |
 | **V0.6.18** 🔜 | 🔒 | Write preconditions | Make the upload version check atomic with its write and decide whether API writes must send a version | G05, G23 | A stale upload cannot pass the check and then overwrite a newer one; a client that sends no version is refused, or that unchecked mode is named in the API guide ahead of the V0.9.10 compatibility promise |
 | **V0.6.19** 🔜 | 🔧 | Revision limits | Read one revision directly, page the revision list and state how long history is kept | G24 | Opening or approving a card with a long history does not load every revision; the list is paged and the retention rule is in the guide |

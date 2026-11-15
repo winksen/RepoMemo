@@ -60,4 +60,4 @@ Syncs run in the background through a runner of their own (one at a time, never 
 
 ## Not yet
 
-Delivery logs and redelivery for webhooks, approvals on pull and merge requests, and tokens other than a personal one (a GitHub App).
+Tokens other than a personal one (a GitHub App). Webhook delivery logs and redelivery exist since V0.3.22; a pull or merge request's approvals are read since V0.3.21.

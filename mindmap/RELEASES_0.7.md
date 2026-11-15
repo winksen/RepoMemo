@@ -11,7 +11,7 @@
 **Scope control:** local OCR (0.6.22), a second tracker (0.8.7) and a second chat adapter (0.8.10) require a pilot owner before implementation. Jira/Slack are the default first choices; pilot evidence may select Linear/Teams instead before work starts. Record a deferral and narrow the supported feature list when a conditional item is not justified. Access boundaries, trustworthy evidence, recovery and publication isolation are mandatory. Full details and pilot thresholds are in the [readiness report](analysis/2026-10-29-team-readiness.md).
 
 **Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, evidence, release).
-**Status:** ✅ shipped (with date) · 🔄 in progress · 🔜 planned. Every row starts planned; a written plan is not an acceptance-test pass.
+**Status:** ✅ shipped (with date) · 🧪 built, not validated (committed with static checks only; the live evidence, walkthrough or run its row asks for is still owed) · 🔄 in progress · 🔜 planned. Every row starts planned; a written plan is not an acceptance-test pass.
 
 ## Every release
 

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.16 (2026-11-17)
+
+Correct the stale claims in the release record and add a "built, not validated" status.
+
+### Changed
+- **A new status, 🧪 built, not validated**, in every release index and in the roadmap: committed with static checks only, with the live evidence, walkthrough or run its row asks for still owed. ✅ keeps its meaning. V0.5.10, V0.5.19 and V0.6.13 now read 🧪 (their results are pending), and the documentation check accepts the status and still requires each such row to have a changelog entry.
+- **Corrected to match the code and `git tag`:** the 0.6 index no longer says nothing shipped; the roadmap's stage table shows 0.5.x as built (live validation pending) and 0.6.x as in progress, and its repository track checks the phases a later release built; `CLAUDE.md` and `docs/README.md` list the release indexes up to 0.9; `PRODUCT.md` says single sign-on with one OpenID Connect provider is built but not validated against a live provider; the functional mindmap names the one 0.4 tag that exists (`RM-V0.4.0`) and that it does not match the form the release workflows start from, and says memory cards with changed evidence are a Health finding; the connectors page no longer lists webhook delivery logs as missing.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock, documentation links (with the new status), TypeScript, clippy and formatting pass. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.6.15 (2026-11-17)
 
 Add a bounded trash with restore for memory cards and uploaded files.

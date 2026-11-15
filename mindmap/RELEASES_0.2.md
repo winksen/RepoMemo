@@ -6,7 +6,7 @@
 Every release of the 0.2 line, shipped and planned, one row each. The plan comes from the [Road to V0.3.0](ROADMAP.md#-road-to-v030): **one change per release**, each shippable alone, with the security rules for a new outside connection in the release that opens it. Planned rows are proposals until decisions 7–14 in the roadmap are agreed; tracks L and M waited on decisions 20–23, and track N on decisions 24–28 (taken as proposed).
 
 **Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, dependencies, release). Releases whose purpose is a security rule or a review finding are marked 🔒 here; the roadmap's plan table files them under the kind of work instead. · 🧹 Refactor · 🧪 Test
-**Status:** ✅ shipped (with its date) · 🔄 in progress · 🔜 planned
+**Status:** ✅ shipped (with its date) · 🧪 built, not validated (committed with static checks only; the live evidence, walkthrough or run its row asks for is still owed) · 🔄 in progress · 🔜 planned
 
 When a release ships, set its status to ✅ with the date and make *What changes* say what was built.
 

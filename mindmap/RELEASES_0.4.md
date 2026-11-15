@@ -8,7 +8,7 @@ Every release of the 0.4 line, planned and later shipped, one row each. The them
 V0.4.67 closed the original deployment plan. The continuation below is a **new proposal**, not shipped work or a change to that historical record. It closes recorded validation debt, improves the daily product, and gives users and administrators a coherent documentation path before the next minor line. Numbered releases are intended as individual commits; split a row if implementation proves it is more than one independently reviewable change.
 
 **Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, dependencies, release).
-**Status:** ✅ shipped (with its date) · 🔄 in progress · 🔜 planned
+**Status:** ✅ shipped (with its date) · 🧪 built, not validated (committed with static checks only; the live evidence, walkthrough or run its row asks for is still owed) · 🔄 in progress · 🔜 planned
 
 When a release ships, set its status to ✅ with the date and make *What changes* say what was built.
 

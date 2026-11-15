@@ -13,7 +13,7 @@
 **Scope control:** local OCR (0.6.22), a second tracker (0.8.7) and a second chat adapter (0.8.10) require a pilot owner before implementation. Jira/Slack are the default first choices; pilot evidence may select Linear/Teams instead before work starts. Record a deferral and narrow the supported feature list when a conditional item is not justified. Access boundaries, trustworthy evidence, recovery and publication isolation are mandatory. Full details and pilot thresholds are in the [readiness report](analysis/2026-10-29-team-readiness.md).
 
 **Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, evidence, release).
-**Status:** ✅ shipped (with date) · 🔄 in progress · 🔜 planned. Every row starts planned; a written plan is not an acceptance-test pass.
+**Status:** ✅ shipped (with date) · 🧪 built, not validated (committed with static checks only; the live evidence, walkthrough or run its row asks for is still owed) · 🔄 in progress · 🔜 planned. Every row starts planned; a written plan is not an acceptance-test pass.
 
 ## Every release
 
@@ -29,7 +29,7 @@
 | **V0.5.7** | ✅ 2026-10-29 | AI. Team access | 🔒 | Session lifecycle | Add provider logout and supported back-channel logout with an absolute reauthentication deadline | A disabled identity cannot refresh forever; an IdP without logout notifications has a documented, tested maximum access window |
 | **V0.5.8** | ✅ 2026-10-29 | AI. Team access | 🔧 | Audit | Extend the existing audit/export path with identity linking, provider policy, login and group-mapping events | An authorized export explains identity changes and failures without tokens or secrets; no duplicate audit subsystem is created |
 | **V0.5.9** | ✅ 2026-10-29 | AI. Team access | 🔒 | Identity review | Review and close findings on redirects, account linking, discovery, tokens and recovery | No high/medium identity finding remains open and negative cases have regression coverage |
-| **V0.5.10** | ✅ 2026-10-29 | AI. Team access | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
+| **V0.5.10** | 🧪 2026-10-29 | AI. Team access | 📘 | Identity checkpoint | Complete the original OIDC checkpoint using a real provider and supported browser/desktop/container paths | Provider sign-in and outage recovery are recorded against the candidate; this closes the identity track, not the expanded 0.5 line |
 | **V0.5.11** | ✅ 2026-10-29 | AI. Team access | ✨ | Workspace access | Add explicit organization-shared versus restricted workspace membership policy | A restricted workspace never auto-enrolls a new org member; existing memberships migrate without silent loss or expansion and server-admin powers are explicit |
 | **V0.5.12** | ✅ 2026-10-29 | AI. Team access | 🔧 | Access UX | Show effective access and its origin before membership or group-policy changes | An administrator can explain every grant and preview affected people; search, counts and direct URLs reveal no restricted workspace to unauthorized users |
 | **V0.5.13** | ✅ 2026-10-29 | AI. Team access | ✨ | Guests | Add expiry and renewal to existing direct guest membership | An expired guest loses read, search, export, event and token access at the deadline; renewals and expiry are auditable |
@@ -38,7 +38,7 @@
 | **V0.5.16** | ✅ 2026-10-29 | AI. Team access | 🔒 | Local MFA | Add optional TOTP enforcement for local-password accounts, with hashed single-use recovery codes | Password alone cannot bypass enabled MFA through browser, token issuance or alternate login routes; replay and recovery reuse are refused |
 | **V0.5.17** | ✅ 2026-10-29 | AI. Team access | ✨ | MFA UX | Add enrollment, recovery and administrator-policy screens for local MFA | Enrollment requires a successful code, recovery codes are shown once, reset requires verified authority and a user can recover without a support backdoor |
 | **V0.5.18** | ✅ 2026-10-29 | AI. Team access | 🔒 | Access verification | Exercise the complete role, guest, token, MFA and restricted-workspace matrix | Denied access stays denied across caches, events, previews, exports and retrieval; upgrades retain intentional existing grants |
-| **V0.5.19** | ✅ 2026-10-29 | AI. Team access | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |
+| **V0.5.19** | 🧪 2026-10-29 | AI. Team access | 📘 | Closing | Record team-access walkthroughs and publish identity/access operating guides | The line's exit journey passes on the supported distribution; MFA and OIDC recovery steps are rehearsed and residual limits are explicit |
 
 ## Verification and handoff
 
