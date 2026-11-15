@@ -7,11 +7,9 @@ import { Combobox } from "./ui/combobox";
 import { PanelHeading } from "./ui/panel-heading";
 import { showToast } from "./ui/toast";
 import { apiMessage } from "../web/format";
+import { formatDateValue } from "../lib/locale";
 
-const when = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { dateStyle: "medium" });
-};
+const when = (value: string) => formatDateValue(value);
 
 type Option = { label: string; value: string };
 

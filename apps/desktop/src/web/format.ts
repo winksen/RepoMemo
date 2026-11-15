@@ -1,3 +1,4 @@
+import { formatDateTimeValue, formatDateValue, formatDayMonth } from "../lib/locale";
 import { IconCode as Code, IconMarkdown as Markdown, IconNote as Note } from "@tabler/icons-react";
 import { SharedApiError } from "../lib/sharedApi";
 import { type ArtifactSummary, type ArtifactType, type Citation, type CollaborationTask, type WorkspaceActivityEvent } from "../types";
@@ -30,14 +31,14 @@ function parseDate(value: string): Date | null {
 export function formatDate(value: string | null | undefined, fallback = "—") {
   if (!value) return fallback;
   const date = parseDate(value);
-  return date ? date.toLocaleDateString(undefined, { dateStyle: "medium" }) : value;
+  return date ? formatDateValue(date) : value;
 }
 
 /** "3 Mar 2026, 14:05": a date with its time. Empty and invalid values are handled as in `formatDate`. */
 export function formatTime(value: string | null | undefined, fallback = "—") {
   if (!value) return fallback;
   const date = parseDate(value);
-  return date ? date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : value;
+  return date ? formatDateTimeValue(date) : value;
 }
 
 /** "5m ago", "3h ago", "2d ago", then the date: how long ago something happened, for lists. */
@@ -53,7 +54,7 @@ export function formatRelativeTime(value: string, now: number = Date.now()) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return formatDayMonth(date);
 }
 
 /** The time of day for today, the day and month for an earlier date; empty when it is not a date. */
@@ -61,8 +62,8 @@ export function formatRecentTime(value: string) {
   const date = parseDate(value);
   if (!date) return "";
   return date.toDateString() === new Date().toDateString()
-    ? date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-    : date.toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    ? formatDateValue(date, { hour: "2-digit", minute: "2-digit" })
+    : formatDayMonth(date);
 }
 
 /** "512 B", "48 KB", "1.5 MB": a size, with no decimals below a megabyte. */
@@ -93,7 +94,7 @@ export function formatShare(share: number) {
 export function formatMetricDay(value: string) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatDayMonth(date);
 }
 
 /** The name of a kind of evidence; `labels` are the names the workspace's template gives (V0.2.173). */
@@ -125,7 +126,7 @@ export function isTaskOverdue(task: CollaborationTask) {
 export function formatTaskDueDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatDayMonth(date);
 }
 
 export function formatProfileTime(value: string | null | undefined) {
@@ -155,7 +156,7 @@ export function artifactCitation(artifacts: ArtifactSummary[], artifactId: strin
 export function citationChange(citation: { last_author?: string | null; last_changed_at?: string | null }): string {
   const author = citation.last_author?.trim();
   const when = citation.last_changed_at ? new Date(citation.last_changed_at) : null;
-  const day = when && !Number.isNaN(when.getTime()) ? when.toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
+  const day = when && !Number.isNaN(when.getTime()) ? formatDateValue(when) : "";
   if (author && day) return `changed by ${author} on ${day}`;
   if (author) return `changed by ${author}`;
   return day ? `changed on ${day}` : "";
@@ -183,6 +184,6 @@ export function apiMessage(error: unknown, fallback: string = UNREACHABLE): stri
 export function lastChangeLabel(author: string | null | undefined, at: string | null | undefined): string {
   if (!author) return "";
   const date = at ? new Date(at) : null;
-  const when = date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined, { dateStyle: "medium" }) : "";
+  const when = date && !Number.isNaN(date.getTime()) ? formatDateValue(date) : "";
   return when ? `${author} · ${when}` : author;
 }

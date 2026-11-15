@@ -8,11 +8,9 @@ import { useConfirm } from "./ui/confirm-dialog";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage } from "../web/format";
+import { formatDateValue } from "../lib/locale";
 
-const when = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { dateStyle: "medium" });
-};
+const when = (value: string) => formatDateValue(value);
 
 /**
  * What was deleted lately and can still be put back (V0.6.15): memory cards with their history, and files that were

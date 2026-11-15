@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.26` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.27` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.27 — Route dates and numbers through one locale-aware formatter and put the core journeys' words in a message catalogue.
+
+- Dates and numbers in the core journeys follow the browser's language. The words of those journeys are kept in one catalogue so a language can be added later; none is offered now.
+
+Checks: Web tests written and compiled, not executed; static checks pass.
 
 ## V0.6.26 — Keep focus and layout usable in the first-value, My work and review journeys, and record the manual checks owed.
 

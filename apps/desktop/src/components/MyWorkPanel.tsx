@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage, formatTaskDueDate } from "../web/format";
+import { t } from "../lib/messages";
 import { showToast } from "./ui/toast";
 import { navigate } from "../web/router";
 
@@ -23,16 +24,16 @@ export function MyWorkPanel({ accessToken, userId }: { accessToken: string; user
     key: accountKeys.myWork(userId), fetch: () => getSharedMyWork(accessToken), initial: EMPTY, staleTime: 0,
   });
   // A failed read is said, not shown as an empty list: "nothing is waiting" would be a claim the page cannot back up.
-  useEffect(() => { if (query.isError) showToast("error", apiMessage(query.error, "Your work could not be read.")); }, [query.isError, query.error]);
+  useEffect(() => { if (query.isError) showToast("error", apiMessage(query.error, t("myWork.readFailed"))); }, [query.isError, query.error]);
   if (query.isLoading || (query.isError && work.total_count === 0)) return null;
   return (
     <section aria-labelledby="my-work-heading" className="rm-my-work">
-      <PanelHeading description={work.total_count ? `${work.total_count} waiting${work.overdue_task_count ? `, ${work.overdue_task_count} overdue` : ""}` : null} icon={Checklist} id="my-work-heading" title="My work" />
-      {work.total_count === 0 ? <p className="shared-muted-copy">Nothing is waiting for you. Tasks assigned to you, files you own that need review and new mentions appear here.</p> : (
+      <PanelHeading description={work.total_count ? (work.overdue_task_count ? t("myWork.waitingOverdue", { total: work.total_count, overdue: work.overdue_task_count }) : t("myWork.waiting", { total: work.total_count })) : null} icon={Checklist} id="my-work-heading" title={t("myWork.title")} />
+      {work.total_count === 0 ? <p className="shared-muted-copy">{t("myWork.empty")}</p> : (
         <ul className="rm-my-work-list">
-          {work.tasks.map((task) => <li key={`task-${task.id}`}><Button className="rm-my-work-item" onClick={() => navigate(`/workspaces/${encodeURIComponent(task.workspace_id)}/tasks`)} type="button" variant="secondary"><span><strong>{task.title}</strong><small>Task · {task.priority} priority{task.due_at ? ` · due ${formatTaskDueDate(task.due_at)}` : ""}</small></span><ChevronRight size={ICON_SIZE.md} /></Button></li>)}
-          {work.reviews.map((review) => <li key={`review-${review.artifact_id}`}><Button className="rm-my-work-item" onClick={() => navigate(`/workspaces/${encodeURIComponent(review.workspace_id)}/review`)} type="button" variant="secondary"><span><strong>{review.title}</strong><small>Review · {review.workspace_name}{review.reason ? ` · ${review.reason}` : ""}</small></span><ChevronRight size={ICON_SIZE.md} /></Button></li>)}
-          {work.mentions.map((mention) => <li key={`mention-${mention.id}`}><Button className="rm-my-work-item" onClick={() => navigate(mention.href)} type="button" variant="secondary"><span><strong>{mention.title}</strong><small>Mention{mention.body ? ` · ${mention.body}` : ""}</small></span><ChevronRight size={ICON_SIZE.md} /></Button></li>)}
+          {work.tasks.map((task) => <li key={`task-${task.id}`}><Button className="rm-my-work-item" onClick={() => navigate(`/workspaces/${encodeURIComponent(task.workspace_id)}/tasks`)} type="button" variant="secondary"><span><strong>{task.title}</strong><small>{task.due_at ? t("myWork.taskDue", { priority: task.priority, due: formatTaskDueDate(task.due_at) }) : t("myWork.task", { priority: task.priority })}</small></span><ChevronRight size={ICON_SIZE.md} /></Button></li>)}
+          {work.reviews.map((review) => <li key={`review-${review.artifact_id}`}><Button className="rm-my-work-item" onClick={() => navigate(`/workspaces/${encodeURIComponent(review.workspace_id)}/review`)} type="button" variant="secondary"><span><strong>{review.title}</strong><small>{review.reason ? t("myWork.reviewReason", { workspace: review.workspace_name, reason: review.reason }) : t("myWork.review", { workspace: review.workspace_name })}</small></span><ChevronRight size={ICON_SIZE.md} /></Button></li>)}
+          {work.mentions.map((mention) => <li key={`mention-${mention.id}`}><Button className="rm-my-work-item" onClick={() => navigate(mention.href)} type="button" variant="secondary"><span><strong>{mention.title}</strong><small>{mention.body ? t("myWork.mentionBody", { body: mention.body }) : t("myWork.mention")}</small></span><ChevronRight size={ICON_SIZE.md} /></Button></li>)}
         </ul>
       )}
     </section>

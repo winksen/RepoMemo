@@ -9,8 +9,12 @@ import { Input } from "./ui/input";
 import { PanelHeading } from "./ui/panel-heading";
 import { showToast } from "./ui/toast";
 import { apiMessage } from "../web/format";
+import { formatDateValue } from "../lib/locale";
+import { t } from "../lib/messages";
 
+/** The input's own value, always `YYYY-MM-DD`; what a person reads goes through `shown`. */
 const day = (value: string | null) => (value ? value.slice(0, 10) : "");
+const shown = (value: string | null) => (value ? formatDateValue(`${day(value)}T12:00:00`) : "");
 
 /**
  * Who is accountable for reviewing this file or memory card, and when it is next due (V0.6.6). The reviewer may be
@@ -65,10 +69,10 @@ export function ReviewOwnershipPanel({ accessToken, canWrite, itemId, kind, work
   const options = members.filter((member) => member.role !== "viewer").map((member) => ({ label: member.user.display_name, description: member.user.email ?? undefined, value: member.user.id }));
   const reviewerName = assignment.reviewer ? assignment.reviewer.display_name : assignment.reviewer_label;
   return <section aria-labelledby={`review-owner-${itemId}`} className="shared-record-panel">
-    <PanelHeading description={assignment.overdue ? "Review is overdue" : assignment.next_review_at ? `Next review ${day(assignment.next_review_at)}` : "No review date"} icon={UserCheck} id={`review-owner-${itemId}`} title="Reviewer" />
+    <PanelHeading description={assignment.overdue ? t("reviewer.overdue") : assignment.next_review_at ? t("reviewer.next", { date: shown(assignment.next_review_at) }) : t("reviewer.noDate")} icon={UserCheck} id={`review-owner-${itemId}`} title={t("reviewer.title")} />
     <p className="shared-muted-copy">
-      {reviewerName ? <>{reviewerName}{assignment.reviewer_departed ? " has left this workspace, so nobody is accountable. Choose someone else." : " is accountable for checking this."}</> : "Nobody is accountable for reviewing this yet."}
-      {assignment.last_reviewed_at ? ` Last reviewed ${day(assignment.last_reviewed_at)}.` : ""}
+      {reviewerName ? <>{reviewerName} {assignment.reviewer_departed ? t("reviewer.left") : t("reviewer.accountable")}</> : t("reviewer.nobody")}
+      {assignment.last_reviewed_at ? ` ${t("reviewer.lastReviewed", { date: shown(assignment.last_reviewed_at) })}` : ""}
     </p>
     {canWrite ? <div className="rm-review-owner-form">
       <Field label="Reviewer"><Combobox aria-label="Reviewer" noneLabel="Nobody" onValueChange={setReviewerId} options={options} placeholder="Choose a reviewer" value={reviewerId} /></Field>

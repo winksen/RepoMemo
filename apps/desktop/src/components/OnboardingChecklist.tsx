@@ -8,6 +8,7 @@ import { PanelHeading } from "./ui/panel-heading";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage } from "../web/format";
+import { t } from "../lib/messages";
 
 /** Activity that can complete a step. */
 const CHECKLIST_ACTIONS = /^(artifact_|evidence_|memory_|repository_|member_|invitation_)/;
@@ -27,7 +28,7 @@ export function OnboardingChecklist({ accessToken, workspaceId }: { accessToken:
     try {
       setOnboarding(await getSharedOnboarding(accessToken, workspaceId));
     } catch (error) {
-      showToast("error", apiMessage(error, "The checklist could not be read."));
+      showToast("error", apiMessage(error, t("onboarding.readFailed")));
     }
   }
 
@@ -46,7 +47,7 @@ export function OnboardingChecklist({ accessToken, workspaceId }: { accessToken:
       refocus.current = true;
       setOnboarding((current) => (current ? { ...current, dismissed } : current));
     } catch (error) {
-      showToast("error", apiMessage(error, "That could not be saved."));
+      showToast("error", apiMessage(error, t("onboarding.saveFailed")));
     } finally {
       setIsSaving(false);
     }
@@ -55,21 +56,21 @@ export function OnboardingChecklist({ accessToken, workspaceId }: { accessToken:
   if (!onboarding) return null;
   const complete = onboarding.done_count === onboarding.total_count;
   if (onboarding.dismissed) {
-    return complete ? null : <div className="rm-checklist-collapsed"><Button data-onboarding-toggle disabled={isSaving} onClick={() => void setDismissed(false)} type="button" variant="secondary"><ListCheck size={ICON_SIZE.md} /> Show the getting-started checklist ({onboarding.done_count} of {onboarding.total_count})</Button></div>;
+    return complete ? null : <div className="rm-checklist-collapsed"><Button data-onboarding-toggle disabled={isSaving} onClick={() => void setDismissed(false)} type="button" variant="secondary"><ListCheck size={ICON_SIZE.md} /> {t("onboarding.show", { done: onboarding.done_count, total: onboarding.total_count })}</Button></div>;
   }
   return (
     <section aria-labelledby="onboarding-heading" className="rm-checklist">
-      <PanelHeading description={`${onboarding.done_count} of ${onboarding.total_count} done`} icon={ListCheck} id="onboarding-heading" title={`Getting started with ${onboarding.template_name}`} />
+      <PanelHeading description={t("onboarding.progress", { done: onboarding.done_count, total: onboarding.total_count })} icon={ListCheck} id="onboarding-heading" title={t("onboarding.title", { template: onboarding.template_name })} />
       <ol className="rm-checklist-steps">
         {onboarding.steps.map((step) => (
           <li data-done={step.done} key={step.id}>
             {step.done ? <CircleCheck aria-hidden size={ICON_SIZE.md} /> : <Circle aria-hidden size={ICON_SIZE.md} />}
             <div><strong>{step.title}</strong><span className="shared-muted-copy">{step.detail}</span></div>
-            <span className="rm-checklist-state">{step.done ? "Done" : "To do"}</span>
+            <span className="rm-checklist-state">{step.done ? t("onboarding.stepDone") : t("onboarding.stepTodo")}</span>
           </li>
         ))}
       </ol>
-      <Button data-onboarding-toggle disabled={isSaving} onClick={() => void setDismissed(true)} type="button" variant="secondary">{complete ? "Hide, all done" : "Hide for now"}</Button>
+      <Button data-onboarding-toggle disabled={isSaving} onClick={() => void setDismissed(true)} type="button" variant="secondary">{complete ? t("onboarding.hideComplete") : t("onboarding.hide")}</Button>
     </section>
   );
 }

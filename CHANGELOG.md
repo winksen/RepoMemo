@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.27 (2026-11-17)
+
+Route dates and numbers through one locale-aware formatter and put the core journeys' words in a message catalogue.
+
+### Added
+- **One formatter for dates and numbers** (`lib/locale.ts`): `formatDateValue`, `formatDateTimeValue`, `formatDayMonth` and `formatNumber`, using `Intl` with the browser's language (or an explicit locale), so a date reads the way its reader writes it. A value that is not a date comes back as it was. `web/format.ts` now calls it, and so do the getting-started checklist, My work and the reviewer, approval, history, trash, template and request panels, which no longer format dates themselves.
+- **A message catalogue** (`lib/messages.ts`) holding the words of the three core journeys (first value, My work, review) under stable keys, with `{name}` values and a fall-back to English for any key a language leaves out. English is the only catalogue that ships.
+- **A test locale proves it.** A test replaces every message with a marked copy and checks that the checklist, My work and the reviewer panel show the marked words, so none of those strings is hard-coded; another checks that the same day and number read differently under `en-US` and `de-DE`, and that none of the journey files calls `toLocale*` directly.
+
+### Changed
+- The reviewer panel shows its next and last review dates in the reader's format (the date field itself still holds `YYYY-MM-DD`).
+- No route, setting or migration changes. **No translated language is shipped or claimed**; about 30 other files still format dates themselves and move over as their screens are touched.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links and TypeScript pass. The new test file and the updated reviewer test were written and compile; neither was executed. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.6.26 (2026-11-17)
 
 Keep focus and layout usable in the first-value, My work and review journeys, and record the manual checks owed.

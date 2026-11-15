@@ -249,6 +249,12 @@ clone and which of them could (`npm run tag:test` tests the script). Neither cre
 The tags `RM-V0.2.0`, `RM-V0.3.0` and `RM-V0.4.0` were made in an earlier form. They stay as history and start no workflow, so no release
 image, archive or installer was built from them. No release has been tagged in the `v` form yet.
 
+## Dates, Numbers And Messages In The Web Client
+
+Dates and numbers a person reads go through one module, `apps/desktop/src/lib/locale.ts` (`formatDateValue`, `formatDateTimeValue`, `formatDayMonth`, `formatNumber`), which follows the browser's language, so a date reads as its reader writes it. `web/format.ts` calls it, and the core-journey components (the getting-started checklist, My work and the reviewer, approval, history, changes, trash, template and request panels) call it instead of `toLocale*`; a test fails if one of them calls `toLocale*` directly. About 30 other files still do and move over as their screens are touched.
+
+The words of the three core journeys (first value, My work, review) live in the message catalogue, `lib/messages.ts`, under stable keys such as `myWork.empty`; `t(key, {values})` fills in `{name}` values. English is the only catalogue that ships. `setMessages` replaces some or all messages (a test, or a future language), and a key a replacement leaves out falls back to English. **No translated language is shipped or claimed**: the groundwork keeps the strings movable, nothing more.
+
 ## Run It In Containers
 
 The server and a Caddy front door (TLS and the web app) as two containers, with the data in a volume:

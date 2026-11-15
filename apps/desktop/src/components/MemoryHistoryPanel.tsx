@@ -3,6 +3,7 @@ import { IconHistory as History, IconLoader2 as Loader } from "@tabler/icons-rea
 import { compareSharedMemoryRevisions, getSharedCitedSource, listSharedMemoryRevisions, restoreSharedMemoryRevision, SharedApiError } from "../lib/sharedApi";
 import type { CitedSource, MemoryRevision, MemoryRevisionComparison } from "../types";
 import { apiMessage } from "../web/format";
+import { formatDateTimeValue } from "../lib/locale";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -18,10 +19,7 @@ const CURRENCY: Record<string, string> = {
   unbound: "content at the time not recorded",
 };
 
-function when(value: string) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
+const when = formatDateTimeValue;
 
 /**
  * The saved revisions of a memory card (V0.6.3): who changed the statement and its citations, when, a comparison with the

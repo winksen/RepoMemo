@@ -7,11 +7,9 @@ import { PanelHeading } from "./ui/panel-heading";
 import { Switch } from "./ui/switch";
 import { showToast } from "./ui/toast";
 import { apiMessage } from "../web/format";
+import { formatDateTimeValue } from "../lib/locale";
 
-const when = (value: string) => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-};
+const when = formatDateTimeValue;
 
 /**
  * Approval of a memory card (V0.6.8). An approval belongs to one revision: editing the card makes a new revision, which
