@@ -65,12 +65,12 @@ async fn build_status(
         .memory_approval_history(card_id)
         .await
         .map_err(map_storage_error)?;
-    let revisions = state
+    let newest = state
         .storage
-        .memory_revisions(card_id)
+        .newest_memory_revision(card_id)
         .await
         .map_err(map_storage_error)?;
-    let newest = revisions.first();
+    let newest = newest.as_ref();
     let revision = newest.map_or(0, |found| found.revision);
     let current = history.iter().find(|decision| decision.revision == revision);
     let approved = current.is_some_and(|decision| decision.decision == "approved");

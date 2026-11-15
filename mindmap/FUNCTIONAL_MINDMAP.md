@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.19` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.19 — Read one revision directly, page a card's history and state how long it is kept.
+
+- A card with a long history opens and is approved without loading every revision, and its history is shown a page at a time. The guides say that history is never trimmed while the card exists.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.18 — Make the upload version check part of its write and name the unchecked mode in the API guide.
 

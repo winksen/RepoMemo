@@ -30,6 +30,9 @@ function when(value: string) {
  */
 export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, updatedAt }: { accessToken: string; canWrite: boolean; cardId: string; onRestored: () => void; updatedAt: string }) {
   const [revisions, setRevisions] = useState<MemoryRevision[] | null>(null);
+  const [nextBefore, setNextBefore] = useState<number | null>(null);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [comparison, setComparison] = useState<MemoryRevisionComparison | "loading" | null>(null);
   const [restoring, setRestoring] = useState<number | null>(null);
   const [inspecting, setInspecting] = useState<MemoryRevision | null>(null);
@@ -48,9 +51,23 @@ export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, 
 
   useEffect(() => {
     let cancelled = false;
-    listSharedMemoryRevisions(accessToken, cardId).then((next) => { if (!cancelled) setRevisions(next); }).catch((error) => { if (!cancelled) showToast("error", apiMessage(error, "The history could not be read.")); });
+    listSharedMemoryRevisions(accessToken, cardId).then((page) => { if (!cancelled) { setRevisions(page.items); setNextBefore(page.nextBefore); setTotal(page.total); } }).catch((error) => { if (!cancelled) showToast("error", apiMessage(error, "The history could not be read.")); });
     return () => { cancelled = true; };
   }, [accessToken, cardId, updatedAt]);
+
+  async function showEarlier() {
+    if (nextBefore === null) return;
+    setLoadingMore(true);
+    try {
+      const page = await listSharedMemoryRevisions(accessToken, cardId, nextBefore);
+      setRevisions((kept) => [...(kept ?? []), ...page.items]);
+      setNextBefore(page.nextBefore);
+    } catch (error) {
+      showToast("error", apiMessage(error, "Earlier revisions could not be read."));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   async function compare(from: number, to: number) {
     setComparison("loading");
@@ -78,7 +95,7 @@ export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, 
     }
   }
 
-  if (!revisions || revisions.length < 2) return null;
+  if (!revisions || total < 2) return null;
   const current = revisions[0];
   return <section className="shared-record-panel shared-versions-panel" aria-label="Revision history">
     {comparison ? <Dialog size="lg" description={comparison === "loading" ? "Comparing…" : `Revision ${comparison.from_revision} to revision ${comparison.to_revision}`} footer={<DialogCancel label="Close" onClick={() => setComparison(null)} />} onClose={() => setComparison(null)} open title="What changed">
@@ -107,7 +124,7 @@ export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, 
       {source && source !== "loading" && "error" in source ? <p role="alert">{source.error}</p> : null}
       {source && source !== "loading" && "state" in source ? <div><p><strong>{source.title}</strong> · {source.state.replace("_", " ")}</p><p className="shared-muted-copy">{source.note}</p>{source.text ? <pre className="shared-version-text">{source.text}</pre> : null}{source.truncated ? <p className="shared-muted-copy">Only the start is shown.</p> : null}</div> : null}
     </Dialog> : null}
-    <PanelHeading description={<>{revisions.length} revisions</>} icon={History} title="Revision history" />
+    <PanelHeading description={<>{revisions.length === total ? `${total} revisions` : `${revisions.length} of ${total} revisions`}</>} icon={History} title="Revision history" />
     <ul className="shared-version-list">
       {revisions.map((revision) => <li key={revision.revision}>
         <div>
@@ -122,5 +139,6 @@ export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, 
         </div>
       </li>)}
     </ul>
+    {nextBefore !== null ? <div><Button busy={loadingMore} onClick={() => void showEarlier()} type="button" variant="secondary">Show earlier revisions</Button></div> : null}
   </section>;
 }

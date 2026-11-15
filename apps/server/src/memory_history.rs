@@ -3,6 +3,7 @@
 
 use axum::{
     extract::{Path, Query, State},
+    http::{HeaderMap, HeaderName, HeaderValue},
     Json,
 };
 use repomemo_domain::{
@@ -117,16 +118,40 @@ pub(crate) async fn list_revisions(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(card_id): Path<String>,
-) -> Result<Json<Vec<MemoryRevision>>, ApiError> {
+    Query(page): Query<RevisionPage>,
+) -> Result<(HeaderMap, Json<Vec<MemoryRevision>>), ApiError> {
     card_workspace(&state, &subject, &card_id, false).await?;
-    let revisions = state
+    let (revisions, next, total) = state
         .storage
-        .memory_revisions(&card_id)
+        .memory_revisions_page(
+            &card_id,
+            page.before,
+            page.limit.unwrap_or(repomemo_storage::DEFAULT_REVISION_PAGE),
+        )
         .await
         .map_err(map_storage_error)?;
     let mut revisions: Vec<MemoryRevision> = revisions.into_iter().map(revision).collect();
     with_currency(&state, &mut revisions).await?;
-    Ok(Json(revisions))
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        HeaderName::from_static("x-total-count"),
+        HeaderValue::from(total.max(0) as u64),
+    );
+    if let Some(cursor) = next {
+        headers.insert(
+            HeaderName::from_static("x-next-cursor"),
+            HeaderValue::from(cursor.max(0) as u64),
+        );
+    }
+    Ok((headers, Json(revisions)))
+}
+
+/// Paging of a card's history (V0.6.19): `limit` (default 50, at most 200) and `before`, the revision number to continue
+/// below, which is the `X-Next-Cursor` of the previous page.
+#[derive(Debug, Deserialize)]
+pub(crate) struct RevisionPage {
+    limit: Option<i64>,
+    before: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]

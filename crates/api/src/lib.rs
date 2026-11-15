@@ -756,8 +756,8 @@ impl RepoMemoCore {
         let detail = self.get_memory_card(card_id.clone()).await?;
         // What each citation pointed at when the newest revision was saved, so the export cannot read as current
         // after a source changed (V0.6.10).
-        let revisions = self.storage.memory_revisions(&card_id).await?;
-        let newest = revisions.first();
+        let newest = self.storage.newest_memory_revision(&card_id).await?;
+        let newest = newest.as_ref();
         let mut markdown = format!(
             "# {}\n\n{}\n\n## Record\n\n- Source: {}\n- Updated: {}\n- Revision: {}\n\n## Evidence\n",
             detail.card.title,

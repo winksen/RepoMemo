@@ -2112,9 +2112,16 @@ export function getSharedMyWork(accessToken: string): Promise<import("../types")
   return request<import("../types").MyWork>("/v1/profile/work", {}, accessToken);
 }
 
-/** The saved revisions of a memory card, newest first (V0.6.3). */
-export function listSharedMemoryRevisions(accessToken: string, cardId: string): Promise<import("../types").MemoryRevision[]> {
-  return request<import("../types").MemoryRevision[]>(`/v1/memory-cards/${cardId}/revisions`, {}, accessToken);
+/** One page of a memory card's saved revisions, newest first (V0.6.3, paged in V0.6.19). `before` continues below a revision number. */
+export async function listSharedMemoryRevisions(accessToken: string, cardId: string, before?: number): Promise<{ items: import("../types").MemoryRevision[]; nextBefore: number | null; total: number }> {
+  let nextBefore: number | null = null;
+  let total = 0;
+  const items = await request<import("../types").MemoryRevision[]>(`/v1/memory-cards/${cardId}/revisions${before === undefined ? "" : `?before=${before}`}`, {}, accessToken, (response) => {
+    const cursor = response.headers.get("X-Next-Cursor");
+    nextBefore = cursor === null ? null : Number(cursor);
+    total = Number(response.headers.get("X-Total-Count") ?? 0);
+  });
+  return { items, nextBefore, total: total || items.length };
 }
 
 export function compareSharedMemoryRevisions(accessToken: string, cardId: string, from: number, to: number): Promise<import("../types").MemoryRevisionComparison> {

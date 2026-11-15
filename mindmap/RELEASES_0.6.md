@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.6 → 0.7 (proposed)
 
-> **Current:** `V0.6.18` (2026-11-17)
+> **Current:** `V0.6.19` (2026-11-17)
 
 > **Theme:** Trusted knowledge in daily work · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -38,7 +38,7 @@
 | **V0.6.16** | ✅ 2026-11-17 | AJ. Daily knowledge | 📘 | Release record | Correct the stale claims the gap audit lists and add a "built, not validated" status | Those documents agree with the code and `git tag`; a row with pending live evidence no longer reads as accepted, and the status legend and the documentation check accept the new status |
 | **V0.6.17** | ✅ 2026-11-17 | AJ. Daily knowledge | 🐞 | Release tags | Use one release tag format across the workflows, guides and the record | The documented tag passes the workflows' tag and version checks; statements about which tags exist match `git tag`; this row publishes nothing |
 | **V0.6.18** | ✅ 2026-11-17 | AJ. Daily knowledge | 🔒 | Write preconditions | Make the upload version check atomic with its write and decide whether API writes must send a version | A stale upload cannot pass the check and then overwrite a newer one; a client that sends no version is refused, or that unchecked mode is named in the API guide ahead of the V0.9.10 compatibility promise |
-| **V0.6.19** | 🔜 | AJ. Daily knowledge | 🔧 | Revision limits | Read one revision directly, page the revision list and state how long history is kept | Opening or approving a card with a long history does not load every revision; the list is paged and the retention rule is in the guide |
+| **V0.6.19** | ✅ 2026-11-17 | AJ. Daily knowledge | 🔧 | Revision limits | Read one revision directly, page the revision list and state how long history is kept | Opening or approving a card with a long history does not load every revision; the list is paged and the retention rule is in the guide |
 | **V0.6.20** | 🔜 | AJ. Daily knowledge | 🔧 | Panel tests | Add web tests for the memory history, approval, review ownership, changes and My work panels | Each panel's loading, refusal, conflict and empty states have a test; the tests compile and lint here and the maintainer's run records their result |
 | **V0.6.21** | 🔜 | AJ. Daily knowledge | 🔧 | Image intake | Allow image storage and preview with no AI provider, showing its searchability state | A screenshot can be kept and found by metadata without leaving the server; later optional vision indexing never implies it was already text-searchable |
 | **V0.6.22** | 🔜 | AJ. Daily knowledge | ✨ | Local OCR (conditional) | Add optional bounded local OCR for scanned PDFs and images, retaining original/page provenance | Pilot scans yield searchable page-linked text; missing OCR gives a clear limitation, low-quality extraction is labelled and resource limits hold |

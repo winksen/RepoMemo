@@ -4,6 +4,18 @@
 use super::*;
 use serde::{Deserialize, Serialize};
 
+/// How many revisions one page of a card's history holds at most, and by default.
+pub const MAX_REVISION_PAGE: i64 = 200;
+pub const DEFAULT_REVISION_PAGE: i64 = 50;
+
+const REVISION_SELECT: &str = r#"
+    SELECT revision.id, revision.card_id, revision.workspace_id, revision.revision, revision.title,
+           revision.body_markdown, revision.source, revision.confidence, revision.citations_json,
+           revision.created_at, revision.restored_from, revision.author_label,
+           users.id AS author_id, users.display_name AS author_name, users.email AS author_email
+    FROM memory_card_revisions AS revision
+    LEFT JOIN users ON users.id = revision.created_by_user_id"#;
+
 /// One cited passage or file as a revision kept it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RevisionCitation {
@@ -149,32 +161,71 @@ pub(crate) async fn snapshot_memory_card(
 }
 
 impl StorageEngine {
-    /// The card's revisions, newest first.
+    /// Every revision of the card, newest first. This reads the whole history: use it for an export or an archive, and
+    /// `memory_revision`, `newest_memory_revision` or `memory_revisions_page` anywhere a request needs less.
     pub async fn memory_revisions(&self, card_id: &str) -> Result<Vec<StoredMemoryRevision>> {
-        let rows = sqlx::query(
-            r#"
-            SELECT revision.id, revision.card_id, revision.workspace_id, revision.revision, revision.title,
-                   revision.body_markdown, revision.source, revision.confidence, revision.citations_json,
-                   revision.created_at, revision.restored_from, revision.author_label,
-                   users.id AS author_id, users.display_name AS author_name, users.email AS author_email
-            FROM memory_card_revisions AS revision
-            LEFT JOIN users ON users.id = revision.created_by_user_id
-            WHERE revision.card_id = ?1
-            ORDER BY revision.revision DESC
-            "#,
-        )
+        let rows = sqlx::query(&format!(
+            "{REVISION_SELECT} WHERE revision.card_id = ?1 ORDER BY revision.revision DESC"
+        ))
         .bind(card_id)
         .fetch_all(self.reader())
         .await?;
         Ok(rows.iter().map(stored_revision).collect())
     }
 
+    /// One revision, read directly (V0.6.19).
     pub async fn memory_revision(&self, card_id: &str, revision: i64) -> Result<StoredMemoryRevision> {
-        self.memory_revisions(card_id)
-            .await?
-            .into_iter()
-            .find(|candidate| candidate.revision == revision)
-            .ok_or_else(|| repomemo_domain::not_found!("That revision was not found."))
+        sqlx::query(&format!(
+            "{REVISION_SELECT} WHERE revision.card_id = ?1 AND revision.revision = ?2"
+        ))
+        .bind(card_id)
+        .bind(revision)
+        .fetch_optional(self.reader())
+        .await?
+        .as_ref()
+        .map(stored_revision)
+        .ok_or_else(|| repomemo_domain::not_found!("That revision was not found."))
+    }
+
+    /// The card's newest revision, or none for a card that has no revisions, read directly (V0.6.19).
+    pub async fn newest_memory_revision(&self, card_id: &str) -> Result<Option<StoredMemoryRevision>> {
+        Ok(sqlx::query(&format!(
+            "{REVISION_SELECT} WHERE revision.card_id = ?1 ORDER BY revision.revision DESC LIMIT 1"
+        ))
+        .bind(card_id)
+        .fetch_optional(self.reader())
+        .await?
+        .as_ref()
+        .map(stored_revision))
+    }
+
+    /// A page of the card's revisions, newest first: at most `limit` of those numbered below `before` (all of them when
+    /// it is none), the number to pass as `before` for the next page, and how many revisions the card has (V0.6.19).
+    pub async fn memory_revisions_page(
+        &self,
+        card_id: &str,
+        before: Option<i64>,
+        limit: i64,
+    ) -> Result<(Vec<StoredMemoryRevision>, Option<i64>, i64)> {
+        let limit = limit.clamp(1, MAX_REVISION_PAGE);
+        let rows = sqlx::query(&format!(
+            "{REVISION_SELECT} WHERE revision.card_id = ?1 AND (?2 IS NULL OR revision.revision < ?2) ORDER BY revision.revision DESC LIMIT ?3"
+        ))
+        .bind(card_id)
+        .bind(before)
+        .bind(limit + 1)
+        .fetch_all(self.reader())
+        .await?;
+        let mut items: Vec<StoredMemoryRevision> = rows.iter().map(stored_revision).collect();
+        let next = (items.len() as i64 > limit).then(|| {
+            items.truncate(limit as usize);
+            items.last().map_or(0, |last| last.revision)
+        });
+        let total = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM memory_card_revisions WHERE card_id = ?1")
+            .bind(card_id)
+            .fetch_one(self.reader())
+            .await?;
+        Ok((items, next, total))
     }
 
     /// Makes an earlier revision the card's current content as a new revision. History is never rewritten. A cited
@@ -277,7 +328,7 @@ impl StorageEngine {
     /// Citations of the card's newest revision whose passage or file no longer exists, as that revision kept them
     /// (title and path as they were). Used to explain a "missing" review reason when the old text is not available.
     pub async fn missing_cited_targets(&self, card_id: &str) -> Result<Vec<RevisionCitation>> {
-        let Some(newest) = self.memory_revisions(card_id).await?.into_iter().next() else {
+        let Some(newest) = self.newest_memory_revision(card_id).await? else {
             return Ok(Vec::new());
         };
         let mut missing = Vec::new();

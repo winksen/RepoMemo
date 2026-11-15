@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.19 (2026-11-17)
+
+Read one revision directly, page a card's history and state how long it is kept.
+
+### Changed
+- **Opening or approving a card no longer reads its whole history.** One revision (`memory_revision`), the newest one (`newest_memory_revision`, used by the approval status, the card export and the missing-citations check) and a page of revisions are each a query of their own instead of loading every revision and picking from it.
+- **The revision list is paged.** `GET /v1/memory-cards/{id}/revisions` returns the newest 50 by default (`?limit=`, at most 200); `?before=<revision number>` continues below it, `X-Next-Cursor` gives the next position and `X-Total-Count` the number of revisions. The history panel shows "50 of 230 revisions" with *Show earlier revisions*. The workspace archive still reads a whole history, which is what an archive is.
+- **Retention is stated:** revisions are never trimmed; they are kept as long as the card exists, and a deleted card's history stays in the trash for 30 days (V0.6.15). The user guide and the API guide say so.
+- No migration or setting changes.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (five revisions read in pages of two, headers, no limit, a single revision, an unknown revision and the approval status) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- No migration or access change. A script that read the revision list now gets the newest 50 and follows `X-Next-Cursor` for the rest.
+
 ## V0.6.18 (2026-11-17)
 
 Make the upload version check part of its write and name the unchecked mode in the API guide.
