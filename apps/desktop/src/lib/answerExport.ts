@@ -4,6 +4,8 @@ export interface ExportCitationSource {
   sourceId: string;
   reviewStatus: string;
   headingPath: string | null;
+  /** The hash of the file's content when the answer is exported, so a later change to the file is detectable. */
+  contentHash: string;
 }
 
 export async function answerExportMarkdown(
@@ -20,7 +22,7 @@ export async function answerExportMarkdown(
         ? source.headingPath ? `section ${source.headingPath}` : "whole artifact"
         : citation.end_line !== null && citation.end_line !== citation.start_line
           ? `lines ${citation.start_line}-${citation.end_line}` : `line ${citation.start_line}`;
-      lines.push(`${index + 1}. [${citation.title}](${citation.path}) — artifact \`${citation.artifact_id}\`; source \`${source.sourceId}\`; ${location}; review: ${source.reviewStatus}`);
+      lines.push(`${index + 1}. [${citation.title}](${citation.path}) — artifact \`${citation.artifact_id}\`; source \`${source.sourceId}\`; ${location}; review: ${source.reviewStatus}; content \`${source.contentHash.slice(0, 12)}\` when exported`);
     } catch {
       lines.push(`${index + 1}. MISSING SOURCE — artifact \`${citation.artifact_id}\`${citation.chunk_id ? `, chunk \`${citation.chunk_id}\`` : ""}; source is unavailable or access was revoked.`);
     }

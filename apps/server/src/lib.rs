@@ -1113,6 +1113,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/memory-cards/{card_id}/changes", get(memory_history::card_changes))
         .route(
+            "/v1/memory-cards/{card_id}/revisions/{revision}/source",
+            get(memory_history::cited_source),
+        )
+        .route(
             "/v1/memory-cards/{card_id}/revisions",
             get(memory_history::list_revisions),
         )

@@ -1628,6 +1628,18 @@ export interface MemoryRevisionCitation {
   title: string;
   path: string;
   confidence: number | null;
+  /** The cited file, when the revision recorded it (V0.6.10). */
+  artifact_id: string | null;
+  /** The hash of the file's content when the revision was saved. */
+  content_hash: string | null;
+  /**
+   * Where the cited file stands now, so a historical citation never reads as current by default: `current` (same
+   * content), `changed` (the file was updated since), `gone` (the file no longer exists) or `unbound` (the revision
+   * predates content binding).
+   */
+  currency: string;
+  /** True when the cited passage or file was already gone when the revision was saved. */
+  missing_at_save: boolean;
 }
 
 /**
@@ -1666,6 +1678,21 @@ export interface MemoryRestoreResult {
   card: MemoryCard;
   revision: number;
   skipped_citations: MemoryRevisionCitation[];
+}
+
+/** The text a revision's citation pointed at, or the exact reason it cannot be shown (V0.6.10). */
+export interface CitedSource {
+  /**
+   * `current` (the file is as cited), `kept_version` (the file changed; the cited version is kept), `unavailable`
+   * (the file changed and the cited text was not kept), `gone` (the file no longer exists) or `unbound` (the
+   * revision predates content binding).
+   */
+  state: string;
+  title: string;
+  content_hash: string | null;
+  text: string | null;
+  truncated: boolean;
+  note: string;
 }
 
 /** One reason a card needs review, explained with the evidence change behind it (V0.6.9). */

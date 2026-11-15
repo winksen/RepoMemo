@@ -1923,6 +1923,20 @@ pub struct MemoryRevisionCitation {
     pub title: String,
     pub path: String,
     pub confidence: Option<f64>,
+    /// The cited file, when the revision recorded it (V0.6.10).
+    #[serde(default)]
+    pub artifact_id: Option<String>,
+    /// The hash of the file's content when the revision was saved.
+    #[serde(default)]
+    pub content_hash: Option<String>,
+    /// Where the cited file stands now, so a historical citation never reads as current by default: `current` (same
+    /// content), `changed` (the file was updated since), `gone` (the file no longer exists) or `unbound` (the revision
+    /// predates content binding).
+    #[serde(default)]
+    pub currency: String,
+    /// True when the cited passage or file was already gone when the revision was saved.
+    #[serde(default)]
+    pub missing_at_save: bool,
 }
 
 /// One saved version of a memory card: its text and the citations it had, who saved it and when. Revisions are never
@@ -1960,6 +1974,20 @@ pub struct MemoryRestoreResult {
     pub card: MemoryCard,
     pub revision: i64,
     pub skipped_citations: Vec<MemoryRevisionCitation>,
+}
+
+/// The text a revision's citation pointed at, or the exact reason it cannot be shown (V0.6.10).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CitedSource {
+    /// `current` (the file is as cited), `kept_version` (the file changed; the cited version is kept), `unavailable`
+    /// (the file changed and the cited text was not kept), `gone` (the file no longer exists) or `unbound` (the
+    /// revision predates content binding).
+    pub state: String,
+    pub title: String,
+    pub content_hash: Option<String>,
+    pub text: Option<String>,
+    pub truncated: bool,
+    pub note: String,
 }
 
 /// One reason a card needs review, explained with the evidence change behind it (V0.6.9).

@@ -187,6 +187,7 @@ export function RetrievalSection({ page }: { page: WorkspacePage }) {
         return {
           sourceId: artifact.summary.source_id,
           reviewStatus: lifecycle.status,
+          contentHash: artifact.summary.content_hash,
           headingPath: artifact.chunks.find((chunk) => chunk.id === citation.chunk_id)?.heading_path ?? null,
         };
       });

@@ -126,7 +126,7 @@ When you save a memory card that someone else saved after you opened it, RepoMem
 
 ### Memory card history
 
-Every save of a memory card is kept as a numbered revision with who saved it and the citations it had. Open a card and use **Revision history** to see *What changed*, *Compare with current* or *Restore*. A restore adds a new revision, so nothing is lost; a cited source that has since been deleted is named and left out.
+Every save of a memory card is kept as a numbered revision with who saved it and the citations it had. Open a card and use **Revision history** to see *What changed*, *Compare with current* or *Restore*. A restore adds a new revision, so nothing is lost; a cited source that has since been deleted is named and left out. Each revision also remembers what its citations said: history shows whether a cited file is *as cited*, *changed since*, *no longer exists* or has *no recorded content*, and **Sources** then **View cited text** displays the text that revision cited when it is still kept, or says why it cannot be shown. Editing or restoring a card never makes a changed source look current; to confirm a source again after it changed, remove the citation and cite it again.
 
 ### My work
 

@@ -710,13 +710,18 @@ impl RepoMemoCore {
     }
 
     pub async fn export_memory_card(&self, card_id: String) -> Result<String> {
-        let detail = self.get_memory_card(card_id).await?;
+        let detail = self.get_memory_card(card_id.clone()).await?;
+        // What each citation pointed at when the newest revision was saved, so the export cannot read as current
+        // after a source changed (V0.6.10).
+        let revisions = self.storage.memory_revisions(&card_id).await?;
+        let newest = revisions.first();
         let mut markdown = format!(
-            "# {}\n\n{}\n\n## Record\n\n- Source: {}\n- Updated: {}\n\n## Evidence\n",
+            "# {}\n\n{}\n\n## Record\n\n- Source: {}\n- Updated: {}\n- Revision: {}\n\n## Evidence\n",
             detail.card.title,
             detail.card.body_markdown.trim(),
             detail.card.source,
             detail.card.updated_at,
+            newest.map_or_else(|| "not recorded".to_owned(), |found| found.revision.to_string()),
         );
         if detail.evidence.is_empty() {
             markdown.push_str("\n_No linked evidence._\n");
@@ -731,14 +736,46 @@ impl RepoMemoCore {
                             .map(|heading| format!("section {heading}"))
                             .unwrap_or_else(|| "whole artifact".to_owned()),
                     };
+                    let artifact = evidence
+                        .artifact_id
+                        .clone()
+                        .unwrap_or_else(|| evidence.target_id.clone());
+                    let recorded = newest.and_then(|found| {
+                        found
+                            .citations
+                            .iter()
+                            .find(|citation| citation.target_id == evidence.target_id)
+                            .map(|citation| citation.content_hash.clone())
+                    });
+                    let now = self
+                        .storage
+                        .get_artifact_summary(&artifact)
+                        .await
+                        .ok()
+                        .map(|summary| summary.content_hash);
+                    let short = |hash: &str| hash[..hash.len().min(12)].to_owned();
+                    let binding = match (recorded.as_deref(), now.as_deref()) {
+                        (Some(recorded), Some(now)) if !recorded.is_empty() && recorded == now => {
+                            format!("content `{}` as cited", short(recorded))
+                        }
+                        (Some(recorded), Some(now)) if !recorded.is_empty() => {
+                            format!(
+                                "SOURCE CHANGED since cited: cited content `{}`, now `{}`",
+                                short(recorded),
+                                short(now)
+                            )
+                        }
+                        _ => "cited content not recorded".to_owned(),
+                    };
                     markdown.push_str(&format!(
-                        "\n- [{}]({}) — artifact `{}`; source `{}`; {}; review: {}\n",
+                        "\n- [{}]({}) — artifact `{}`; source `{}`; {}; review: {}; {}\n",
                         evidence.title.unwrap_or_else(|| "Untitled evidence".to_owned()),
                         evidence.path.unwrap_or_else(|| evidence.target_id.clone()),
-                        evidence.artifact_id.unwrap_or_else(|| evidence.target_id.clone()),
+                        artifact,
                         evidence.source_id.unwrap_or_else(|| "unavailable".to_owned()),
                         location,
                         evidence.review_status.unwrap_or_else(|| "active".to_owned()),
+                        binding,
                     ));
                 } else {
                     markdown.push_str(&format!(

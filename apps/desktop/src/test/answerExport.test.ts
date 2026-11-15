@@ -10,8 +10,8 @@ const answer: AskAnswer = {
 
 describe("answer export", () => {
   it("records a resolvable source and review state", async () => {
-    const markdown = await answerExportMarkdown("Question?", answer, async () => ({ sourceId: "source-1", headingPath: "Overview", reviewStatus: "verified" }));
-    expect(markdown).toContain("artifact `artifact-1`; source `source-1`; lines 3-5; review: verified");
+    const markdown = await answerExportMarkdown("Question?", answer, async () => ({ sourceId: "source-1", headingPath: "Overview", reviewStatus: "verified", contentHash: "0123456789abcdef0123" }));
+    expect(markdown).toContain("artifact `artifact-1`; source `source-1`; lines 3-5; review: verified; content `0123456789ab` when exported");
   });
 
   it("marks a missing or inaccessible source explicitly", async () => {

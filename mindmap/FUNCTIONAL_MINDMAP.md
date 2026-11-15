@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.9` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.10` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.10 — Bind a memory card's citations to the content they cited, so history never reads as current by default.
+
+- Each revision of a memory card remembers what its citations said. History tells you whether a cited file is as cited, has changed, is gone or was never recorded, and shows the text that was cited when it is still kept. Editing or restoring a card never makes a changed source look current, and exports say which content they cited.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.9 — Show what changed behind a memory card's "needs review" flag.
 

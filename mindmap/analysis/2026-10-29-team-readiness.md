@@ -2,6 +2,7 @@
 
 > **Review date:** 2026-10-29 · **Baseline:** V0.4.104, commit `e46f682` · **Method:** repository and workflow inspection, plus primary-source competitor research. This is a product assessment, not a live usability test, security certification or measured capacity claim. No application, build or test suite was started for this review.
 > **Delivery plan:** [Roadmap: proposed path to 1.0](../ROADMAP.md#proposed-path-to-10-team-readiness) · [0.5](../RELEASES_0.5.md) · [0.6](../RELEASES_0.6.md) · [0.7](../RELEASES_0.7.md) · [0.8](../RELEASES_0.8.md) · [0.9](../RELEASES_0.9.md).
+> **Renumbered:** the release numbers below are those of the review date. Unshipped rows from V0.6.11 and V0.8.15 moved on 2026-11-04: see the [gap audit](../ROADMAP.md#gap-audit-of-2026-11-04).
 
 ## Verdict and product promise
 

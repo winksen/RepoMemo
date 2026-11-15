@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconHistory as History, IconLoader2 as Loader } from "@tabler/icons-react";
-import { compareSharedMemoryRevisions, listSharedMemoryRevisions, restoreSharedMemoryRevision } from "../lib/sharedApi";
-import type { MemoryRevision, MemoryRevisionComparison } from "../types";
+import { compareSharedMemoryRevisions, getSharedCitedSource, listSharedMemoryRevisions, restoreSharedMemoryRevision, SharedApiError } from "../lib/sharedApi";
+import type { CitedSource, MemoryRevision, MemoryRevisionComparison } from "../types";
 import { apiMessage } from "../web/format";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
@@ -9,6 +9,14 @@ import { Dialog, DialogCancel } from "./ui/dialog";
 import { useConfirm } from "./ui/confirm-dialog";
 import { showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
+
+/** How a historical citation stands against the file as it is now. A citation is never shown as current unless it is. */
+const CURRENCY: Record<string, string> = {
+  current: "the file is as cited",
+  changed: "the file has changed since",
+  gone: "the file no longer exists",
+  unbound: "content at the time not recorded",
+};
 
 function when(value: string) {
   const date = new Date(value);
@@ -24,7 +32,19 @@ export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, 
   const [revisions, setRevisions] = useState<MemoryRevision[] | null>(null);
   const [comparison, setComparison] = useState<MemoryRevisionComparison | "loading" | null>(null);
   const [restoring, setRestoring] = useState<number | null>(null);
+  const [inspecting, setInspecting] = useState<MemoryRevision | null>(null);
+  const [source, setSource] = useState<CitedSource | { error: string } | "loading" | null>(null);
   const confirm = useConfirm();
+
+  async function viewSource(revision: number, index: number) {
+    setSource("loading");
+    try {
+      setSource(await getSharedCitedSource(accessToken, cardId, revision, index));
+    } catch (error) {
+      // A refusal is not the same as a source that is gone: say which it was.
+      setSource({ error: error instanceof SharedApiError && (error.status === 403 || error.status === 404) ? "You no longer have access to this card, so its sources cannot be shown." : apiMessage(error, "The cited text could not be read.") });
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +96,17 @@ export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, 
         {!comparison.citations_added.length && !comparison.citations_removed.length ? <p className="shared-muted-copy">The citations are the same.</p> : null}
       </>}
     </Dialog> : null}
+    {inspecting ? <Dialog size="lg" description={`What revision ${inspecting.revision} cited, against the files as they are now`} footer={<DialogCancel label="Close" onClick={() => { setInspecting(null); setSource(null); }} />} onClose={() => { setInspecting(null); setSource(null); }} open title={`Sources of revision ${inspecting.revision}`}>
+      {inspecting.citations.length ? <ul className="shared-version-list">
+        {inspecting.citations.map((citation, index) => <li key={`${citation.target_id}-${index}`}>
+          <div><strong>{citation.title || citation.path || "A cited source"}</strong><small>{CURRENCY[citation.currency] ?? "state unknown"}{citation.content_hash ? ` · content ${citation.content_hash.slice(0, 12)}` : ""}</small></div>
+          <div className="shared-version-actions"><Button onClick={() => void viewSource(inspecting.revision, index)} type="button" variant="secondary">View cited text</Button></div>
+        </li>)}
+      </ul> : <p className="shared-muted-copy">This revision cited nothing.</p>}
+      {source === "loading" ? <p className="shared-muted-copy"><Loader className="spin" size={ICON_SIZE.sm} /> Loading…</p> : null}
+      {source && source !== "loading" && "error" in source ? <p role="alert">{source.error}</p> : null}
+      {source && source !== "loading" && "state" in source ? <div><p><strong>{source.title}</strong> · {source.state.replace("_", " ")}</p><p className="shared-muted-copy">{source.note}</p>{source.text ? <pre className="shared-version-text">{source.text}</pre> : null}{source.truncated ? <p className="shared-muted-copy">Only the start is shown.</p> : null}</div> : null}
+    </Dialog> : null}
     <PanelHeading description={<>{revisions.length} revisions</>} icon={History} title="Revision history" />
     <ul className="shared-version-list">
       {revisions.map((revision) => <li key={revision.revision}>
@@ -84,6 +115,7 @@ export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, 
           <small>{revision.author ? `Saved by ${revision.author.display_name} · ` : "Author not recorded · "}{when(revision.created_at)} · {revision.citations.length} {revision.citations.length === 1 ? "citation" : "citations"}</small>
         </div>
         <div className="shared-version-actions">
+          {revision.citations.length ? <Button onClick={() => { setSource(null); setInspecting(revision); }} type="button" variant="secondary">Sources</Button> : null}
           {revision.revision > 1 ? <Button onClick={() => void compare(revision.revision - 1, revision.revision)} type="button" variant="secondary">What changed</Button> : null}
           {revision.revision !== current.revision ? <Button onClick={() => void compare(revision.revision, current.revision)} type="button" variant="secondary">Compare with current</Button> : null}
           {canWrite && revision.revision !== current.revision ? <Button aria-label={`Restore revision ${revision.revision}`} busy={restoring === revision.revision} disabled={restoring !== null} onClick={() => void restore(revision.revision)} type="button" variant="secondary">Restore</Button> : null}

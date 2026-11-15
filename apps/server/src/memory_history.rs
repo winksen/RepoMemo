@@ -6,7 +6,8 @@ use axum::{
     Json,
 };
 use repomemo_domain::{
-    MemoryChange, MemoryChanges, MemoryRestoreResult, MemoryRevision, MemoryRevisionCitation, MemoryRevisionComparison,
+    CitedSource, MemoryChange, MemoryChanges, MemoryRestoreResult, MemoryRevision, MemoryRevisionCitation,
+    MemoryRevisionComparison,
 };
 use repomemo_storage::{RevisionCitation, StoredMemoryRevision};
 use serde::Deserialize;
@@ -23,7 +24,56 @@ fn citation(stored: &RevisionCitation) -> MemoryRevisionCitation {
         title: stored.title.clone(),
         path: stored.path.clone(),
         confidence: stored.confidence,
+        artifact_id: Some(stored.artifact_id.clone()).filter(|id| !id.is_empty()),
+        content_hash: Some(stored.content_hash.clone()).filter(|hash| !hash.is_empty()),
+        currency: String::new(),
+        missing_at_save: stored.missing_at_save,
     }
+}
+
+/// The content hash a file has now: `None` when the file no longer exists, an error when that could not be read, so a
+/// database failure is never reported as a missing source.
+async fn current_hash(state: &AppState, artifact_id: &str) -> Result<Option<String>, ApiError> {
+    match state.storage.get_artifact_summary(artifact_id).await {
+        Ok(summary) => Ok(Some(summary.content_hash)),
+        Err(error) => match repomemo_domain::classify(&error) {
+            Some((repomemo_domain::ErrorKind::NotFound, _)) => Ok(None),
+            _ => Err(map_storage_error(error)),
+        },
+    }
+}
+
+/// Says where each cited file stands now against the content the revision recorded.
+async fn with_currency(state: &AppState, revisions: &mut [MemoryRevision]) -> Result<(), ApiError> {
+    let mut hashes: std::collections::HashMap<String, Option<String>> = std::collections::HashMap::new();
+    for revision in revisions.iter() {
+        for citation in &revision.citations {
+            if let Some(id) = &citation.artifact_id {
+                if !hashes.contains_key(id) {
+                    hashes.insert(id.clone(), current_hash(state, id).await?);
+                }
+            }
+        }
+    }
+    for revision in revisions.iter_mut() {
+        for citation in &mut revision.citations {
+            citation.currency = match (&citation.artifact_id, &citation.content_hash) {
+                _ if citation.missing_at_save => "gone",
+                (Some(id), Some(recorded)) => match hashes.get(id).and_then(|now| now.as_ref()) {
+                    None => "gone",
+                    Some(now) if now == recorded => "current",
+                    Some(_) => "changed",
+                },
+                (Some(id), None) => match hashes.get(id).and_then(|now| now.as_ref()) {
+                    None => "gone",
+                    Some(_) => "unbound",
+                },
+                _ => "unbound",
+            }
+            .to_owned();
+        }
+    }
+    Ok(())
 }
 
 fn revision(stored: StoredMemoryRevision) -> MemoryRevision {
@@ -73,7 +123,9 @@ pub(crate) async fn list_revisions(
         .memory_revisions(&card_id)
         .await
         .map_err(map_storage_error)?;
-    Ok(Json(revisions.into_iter().map(revision).collect()))
+    let mut revisions: Vec<MemoryRevision> = revisions.into_iter().map(revision).collect();
+    with_currency(&state, &mut revisions).await?;
+    Ok(Json(revisions))
 }
 
 #[derive(Debug, Deserialize)]
@@ -261,4 +313,95 @@ pub(crate) async fn card_changes(
         revision: detail.revision,
         changes,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SourceQuery {
+    index: usize,
+}
+
+/// The text a revision's citation pointed at (V0.6.10): the file as cited when it is unchanged or an earlier version with
+/// the recorded content is kept, otherwise the exact reason it cannot be shown. A person without access to the workspace
+/// is refused before any of this is read.
+pub(crate) async fn cited_source(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((card_id, number)): Path<(String, i64)>,
+    Query(query): Query<SourceQuery>,
+) -> Result<Json<CitedSource>, ApiError> {
+    card_workspace(&state, &subject, &card_id, false).await?;
+    let stored = state
+        .storage
+        .memory_revision(&card_id, number)
+        .await
+        .map_err(map_storage_error)?;
+    let citation = stored
+        .citations
+        .get(query.index)
+        .ok_or_else(|| ApiError::not_found("That citation was not found in this revision."))?;
+    let source = |state: &str, text: Option<String>, truncated: bool, note: &str| CitedSource {
+        state: state.to_owned(),
+        title: citation.title.clone(),
+        content_hash: Some(citation.content_hash.clone()).filter(|hash| !hash.is_empty()),
+        text,
+        truncated,
+        note: note.to_owned(),
+    };
+    if citation.missing_at_save {
+        return Ok(Json(source(
+            "gone",
+            None,
+            false,
+            "The cited passage or file was already gone when this revision was saved, so there was nothing to record.",
+        )));
+    }
+    if citation.artifact_id.is_empty() || citation.content_hash.is_empty() {
+        return Ok(Json(source(
+            "unbound",
+            None,
+            false,
+            "This revision was saved before citations recorded the content they pointed at, so what the source said then is not known.",
+        )));
+    }
+    let Some(current_hash) = current_hash(&state, &citation.artifact_id).await? else {
+        return Ok(Json(source(
+            "gone",
+            None,
+            false,
+            "The cited file no longer exists, and the text it had is not kept.",
+        )));
+    };
+    let versions = state
+        .storage
+        .list_artifact_versions(&citation.artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    let Some(found) = versions
+        .iter()
+        .find(|version| version.content_hash == citation.content_hash)
+    else {
+        return Ok(Json(source(
+            "unavailable",
+            None,
+            false,
+            "The file changed after this revision was saved and the text it had then was not kept (repository files follow their commits).",
+        )));
+    };
+    let text = state
+        .core
+        .artifact_version_text(&citation.artifact_id, found.version)
+        .await
+        .map_err(map_core_error)?;
+    let state_name = if current_hash == citation.content_hash {
+        "current"
+    } else {
+        "kept_version"
+    };
+    let note = if state_name == "current" {
+        "The file is as it was when this revision was saved."
+    } else {
+        "The file has changed since; this is the version this revision cited."
+    };
+    let note = text.note.clone().unwrap_or_else(|| note.to_owned());
+    Ok(Json(source(state_name, text.text, text.truncated, &note)))
 }

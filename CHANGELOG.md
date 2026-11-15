@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.10 (2026-11-17)
+
+Bind a memory card's citations to the content they cited, so history never reads as current by default.
+
+### Added
+- A saved revision records, for each citation, the file and the hash of its content. **Revision history** says for each one whether the file is *as cited*, *changed since*, *no longer exists* or has *no recorded content* (revisions from before this release), and the new `GET /v1/memory-cards/{id}/revisions/{n}/source?index=` returns the text that revision cited when it is still kept, or the exact reason it cannot be shown (the file changed and repository files follow their commits, the file is gone, or nothing was recorded).
+- A citation keeps its first recorded content: a title or text edit that leaves it alone, and a restore, carry the record forward instead of replacing it with the file as it is now. Only a citation new to the card records the file at the save. To re-confirm a citation after a source changed, remove it and cite it again.
+- A passage that was already gone when a revision was saved is reported as gone, not as a revision that predates the feature, and a database error while checking a source is an error, not a missing file.
+- The Markdown export of a card names its revision and, per citation, the content it cited and whether the source changed since. An exported Ask answer names each source's content when it was exported.
+- No migration: the record is stored with each revision's citations.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (current, changed, kept text, title edit, restore, gone, out of range, outsider) and an updated export test were written and compile; they were not executed. Nothing was built or run.
+
+### Upgrading
+- No migration or access change. Revisions saved before this release keep showing *no recorded content* for their citations.
+
 ## V0.6.9 (2026-11-01)
 
 Show what changed behind a memory card's "needs review" flag.

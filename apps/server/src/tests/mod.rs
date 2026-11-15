@@ -13,6 +13,7 @@ mod ai;
 mod archive_history;
 mod auth;
 mod card_changes;
+mod citation_durability;
 mod code_owners;
 mod compression;
 mod connectors;

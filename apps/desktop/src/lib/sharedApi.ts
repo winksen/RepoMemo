@@ -2166,3 +2166,8 @@ export function setSharedApprovalPolicy(accessToken: string, workspaceId: string
 export function getSharedMemoryChanges(accessToken: string, cardId: string): Promise<import("../types").MemoryChanges> {
   return request<import("../types").MemoryChanges>(`/v1/memory-cards/${cardId}/changes`, {}, accessToken);
 }
+
+/** The text a revision's citation pointed at, or the exact reason it cannot be shown (V0.6.10). */
+export function getSharedCitedSource(accessToken: string, cardId: string, revision: number, index: number): Promise<import("../types").CitedSource> {
+  return request<import("../types").CitedSource>(`/v1/memory-cards/${cardId}/revisions/${revision}/source?index=${index}`, {}, accessToken);
+}

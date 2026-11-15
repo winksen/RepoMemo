@@ -40,7 +40,7 @@ impl StorageEngine {
         }
         {
             let mut connection = self.pool.acquire().await?;
-            crate::memory_revisions::snapshot_memory_card(&mut connection, &id, None).await?;
+            crate::memory_revisions::snapshot_memory_card(&mut connection, &id, None, None).await?;
         }
 
         self.get_memory_card(&id).await.map(|detail| detail.card)
@@ -106,7 +106,7 @@ impl StorageEngine {
             .fetch_one(&mut *tx)
             .await?;
         if kept == 0 {
-            crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None).await?;
+            crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None, None).await?;
         }
         let changed = sqlx::query(
             r#"
@@ -137,7 +137,7 @@ impl StorageEngine {
                 insert_citation_link(&mut *tx, workspace_id, card_id, citation, &now).await?;
             }
         }
-        crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None).await?;
+        crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None, None).await?;
         tx.commit().await?;
         self.get_memory_card(card_id).await.map(|detail| detail.card)
     }

@@ -248,6 +248,7 @@
 | GET | `/v1/workspaces/{workspace_id}/approval-policy` | auth | require_workspace_read | — | Policy |
 | PUT | `/v1/workspaces/{workspace_id}/approval-policy` | auth | require_workspace_admin | Policy | Policy |
 | GET | `/v1/memory-cards/{card_id}/changes` | auth | — | — | MemoryChanges |
+| GET | `/v1/memory-cards/{card_id}/revisions/{revision}/source` | auth | — | — | CitedSource |
 | GET | `/v1/memory-cards/{card_id}/revisions` | auth | — | — | Vec<MemoryRevision |
 | GET | `/v1/memory-cards/{card_id}/revisions/compare` | auth | — | — | MemoryRevisionComparison |
 | POST | `/v1/memory-cards/{card_id}/revisions/{revision}/restore` | auth | — | — | MemoryRestoreResult |

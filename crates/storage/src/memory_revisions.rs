@@ -13,6 +13,15 @@ pub struct RevisionCitation {
     pub metadata: String,
     pub title: String,
     pub path: String,
+    /// The cited file and the hash of its content when the revision was saved (V0.6.10); empty for a revision that
+    /// predates the binding.
+    #[serde(default)]
+    pub artifact_id: String,
+    #[serde(default)]
+    pub content_hash: String,
+    /// True when the cited passage or file was already gone at the moment of the save, so there was nothing to record.
+    #[serde(default)]
+    pub missing_at_save: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -42,10 +51,16 @@ pub struct MemoryRestore {
 
 /// Writes the card as it is now as the next revision. Called inside the transaction that changed the card, so a
 /// revision and the state it describes cannot disagree.
+///
+/// A citation keeps the content it first recorded (V0.6.10): a save that leaves a citation alone, or a restore of an
+/// earlier revision, carries that record forward instead of replacing it with whatever the file is now. Only a
+/// citation that is new to the card records the file as it is at the save. `recorded` names the citations to carry
+/// from (a restore passes the revision it restores); otherwise the card's newest earlier revision is used.
 pub(crate) async fn snapshot_memory_card(
     connection: &mut sqlx::SqliteConnection,
     card_id: &str,
     restored_from: Option<i64>,
+    recorded: Option<&[RevisionCitation]>,
 ) -> Result<i64> {
     let row =
         sqlx::query("SELECT workspace_id, title, body_markdown, source, confidence FROM memory_cards WHERE id = ?1")
@@ -55,7 +70,8 @@ pub(crate) async fn snapshot_memory_card(
     let links = sqlx::query(
         r#"
         SELECT link.to_type, link.to_id, link.confidence, link.metadata_json,
-               COALESCE(artifact.title, '') AS title, COALESCE(artifact.path, '') AS path
+               COALESCE(artifact.title, '') AS title, COALESCE(artifact.path, '') AS path,
+               COALESCE(artifact.id, '') AS artifact_id, COALESCE(artifact.content_hash, '') AS content_hash
         FROM links AS link
         LEFT JOIN chunks AS chunk ON link.to_type = 'chunk' AND chunk.id = link.to_id
         LEFT JOIN artifacts AS artifact ON artifact.id = CASE WHEN link.to_type = 'artifact' THEN link.to_id ELSE chunk.artifact_id END
@@ -66,15 +82,38 @@ pub(crate) async fn snapshot_memory_card(
     .bind(card_id)
     .fetch_all(&mut *connection)
     .await?;
+    let earlier: Vec<RevisionCitation> = match recorded {
+        Some(citations) => citations.to_vec(),
+        None => sqlx::query_scalar::<_, String>(
+            "SELECT citations_json FROM memory_card_revisions WHERE card_id = ?1 ORDER BY revision DESC LIMIT 1",
+        )
+        .bind(card_id)
+        .fetch_optional(&mut *connection)
+        .await?
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .unwrap_or_default(),
+    };
     let citations: Vec<RevisionCitation> = links
         .iter()
-        .map(|link| RevisionCitation {
-            target_type: link.get("to_type"),
-            target_id: link.get("to_id"),
-            confidence: link.get("confidence"),
-            metadata: link.get("metadata_json"),
-            title: link.get("title"),
-            path: link.get("path"),
+        .map(|link| {
+            let target_id: String = link.get("to_id");
+            let artifact_id: String = link.get("artifact_id");
+            let carried = earlier.iter().find(|citation| citation.target_id == target_id);
+            let content_hash = match carried {
+                Some(found) => found.content_hash.clone(),
+                None => link.get("content_hash"),
+            };
+            RevisionCitation {
+                target_type: link.get("to_type"),
+                missing_at_save: artifact_id.is_empty(),
+                target_id,
+                confidence: link.get("confidence"),
+                metadata: link.get("metadata_json"),
+                title: link.get("title"),
+                path: link.get("path"),
+                artifact_id,
+                content_hash,
+            }
         })
         .collect();
     let next = sqlx::query_scalar::<_, i64>(
@@ -200,7 +239,7 @@ impl StorageEngine {
             .execute(&mut *tx)
             .await?;
         }
-        let created = snapshot_memory_card(&mut tx, card_id, Some(revision)).await?;
+        let created = snapshot_memory_card(&mut tx, card_id, Some(revision), Some(&earlier.citations)).await?;
         tx.commit().await?;
         let card = self.get_memory_card(card_id).await?.card;
         Ok(MemoryRestore {
