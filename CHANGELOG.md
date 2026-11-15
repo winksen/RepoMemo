@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.14 (2026-11-17)
+
+Carry memory card revisions, citation records, approvals and review in workspace archives (format 3).
+
+### Added
+- **Archive format 3.** An export now holds each memory card's saved revisions (text, citations, dates and author as a name), the content each citation recorded, every approval decision, and the card's reviewer and next review date. The workspace's *require independent review* setting travels in its settings. The manifest counts revisions, approvals and reviews. Format 1 and 2 archives still import, and a card without revisions gets its present state as revision 1.
+- **After an import** the card's history reads as it did, with the same numbers, dates and recorded content, so a citation is judged against what it cited. Authors are shown by the name they had (no account is created or matched). If an archive's newest revision differs from the card, the card's state is added as one more revision.
+- **Approvals come back as an imported record**, shown beside the card's own decisions as *Approved elsewhere*. They never approve the card, never count as the person's decision here, and never satisfy or block independent review. The import report says how many came back this way.
+- **Identities are rechecked.** A reviewer is kept only if the same address belongs to a person who can edit in the new workspace; otherwise the name is kept as a reviewer who has left, and an administrator assigns someone. Anyone named is credited by name only.
+- A citation of a passage in an earlier revision comes back as the file it was in (the passage's identity is not recoverable for history); the import report warns of it.
+- Migration `0060_knowledge_archives`: an author label and an import-baseline flag on revisions, and a table for imported approval records.
+
+### Checks
+- Version, migration lock (60 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (export, import, history, recorded content, approval as a record, independent-review setting, review date) was written and compiles; it was not executed, and neither was the migration. Two existing tests now expect format 3. Nothing was built or run.
+
+### Upgrading
+- One additive migration. An archive written by this version needs this version or later to be imported; older servers refuse format 3 with the usual message.
+
 ## V0.6.13 (2026-11-17)
 
 Record what the test checkpoint covers and leave the run to the maintainer.

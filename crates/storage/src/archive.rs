@@ -6,15 +6,19 @@
 //! ones). Nothing is written.
 
 use repomemo_domain::{
-    ArchiveArtifact, ArchiveChecklistItem, ArchiveChunkRef, ArchiveCitation, ArchiveComment, ArchiveFolder,
-    ArchiveLifecycle, ArchiveLifecycleEvent, ArchiveMemoryCard, ArchivePerson, ArchiveSavedSearch, ArchiveSource,
-    ArchiveTask, ArchiveVersion, ArchiveWorkspace, SharedUser, WorkspaceArchiveData,
+    ArchiveApproval, ArchiveArtifact, ArchiveChecklistItem, ArchiveChunkRef, ArchiveCitation, ArchiveComment,
+    ArchiveFolder, ArchiveLifecycle, ArchiveLifecycleEvent, ArchiveMemoryCard, ArchivePerson, ArchiveReview,
+    ArchiveRevision, ArchiveRevisionCitation, ArchiveSavedSearch, ArchiveSource, ArchiveTask, ArchiveVersion,
+    ArchiveWorkspace, SharedUser, WorkspaceArchiveData,
 };
 
 use super::*;
 
 /// The address an anonymized account was given; it is not an address worth carrying.
 const ANONYMIZED_ADDRESS_SUFFIX: &str = "@anonymized.invalid";
+
+/// A card's revisions, approvals and review assignment, as they are exported.
+type CardKnowledge = (Vec<ArchiveRevision>, Vec<ArchiveApproval>, Option<ArchiveReview>);
 
 fn person(name: String, email: Option<String>) -> ArchivePerson {
     let email = email.filter(|email| !email.trim().is_empty() && !email.ends_with(ANONYMIZED_ADDRESS_SUFFIX));
@@ -341,12 +345,90 @@ impl StorageEngine {
             });
         }
 
+        let artifact_ids: HashSet<String> = sqlx::query_scalar("SELECT id FROM artifacts WHERE workspace_id = ?1")
+            .bind(workspace_id)
+            .fetch_all(self.reader())
+            .await?
+            .into_iter()
+            .collect();
+        let mut knowledge: HashMap<String, CardKnowledge> = HashMap::new();
+        for row in &cards {
+            let id: String = row.get("id");
+            let revisions = self
+                .memory_revisions(&id)
+                .await?
+                .into_iter()
+                .rev()
+                .map(|stored| ArchiveRevision {
+                    revision: stored.revision,
+                    title: stored.title,
+                    body_markdown: stored.body_markdown,
+                    source: stored.source,
+                    confidence: stored.confidence,
+                    citations: stored
+                        .citations
+                        .into_iter()
+                        .map(|citation| ArchiveRevisionCitation {
+                            artifact_id: Some(citation.artifact_id)
+                                .filter(|artifact| !artifact.is_empty() && artifact_ids.contains(artifact)),
+                            passage: citation.target_type == "chunk",
+                            title: citation.title,
+                            path: citation.path,
+                            confidence: citation.confidence,
+                            content_hash: Some(citation.content_hash).filter(|hash| !hash.is_empty()),
+                            missing_at_save: citation.missing_at_save,
+                        })
+                        .collect(),
+                    author: stored.author.map(person_from_user).or_else(|| {
+                        stored.author_label.map(|label| ArchivePerson {
+                            name: label,
+                            email: None,
+                        })
+                    }),
+                    created_at: stored.created_at,
+                    restored_from: stored.restored_from,
+                })
+                .collect();
+            let approvals = self
+                .memory_approval_history(&id)
+                .await?
+                .into_iter()
+                .rev()
+                .map(|decision| ArchiveApproval {
+                    revision: decision.revision,
+                    decision: decision.decision,
+                    by: decision.user.map(person_from_user),
+                    note: decision.note,
+                    created_at: decision.created_at,
+                })
+                .collect();
+            let review = self
+                .review_assignment("memory_card", &id)
+                .await?
+                .filter(|found| found.reviewer.is_some() || found.next_review_at.is_some())
+                .map(|found| ArchiveReview {
+                    reviewer: found.reviewer.map(person_from_user).or_else(|| {
+                        found.reviewer_label.map(|label| ArchivePerson {
+                            name: label,
+                            email: None,
+                        })
+                    }),
+                    next_review_at: found.next_review_at,
+                    last_reviewed_at: found.last_reviewed_at,
+                });
+            knowledge.insert(id, (revisions, approvals, review));
+        }
+
         let cards = cards
             .into_iter()
             .map(|row| {
                 let id: String = row.get("id");
+                let (revisions, approvals, review) = knowledge.remove(&id).unwrap_or_default();
                 ArchiveMemoryCard {
                     citations: citations.remove(&id).unwrap_or_default(),
+                    revisions,
+                    approvals,
+                    review,
                     id,
                     title: row.get("title"),
                     body_markdown: row.get("body_markdown"),

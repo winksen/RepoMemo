@@ -354,6 +354,24 @@ impl WorkspaceArchiveData {
                 "{missing_citations} citation(s) name a file that is not in the archive and will be left out."
             ));
         }
+        let approvals: usize = self.memory_cards.iter().map(|card| card.approvals.len()).sum();
+        if approvals > 0 {
+            check.warnings.push(format!(
+                "{approvals} approval decision(s) come back as an imported record. They show who decided what and when, but nothing is approved on this server until someone here approves it."
+            ));
+        }
+        let passages = self
+            .memory_cards
+            .iter()
+            .flat_map(|card| card.revisions.iter())
+            .flat_map(|revision| revision.citations.iter())
+            .filter(|citation| citation.passage)
+            .count();
+        if passages > 0 {
+            check.warnings.push(format!(
+                "{passages} citation(s) of earlier revisions cited a passage; they come back as the file they were in."
+            ));
+        }
         if self.omitted_citations > 0 {
             check.warnings.push(format!(
                 "{} citation(s) were already left out of the archive because what they cited no longer existed.",
@@ -380,6 +398,20 @@ impl WorkspaceArchiveData {
             }
         }
         self.comments.iter().for_each(|comment| add(&comment.author));
+        for card in &self.memory_cards {
+            card.revisions
+                .iter()
+                .filter_map(|revision| revision.author.as_ref())
+                .for_each(&mut add);
+            card.approvals
+                .iter()
+                .filter_map(|found| found.by.as_ref())
+                .for_each(&mut add);
+            card.review
+                .iter()
+                .filter_map(|review| review.reviewer.as_ref())
+                .for_each(&mut add);
+        }
         for entry in &self.lifecycle {
             entry.owner.iter().for_each(&mut add);
             entry.reviewed_by.iter().for_each(&mut add);

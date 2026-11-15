@@ -1064,6 +1064,8 @@ export interface CreateMemoryCardRequest {
   source: string;
   confidence: number | null;
   citations: Citation[];
+  /** Who is saving. Written with the revision in the same transaction (V0.6.11); `None` leaves it unattributed. */
+  author_user_id: string | null;
 }
 
 export interface UpdateMemoryCardRequest {
@@ -1079,6 +1081,8 @@ export interface UpdateMemoryCardRequest {
    * it cannot silently overwrite a later save; `None` writes without the check.
    */
   expected_revision: number | null;
+  /** Who is saving. Written with the revision in the same transaction (V0.6.11); `None` leaves it unattributed. */
+  author_user_id: string | null;
 }
 
 export interface AppSettings {
@@ -1575,6 +1579,20 @@ export interface MemoryApprovalDecision {
   created_at: string;
 }
 
+/**
+ * An approval decision that came with an imported workspace archive (V0.6.14): a record of what was decided on another
+ * server, kept for reading. It never counts as an approval here.
+ */
+export interface ImportedApproval {
+  revision: number;
+  /** `approved` or `withdrawn`, as it was decided elsewhere. */
+  decision: string;
+  /** Who decided, as a name and an address. */
+  person: string;
+  note: string;
+  decided_at: string;
+}
+
 /** Whether the newest revision of a card is approved, who may decide, and the decisions so far. */
 export interface MemoryApprovalStatus {
   /** The newest revision, the one a decision would be about. */
@@ -1589,6 +1607,8 @@ export interface MemoryApprovalStatus {
   cannot_approve_reason: string | null;
   /** Newest first, including decisions about earlier revisions. */
   history: MemoryApprovalDecision[];
+  /** Decisions that arrived with an imported archive; read-only records, never counted as approval (V0.6.14). */
+  imported: ImportedApproval[];
 }
 
 /** Who is accountable for reviewing one item and when it is next due (V0.6.6). */
@@ -1655,6 +1675,8 @@ export interface MemoryRevision {
   citations: MemoryRevisionCitation[];
   /** None for a revision that predates attribution or whose author was removed. */
   author: SharedUser | null;
+  /** The name an imported revision's author had on the server it came from, when there is no account here (V0.6.14). */
+  author_label: string | null;
   created_at: string;
   restored_from: number | null;
 }

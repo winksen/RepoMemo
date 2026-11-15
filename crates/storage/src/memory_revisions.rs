@@ -36,6 +36,8 @@ pub struct StoredMemoryRevision {
     pub confidence: Option<f64>,
     pub citations: Vec<RevisionCitation>,
     pub author: Option<SharedUser>,
+    /// The author's name on the server an imported revision came from (V0.6.14).
+    pub author_label: Option<String>,
     pub created_at: String,
     pub restored_from: Option<i64>,
 }
@@ -153,7 +155,7 @@ impl StorageEngine {
             r#"
             SELECT revision.id, revision.card_id, revision.workspace_id, revision.revision, revision.title,
                    revision.body_markdown, revision.source, revision.confidence, revision.citations_json,
-                   revision.created_at, revision.restored_from,
+                   revision.created_at, revision.restored_from, revision.author_label,
                    users.id AS author_id, users.display_name AS author_name, users.email AS author_email
             FROM memory_card_revisions AS revision
             LEFT JOIN users ON users.id = revision.created_by_user_id
@@ -265,6 +267,7 @@ fn stored_revision(row: &SqliteRow) -> StoredMemoryRevision {
             display_name: row.get("author_name"),
             email: row.get("author_email"),
         }),
+        author_label: row.get("author_label"),
         created_at: row.get("created_at"),
         restored_from: row.get("restored_from"),
     }

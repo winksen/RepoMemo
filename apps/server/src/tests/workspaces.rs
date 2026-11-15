@@ -1782,7 +1782,7 @@ async fn a_workspace_exports_as_an_archive_that_holds_everything_it_has() {
 
     let manifest: Value = serde_json::from_slice(&entries["manifest.json"]).unwrap();
     assert_eq!(manifest["format"], "repomemo-workspace-archive");
-    assert_eq!(manifest["format_version"], 2);
+    assert_eq!(manifest["format_version"], 3);
     let counts = &manifest["counts"];
     assert_eq!(counts["artifacts"], 3);
     assert_eq!(counts["blobs"], 2, "two files share their text, so one stored file");

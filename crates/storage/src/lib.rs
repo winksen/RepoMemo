@@ -52,7 +52,7 @@ mod users;
 mod vectors;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
-pub use approvals::StoredApproval;
+pub use approvals::{StoredApproval, StoredImportedApproval};
 pub use archive_import::{ImportedWorkspace, PendingPassage};
 pub use connectors::{ConnectorItemOutcome, ConnectorItemWrite};
 pub use credentials::{RepoCredentialInfo, RepoSecret, RepoWebhookInfo};

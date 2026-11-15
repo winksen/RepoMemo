@@ -22,6 +22,7 @@ mod cross_search;
 mod edit_conflicts;
 mod evidence;
 mod evidence_tools;
+mod knowledge_archive;
 mod knowledge_fixture;
 mod load;
 mod memory;

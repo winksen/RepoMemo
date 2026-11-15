@@ -12,7 +12,38 @@ pub struct StoredApproval {
     pub created_at: String,
 }
 
+/// A decision that arrived with an imported archive (V0.6.14): a record, never an approval.
+#[derive(Debug, Clone)]
+pub struct StoredImportedApproval {
+    pub revision: i64,
+    pub decision: String,
+    pub person: String,
+    pub note: String,
+    pub decided_at: String,
+}
+
 impl StorageEngine {
+    /// The decisions that came with an imported archive, newest first.
+    pub async fn imported_approvals(&self, card_id: &str) -> Result<Vec<StoredImportedApproval>> {
+        let rows = sqlx::query(
+            r#"SELECT revision, decision, person_label, note, decided_at
+               FROM memory_card_imported_approvals WHERE card_id = ?1 ORDER BY id DESC"#,
+        )
+        .bind(card_id)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|row| StoredImportedApproval {
+                revision: row.get("revision"),
+                decision: row.get("decision"),
+                person: row.get("person_label"),
+                note: row.get("note"),
+                decided_at: row.get("decided_at"),
+            })
+            .collect())
+    }
+
     /// Every decision about the card, newest first.
     pub async fn memory_approval_history(&self, card_id: &str) -> Result<Vec<StoredApproval>> {
         let rows = sqlx::query(

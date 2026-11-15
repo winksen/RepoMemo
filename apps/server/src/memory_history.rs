@@ -85,6 +85,7 @@ fn revision(stored: StoredMemoryRevision) -> MemoryRevision {
         confidence: stored.confidence,
         citations: stored.citations.iter().map(citation).collect(),
         author: stored.author,
+        author_label: stored.author_label,
         created_at: stored.created_at,
         restored_from: stored.restored_from,
     }

@@ -1874,6 +1874,19 @@ pub struct MemoryApprovalDecision {
     pub created_at: String,
 }
 
+/// An approval decision that came with an imported workspace archive (V0.6.14): a record of what was decided on another
+/// server, kept for reading. It never counts as an approval here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportedApproval {
+    pub revision: i64,
+    /// `approved` or `withdrawn`, as it was decided elsewhere.
+    pub decision: String,
+    /// Who decided, as a name and an address.
+    pub person: String,
+    pub note: String,
+    pub decided_at: String,
+}
+
 /// Whether the newest revision of a card is approved, who may decide, and the decisions so far.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryApprovalStatus {
@@ -1889,6 +1902,9 @@ pub struct MemoryApprovalStatus {
     pub cannot_approve_reason: Option<String>,
     /// Newest first, including decisions about earlier revisions.
     pub history: Vec<MemoryApprovalDecision>,
+    /// Decisions that arrived with an imported archive; read-only records, never counted as approval (V0.6.14).
+    #[serde(default)]
+    pub imported: Vec<ImportedApproval>,
 }
 
 /// Who is accountable for reviewing one item and when it is next due (V0.6.6).
@@ -1957,6 +1973,9 @@ pub struct MemoryRevision {
     pub citations: Vec<MemoryRevisionCitation>,
     /// None for a revision that predates attribution or whose author was removed.
     pub author: Option<SharedUser>,
+    /// The name an imported revision's author had on the server it came from, when there is no account here (V0.6.14).
+    #[serde(default)]
+    pub author_label: Option<String>,
     pub created_at: String,
     pub restored_from: Option<i64>,
 }

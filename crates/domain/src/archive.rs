@@ -13,8 +13,9 @@ use serde_json::Value;
 /// The `format` field of a manifest.
 pub const ARCHIVE_FORMAT: &str = "repomemo-workspace-archive";
 /// Bumped when an archive written by a newer server cannot be read by an older one. Version 2 (V0.3.19) adds the
-/// earlier versions of files and the saved searches; a server reads versions 1 and 2.
-pub const ARCHIVE_FORMAT_VERSION: u32 = 2;
+/// earlier versions of files and the saved searches; version 3 (V0.6.14) adds each memory card's revisions, the content
+/// its citations recorded, its approvals and its review assignment. A server reads versions 1, 2 and 3.
+pub const ARCHIVE_FORMAT_VERSION: u32 = 3;
 pub const ARCHIVE_MANIFEST_ENTRY: &str = "manifest.json";
 pub const ARCHIVE_DATA_ENTRY: &str = "workspace.json";
 pub const ARCHIVE_BLOB_PREFIX: &str = "blobs/";
@@ -47,6 +48,15 @@ pub struct ArchiveCounts {
     /// Saved searches (format 2).
     #[serde(default)]
     pub saved_searches: u64,
+    /// Memory card revisions (format 3).
+    #[serde(default)]
+    pub revisions: u64,
+    /// Approval decisions about memory card revisions (format 3).
+    #[serde(default)]
+    pub approvals: u64,
+    /// Review assignments of memory cards (format 3).
+    #[serde(default)]
+    pub reviews: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,6 +156,69 @@ pub struct ArchiveMemoryCard {
     pub updated_at: String,
     pub metadata: Value,
     pub citations: Vec<ArchiveCitation>,
+    /// Every saved revision of the card, oldest first (format 3). Empty in an older archive.
+    #[serde(default)]
+    pub revisions: Vec<ArchiveRevision>,
+    /// Every approval decision, oldest first (format 3).
+    #[serde(default)]
+    pub approvals: Vec<ArchiveApproval>,
+    /// The accountable reviewer and the next review date (format 3).
+    #[serde(default)]
+    pub review: Option<ArchiveReview>,
+}
+
+/// One citation of a saved revision as the archive carries it (format 3): the file, whether it was a passage, and the
+/// content hash the revision recorded for it, so an import shows the same citation meaning.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArchiveRevisionCitation {
+    /// The cited file, named by the archive's own artifact id; none when it was already gone when the revision was saved.
+    pub artifact_id: Option<String>,
+    /// True when the revision cited a passage of the file. An import keeps the file, because the passage's identity is
+    /// not recoverable for a historical revision.
+    #[serde(default)]
+    pub passage: bool,
+    pub title: String,
+    pub path: String,
+    pub confidence: Option<f64>,
+    /// The hash of the file's content when the revision was saved; none when the revision did not record one.
+    #[serde(default)]
+    pub content_hash: Option<String>,
+    #[serde(default)]
+    pub missing_at_save: bool,
+}
+
+/// A saved revision of a memory card (format 3). Its author is a name and an address, as everywhere in an archive.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveRevision {
+    pub revision: i64,
+    pub title: String,
+    pub body_markdown: String,
+    pub source: String,
+    pub confidence: Option<f64>,
+    pub citations: Vec<ArchiveRevisionCitation>,
+    pub author: Option<ArchivePerson>,
+    pub created_at: String,
+    pub restored_from: Option<i64>,
+}
+
+/// A decision about a revision of a memory card (format 3). An import keeps it as a record of what was decided
+/// elsewhere; it never approves anything on the server that reads it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArchiveApproval {
+    pub revision: i64,
+    /// `approved` or `withdrawn`.
+    pub decision: String,
+    pub by: Option<ArchivePerson>,
+    pub note: String,
+    pub created_at: String,
+}
+
+/// Who is accountable for a memory card's review and when it is next due (format 3).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArchiveReview {
+    pub reviewer: Option<ArchivePerson>,
+    pub next_review_at: Option<String>,
+    pub last_reviewed_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -306,6 +379,9 @@ impl WorkspaceArchiveData {
             omitted_citations: self.omitted_citations,
             versions: self.versions.len() as u64,
             saved_searches: self.saved_searches.len() as u64,
+            revisions: self.memory_cards.iter().map(|card| card.revisions.len() as u64).sum(),
+            approvals: self.memory_cards.iter().map(|card| card.approvals.len() as u64).sum(),
+            reviews: self.memory_cards.iter().filter(|card| card.review.is_some()).count() as u64,
         }
     }
 }

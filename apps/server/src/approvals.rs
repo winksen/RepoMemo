@@ -8,7 +8,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use repomemo_domain::{MemoryApprovalDecision, MemoryApprovalStatus, WorkspaceRole};
+use repomemo_domain::{ImportedApproval, MemoryApprovalDecision, MemoryApprovalStatus, WorkspaceRole};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -116,6 +116,20 @@ async fn build_status(
                 user: decision.user,
                 note: decision.note,
                 created_at: decision.created_at,
+            })
+            .collect(),
+        imported: state
+            .storage
+            .imported_approvals(card_id)
+            .await
+            .map_err(map_storage_error)?
+            .into_iter()
+            .map(|record| ImportedApproval {
+                revision: record.revision,
+                decision: record.decision,
+                person: record.person,
+                note: record.note,
+                decided_at: record.decided_at,
             })
             .collect(),
     })

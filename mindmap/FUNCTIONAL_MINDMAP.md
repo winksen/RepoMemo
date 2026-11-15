@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.14 — Carry memory card revisions, citation records, approvals and review in workspace archives (format 3).
+
+- A workspace archive carries what makes knowledge trustworthy: each card's history, what its citations cited, who decided what, and who reviews it and when. On import the history reads the same, approvals are shown as a record of the old decision and never as an approval here, and a reviewer is only kept when the person exists in the new workspace.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.13 — Record what the test checkpoint covers and leave the run to the maintainer.
 

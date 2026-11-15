@@ -66,6 +66,12 @@ export function MemoryApprovalPanel({ accessToken, cardId, isAdmin, updatedAt, w
     {status.history.length ? <ul className="shared-version-list" aria-label="Approval decisions">
       {status.history.map((decision, index) => <li key={index}><div><strong>{decision.decision === "approved" ? "Approved" : "Withdrawn"} · revision {decision.revision}</strong><small>{decision.user ? decision.user.display_name : "Unknown"} · {when(decision.created_at)}{decision.note ? ` · ${decision.note}` : ""}</small></div></li>)}
     </ul> : null}
+    {status.imported.length ? <>
+      <p className="shared-muted-copy">Decisions made on the server this workspace was imported from. They are a record only: nothing is approved here until someone here approves it.</p>
+      <ul className="shared-version-list" aria-label="Imported approval decisions">
+        {status.imported.map((record, index) => <li key={index}><div><strong>{record.decision === "approved" ? "Approved" : "Withdrawn"} elsewhere · revision {record.revision}</strong><small>{record.person} · {when(record.decided_at)}{record.note ? ` · ${record.note}` : ""}</small></div></li>)}
+      </ul>
+    </> : null}
   </section>;
 }
 

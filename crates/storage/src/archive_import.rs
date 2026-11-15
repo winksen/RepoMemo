@@ -11,8 +11,8 @@
 //! the text. The same goes for owners and assignees.
 
 use repomemo_domain::{
-    ArchiveChunkRef, ArchivePerson, WorkspaceArchiveData, WorkspaceTemplateRef, LIFECYCLE_STATUSES, TASK_PRIORITIES,
-    TASK_STATUSES,
+    ArchiveChunkRef, ArchiveMemoryCard, ArchivePerson, ArchiveRevision, WorkspaceArchiveData, WorkspaceTemplateRef,
+    LIFECYCLE_STATUSES, TASK_PRIORITIES, TASK_STATUSES,
 };
 
 use crate::organizations::TEMPLATE_SETTING;
@@ -51,7 +51,154 @@ fn with_note(text: &str, note: &str) -> String {
     }
 }
 
+fn person_label(person: &ArchivePerson) -> String {
+    match person.email.as_deref().filter(|email| !email.is_empty()) {
+        Some(email) => format!("{} <{email}>", person.name),
+        None => person.name.clone(),
+    }
+}
+
 impl StorageEngine {
+    /// A card's saved history, approvals and review assignment from an archive (V0.6.14). Revisions keep their numbers,
+    /// text, dates and the content each citation recorded; their authors are names, since an archive cannot vouch for an
+    /// account. An archive from before format 3 carries none, so the card's present state becomes its revision 1
+    /// (V0.6.12). An approval comes back as a record and approves nothing here. A reviewer is kept only when the same
+    /// address belongs to a person who can work in the new workspace; otherwise the name is kept as a reviewer who has
+    /// left, and an administrator assigns someone.
+    async fn import_card_knowledge(
+        &self,
+        tx: &mut sqlx::Transaction<'_, Sqlite>,
+        workspace_id: &str,
+        card_id: &str,
+        card: &ArchiveMemoryCard,
+        artifact_ids: &HashMap<String, String>,
+    ) -> Result<()> {
+        let mut revisions: Vec<&ArchiveRevision> = card.revisions.iter().filter(|found| found.revision >= 1).collect();
+        revisions.sort_by_key(|found| found.revision);
+        revisions.dedup_by_key(|found| found.revision);
+        if revisions.is_empty() {
+            crate::memory_revisions::snapshot_memory_card(&mut *tx, card_id, None, None, None).await?;
+            sqlx::query("UPDATE memory_card_revisions SET import_baseline = 1 WHERE card_id = ?1")
+                .bind(card_id)
+                .execute(&mut **tx)
+                .await?;
+        } else {
+            for revision in &revisions {
+                let citations: Vec<crate::memory_revisions::RevisionCitation> = revision
+                    .citations
+                    .iter()
+                    .map(|citation| {
+                        let artifact = citation
+                            .artifact_id
+                            .as_ref()
+                            .and_then(|id| artifact_ids.get(id))
+                            .cloned();
+                        crate::memory_revisions::RevisionCitation {
+                            target_type: "artifact".to_owned(),
+                            target_id: artifact.clone().unwrap_or_default(),
+                            confidence: citation.confidence,
+                            metadata: "{}".to_owned(),
+                            title: citation.title.clone(),
+                            path: citation.path.clone(),
+                            missing_at_save: citation.missing_at_save || artifact.is_none(),
+                            artifact_id: artifact.unwrap_or_default(),
+                            content_hash: citation.content_hash.clone().unwrap_or_default(),
+                        }
+                    })
+                    .collect();
+                sqlx::query(
+                    r#"INSERT INTO memory_card_revisions
+                       (id, card_id, workspace_id, revision, title, body_markdown, source, confidence, citations_json,
+                        created_by_user_id, created_at, restored_from, author_label, import_baseline)
+                       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, ?10, ?11, ?12, 0)"#,
+                )
+                .bind(Uuid::new_v4().to_string())
+                .bind(card_id)
+                .bind(workspace_id)
+                .bind(revision.revision)
+                .bind(&revision.title)
+                .bind(&revision.body_markdown)
+                .bind(&revision.source)
+                .bind(revision.confidence)
+                .bind(serde_json::to_string(&citations)?)
+                .bind(&revision.created_at)
+                .bind(revision.restored_from)
+                .bind(revision.author.as_ref().map(person_label))
+                .execute(&mut **tx)
+                .await?;
+            }
+            // The newest revision has to be the card as it is. An archive whose card was changed without a revision gets
+            // that state as one more.
+            let newest = revisions.last().expect("revisions are not empty");
+            if newest.title.trim() != card.title.trim()
+                || newest.body_markdown.trim() != card.body_markdown.trim()
+                || newest.source.trim() != card.source.trim()
+            {
+                crate::memory_revisions::snapshot_memory_card(&mut *tx, card_id, None, None, None).await?;
+            }
+        }
+        let now = Utc::now().to_rfc3339();
+        for approval in &card.approvals {
+            sqlx::query(
+                r#"INSERT INTO memory_card_imported_approvals
+                   (card_id, workspace_id, revision, decision, person_label, note, decided_at, imported_at)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+            )
+            .bind(card_id)
+            .bind(workspace_id)
+            .bind(approval.revision)
+            .bind(if approval.decision == "withdrawn" {
+                "withdrawn"
+            } else {
+                "approved"
+            })
+            .bind(
+                approval
+                    .by
+                    .as_ref()
+                    .map_or_else(|| "someone who is no longer known".to_owned(), person_label),
+            )
+            .bind(&approval.note)
+            .bind(&approval.created_at)
+            .bind(&now)
+            .execute(&mut **tx)
+            .await?;
+        }
+        if let Some(review) = &card.review {
+            let mut reviewer: Option<(String, String)> = None;
+            if let Some(person) = &review.reviewer {
+                if let Some(email) = person.email.as_deref().filter(|email| !email.is_empty()) {
+                    if let Some(user) = self.find_user_by_email(email).await? {
+                        let role = self.workspace_role_for_user(&user.id, workspace_id).await?;
+                        if role.is_some_and(|role| !matches!(role, WorkspaceRole::Viewer)) {
+                            reviewer = Some((user.id, user.display_name));
+                        }
+                    }
+                }
+            }
+            let label = reviewer
+                .as_ref()
+                .map(|(_, name)| name.clone())
+                .or_else(|| review.reviewer.as_ref().map(|person| person.name.clone()));
+            sqlx::query(
+                r#"INSERT OR REPLACE INTO review_assignments
+                   (item_kind, item_id, workspace_id, reviewer_user_id, reviewer_label, next_review_at, last_reviewed_at,
+                    assigned_by_user_id, updated_at)
+                   VALUES ('memory_card', ?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7)"#,
+            )
+            .bind(card_id)
+            .bind(workspace_id)
+            .bind(reviewer.as_ref().map(|(id, _)| id.as_str()))
+            .bind(label)
+            .bind(&review.next_review_at)
+            .bind(&review.last_reviewed_at)
+            .bind(&now)
+            .execute(&mut **tx)
+            .await?;
+        }
+        Ok(())
+    }
+
     /// Refuses a person who may not create workspaces in the organization.
     pub async fn check_can_create_workspace(&self, creator_id: &str, organization_id: &str) -> Result<()> {
         self.require_workspace_creator(creator_id, organization_id)
@@ -432,9 +579,8 @@ impl StorageEngine {
                     }),
                 }
             }
-            // The imported text and the citations linked so far are the card's revision 1 (V0.6.12), so it never
-            // reports revision 0 and its first edit does not become the only entry in its history.
-            crate::memory_revisions::snapshot_memory_card(&mut tx, &id, None, None, None).await?;
+            self.import_card_knowledge(&mut tx, workspace_id, &id, card, &imported.artifact_ids)
+                .await?;
         }
 
         // The settings that make sense on another server.
@@ -449,6 +595,22 @@ impl StorageEngine {
                 "UPDATE workspaces SET settings_json = json_set(settings_json, '$.ai_min_role', ?1) WHERE id = ?2",
             )
             .bind(policy)
+            .bind(workspace_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+
+        // The rule that a revision cannot be approved by the person who made it travels with the workspace (V0.6.14).
+        if let Some(policy) = data
+            .workspace
+            .settings
+            .get("independent_review")
+            .and_then(Value::as_bool)
+        {
+            sqlx::query(
+                "UPDATE workspaces SET settings_json = json_set(settings_json, '$.independent_review', json(?1)) WHERE id = ?2",
+            )
+            .bind(if policy { "true" } else { "false" })
             .bind(workspace_id)
             .execute(&mut *tx)
             .await?;
@@ -504,8 +666,7 @@ impl StorageEngine {
         // does not become a revision of its own. After any edit the card's history is left alone.
         let baseline = sqlx::query_scalar::<_, i64>(
             r#"SELECT COUNT(*) FROM memory_card_revisions AS kept
-               WHERE kept.card_id = ?1 AND kept.revision = 1 AND kept.created_by_user_id IS NULL
-                 AND kept.restored_from IS NULL
+               WHERE kept.card_id = ?1 AND kept.revision = 1 AND kept.import_baseline = 1
                  AND NOT EXISTS (SELECT 1 FROM memory_card_revisions AS later WHERE later.card_id = ?1 AND later.revision > 1)"#,
         )
         .bind(card_id)

@@ -112,7 +112,7 @@ export function MemoryHistoryPanel({ accessToken, canWrite, cardId, onRestored, 
       {revisions.map((revision) => <li key={revision.revision}>
         <div>
           <strong>Revision {revision.revision}{revision.revision === current.revision ? " · current" : ""}{revision.restored_from ? ` · restored from revision ${revision.restored_from}` : ""}</strong>
-          <small>{revision.author ? `Saved by ${revision.author.display_name} · ` : "Author not recorded · "}{when(revision.created_at)} · {revision.citations.length} {revision.citations.length === 1 ? "citation" : "citations"}</small>
+          <small>{revision.author ? `Saved by ${revision.author.display_name} · ` : revision.author_label ? `Saved by ${revision.author_label} (on the server it was imported from) · ` : "Author not recorded · "}{when(revision.created_at)} · {revision.citations.length} {revision.citations.length === 1 ? "citation" : "citations"}</small>
         </div>
         <div className="shared-version-actions">
           {revision.citations.length ? <Button onClick={() => { setSource(null); setInspecting(revision); }} type="button" variant="secondary">Sources</Button> : null}
