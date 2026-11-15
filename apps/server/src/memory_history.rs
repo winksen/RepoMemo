@@ -191,12 +191,7 @@ pub(crate) async fn restore_revision(
     let workspace_id = card_workspace(&state, &subject, &card_id, true).await?;
     let restored = state
         .storage
-        .restore_memory_revision(&card_id, number)
-        .await
-        .map_err(map_storage_error)?;
-    state
-        .storage
-        .attribute_memory_revision(&card_id, &subject.user_id)
+        .restore_memory_revision_by(&card_id, number, Some(&subject.user_id))
         .await
         .map_err(map_storage_error)?;
     record_workspace_activity(

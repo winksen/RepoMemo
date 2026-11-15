@@ -31,6 +31,7 @@ mod onboarding;
 mod operations;
 mod performance;
 mod review_ownership;
+mod revision_attribution;
 mod system;
 mod templates;
 mod workspaces;

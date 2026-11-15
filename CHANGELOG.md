@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.11 (2026-11-17)
+
+Write a memory card revision's author in the same transaction as the revision.
+
+### Fixed
+- A revision's author was written by a second update after the save, so two near-simultaneous saves could credit the first person's name to the second revision and leave the first with none. The author is now part of the revision's own insert, for creating a card, editing it and restoring a revision.
+- A new revision can no longer be left without an author, so the independent-review check (V0.6.8) cannot be passed by the person who made the revision. Only revisions from before V0.6.3 stay unattributed.
+- No migration, route or setting changes.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (an owner and a member saving at once) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- No migration or access change.
+
 ## V0.6.10 (2026-11-17)
 
 Bind a memory card's citations to the content they cited, so history never reads as current by default.

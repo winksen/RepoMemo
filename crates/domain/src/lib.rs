@@ -1199,6 +1199,9 @@ pub struct CreateMemoryCardRequest {
     pub source: String,
     pub confidence: Option<f64>,
     pub citations: Vec<Citation>,
+    /// Who is saving. Written with the revision in the same transaction (V0.6.11); `None` leaves it unattributed.
+    #[serde(default)]
+    pub author_user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1215,6 +1218,9 @@ pub struct UpdateMemoryCardRequest {
     /// it cannot silently overwrite a later save; `None` writes without the check.
     #[serde(default)]
     pub expected_revision: Option<i64>,
+    /// Who is saving. Written with the revision in the same transaction (V0.6.11); `None` leaves it unattributed.
+    #[serde(default)]
+    pub author_user_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

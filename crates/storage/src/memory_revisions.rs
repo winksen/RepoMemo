@@ -50,7 +50,8 @@ pub struct MemoryRestore {
 }
 
 /// Writes the card as it is now as the next revision. Called inside the transaction that changed the card, so a
-/// revision and the state it describes cannot disagree.
+/// revision and the state it describes cannot disagree. The author is written in the same insert (V0.6.11), so two
+/// near-simultaneous saves each credit their own writer.
 ///
 /// A citation keeps the content it first recorded (V0.6.10): a save that leaves a citation alone, or a restore of an
 /// earlier revision, carries that record forward instead of replacing it with whatever the file is now. Only a
@@ -61,6 +62,7 @@ pub(crate) async fn snapshot_memory_card(
     card_id: &str,
     restored_from: Option<i64>,
     recorded: Option<&[RevisionCitation]>,
+    author: Option<&str>,
 ) -> Result<i64> {
     let row =
         sqlx::query("SELECT workspace_id, title, body_markdown, source, confidence FROM memory_cards WHERE id = ?1")
@@ -125,7 +127,7 @@ pub(crate) async fn snapshot_memory_card(
     sqlx::query(
         r#"INSERT INTO memory_card_revisions
            (id, card_id, workspace_id, revision, title, body_markdown, source, confidence, citations_json, created_by_user_id, created_at, restored_from)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, ?10, ?11)"#,
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?12, ?10, ?11)"#,
     )
     .bind(Uuid::new_v4().to_string())
     .bind(card_id)
@@ -138,27 +140,13 @@ pub(crate) async fn snapshot_memory_card(
     .bind(serde_json::to_string(&citations)?)
     .bind(Utc::now().to_rfc3339())
     .bind(restored_from)
+    .bind(author)
     .execute(&mut *connection)
     .await?;
     Ok(next)
 }
 
 impl StorageEngine {
-    /// Names the person who made the card's newest revision, when it has no author yet. Storage writes the revision
-    /// with the card; the request that caused it knows who asked.
-    pub async fn attribute_memory_revision(&self, card_id: &str, user_id: &str) -> Result<()> {
-        sqlx::query(
-            r#"UPDATE memory_card_revisions SET created_by_user_id = ?2
-               WHERE card_id = ?1 AND created_by_user_id IS NULL
-                 AND revision = (SELECT MAX(revision) FROM memory_card_revisions WHERE card_id = ?1)"#,
-        )
-        .bind(card_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await?;
-        Ok(())
-    }
-
     /// The card's revisions, newest first.
     pub async fn memory_revisions(&self, card_id: &str) -> Result<Vec<StoredMemoryRevision>> {
         let rows = sqlx::query(
@@ -190,6 +178,16 @@ impl StorageEngine {
     /// Makes an earlier revision the card's current content as a new revision. History is never rewritten. A cited
     /// passage or file that no longer exists is left out and reported, not invented back.
     pub async fn restore_memory_revision(&self, card_id: &str, revision: i64) -> Result<MemoryRestore> {
+        self.restore_memory_revision_by(card_id, revision, None).await
+    }
+
+    /// Like `restore_memory_revision`, crediting the new revision to `author` in the same transaction.
+    pub async fn restore_memory_revision_by(
+        &self,
+        card_id: &str,
+        revision: i64,
+        author: Option<&str>,
+    ) -> Result<MemoryRestore> {
         let earlier = self.memory_revision(card_id, revision).await?;
         let mut tx = self.pool.begin().await?;
         let now = Utc::now().to_rfc3339();
@@ -239,7 +237,7 @@ impl StorageEngine {
             .execute(&mut *tx)
             .await?;
         }
-        let created = snapshot_memory_card(&mut tx, card_id, Some(revision), Some(&earlier.citations)).await?;
+        let created = snapshot_memory_card(&mut tx, card_id, Some(revision), Some(&earlier.citations), author).await?;
         tx.commit().await?;
         let card = self.get_memory_card(card_id).await?.card;
         Ok(MemoryRestore {

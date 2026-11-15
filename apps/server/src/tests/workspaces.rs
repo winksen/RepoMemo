@@ -2185,6 +2185,7 @@ async fn a_local_workspace_archived_by_the_desktop_app_imports_with_its_memory_a
         body_markdown: "Restart the worker first.".to_owned(),
         source: "manual".to_owned(),
         confidence: None,
+        author_user_id: None,
         citations: vec![repomemo_domain::Citation {
             artifact_id: note.id.clone(),
             chunk_id: Some(chunk_id),

@@ -655,13 +655,14 @@ impl RepoMemoCore {
             repomemo_domain::bail_not_found!("Workspace was not found.");
         }
         self.storage
-            .create_memory_card(
+            .create_memory_card_by(
                 &request.workspace_id,
                 &request.title,
                 &request.body_markdown,
                 &request.source,
                 request.confidence,
                 &request.citations,
+                request.author_user_id.as_deref(),
             )
             .await
     }
@@ -669,7 +670,7 @@ impl RepoMemoCore {
     pub async fn update_memory_card(&self, request: UpdateMemoryCardRequest) -> Result<MemoryCard> {
         validate_memory_card_fields(&request.title, &request.body_markdown, &request.source)?;
         self.storage
-            .update_memory_card_expecting(
+            .update_memory_card_by(
                 &request.card_id,
                 &request.title,
                 &request.body_markdown,
@@ -677,6 +678,7 @@ impl RepoMemoCore {
                 request.confidence,
                 request.citations.as_deref(),
                 request.expected_revision,
+                request.author_user_id.as_deref(),
             )
             .await
     }
@@ -2038,6 +2040,7 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
                 body_markdown: "The source of truth remains local.".to_owned(),
                 source: "manual".to_owned(),
                 confidence: None,
+                author_user_id: None,
                 citations: vec![Citation {
                     artifact_id: artifact.id.clone(),
                     chunk_id: None,
@@ -2092,6 +2095,7 @@ Document {file} section {index} covers topic{} and the deploy_{} function.
             body_markdown: "The source of truth remains local.".to_owned(),
             source: "manual".to_owned(),
             confidence: None,
+            author_user_id: None,
             citations: vec![Citation {
                 artifact_id: artifact.id.clone(),
                 chunk_id: Some(chunk_id),

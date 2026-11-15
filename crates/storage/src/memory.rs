@@ -10,6 +10,22 @@ impl StorageEngine {
         confidence: Option<f64>,
         citations: &[Citation],
     ) -> Result<MemoryCard> {
+        self.create_memory_card_by(workspace_id, title, body_markdown, source, confidence, citations, None)
+            .await
+    }
+
+    /// Like `create_memory_card`, crediting revision 1 to `author` when it is written.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_memory_card_by(
+        &self,
+        workspace_id: &str,
+        title: &str,
+        body_markdown: &str,
+        source: &str,
+        confidence: Option<f64>,
+        citations: &[Citation],
+        author: Option<&str>,
+    ) -> Result<MemoryCard> {
         for citation in citations {
             self.validate_memory_evidence(workspace_id, citation).await?;
         }
@@ -40,7 +56,7 @@ impl StorageEngine {
         }
         {
             let mut connection = self.pool.acquire().await?;
-            crate::memory_revisions::snapshot_memory_card(&mut connection, &id, None, None).await?;
+            crate::memory_revisions::snapshot_memory_card(&mut connection, &id, None, None, author).await?;
         }
 
         self.get_memory_card(&id).await.map(|detail| detail.card)
@@ -71,6 +87,32 @@ impl StorageEngine {
         confidence: Option<f64>,
         citations: Option<&[Citation]>,
         expected_revision: Option<i64>,
+    ) -> Result<MemoryCard> {
+        self.update_memory_card_by(
+            card_id,
+            title,
+            body_markdown,
+            source,
+            confidence,
+            citations,
+            expected_revision,
+            None,
+        )
+        .await
+    }
+
+    /// Like `update_memory_card_expecting`, crediting the new revision to `author` in the same transaction.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn update_memory_card_by(
+        &self,
+        card_id: &str,
+        title: &str,
+        body_markdown: &str,
+        source: &str,
+        confidence: Option<f64>,
+        citations: Option<&[Citation]>,
+        expected_revision: Option<i64>,
+        author: Option<&str>,
     ) -> Result<MemoryCard> {
         let now = Utc::now().to_rfc3339();
         // New citations are checked before anything changes, against the
@@ -106,7 +148,7 @@ impl StorageEngine {
             .fetch_one(&mut *tx)
             .await?;
         if kept == 0 {
-            crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None, None).await?;
+            crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None, None, None).await?;
         }
         let changed = sqlx::query(
             r#"
@@ -137,7 +179,7 @@ impl StorageEngine {
                 insert_citation_link(&mut *tx, workspace_id, card_id, citation, &now).await?;
             }
         }
-        crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None, None).await?;
+        crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None, None, author).await?;
         tx.commit().await?;
         self.get_memory_card(card_id).await.map(|detail| detail.card)
     }

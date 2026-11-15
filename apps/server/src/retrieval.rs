@@ -427,14 +427,10 @@ pub(crate) async fn create_memory_card(
             source: request.source,
             confidence: request.confidence,
             citations: request.citations,
+            author_user_id: Some(subject.user_id.clone()),
         })
         .await
         .map_err(map_core_error)?;
-    state
-        .storage
-        .attribute_memory_revision(&card.id, &subject.user_id)
-        .await
-        .map_err(map_storage_error)?;
     crate::notify_mentions(
         &state,
         &subject.user_id,
@@ -494,14 +490,10 @@ pub(crate) async fn update_memory_card(
             confidence: request.confidence,
             citations: request.citations,
             expected_revision: request.expected_revision,
+            author_user_id: Some(subject.user_id.clone()),
         })
         .await
         .map_err(map_core_error)?;
-    state
-        .storage
-        .attribute_memory_revision(&card.id, &subject.user_id)
-        .await
-        .map_err(map_storage_error)?;
     crate::notify_mentions(
         &state,
         &subject.user_id,
