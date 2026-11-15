@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.21` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.22` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.22 — Record the deferral of local OCR and say plainly what is and is not searchable.
+
+- The product says plainly that it does not read the words in scans or screenshots, what to do instead, and that this is a deliberate deferral until a pilot owner asks for it.
+
+Checks: Documentation check passes.
 
 ## V0.6.21 — Keep and preview images with no AI provider, and show how each one can be found.
 
@@ -876,7 +882,8 @@ These are observed in the code and are useful for prioritizing. The roadmap item
 
 | Capability or limit | Status |
 |---|---|
-| Single sign-on (OIDC, SAML) and provisioning from an identity provider | **Proposed** as the 0.5.x theme ([plan](plans/2026-10-27-0.5-single-sign-on.md)); sign-in is email and password only |
+| Single sign-on and provisioning from an identity provider | **One OpenID Connect provider is built** (V0.5.1–V0.5.8: sign-in, required sign-in with a break-glass account, group mapping, session deadline) and has **not been validated against a live provider**; SAML and SCIM provisioning are not built ([plan](plans/2026-10-27-0.5-single-sign-on.md)) |
+| OCR of scanned PDFs and pictures of text | **Deferred** (V0.6.22): no pilot owner. Scans and screenshots are kept and previewed, not read; a screenshot is found by name, or by an AI description when a vision provider is set |
 | Scale-out: PostgreSQL, object storage, more than one server | **Not built**; one server, SQLite and a file store |
 | A hosted RepoMemo service | **Not offered**; self-hosted only |
 | Published releases, signed installers and signed updates | **Not yet**: the only 0.4 tag, `RM-V0.4.0`, does not match the `vX.Y.Z` form the release workflows start from (documented in V0.6.17), so release images, archives and installers are built by CI on a tag but not yet published or validated end to end; signing keys do not exist yet ([evidence](technical/release-evidence-0.4.73.md)) |

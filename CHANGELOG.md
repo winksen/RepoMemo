@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.22 (2026-11-17)
+
+Record the deferral of local OCR and say plainly what is and is not searchable.
+
+### Changed
+- **Decision: local OCR is not built in this line.** The roadmap's scope control requires a pilot owner before a conditional item is implemented, and none exists. The decision, the row and the scope-control paragraph now say so; the row's type is documentation, and it lists what a pilot owner must bring to reopen it: sample scans, the languages, a resource limit and an engine that passes licence review.
+- **The guides say what the product does with scans.** A scanned PDF or a screenshot of text is kept and previewed, but the words in the picture are not read, so a search finds neither its words nor a scanned PDF's pages. The user guide and the search guide name what works instead: a memory card that quotes what matters and cites the file, or the text pasted as a note. A screenshot is found by name, or by an AI description when a vision provider is set, which is not a transcription.
+- The functional mindmap lists the deferral among the capabilities not built.
+
+### Fixed
+- The functional mindmap still said single sign-on was only proposed and that sign-in is email and password only. It now says one OpenID Connect provider is built (V0.5.1–V0.5.8) and not validated against a live provider, and that SAML and SCIM provisioning are not built.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, documentation links and the other source checks pass. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.6.21 (2026-11-17)
 
 Keep and preview images with no AI provider, and show how each one can be found.

@@ -70,6 +70,7 @@ Stored text (your files, notes and memory cards) and generated text (answers, ov
 | Text provider down or slow | Ask reports the provider's failure; nothing is invented | Retry; an admin checks the provider |
 | Too many AI requests | A rate-limit message | Wait; the server limit is `REPOMEMO_AI_REQUESTS_PER_HOUR` (120 per user by default, `0` is unlimited) |
 | Images | Without a vision provider they are stored, previewed and found by name and path only; with one, an AI description of what they show is searched too, made when they are indexed | An admin sets a vision provider, then re-indexes the image |
+| A scanned PDF, or a screenshot of text | Kept and previewed, but its words are not read: there is no OCR, so a search finds neither its words nor its pages (a screenshot is found by name; with a vision provider, by the AI's description of it, which is not a transcription) | Quote what matters in a memory card that cites the file, or paste the text as a note |
 | A provider address outside the allowed hosts | It cannot be saved | An operator sets `REPOMEMO_AI_ALLOWED_HOSTS` |
 
 Keys are stored encrypted on the server and never sent back to the browser. Setting up a provider and the consent a cloud provider needs: [user guide, § AI](USER_GUIDE.md#10-ai-optional-explicit-safe).
