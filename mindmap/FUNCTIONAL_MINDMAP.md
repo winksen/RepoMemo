@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.29` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.30` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.30 — Close the 0.6 line with its walkthroughs recorded as owed and the deferral of OCR stated.
+
+- The 0.6 line is complete as built: a teammate can start with no AI, review a changed conclusion, recover from an edit conflict or a deletion, and move a workspace without losing its history. Whether each journey passes on a real server is for the maintainer to record on the closing sheet.
+
+Checks: Documentation check passes; walkthroughs pending.
 
 ## V0.6.29 — Review the 0.6 knowledge surfaces for security and fix what the review found.
 

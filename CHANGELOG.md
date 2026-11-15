@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.30 (2026-11-17)
+
+Close the 0.6 line with its walkthroughs recorded as owed and the deferral of OCR stated.
+
+### Added
+- **[The 0.6 closing record](mindmap/technical/release-evidence-0.6.30.md):** what the line delivers, release by release, with the migrations it added (0055 to 0063); the checks that were run and the ones that were not; and the exit journey for a small team with no AI provider, in six steps: activation, review of a changed conclusion, an edit conflict and a draft, recovery from the trash, moving the workspace through an archive twice, and the same journeys by keyboard at 200% zoom in both themes. **Every result is pending**, so the row is 🧪 until the maintainer fills the sheet in and the [test run](mindmap/technical/release-evidence-0.6.13.md) is recorded.
+- The record states the scope that was **not** built: OCR of scans and pictures of text is deferred, because no pilot owner exists, and the guides already say what to do instead.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock (63 files), generated types, styles, accessibility, documentation links, TypeScript, clippy and formatting pass. **No walkthrough, browser, screen reader, second machine, test run or CI run was done**, and nothing was pushed, tagged or published.
+
+### Upgrading
+- Nothing to do. When publishing, the tag is `v0.6.30`, not an `RM-V` tag.
+
 ## V0.6.29 (2026-11-17)
 
 Review the 0.6 knowledge surfaces for security and fix what the review found.
