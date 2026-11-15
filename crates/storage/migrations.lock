@@ -62,3 +62,4 @@
 0.6.6  0056_review_assignments.sql  5d52332f0f4b27a1a39ab58f51bfa6ffbeb2a9bab750e17516c0817e9fdfe446
 0.6.7  0057_review_reminders.sql  c5d1b8680a8dc09903588afd0b3dc2017bdd61ffdca8f38da11998e31e451070
 0.6.8  0058_memory_approvals.sql  0e7c89de7ce43e3d2035f08ffdbcae0e21b0edd16dc2cc9857846e9a2d381556
+0.6.12  0059_imported_card_history.sql  b4559ba3d537bb7d184279d62c7ca438c465ac5b6a3e8d57470a3fd80c76c191

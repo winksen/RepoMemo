@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.12 (2026-11-17)
+
+Give every imported memory card revision 1, and repair cards imported without one.
+
+### Fixed
+- A card made by a workspace import had no revision, so it reported revision 0, could be approved at it, and its first edit became revision 1 and left the imported text out of the history. An import now writes revision 1 with the imported text and the citations linked so far; a cited passage that is linked once its file is indexed is added to that revision while nobody has edited the card, so it does not become a revision of its own.
+- An imported card's first edit is now revision 2, and the imported text stays in the history.
+- Migration `0059_imported_card_history` gives revision 1, with no author, to every card that has none. Cards that already have history are untouched. The repaired revisions show *no recorded content* for their citations, because what the import cited cannot be told from the file as it is now.
+
+### Checks
+- Version, migration lock (59 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. The existing local-archive import test now also checks the imported card's revision; it was written and compiles, and it was not executed. The migration's SQL was not run. Nothing was built or run.
+
+### Upgrading
+- One additive migration. It only adds revision rows to cards that have none.
+
 ## V0.6.11 (2026-11-17)
 
 Write a memory card revision's author in the same transaction as the revision.

@@ -2268,6 +2268,17 @@ async fn a_local_workspace_archived_by_the_desktop_app_imports_with_its_memory_a
     assert!(evidence
         .iter()
         .any(|item| item["target_type"] == "chunk" && item["artifact_id"] == files[0]["id"] && item["exists"] == true));
+    // The imported card has revision 1 with its imported text and the passage it cites, not revision 0 (V0.6.12).
+    let revisions = get(format!(
+        "/v1/memory-cards/{}/revisions",
+        cards[0]["id"].as_str().unwrap()
+    ))
+    .await;
+    assert_eq!(revisions.as_array().unwrap().len(), 1, "{revisions}");
+    assert_eq!(revisions[0]["revision"], 1);
+    assert_eq!(revisions[0]["body_markdown"], "Restart the worker first.");
+    assert_eq!(revisions[0]["citations"].as_array().unwrap().len(), 1);
+    assert_eq!(revisions[0]["citations"][0]["currency"], "current");
     let _ = std::fs::remove_dir_all(local_dir);
     let _ = std::fs::remove_dir_all(data_dir);
 }

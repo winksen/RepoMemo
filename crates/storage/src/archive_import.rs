@@ -432,6 +432,9 @@ impl StorageEngine {
                     }),
                 }
             }
+            // The imported text and the citations linked so far are the card's revision 1 (V0.6.12), so it never
+            // reports revision 0 and its first edit does not become the only entry in its history.
+            crate::memory_revisions::snapshot_memory_card(&mut tx, &id, None, None, None).await?;
         }
 
         // The settings that make sense on another server.
@@ -496,6 +499,26 @@ impl StorageEngine {
             &Utc::now().to_rfc3339(),
         )
         .await?;
+        // A passage that is linked once its file is indexed belongs to the import's own revision 1 while that is
+        // still the card's only revision and nobody has edited it: the baseline is written again with it, so it
+        // does not become a revision of its own. After any edit the card's history is left alone.
+        let baseline = sqlx::query_scalar::<_, i64>(
+            r#"SELECT COUNT(*) FROM memory_card_revisions AS kept
+               WHERE kept.card_id = ?1 AND kept.revision = 1 AND kept.created_by_user_id IS NULL
+                 AND kept.restored_from IS NULL
+                 AND NOT EXISTS (SELECT 1 FROM memory_card_revisions AS later WHERE later.card_id = ?1 AND later.revision > 1)"#,
+        )
+        .bind(card_id)
+        .fetch_one(&mut *tx)
+        .await?
+            > 0;
+        if baseline {
+            sqlx::query("DELETE FROM memory_card_revisions WHERE card_id = ?1")
+                .bind(card_id)
+                .execute(&mut *tx)
+                .await?;
+            crate::memory_revisions::snapshot_memory_card(&mut tx, card_id, None, None, None).await?;
+        }
         tx.commit().await?;
         Ok(())
     }

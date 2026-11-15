@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.11` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.12 — Give every imported memory card revision 1, and repair cards imported without one.
+
+- A card that arrived through a workspace import starts at revision 1 with its imported text. It cannot be approved before it has a history, and an edit adds to that history instead of replacing it.
+
+Checks: Existing import test extended and compiled, not executed; static checks pass.
 
 ## V0.6.11 — Write a memory card revision's author in the same transaction as the revision.
 
