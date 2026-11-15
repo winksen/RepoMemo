@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.18 — Make the upload version check part of its write and name the unchecked mode in the API guide.
+
+- Two people uploading a new version of the same file from the same starting point can no longer both succeed: the second is told the file changed. The API guide says plainly that a request that names no starting state overwrites.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.17 — Use one release tag format, `vX.Y.Z`, across the workflows, the guides and the record.
 

@@ -37,6 +37,7 @@ mod system;
 mod templates;
 mod trash;
 mod workspaces;
+mod write_preconditions;
 
 pub(super) async fn wait_for_indexed_artifacts(
     app: &axum::Router,

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.18 (2026-11-17)
+
+Make the upload version check part of its write and name the unchecked mode in the API guide.
+
+### Fixed
+- **A stale upload can no longer pass the check and then overwrite a newer one.** `POST /v1/artifacts/{id}/versions` compared `X-RepoMemo-Expected-Updated-At` with the file as read just before the write, so a change that landed in between was overwritten. The comparison is now part of the update statement itself: of two uploads that started from the same state, exactly one is stored and the other gets `409`. The earlier comparison stays as a quick refusal.
+
+### Changed
+- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.10 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
+- No route, setting or migration changes.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (two concurrent uploads from the same state: one 200, one 409, one new version, and an unchecked upload still succeeds) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- No migration or access change. A client that sent the header now also gets `409` in the rare race it could not see before.
+
 ## V0.6.17 (2026-11-17)
 
 Use one release tag format, `vX.Y.Z`, across the workflows, the guides and the record.

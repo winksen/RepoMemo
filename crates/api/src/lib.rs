@@ -422,7 +422,7 @@ impl RepoMemoCore {
         bytes: Vec<u8>,
         uploaded_by: Option<&str>,
     ) -> Result<ArtifactSummary> {
-        self.replace_artifact_content_with(artifact_id, filename, UploadContent::Bytes(bytes), uploaded_by)
+        self.replace_artifact_content_with(artifact_id, filename, UploadContent::Bytes(bytes), uploaded_by, None)
             .await
     }
 
@@ -435,8 +435,28 @@ impl RepoMemoCore {
         staged: StagedBlob,
         uploaded_by: Option<&str>,
     ) -> Result<ArtifactSummary> {
-        self.replace_artifact_content_with(artifact_id, filename, UploadContent::Staged(staged), uploaded_by)
+        self.replace_artifact_content_with(artifact_id, filename, UploadContent::Staged(staged), uploaded_by, None)
             .await
+    }
+
+    /// Like [`RepoMemoCore::replace_artifact_version_staged`], refusing with a conflict when the file was changed since
+    /// `expected_updated_at`; the check is part of the write, not a read before it (V0.6.18).
+    pub async fn replace_artifact_version_staged_expecting(
+        &self,
+        artifact_id: &str,
+        filename: &str,
+        staged: StagedBlob,
+        uploaded_by: Option<&str>,
+        expected_updated_at: Option<&str>,
+    ) -> Result<ArtifactSummary> {
+        self.replace_artifact_content_with(
+            artifact_id,
+            filename,
+            UploadContent::Staged(staged),
+            uploaded_by,
+            expected_updated_at,
+        )
+        .await
     }
 
     async fn replace_artifact_content_with(
@@ -445,6 +465,7 @@ impl RepoMemoCore {
         filename: &str,
         content: UploadContent,
         uploaded_by: Option<&str>,
+        expected_updated_at: Option<&str>,
     ) -> Result<ArtifactSummary> {
         if content.is_empty() {
             repomemo_domain::bail_invalid!("Uploaded files cannot be empty.");
@@ -467,7 +488,14 @@ impl RepoMemoCore {
         let size_bytes = content.size_bytes() as i64;
         content.store(&self.storage, &content_hash, &mime_type).await?;
         self.storage
-            .replace_artifact_content(artifact_id, &content_hash, size_bytes, Some(&mime_type), uploaded_by)
+            .replace_artifact_content_expecting(
+                artifact_id,
+                &content_hash,
+                size_bytes,
+                Some(&mime_type),
+                uploaded_by,
+                expected_updated_at,
+            )
             .await
     }
 

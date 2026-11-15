@@ -1343,16 +1343,17 @@ pub(crate) async fn upload_artifact_version(
     let current = writable_artifact_summary(&state, &subject, &artifact_id).await?;
     let workspace_id = current.workspace_id;
     repositories::ensure_not_repository_file(&state, &artifact_id).await?;
-    // The editor says which state of the file it started from; a file changed since is not overwritten (V0.6.4).
-    if let Some(seen) = headers
+    // The editor says which state of the file it started from; a file changed since is not overwritten (V0.6.4). The
+    // check is repeated inside the write itself (V0.6.18), so a change that lands after this read still cannot be
+    // overwritten. A client that names no state writes unchecked, which docs/API.md states.
+    let expected = headers
         .get("x-repomemo-expected-updated-at")
         .and_then(|value| value.to_str().ok())
-    {
-        if seen != current.updated_at {
-            return Err(ApiError::conflict(
-                "This file was changed after you opened it. Reload it to see the newer version, then upload again.",
-            ));
-        }
+        .map(str::to_owned);
+    if expected.as_deref().is_some_and(|seen| seen != current.updated_at) {
+        return Err(ApiError::conflict(
+            "This file was changed after you opened it. Reload it to see the newer version, then upload again.",
+        ));
     }
     let filename = headers
         .get("x-repomemo-filename")
@@ -1370,7 +1371,13 @@ pub(crate) async fn upload_artifact_version(
     quotas::check_incoming(&state, &subject, &workspace_id, received.staged.size_bytes, true).await?;
     let artifact = state
         .core
-        .replace_artifact_version_staged(&artifact_id, &filename, received.staged, Some(&subject.user_id))
+        .replace_artifact_version_staged_expecting(
+            &artifact_id,
+            &filename,
+            received.staged,
+            Some(&subject.user_id),
+            expected.as_deref(),
+        )
         .await
         .map_err(map_core_error)?;
     state.converter.ensure(state.storage.clone(), artifact.clone());

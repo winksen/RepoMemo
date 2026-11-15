@@ -1031,6 +1031,22 @@ impl StorageEngine {
         mime_type: Option<&str>,
         uploaded_by: Option<&str>,
     ) -> Result<ArtifactSummary> {
+        self.replace_artifact_content_expecting(artifact_id, content_hash, size_bytes, mime_type, uploaded_by, None)
+            .await
+    }
+
+    /// Like `replace_artifact_content`, but refuses with a conflict when `expected_updated_at` is given and the file
+    /// was changed since. The check is part of the update itself (V0.6.18), so a change that lands between a caller's
+    /// earlier read and this write cannot be overwritten.
+    pub async fn replace_artifact_content_expecting(
+        &self,
+        artifact_id: &str,
+        content_hash: &str,
+        size_bytes: i64,
+        mime_type: Option<&str>,
+        uploaded_by: Option<&str>,
+        expected_updated_at: Option<&str>,
+    ) -> Result<ArtifactSummary> {
         let current = self.get_artifact_summary(artifact_id).await?;
         if current.content_hash == content_hash {
             repomemo_domain::bail_conflict!("This file already holds exactly that content.");
@@ -1040,21 +1056,30 @@ impl StorageEngine {
         // at once and a duplicate content leaves no version row behind.
         let mut tx = self.pool.begin().await?;
         let updated = sqlx::query(
-            "UPDATE artifacts SET content_hash = ?2, size_bytes = ?3, mime_type = COALESCE(?4, mime_type), updated_at = ?5, indexed_at = NULL WHERE id = ?1",
+            "UPDATE artifacts SET content_hash = ?2, size_bytes = ?3, mime_type = COALESCE(?4, mime_type), updated_at = ?5, indexed_at = NULL WHERE id = ?1 AND (?6 IS NULL OR updated_at = ?6)",
         )
         .bind(artifact_id)
         .bind(content_hash)
         .bind(size_bytes)
         .bind(mime_type)
         .bind(&now)
+        .bind(expected_updated_at)
         .execute(&mut *tx)
         .await;
-        if let Err(error) = updated {
-            let error: anyhow::Error = error.into();
-            if is_unique_violation(&error) {
-                repomemo_domain::bail_conflict!("Another version of this file already holds that content.");
+        match updated {
+            Err(error) => {
+                let error: anyhow::Error = error.into();
+                if is_unique_violation(&error) {
+                    repomemo_domain::bail_conflict!("Another version of this file already holds that content.");
+                }
+                return Err(error);
             }
-            return Err(error);
+            Ok(done) if done.rows_affected() == 0 => {
+                repomemo_domain::bail_conflict!(
+                    "This file was changed after you opened it. Reload it to see the newer version, then upload again."
+                );
+            }
+            Ok(_) => {}
         }
         let last = sqlx::query_as::<_, (i64, String)>(
             "SELECT version, replaced_at FROM artifact_versions WHERE artifact_id = ?1 ORDER BY version DESC LIMIT 1",
