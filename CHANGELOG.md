@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.20 (2026-11-17)
+
+Add web tests for the memory history, approval, review ownership, changes and My work panels.
+
+### Added
+- **Five test files, 31 cases**, one per panel: `memoryHistoryPanel` (a single revision shows nothing, order and authors including an imported author's name, paging with *Show earlier revisions*, no restore for a reader, the restore confirmation and a refused restore, a changed historical citation and a refused source read, a failed read), `memoryApprovalPanel` (loading, approving the revision read, a card that moved past it, a refusal explained in words, an imported record that approves nothing, the policy switch for administrators only, a failed read), `reviewOwnershipPanel` (loading, nobody accountable, a reviewer who left, overdue, a reader without the form, a refused read and a refused save), `memoryChangesPanel` (nothing while loading or when nothing changed, the reason no text is shown with open and remove, a missing citation, a reader, a busy card, a refused read) and `myWorkPanel` (loading, empty, a list with its overdue count, a failed read).
+
+### Fixed
+- **My work no longer reports a failed read as an empty list.** A read that failed showed "Nothing is waiting for you", a claim the page could not back up. It now says in a toast that it could not read and shows nothing instead.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript (which compiles every new test) and clippy pass. **None of the new tests was executed**, so they may need small fixes when the maintainer runs `npm run test:web`; the result belongs in the [test checkpoint record](mindmap/technical/release-evidence-0.6.13.md). This row stays 🧪 until then.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.6.19 (2026-11-17)
 
 Read one revision directly, page a card's history and state how long it is kept.

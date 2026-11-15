@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { IconChevronRight as ChevronRight, IconChecklist as Checklist } from "@tabler/icons-react";
 import { getSharedMyWork } from "../lib/sharedApi";
 import { accountKeys } from "../lib/queryClient";
@@ -6,7 +7,8 @@ import type { MyWork } from "../types";
 import { Button } from "./ui/button";
 import { PanelHeading } from "./ui/panel-heading";
 import { ICON_SIZE } from "./ui/icon";
-import { formatTaskDueDate } from "../web/format";
+import { apiMessage, formatTaskDueDate } from "../web/format";
+import { showToast } from "./ui/toast";
 import { navigate } from "../web/router";
 
 const EMPTY: MyWork = { tasks: [], reviews: [], mentions: [], overdue_task_count: 0, total_count: 0 };
@@ -20,7 +22,9 @@ export function MyWorkPanel({ accessToken, userId }: { accessToken: string; user
   const [work, , query] = useServerState<MyWork>({
     key: accountKeys.myWork(userId), fetch: () => getSharedMyWork(accessToken), initial: EMPTY, staleTime: 0,
   });
-  if (query.isLoading) return null;
+  // A failed read is said, not shown as an empty list: "nothing is waiting" would be a claim the page cannot back up.
+  useEffect(() => { if (query.isError) showToast("error", apiMessage(query.error, "Your work could not be read.")); }, [query.isError, query.error]);
+  if (query.isLoading || (query.isError && work.total_count === 0)) return null;
   return (
     <section aria-labelledby="my-work-heading" className="rm-my-work">
       <PanelHeading description={work.total_count ? `${work.total_count} waiting${work.overdue_task_count ? `, ${work.overdue_task_count} overdue` : ""}` : null} icon={Checklist} id="my-work-heading" title="My work" />

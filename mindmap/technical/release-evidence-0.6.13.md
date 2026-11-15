@@ -37,6 +37,7 @@ two figures are not directly comparable. The maintainer's run reports the number
 `drafts.test.ts`, `identitySettings.test.tsx`, `offboardDialog.test.tsx`, `onboardingChecklist.test.tsx`,
 `providerSignIn.test.tsx`, `tokenWorkspaces.test.tsx`, `twoStepPanel.test.tsx`, `workspaceAccessPolicy.test.tsx`,
 `workspaceGuests.test.tsx`: result pending. `answerExport.test.ts` was extended in V0.6.10.
+V0.6.20 added `memoryHistoryPanel`, `memoryApprovalPanel`, `reviewOwnershipPanel`, `memoryChangesPanel` and `myWorkPanel` (31 cases): result pending.
 
 ## Static checks run for this record
 
