@@ -484,6 +484,34 @@ export interface EmailAttachmentInfo {
 }
 
 /**
+ * A request that a question or a result be improved (V0.6.25), as the person who asked and the workspace's administrators see
+ * it. The query text is kept until `expires_at`, then removed with the request.
+ */
+export interface SearchFeedback {
+  id: string;
+  /** `no_answer` or `unhelpful_result`. */
+  kind: string;
+  query: string;
+  /** For an unhelpful result: the file that did not help. */
+  artifact_id: string | null;
+  artifact_title: string | null;
+  note: string;
+  /** `open`, `resolved` or `declined`. */
+  status: string;
+  asked_by: SharedUser | null;
+  created_at: string;
+  /** What answered it: `evidence` or `memory_card`, with its id and title. */
+  resolution_kind: string | null;
+  resolution_id: string | null;
+  resolution_title: string | null;
+  resolved_by: SharedUser | null;
+  resolved_note: string;
+  resolved_at: string | null;
+  /** When the request and its query text are removed: 180 days after it was made while open, 30 days after it was closed. */
+  expires_at: string;
+}
+
+/**
  * What moving a folder would do, before it is done (V0.6.24): what is inside, what stays attached, where it would end up, and
  * the reason a move is refused when it is.
  */

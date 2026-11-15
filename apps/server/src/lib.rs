@@ -48,6 +48,7 @@ mod review;
 mod review_ownership;
 mod review_reminders;
 mod runner;
+mod search_feedback;
 mod security;
 mod serve;
 mod setup;
@@ -820,6 +821,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/onboarding",
             get(onboarding::get_onboarding).put(onboarding::set_onboarding_dismissed),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/search-feedback",
+            get(search_feedback::list_search_feedback).post(search_feedback::submit_search_feedback),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/search-feedback/{feedback_id}/resolve",
+            post(search_feedback::resolve_search_feedback),
         )
         .route("/v1/workspaces/{workspace_id}/trash", get(trash::list_trash))
         .route(

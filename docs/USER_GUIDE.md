@@ -304,6 +304,7 @@ Search ranks verified evidence a little higher and, by default, leaves outdated 
 - Filter by file type, language, source, folder, evidence state or date. A **Code symbols** box finds where a function, class or method is defined, and in Go, Java, C# and PHP also a constant, a field or a property.
 - Results show highlighted snippets, the path and the line range; click to open.
 - **Save a search** to share it with the team.
+- **Not what you needed?** Under a search, **Tell the owners** sends what you searched for (and a note, if you add one) to the people who can improve the evidence; **This result did not help** does the same for one result. Your search stays on the screen. Anyone who can read the workspace can send one, and they see their own under **Settings › Search requests**, with what answered them. Owners and administrators see everyone's there and answer each with a memory card or a file, or decline it. **The query text is kept only for a while:** 180 days if nobody answers, 30 days after a request is answered or declined; then it is removed. Each person can have 25 open requests in a workspace.
 - On the dashboard, one search box covers **every workspace you can read**, each under its own rules. It can be narrowed to a kind of file, a language and a range of days, and it also finds **memory cards** (not while you narrow to a kind of file or a language, since cards are not files).
 
 ### Ask your evidence

@@ -225,6 +225,9 @@
 | GET | `/v1/workspaces/{workspace_id}/review-assignment` | auth | require_workspace_read | — | ReviewAssignmentView |
 | PUT | `/v1/workspaces/{workspace_id}/review-assignment` | auth | require_workspace_write | AssignRequest | ReviewAssignmentView |
 | POST | `/v1/workspaces/{workspace_id}/review-assignment/complete` | auth | require_workspace_write | CompleteRequest | ReviewAssignmentView |
+| GET | `/v1/workspaces/{workspace_id}/search-feedback` | auth | require_workspace_read | — (`?status=`) | Vec<SearchFeedback> |
+| POST | `/v1/workspaces/{workspace_id}/search-feedback` | auth | require_workspace_read | SubmitFeedback | SearchFeedback |
+| POST | `/v1/workspaces/{workspace_id}/search-feedback/{feedback_id}/resolve` | auth | require_workspace_admin | ResolveFeedback | SearchFeedback |
 | GET | `/v1/workspaces/{workspace_id}/trash` | auth | require_workspace_write | — | TrashItem[] |
 | DELETE | `/v1/workspaces/{workspace_id}/trash/{trash_id}` | auth | require_workspace_admin | — | — |
 | POST | `/v1/workspaces/{workspace_id}/trash/{trash_id}/restore` | auth | require_workspace_write | — | TrashRestoreResult |

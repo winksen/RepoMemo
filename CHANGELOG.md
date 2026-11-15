@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.25 (2026-11-17)
+
+Capture an unanswered question or an unhelpful result as a request the owners can answer.
+
+### Added
+- **Tell the owners.** Under a search, *Not what you needed? Tell the owners* sends what was searched for, with an optional note, to the people who can improve the evidence; *This result did not help* sends one result. The search stays on the screen, so the query and the results are not lost. Anyone who can read the workspace can send one.
+- **Search requests** in **Settings**. A person sees the requests they sent and what answered them; owners and administrators see everyone's and answer each with a **memory card** or a **file** of the workspace (checked to exist there), or decline it. An answered request cannot be answered twice (`409`).
+- **Retention is explicit.** The query text is kept 180 days if nobody answers and 30 days after a request is answered or declined, then removed; every request shows when. Each person can have 25 open requests in a workspace, and a query is limited to 512 characters. The activity feed records that a request was answered or declined, never its query text.
+- **Permission-scoped.** Someone outside the workspace can neither send nor read; a person who can only read sees only their own requests.
+- `GET`/`POST /v1/workspaces/{id}/search-feedback`, `POST /v1/workspaces/{id}/search-feedback/{request}/resolve`; migration 0063.
+
+### Checks
+- Version, migration lock (63 files), generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (a member and a guest ask, invalid requests, own and everyone's lists, member refused, a missing target, one answer only, decline, an outsider) was written and compiles; it was not executed, and neither was the migration. The retention purge is covered by no test. Nothing was built or run.
+
+### Upgrading
+- One additive migration. Nothing is collected until someone sends a request.
+
 ## V0.6.24 (2026-11-17)
 
 Preview a folder move: what is inside, what stays attached and why a move is refused.

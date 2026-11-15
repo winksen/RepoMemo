@@ -2233,3 +2233,24 @@ export function saveSharedOrganizationTemplate(accessToken: string, organization
   return request<OrganizationTemplate>(`/v1/organizations/${organizationId}/templates`, { method: "PUT", body: JSON.stringify({ definition, note }) }, accessToken);
 }
 
+/** Tells the workspace's owners that a question went unanswered or a result did not help (V0.6.25). The search on the page is not touched. */
+export function submitSharedSearchFeedback(accessToken: string, workspaceId: string, input: { kind: "no_answer" | "unhelpful_result"; query: string; artifactId?: string; note?: string }): Promise<import("../types").SearchFeedback> {
+  return request<import("../types").SearchFeedback>(`/v1/workspaces/${workspaceId}/search-feedback`, {
+    method: "POST",
+    body: JSON.stringify({ kind: input.kind, query: input.query, artifact_id: input.artifactId ?? null, note: input.note ?? "" }),
+  }, accessToken);
+}
+
+/** The requests the caller may see: all of them for an owner or administrator, their own for anyone else. */
+export function listSharedSearchFeedback(accessToken: string, workspaceId: string, status?: "open" | "resolved" | "declined"): Promise<import("../types").SearchFeedback[]> {
+  return request<import("../types").SearchFeedback[]>(`/v1/workspaces/${workspaceId}/search-feedback${status ? `?status=${status}` : ""}`, {}, accessToken);
+}
+
+/** Answers a request with a memory card or a file, or declines it; administrators only. */
+export function resolveSharedSearchFeedback(accessToken: string, workspaceId: string, feedbackId: string, input: { resolution: "evidence" | "memory_card" | "declined"; targetId?: string; note?: string }): Promise<import("../types").SearchFeedback> {
+  return request<import("../types").SearchFeedback>(`/v1/workspaces/${workspaceId}/search-feedback/${feedbackId}/resolve`, {
+    method: "POST",
+    body: JSON.stringify({ resolution: input.resolution, target_id: input.targetId ?? null, note: input.note ?? "" }),
+  }, accessToken);
+}
+

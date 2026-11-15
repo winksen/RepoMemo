@@ -36,6 +36,7 @@ mod performance;
 mod review_ownership;
 mod revision_attribution;
 mod revision_limits;
+mod search_feedback;
 mod system;
 mod templates;
 mod trash;

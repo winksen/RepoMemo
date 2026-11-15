@@ -563,6 +563,33 @@ pub struct EmailAttachmentInfo {
 /// Folders may be nested this many levels deep (a top-level folder is level 1).
 pub const MAX_FOLDER_DEPTH: usize = 5;
 
+/// A request that a question or a result be improved (V0.6.25), as the person who asked and the workspace's administrators see
+/// it. The query text is kept until `expires_at`, then removed with the request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchFeedback {
+    pub id: String,
+    /// `no_answer` or `unhelpful_result`.
+    pub kind: String,
+    pub query: String,
+    /// For an unhelpful result: the file that did not help.
+    pub artifact_id: Option<String>,
+    pub artifact_title: Option<String>,
+    pub note: String,
+    /// `open`, `resolved` or `declined`.
+    pub status: String,
+    pub asked_by: Option<SharedUser>,
+    pub created_at: String,
+    /// What answered it: `evidence` or `memory_card`, with its id and title.
+    pub resolution_kind: Option<String>,
+    pub resolution_id: Option<String>,
+    pub resolution_title: Option<String>,
+    pub resolved_by: Option<SharedUser>,
+    pub resolved_note: String,
+    pub resolved_at: Option<String>,
+    /// When the request and its query text are removed: 180 days after it was made while open, 30 days after it was closed.
+    pub expires_at: String,
+}
+
 /// What moving a folder would do, before it is done (V0.6.24): what is inside, what stays attached, where it would end up, and
 /// the reason a move is refused when it is.
 #[derive(Debug, Clone, Serialize, Deserialize)]
