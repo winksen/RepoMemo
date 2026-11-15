@@ -704,11 +704,8 @@ pub(crate) async fn upload_artifact(
             "File names must be at most {MAX_UPLOAD_FILENAME_CHARS} characters long, without control characters."
         )));
     }
-    state
-        .core
-        .ensure_upload_allowed(&workspace_id, &filename)
-        .await
-        .map_err(map_core_error)?;
+    // Images are accepted with no AI provider (V0.6.21): they are stored, previewed and found by name and path, and a
+    // vision provider, when there is one, adds a description of what they show.
     // Check room against the declared length before reading, then count the upload only after the
     // actual bytes also fit. A rejected upload must not use up the hourly allowance.
     let declared = declared_length(&headers).unwrap_or(0);

@@ -27,7 +27,7 @@ const COPY: Record<Purpose, { title: string; intro: string; modelLabel: string; 
   },
   vision: {
     title: "AI for images",
-    intro: "Uploaded images are turned into searchable text by this provider. Images cannot be uploaded until it is set up. Use a vision-capable model.",
+    intro: "Uploaded images are described in text by this provider, so what a picture shows becomes searchable. Without it images are still stored and previewed and can be found by their name, but nothing in the picture is searchable. Use a vision-capable model.",
     modelLabel: "Vision model",
     ollamaModel: "llama3.2-vision",
     cloudModel: "openai/gpt-4o-mini",

@@ -977,7 +977,7 @@ async fn folders_nest_to_a_limit_hold_notes_and_images_need_a_vision_provider() 
         .unwrap();
     assert_ne!(note_gone.status(), 200);
 
-    // Images are refused until an image AI provider exists.
+    // An image is accepted with no AI provider (V0.6.21): it is stored, and findable by its name.
     let image = app
         .clone()
         .oneshot(
@@ -992,7 +992,29 @@ async fn folders_nest_to_a_limit_hold_notes_and_images_need_a_vision_provider() 
         )
         .await
         .unwrap();
-    assert_eq!(image.status(), 400);
+    assert_eq!(image.status(), 201);
+    let image = response_json(image).await;
+    assert_eq!(image["artifact_type"], "image");
+    let image_id = image["id"].as_str().unwrap().to_owned();
+    // Indexing runs in the background; wait for the image's own passage.
+    let mut detail = Value::Null;
+    for _ in 0..100 {
+        detail = response_json(
+            app.clone()
+                .oneshot(auth_request("GET", &format!("/v1/artifacts/{image_id}"), &owner))
+                .await
+                .unwrap(),
+        )
+        .await;
+        if !detail["chunks"].as_array().is_none_or(Vec::is_empty) {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    let chunks = detail["chunks"].as_array().unwrap();
+    assert_eq!(chunks.len(), 1, "{detail}");
+    assert_eq!(chunks[0]["heading_path"], "Image details");
+    assert!(chunks[0]["text"].as_str().unwrap().contains("diagram.png"));
 }
 
 #[tokio::test]

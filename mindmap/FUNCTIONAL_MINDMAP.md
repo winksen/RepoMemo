@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.20` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.21` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.21 — Keep and preview images with no AI provider, and show how each one can be found.
+
+- A person can keep a screenshot without any AI: it is stored, previewed and found by its name. The page says exactly what is searchable, and what the picture shows becomes searchable only if an administrator adds an image provider.
+
+Checks: Upload test updated and compiled, not executed; static checks pass.
 
 ## V0.6.20 — Add web tests for the memory history, approval, review ownership, changes and My work panels.
 

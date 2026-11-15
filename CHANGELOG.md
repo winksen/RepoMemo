@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.21 (2026-11-17)
+
+Keep and preview images with no AI provider, and show how each one can be found.
+
+### Changed
+- **Images are accepted without an AI provider.** Upload used to refuse a picture until an administrator had set up an image-capable provider. A screenshot is now stored and previewed, and indexed by its **name, path and type**, so a search for a word in its file name finds it. Nothing is read from the picture itself.
+- **The image page says how it can be found:** *Searchable by its name and path only. Nothing in the picture itself is searchable…*, *Searchable by an AI description of what the picture shows* (with a reminder that the description is generated and should be checked against the image), or *Not indexed yet*. The page never implies that picture content is searchable unless something described it.
+- **A vision provider is still optional and still adds more.** When one is enabled, indexing replaces the name-and-path passage with the description, as before; the provider form and the search guide now say that images work without it. The indexing stage for the no-provider case is named `image_metadata_only` (it was `image_needs_vision_provider`).
+- No route, setting or migration changes.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (indexer, storage, api, server, all targets) and formatting pass. The upload test now expects `201` and the image's name-and-path passage, and a web test covers the three searchability states; both were written and compile, and neither was executed. Nothing was built or run.
+
+### Upgrading
+- No migration or access change. Images already stored with no provider have no passage until they are indexed again (re-index the workspace or the file).
+
 ## V0.6.20 (2026-11-17)
 
 Add web tests for the memory history, approval, review ownership, changes and My work panels.

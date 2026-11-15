@@ -69,7 +69,7 @@ Stored text (your files, notes and memory cards) and generated text (answers, ov
 | Embedding provider down | Search falls back to keywords, with a warning | Wait, or an admin checks *Test connection* |
 | Text provider down or slow | Ask reports the provider's failure; nothing is invented | Retry; an admin checks the provider |
 | Too many AI requests | A rate-limit message | Wait; the server limit is `REPOMEMO_AI_REQUESTS_PER_HOUR` (120 per user by default, `0` is unlimited) |
-| Images | They are searchable only through an AI description, made when they are indexed | An admin sets a vision provider, then re-indexes the image |
+| Images | Without a vision provider they are stored, previewed and found by name and path only; with one, an AI description of what they show is searched too, made when they are indexed | An admin sets a vision provider, then re-indexes the image |
 | A provider address outside the allowed hosts | It cannot be saved | An operator sets `REPOMEMO_AI_ALLOWED_HOSTS` |
 
 Keys are stored encrypted on the server and never sent back to the browser. Setting up a provider and the consent a cloud provider needs: [user guide, § AI](USER_GUIDE.md#10-ai-optional-explicit-safe).

@@ -1524,10 +1524,7 @@ impl RepoMemoCore {
                         "described_image".to_owned(),
                     )
                 }
-                None => (
-                    index_artifact(summary, &bytes)?,
-                    "image_needs_vision_provider".to_owned(),
-                ),
+                None => (index_artifact(summary, &bytes)?, "image_metadata_only".to_owned()),
             }
         } else {
             (index_artifact(summary, &bytes)?, "chunked_text".to_owned())
@@ -1553,27 +1550,6 @@ impl RepoMemoCore {
                     .find(|settings| settings.enabled && !settings.has_explicit_purpose())
             })
             .cloned())
-    }
-
-    /// Image uploads are only accepted once an image AI provider is enabled, so
-    /// a picture is never stored without a way to make it searchable.
-    pub async fn ensure_upload_allowed(&self, workspace_id: &str, filename: &str) -> Result<()> {
-        let is_image = matches!(detect_artifact_type(Path::new(filename)), Some(ArtifactType::Image));
-        if !is_image {
-            return Ok(());
-        }
-        let has_vision = self
-            .storage
-            .list_provider_settings(workspace_id)
-            .await?
-            .iter()
-            .any(|settings| settings.enabled && settings.purpose() == "vision");
-        if !has_vision {
-            repomemo_domain::bail_invalid!(
-                "An image AI provider is required to upload images. An administrator can set one up in Settings."
-            );
-        }
-        Ok(())
     }
 }
 

@@ -39,14 +39,14 @@ struct MarkdownSection {
 
 pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexArtifactOutput> {
     if matches!(summary.artifact_type, ArtifactType::Image) {
-        return Ok(IndexArtifactOutput {
-            chunks: Vec::new(),
-            symbols: Vec::new(),
-            warnings: vec![
-                "Images are not decoded as text. Run visual analysis with a vision-capable AI provider to make their content searchable."
-                    .to_owned(),
-            ],
-        });
+        // Nothing is decoded from the picture here. Its name and path are indexed so it can be found by them (V0.6.21);
+        // a vision provider, when one is enabled, replaces this with a description of what the picture shows.
+        let mut output = index_image_metadata(summary);
+        output.warnings.push(
+            "Images are not decoded as text. Run visual analysis with a vision-capable AI provider to make their content searchable."
+                .to_owned(),
+        );
+        return Ok(output);
     }
 
     let mut warnings = Vec::new();
@@ -111,6 +111,41 @@ pub fn index_artifact(summary: &ArtifactSummary, bytes: &[u8]) -> Result<IndexAr
 
 /// Turns a vision model's faithful description into the single searchable representation
 /// for an image. Images deliberately have no line chunks or symbol index.
+/// The one passage an image has before anything describes it: its name, path and type. It is what makes a screenshot
+/// findable by name without any AI, and it says on its face that nothing from the picture itself is searchable.
+pub fn index_image_metadata(summary: &ArtifactSummary) -> IndexArtifactOutput {
+    let text = format!(
+        "Image {}. File {}. Type {}. No text has been read from the picture, so it can be found by its name and path only.",
+        summary.title,
+        summary.path,
+        summary.mime_type.as_deref().unwrap_or("image"),
+    );
+    let chunk = Chunk {
+        id: String::new(),
+        artifact_id: summary.id.clone(),
+        workspace_id: summary.workspace_id.clone(),
+        chunk_index: 0,
+        token_count: Some(estimate_tokens(&text)),
+        start_line: None,
+        end_line: None,
+        heading_path: Some("Image details".to_owned()),
+        content_hash: content_hash(text.as_bytes()),
+        embedding_status: "not_configured".to_owned(),
+        metadata: json!({
+            "source_path": summary.path,
+            "mime_type": summary.mime_type,
+            "artifact_type": "image",
+            "representation": "image_metadata",
+        }),
+        text,
+    };
+    IndexArtifactOutput {
+        chunks: vec![chunk],
+        symbols: Vec::new(),
+        warnings: Vec::new(),
+    }
+}
+
 pub fn index_image_description(summary: &ArtifactSummary, description: &str) -> IndexArtifactOutput {
     let text = description.trim();
     if text.is_empty() {

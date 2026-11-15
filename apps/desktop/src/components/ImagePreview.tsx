@@ -5,6 +5,20 @@ import { downloadSharedArtifactFile } from "../lib/sharedApi";
 const RASTER_TYPE = /^image\/(png|jpeg|gif|webp|bmp)$/;
 
 /**
+ * How an image can be found (V0.6.21), from what is indexed for it: a description of the picture, or only its name and
+ * path. Nothing is claimed about the picture's content unless something described it.
+ */
+export function imageSearchability(chunks: { heading_path: string | null }[]): { state: "pending" | "described" | "metadata"; text: string } {
+  if (chunks.some((chunk) => chunk.heading_path === "Visual description")) {
+    return { state: "described", text: "Searchable by an AI description of what the picture shows. The description is generated, so check it against the image." };
+  }
+  if (chunks.length > 0) {
+    return { state: "metadata", text: "Searchable by its name and path only. Nothing in the picture itself is searchable; an administrator can add an image AI provider in Settings to describe it." };
+  }
+  return { state: "pending", text: "Not indexed yet, so it is not searchable." };
+}
+
+/**
  * The stored image, fetched with the user's session and shown at its natural size up to the panel width.
  * A blob URL belongs to this app's origin, so only raster images are offered in a tab of their own: an SVG
  * (or a file served with any other type) opened that way would run its scripts with the user's session.

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../lib/sharedApi", () => ({ downloadSharedArtifactFile: vi.fn() }));
 import { downloadSharedArtifactFile } from "../lib/sharedApi";
-import { ImagePreview } from "../components/ImagePreview";
+import { ImagePreview, imageSearchability } from "../components/ImagePreview";
 
 beforeEach(() => {
   URL.createObjectURL = vi.fn(() => "blob:http://localhost/preview");
@@ -28,5 +28,14 @@ describe("ImagePreview", () => {
       expect(container.querySelector("a"), type).toBeNull();
       unmount();
     }
+  });
+});
+
+describe("imageSearchability", () => {
+  it("claims nothing about a picture's content unless something described it", () => {
+    expect(imageSearchability([]).state).toBe("pending");
+    expect(imageSearchability([{ heading_path: "Image details" }])).toMatchObject({ state: "metadata" });
+    expect(imageSearchability([{ heading_path: "Image details" }]).text).toContain("name and path only");
+    expect(imageSearchability([{ heading_path: "Visual description" }])).toMatchObject({ state: "described" });
   });
 });

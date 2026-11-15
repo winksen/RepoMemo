@@ -243,7 +243,7 @@ Anything you store is called **evidence**. Writers can add it three ways:
 | **Upload files or a whole folder** | Up to 10 MiB per file. Folder structure is recreated; `.git`, `node_modules` and build folders are skipped. The same file uploaded twice is stored once |
 | **Link a git repository** | See below: the whole codebase stays in step with its branch |
 
-**Supported:** Markdown, text, code and config files, Word, Excel, PowerPoint, PDF, OneNote, Outlook emails, and images (images need an image-capable AI provider, because they're searchable through an AI description of them).
+**Supported:** Markdown, text, code and config files, Word, Excel, PowerPoint, PDF, OneNote, Outlook emails, and images. **Images need no AI provider to be kept:** a screenshot is stored, previewed and found by its name and path, and the page says so ("Searchable by its name and path only"). What the picture shows becomes searchable only when an administrator adds an image-capable AI provider, which describes it; the page then says the description is generated and should be checked against the image.
 
 Organize with **nested folders** (up to 5 levels). You can open office files and PDFs right in the browser; where the admin has turned on previews, Word, Excel and PowerPoint show exactly as laid out, and **Open in Office** opens them in the desktop app.
 
