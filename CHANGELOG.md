@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.13 (2026-11-17)
+
+Record what the test checkpoint covers and leave the run to the maintainer.
+
+### Added
+- [A checkpoint record](mindmap/technical/release-evidence-0.6.13.md) lists every test added since V0.4.105: 38 Rust test functions and 20 web test cases in 9 new files (counted in the source), each with a result cell, the commands to run, and a table for the totals and for CI on the pushed commit.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock, documentation links, TypeScript, clippy and formatting pass. **No test was executed and nothing was pushed**: every result in the record is pending, and the record says so. A failure found by the maintainer's run becomes a numbered fix row; no test is skipped or removed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.6.12 (2026-11-17)
 
 Give every imported memory card revision 1, and repair cards imported without one.
