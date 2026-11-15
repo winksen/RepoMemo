@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.6.28` (2026-11-17) · **Next:** V0.6.29 security review. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.6.29` (2026-11-17) · **Next:** V0.6.30 closing walkthroughs. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `RM-V0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -84,6 +84,7 @@ timeline
 | Track K: frontend polish (V0.2.57–V0.2.129) | ✅ V0.2.57–V0.2.129 built (K1 to K6 done); decisions 15–19 taken as proposed; [plan](plans/2026-10-17-frontend-polish.md) |
 | Security and backend review 2026-10-21 (fifth pass) | ✅ Closed at V0.2.162: 2 high, 9 medium, 15 low and 4 info findings, none high, medium or low open, plus 11 performance findings built (P12–P21); the review's table names the release of each fix; [review](security/2026-10-21-security-review.md) |
 | Security review of 0.3.x 2026-10-24 (seventh pass, new surface only) | ✅ Closed at V0.3.26: 0 high, 1 medium, 6 low and 5 info findings, none medium or low open; [review](security/2026-10-24-0.3-security-review.md) |
+| Security review of the 0.6 knowledge surfaces 2026-11-17 (ninth pass, new surface only) | ✅ Closed at V0.6.29: 0 high, 1 medium, 3 low and 5 info findings, none medium or low open; [review](security/2026-11-17-0.6-security-review.md) |
 | Security review of workspace templates 2026-10-22 (sixth pass, new surface only) | ✅ Closed at V0.2.192: 0 high, 2 medium, 2 low and 4 info findings, none medium or low open; [review](security/2026-10-22-workspace-templates-security-review.md) |
 | Track L: security and dependencies (V0.2.130–V0.2.148) | ✅ V0.2.130–V0.2.148 built; decisions 20–23 taken as proposed |
 | Track M: backend hardening and performance (V0.2.149–V0.2.162) | ✅ V0.2.149–V0.2.162 built; decisions 20–23 taken as proposed |
@@ -1819,7 +1820,7 @@ The documentation sequence is deliberately after the feature and interface track
 | G24 | Revision history has no limits | `memory_revision` and the approval status load a card's whole history to find one revision, and the revision list has no paging or retention rule | V0.6.19 |
 | G25 | 0.6 panels have no web tests | `MemoryHistoryPanel`, `MemoryApprovalPanel`, `ReviewOwnershipPanel`, `MemoryChangesPanel` and `MyWorkPanel` have none; their routes have server tests | V0.6.20 |
 | G26 | Localization has no row | The readiness report says localization infrastructure matters, but no row covers it, the client has no i18n library and about 60 `toLocale*` calls are spread across its files | V0.6.27 |
-| G27 | No security review is planned before V0.9.8 | The last is the [identity review](security/2026-10-29-identity-review.md). 0.6 adds cross-workspace My work, revisions and approvals; 0.8 adds outbound delivery and anonymous reading | V0.6.29, V0.8.15 |
+| G27 | No security review is planned before V0.9.8 (done for 0.6 at V0.6.29) | The last is the [identity review](security/2026-10-29-identity-review.md). 0.6 adds cross-workspace My work, revisions and approvals; 0.8 adds outbound delivery and anonymous reading | V0.6.29, V0.8.15 |
 
 **Renumbered (all unshipped):** V0.6.11 → V0.6.15, V0.6.12 → V0.6.21, V0.6.13 → V0.6.22, V0.6.14 → V0.6.23, V0.6.15 → V0.6.24, V0.6.16 → V0.6.25, V0.6.17 → V0.6.26, V0.6.18 → V0.6.28, V0.6.19 → V0.6.30, and V0.8.15–V0.8.19 each moved up by one. The [readiness report](analysis/2026-10-29-team-readiness.md) keeps its original numbers as a dated record.
 
@@ -1882,7 +1883,7 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.6.26** 🧪 2026-11-17 | 🔧 | Journey UX | Make the onboarding, personal queue and review flow keyboard/narrow-screen usable | G04, G13 | Focus, context and drafts survive navigation, retry and reconnect; the specified journeys work at 200% zoom and in both themes with recorded manual checks |
 | **V0.6.27** ✅ 2026-11-17 | 🔧 | Locale groundwork | Route dates and numbers through one locale-aware formatter and put core-journey strings in a message catalogue | G26 | Core journeys show dates and numbers in the browser's locale; a test locale proves their strings come from the catalogue; no translated language is shipped or claimed |
 | **V0.6.28** ✅ 2026-11-17 | 🔧 | Portability | Check the whole archive journey for knowledge revisions, review policy, templates and recovery state | G05, G06, G20 | Round-trip preserves citation meaning and records, rechecks identities and never imports a privileged approval as a trusted local actor |
-| **V0.6.29** 🔜 | 🔒 | Security review | Review the 0.6 surfaces: My work, revisions, approvals, drafts, trash, archives and search feedback | G27 | No high/medium finding stays open and negative cases have regression coverage; the review is recorded under `mindmap/security/` |
+| **V0.6.29** ✅ 2026-11-17 | 🔒 | Security review | Review the 0.6 surfaces: My work, revisions, approvals, drafts, trash, archives and search feedback | G27 | No high/medium finding stays open and negative cases have regression coverage; the review is recorded under `mindmap/security/` |
 | **V0.6.30** 🔜 | 📘 | Closing | Record no-AI activation, review, edit-conflict and recovery walkthroughs | G04–G08, G13 | The daily-knowledge exit journey passes; guides distinguish implemented OCR or its explicitly deferred scope |
 
 ### The 0.7.x line: projects connected to their evidence

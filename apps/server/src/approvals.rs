@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     map_storage_error, record_workspace_activity, require_workspace_admin, require_workspace_read,
-    require_workspace_write, ApiError, AppState, AuthenticatedSubject,
+    require_workspace_write, ApiError, AppState, AuthenticatedSubject, ManagingSubject,
 };
 
 const POLICY_SETTING: &str = "independent_review";
@@ -246,7 +246,7 @@ pub(crate) async fn get_policy(
 
 /// Turns independent review on or off. Existing approvals are not changed; the rule applies to later decisions.
 pub(crate) async fn set_policy(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
     Json(policy): Json<Policy>,

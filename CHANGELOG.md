@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.29 (2026-11-17)
+
+Review the 0.6 knowledge surfaces for security and fix what the review found.
+
+### Added
+- **[A static security review](mindmap/security/2026-11-17-0.6-security-review.md)** of My work, revisions and the cited-source reader, drafts, review ownership, approvals, imported history, archives and their round trip, trash, write preconditions, organization templates, the folder move preview and search feedback: who can reach each route and record, what a narrower token could do, what a crafted archive can carry and what stays after a delete. **0 high, 1 medium, 3 low, 5 info; none open.** It maps each negative case to its test.
+
+### Fixed
+- **S1 (medium): four administrative routes accepted a read-and-write token.** The approval rule (`PUT …/approval-policy`), removing a trashed item for good (`DELETE …/trash/{id}`), answering or declining a search request and saving an organization template now need a browser session or an `admin`-scope token, like the other routes that change how a workspace is governed. A script with a `write` token gets `403`; the API guide lists them under the `admin` scope.
+- **S2 (low): a restored file skipped the storage allowance.** A restore is now checked against the workspace allowance and the disk floor first, so delete, refill and restore cannot go past the limit.
+- **S3 and S4 (low, defence in depth): a revision's cited file and a restored card's targets must belong to the card's workspace.** Nothing was reachable through the API; the checks stop a future change from making it so.
+- No migration or setting changes.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (a write token refused on the four routes, an admin token past the guard) was written and compiles; it was not executed. The restore allowance has no test. Nothing was built or run.
+
+### Upgrading
+- No migration. A script that used a `write` token on one of the four routes now needs an `admin`-scope token.
+
 ## V0.6.28 (2026-11-17)
 
 Check the whole archive journey for knowledge, review policy, templates and recovery state.

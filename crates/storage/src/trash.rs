@@ -84,20 +84,27 @@ async fn known_user(tx: &mut sqlx::Transaction<'_, Sqlite>, id: Option<String>) 
     Ok((found > 0).then_some(id))
 }
 
-async fn target_exists(tx: &mut sqlx::Transaction<'_, Sqlite>, target_type: &str, target_id: &str) -> Result<bool> {
+/// Whether a citation's target exists in the workspace being restored into (V0.6.29): a target of another workspace is not one.
+async fn target_exists(
+    tx: &mut sqlx::Transaction<'_, Sqlite>,
+    workspace_id: &str,
+    target_type: &str,
+    target_id: &str,
+) -> Result<bool> {
     let table = match target_type {
         "chunk" => "chunks",
         "artifact" => "artifacts",
         "memory_card" => "memory_cards",
         _ => return Ok(false),
     };
-    Ok(
-        sqlx::query_scalar::<_, i64>(&format!("SELECT COUNT(*) FROM {table} WHERE id = ?1"))
-            .bind(target_id)
-            .fetch_one(&mut **tx)
-            .await?
-            > 0,
-    )
+    Ok(sqlx::query_scalar::<_, i64>(&format!(
+        "SELECT COUNT(*) FROM {table} WHERE id = ?1 AND workspace_id = ?2"
+    ))
+    .bind(target_id)
+    .bind(workspace_id)
+    .fetch_one(&mut **tx)
+    .await?
+        > 0)
 }
 
 /// Keeps the card in trash. Called inside the transaction that deletes it, before anything is removed.
@@ -332,6 +339,19 @@ impl StorageEngine {
             })
     }
 
+    /// The size of the file an item in trash would restore, so a restore can be held to the workspace's allowance first
+    /// (V0.6.29). None for a card or an item that is not there.
+    pub async fn trash_artifact_size(&self, workspace_id: &str, trash_id: &str) -> Result<Option<i64>> {
+        Ok(sqlx::query_scalar::<_, Option<i64>>(
+            "SELECT json_extract(payload_json, '$.artifact.size_bytes') FROM trash_items WHERE id = ?1 AND workspace_id = ?2 AND kind = 'artifact'",
+        )
+        .bind(trash_id)
+        .bind(workspace_id)
+        .fetch_optional(self.reader())
+        .await?
+        .flatten())
+    }
+
     /// Removes an item from trash for good. A file's stored content is left for garbage collection.
     pub async fn purge_trash_item(&self, workspace_id: &str, trash_id: &str) -> Result<()> {
         let removed = sqlx::query("DELETE FROM trash_items WHERE id = ?1 AND workspace_id = ?2")
@@ -547,7 +567,7 @@ async fn restore_card(
     }
     for link in payload["links"].as_array().into_iter().flatten() {
         let (target_type, target_id) = (text(link, "to_type"), text(link, "to_id"));
-        if !target_exists(tx, &target_type, &target_id).await? {
+        if !target_exists(tx, workspace_id, &target_type, &target_id).await? {
             restore.skipped_citations += 1;
             continue;
         }

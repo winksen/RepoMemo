@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     map_core_error, map_storage_error, require_organization_admin, require_organization_read, ApiError, AppState,
-    AuthenticatedSubject,
+    AuthenticatedSubject, ManagingSubject,
 };
 
 /// One organization template as the settings list it: the newest version and who saved it.
@@ -115,7 +115,7 @@ pub(crate) async fn organization_template_versions(
 /// file; its `meta.version` must be one more than the newest saved (1 for a new template), so two administrators who
 /// edit from the same version cannot overwrite each other.
 pub(crate) async fn save_organization_template(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(organization_id): Path<String>,
     Json(request): Json<SaveOrganizationTemplate>,

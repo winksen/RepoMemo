@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.6.28` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.6.29` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.6.29 — Review the 0.6 knowledge surfaces for security and fix what the review found.
+
+- A script with an everyday token can no longer change the approval rule, destroy trashed content, close people's requests or change an organization's templates. A restored file counts against the workspace's allowance. The review records what was checked and what is accepted.
+
+Checks: Server test written and compiled, not executed; static checks pass.
 
 ## V0.6.28 — Check the whole archive journey for knowledge, review policy, templates and recovery state.
 

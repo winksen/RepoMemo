@@ -9,7 +9,7 @@ use repomemo_domain::{TrashItem, TrashRestoreResult};
 
 use crate::{
     map_storage_error, record_workspace_activity, require_workspace_admin, require_workspace_write, ApiError, AppState,
-    AuthenticatedSubject,
+    AuthenticatedSubject, ManagingSubject,
 };
 
 /// What can be put back. Anyone who can edit the workspace sees it; it holds only what they could have deleted.
@@ -47,6 +47,16 @@ pub(crate) async fn restore_trash_item(
     Path((workspace_id, trash_id)): Path<(String, String)>,
 ) -> Result<Json<TrashRestoreResult>, ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
+    // A restored file counts against the workspace's allowance and the disk like a new one (V0.6.29): deleting, filling the
+    // space again and restoring cannot be a way past the limit.
+    if let Some(size) = state
+        .storage
+        .trash_artifact_size(&workspace_id, &trash_id)
+        .await
+        .map_err(map_storage_error)?
+    {
+        crate::quotas::check_incoming(&state, &subject, &workspace_id, size.max(0) as u64, false).await?;
+    }
     let restored = state
         .storage
         .restore_from_trash(&workspace_id, &trash_id)
@@ -113,7 +123,7 @@ pub(crate) async fn restore_trash_item(
 
 /// Removes an item from trash for good. Only an administrator can, and the workspace's activity records it.
 pub(crate) async fn purge_trash_item(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path((workspace_id, trash_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {

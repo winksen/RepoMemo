@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 use crate::{
     map_storage_error, record_workspace_activity, require_workspace_admin, require_workspace_read, ApiError, AppState,
-    AuthenticatedSubject,
+    AuthenticatedSubject, ManagingSubject,
 };
 
 const MAX_QUERY_CHARS: usize = 512;
@@ -142,7 +142,7 @@ pub(crate) async fn list_search_feedback(
 
 /// Answers a request with a file or a memory card of the workspace, or declines it. Only an administrator can.
 pub(crate) async fn resolve_search_feedback(
-    subject: AuthenticatedSubject,
+    ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path((workspace_id, feedback_id)): Path<(String, String)>,
     Json(request): Json<ResolveFeedback>,

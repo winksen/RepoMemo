@@ -26,6 +26,7 @@ mod evidence_tools;
 mod folder_move_preview;
 mod knowledge_archive;
 mod knowledge_fixture;
+mod knowledge_token_scopes;
 mod load;
 mod memory;
 mod memory_history;

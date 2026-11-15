@@ -34,8 +34,12 @@ fn citation(stored: &RevisionCitation) -> MemoryRevisionCitation {
 
 /// The content hash a file has now: `None` when the file no longer exists, an error when that could not be read, so a
 /// database failure is never reported as a missing source.
-async fn current_hash(state: &AppState, artifact_id: &str) -> Result<Option<String>, ApiError> {
+///
+/// A file of another workspace counts as absent (V0.6.29): a revision can only legitimately cite a file of its own workspace,
+/// so a revision that names any other is never a way to learn anything about that file.
+async fn current_hash(state: &AppState, artifact_id: &str, workspace_id: &str) -> Result<Option<String>, ApiError> {
     match state.storage.get_artifact_summary(artifact_id).await {
+        Ok(summary) if summary.workspace_id != workspace_id => Ok(None),
         Ok(summary) => Ok(Some(summary.content_hash)),
         Err(error) => match repomemo_domain::classify(&error) {
             Some((repomemo_domain::ErrorKind::NotFound, _)) => Ok(None),
@@ -45,13 +49,13 @@ async fn current_hash(state: &AppState, artifact_id: &str) -> Result<Option<Stri
 }
 
 /// Says where each cited file stands now against the content the revision recorded.
-async fn with_currency(state: &AppState, revisions: &mut [MemoryRevision]) -> Result<(), ApiError> {
+async fn with_currency(state: &AppState, workspace_id: &str, revisions: &mut [MemoryRevision]) -> Result<(), ApiError> {
     let mut hashes: std::collections::HashMap<String, Option<String>> = std::collections::HashMap::new();
     for revision in revisions.iter() {
         for citation in &revision.citations {
             if let Some(id) = &citation.artifact_id {
                 if !hashes.contains_key(id) {
-                    hashes.insert(id.clone(), current_hash(state, id).await?);
+                    hashes.insert(id.clone(), current_hash(state, id, workspace_id).await?);
                 }
             }
         }
@@ -120,7 +124,7 @@ pub(crate) async fn list_revisions(
     Path(card_id): Path<String>,
     Query(page): Query<RevisionPage>,
 ) -> Result<(HeaderMap, Json<Vec<MemoryRevision>>), ApiError> {
-    card_workspace(&state, &subject, &card_id, false).await?;
+    let workspace_id = card_workspace(&state, &subject, &card_id, false).await?;
     let (revisions, next, total) = state
         .storage
         .memory_revisions_page(
@@ -131,7 +135,7 @@ pub(crate) async fn list_revisions(
         .await
         .map_err(map_storage_error)?;
     let mut revisions: Vec<MemoryRevision> = revisions.into_iter().map(revision).collect();
-    with_currency(&state, &mut revisions).await?;
+    with_currency(&state, &workspace_id, &mut revisions).await?;
     let mut headers = HeaderMap::new();
     headers.insert(
         HeaderName::from_static("x-total-count"),
@@ -350,7 +354,7 @@ pub(crate) async fn cited_source(
     Path((card_id, number)): Path<(String, i64)>,
     Query(query): Query<SourceQuery>,
 ) -> Result<Json<CitedSource>, ApiError> {
-    card_workspace(&state, &subject, &card_id, false).await?;
+    let workspace_id = card_workspace(&state, &subject, &card_id, false).await?;
     let stored = state
         .storage
         .memory_revision(&card_id, number)
@@ -384,7 +388,7 @@ pub(crate) async fn cited_source(
             "This revision was saved before citations recorded the content they pointed at, so what the source said then is not known.",
         )));
     }
-    let Some(current_hash) = current_hash(&state, &citation.artifact_id).await? else {
+    let Some(current_hash) = current_hash(&state, &citation.artifact_id, &workspace_id).await? else {
         return Ok(Json(source(
             "gone",
             None,

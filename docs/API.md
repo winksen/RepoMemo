@@ -10,7 +10,7 @@ Tokens are made by a person signed in to the browser (never by another token): *
 |---|---|
 | `read` | Look and search: `GET`, and the `POST` routes that only read (search, ask, query) |
 | `write` | Also do content work: add evidence, tasks, comments, memory cards |
-| `admin` | Also change who has access or how a workspace is set up: invitations, roles, deleting, AI providers, repository and connector links, webhooks, export and import. Offered with a warning |
+| `admin` | Also change who has access or how a workspace is set up: invitations, roles, deleting, AI providers, repository and connector links, webhooks, export and import, the approval rule, removing an item from the trash for good, answering search requests and saving organization templates. Offered with a warning |
 | `system` | Administrators only: also change things in the System area |
 
 A token lives 7 to 365 days, is shown **once**, is stored only as a hash, and is revoked at any time from the same page. Choose the narrowest scope that works. It acts as you: it can never do more than your role in a workspace allows, and a viewer's `write` token still cannot write.
