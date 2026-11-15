@@ -951,6 +951,22 @@ impl StorageEngine {
     /// deepest folder it contains, and the name must be free in its new place.
     pub async fn move_folder(&self, folder_id: &str, new_parent_id: Option<&str>) -> Result<Folder> {
         let folder = self.get_folder(folder_id).await?;
+        self.check_folder_move(&folder, new_parent_id).await?;
+        if folder.parent_id.as_deref() == new_parent_id {
+            return Ok(folder);
+        }
+        sqlx::query("UPDATE folders SET parent_id = ?2 WHERE id = ?1")
+            .bind(folder_id)
+            .bind(new_parent_id)
+            .execute(&self.pool)
+            .await?;
+        self.get_folder(folder_id).await
+    }
+
+    /// The rules of a move, shared by the move and its preview: a folder cannot go into itself or into one inside it,
+    /// the nesting stays within `MAX_FOLDER_DEPTH`, and the name must be free at the new place.
+    async fn check_folder_move(&self, folder: &Folder, new_parent_id: Option<&str>) -> Result<()> {
+        let folder_id = folder.id.as_str();
         let all = self.list_folders(&folder.workspace_id).await?;
         let by_id: HashMap<&str, &Folder> = all.iter().map(|candidate| (candidate.id.as_str(), candidate)).collect();
         // Levels above the new place.
@@ -992,7 +1008,7 @@ impl StorageEngine {
             repomemo_domain::bail_invalid!("Folders can be nested up to {MAX_FOLDER_DEPTH} levels deep.");
         }
         if folder.parent_id.as_deref() == new_parent_id {
-            return Ok(folder);
+            return Ok(());
         }
         let duplicate: Option<i64> = sqlx::query_scalar(
             r#"
@@ -1010,12 +1026,81 @@ impl StorageEngine {
         if duplicate.is_some() {
             repomemo_domain::bail_conflict!("A folder with this name already exists there.");
         }
-        sqlx::query("UPDATE folders SET parent_id = ?2 WHERE id = ?1")
-            .bind(folder_id)
-            .bind(new_parent_id)
-            .execute(&self.pool)
-            .await?;
-        self.get_folder(folder_id).await
+        Ok(())
+    }
+
+    /// What moving the folder to `new_parent_id` (none: the top level) would do, without doing it (V0.6.24). A refusal the
+    /// move itself would give is reported in the answer instead of as an error, so the person sees the reason before
+    /// choosing. Moving changes only the folder's place: files keep their ids, so the citations that point at them and
+    /// the comments on them stay attached.
+    pub async fn preview_folder_move(
+        &self,
+        folder_id: &str,
+        new_parent_id: Option<&str>,
+    ) -> Result<repomemo_domain::FolderMovePreview> {
+        let folder = self.get_folder(folder_id).await?;
+        let all = self.list_folders(&folder.workspace_id).await?;
+        let by_id: HashMap<&str, &Folder> = all.iter().map(|candidate| (candidate.id.as_str(), candidate)).collect();
+        let path_of = |id: Option<&str>| {
+            let mut names = Vec::new();
+            let mut cursor = id.and_then(|id| by_id.get(id).copied());
+            while let Some(current) = cursor {
+                names.push(current.name.as_str());
+                cursor = current
+                    .parent_id
+                    .as_deref()
+                    .and_then(|parent| by_id.get(parent).copied());
+            }
+            names.reverse();
+            names.join(" / ")
+        };
+        let from_path = path_of(Some(folder_id));
+        let target_path = path_of(new_parent_id);
+        let to_path = if target_path.is_empty() {
+            folder.name.clone()
+        } else {
+            format!("{target_path} / {}", folder.name)
+        };
+        let (refusal, allowed) = match self.check_folder_move(&folder, new_parent_id).await {
+            Ok(()) => (None, true),
+            Err(error) => match repomemo_domain::classify(&error) {
+                Some((_, message)) => (Some(message.to_owned()), false),
+                None => return Err(error),
+            },
+        };
+        let (folder_ids, artifact_ids) = self.folder_subtree(folder_id).await?;
+        let folder_list = serde_json::to_string(&folder_ids)?;
+        let (citations, citing_cards): (i64, i64) = sqlx::query_as(
+            r#"SELECT COUNT(*), COUNT(DISTINCT link.from_id)
+               FROM links AS link
+               LEFT JOIN chunks AS chunk ON link.to_type = 'chunk' AND chunk.id = link.to_id
+               WHERE link.from_type = 'memory_card' AND link.relation_type = 'cites'
+                 AND COALESCE(chunk.artifact_id, link.to_id) IN
+                     (SELECT id FROM artifacts WHERE folder_id IN (SELECT value FROM json_each(?1)))"#,
+        )
+        .bind(&folder_list)
+        .fetch_one(self.reader())
+        .await?;
+        let comments: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM artifact_comments
+               WHERE artifact_id IN (SELECT id FROM artifacts WHERE folder_id IN (SELECT value FROM json_each(?1)))"#,
+        )
+        .bind(&folder_list)
+        .fetch_one(self.reader())
+        .await?;
+        Ok(repomemo_domain::FolderMovePreview {
+            folder_name: folder.name.clone(),
+            from_path,
+            to_path,
+            subfolders: folder_ids.len() as i64 - 1,
+            files: artifact_ids.len() as i64,
+            citing_cards,
+            citations,
+            comments,
+            unchanged: folder.parent_id.as_deref() == new_parent_id,
+            allowed,
+            refusal,
+        })
     }
 
     /// Replaces the content of an artifact in place: it keeps its id, folder,

@@ -483,6 +483,34 @@ export interface EmailAttachmentInfo {
   size_bytes: number;
 }
 
+/**
+ * What moving a folder would do, before it is done (V0.6.24): what is inside, what stays attached, where it would end up, and
+ * the reason a move is refused when it is.
+ */
+export interface FolderMovePreview {
+  folder_name: string;
+  /** Where the folder is now and where it would be, as folder names from the top level. */
+  from_path: string;
+  to_path: string;
+  /** Folders inside it, at any depth. */
+  subfolders: number;
+  /** Files in it and in those folders. */
+  files: number;
+  /** Memory cards that cite one of those files, and how many citations they hold. A move changes none of them. */
+  citing_cards: number;
+  citations: number;
+  /** Comments on those files; they stay on their files. */
+  comments: number;
+  /** True when the folder is already where it was asked to go. */
+  unchanged: boolean;
+  /**
+   * False when the move would be refused (a folder into itself or into one inside it, nesting too deep, a name already
+   * used there).
+   */
+  allowed: boolean;
+  refusal: string | null;
+}
+
 export interface Folder {
   id: string;
   workspace_id: string;

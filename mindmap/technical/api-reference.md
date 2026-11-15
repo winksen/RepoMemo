@@ -202,6 +202,7 @@
 | POST | `/v1/artifacts/{artifact_id}/index` | auth | require_workspace_write | — | 202 IndexingJobStatus (running; done in the background) |
 | POST | `/v1/workspaces/{workspace_id}/index` | auth | require_workspace_admin | — | 202 IndexingJobStatus (running; 409 while one runs) |
 | POST | `/v1/workspaces/{workspace_id}/artifacts/bulk` | auth | require_workspace_write | BulkArtifactsRequest | BulkArtifactsResponse |
+| GET | `/v1/workspaces/{workspace_id}/folders/{folder_id}/move-preview` | auth | require_workspace_write | — (`?parent_id=`) | FolderMovePreview |
 | POST | `/v1/workspaces/{workspace_id}/folders/{folder_id}/move` | auth | require_workspace_write | MoveFolderRequest | Folder |
 | POST | `/v1/artifacts/{artifact_id}/versions` | auth | require_workspace_write | — | SharedArtifactSummary |
 | GET | `/v1/artifacts/{artifact_id}/versions` | auth | require_workspace_read (via the artifact) | — | Vec<ArtifactVersion> |

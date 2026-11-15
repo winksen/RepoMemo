@@ -1210,6 +1210,31 @@ pub(crate) async fn move_folder(
     Ok(Json(folder))
 }
 
+/// The new parent a move is asked about; none is the top level.
+#[derive(Debug, Deserialize)]
+pub(crate) struct FolderMovePreviewQuery {
+    parent_id: Option<String>,
+}
+
+/// What moving a folder would do, before it is done (V0.6.24): what is inside, what stays attached, where it would end up
+/// and, when the move would be refused, why. Nothing is changed.
+pub(crate) async fn preview_folder_move(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, folder_id)): Path<(String, String)>,
+    Query(query): Query<FolderMovePreviewQuery>,
+) -> Result<Json<repomemo_domain::FolderMovePreview>, ApiError> {
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    validate_folder(&state, &workspace_id, Some(&folder_id)).await?;
+    let parent_id = validate_folder(&state, &workspace_id, query.parent_id.as_deref()).await?;
+    state
+        .storage
+        .preview_folder_move(&folder_id, parent_id.as_deref())
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
+}
+
 const MAX_BULK_ARTIFACTS: usize = 200;
 
 /// Moves, deletes or changes the evidence state of many files at once. Each

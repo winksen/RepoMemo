@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.24 (2026-11-17)
+
+Preview a folder move: what is inside, what stays attached and why a move is refused.
+
+### Added
+- **A preview before a folder is moved.** The move dialog now says, for the destination chosen, where the folder ends up (`Policies` becomes `Archive / Policies`), how many files and folders are inside it, how many memory cards cite those files and how many citations that is, and how many comments are on them. It states that all of them stay attached: a move changes only the folder's place and files keep their identity.
+- **Refusals are explained first.** A folder moved into itself or into one inside it, nesting beyond 5 levels, or a name already used at the destination is reported in the preview with the same message the move would give; a folder already at the destination says so. Cycles and depth overflow stay refused by the move itself, which now shares one set of rules with the preview.
+- `GET /v1/workspaces/{id}/folders/{folder}/move-preview?parent_id=` (writers only; it changes nothing). No migration.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (storage, api, server, all targets) and formatting pass. One server test (a cited, commented file in a nested folder: counts, paths, a cycle, an unchanged place, nothing written by the preview, the move keeping the citation and comment, a guest refused) and one web test file were written and compile; neither was executed. Nothing was built or run.
+
+### Upgrading
+- No migration or access change.
+
 ## V0.6.23 (2026-11-17)
 
 Let organization administrators save and version templates that their workspaces can preview and adopt.

@@ -1074,6 +1074,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/workspaces/{workspace_id}/search", post(search_workspace))
         .route("/v1/workspaces/{workspace_id}/artifacts/bulk", post(bulk_artifacts))
         .route(
+            "/v1/workspaces/{workspace_id}/folders/{folder_id}/move-preview",
+            get(preview_folder_move),
+        )
+        .route(
             "/v1/workspaces/{workspace_id}/folders/{folder_id}/move",
             post(move_folder),
         )

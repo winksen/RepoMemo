@@ -563,6 +563,31 @@ pub struct EmailAttachmentInfo {
 /// Folders may be nested this many levels deep (a top-level folder is level 1).
 pub const MAX_FOLDER_DEPTH: usize = 5;
 
+/// What moving a folder would do, before it is done (V0.6.24): what is inside, what stays attached, where it would end up, and
+/// the reason a move is refused when it is.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FolderMovePreview {
+    pub folder_name: String,
+    /// Where the folder is now and where it would be, as folder names from the top level.
+    pub from_path: String,
+    pub to_path: String,
+    /// Folders inside it, at any depth.
+    pub subfolders: i64,
+    /// Files in it and in those folders.
+    pub files: i64,
+    /// Memory cards that cite one of those files, and how many citations they hold. A move changes none of them.
+    pub citing_cards: i64,
+    pub citations: i64,
+    /// Comments on those files; they stay on their files.
+    pub comments: i64,
+    /// True when the folder is already where it was asked to go.
+    pub unchanged: bool,
+    /// False when the move would be refused (a folder into itself or into one inside it, nesting too deep, a name already
+    /// used there).
+    pub allowed: bool,
+    pub refusal: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Folder {
     pub id: String,

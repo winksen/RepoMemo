@@ -5,6 +5,7 @@ import { type ArtifactSummary, type Folder } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Checkbox } from "../../components/ui/checkbox";
+import { FolderMovePreviewNote } from "../../components/FolderMovePreviewNote";
 import { EmptyState } from "../../components/ui/empty-state";
 import { FeedbackNotice } from "../../components/ui/feedback-notice";
 import { Field } from "../../components/ui/field";
@@ -430,6 +431,7 @@ export function EvidenceSection({ page }: { page: WorkspacePage }) {
         <button aria-pressed={moveTarget === null} className="rm-option" onClick={() => setMoveTarget(null)} type="button"><FolderIcon size={ICON_SIZE.md} /> All evidence (top level)</button>
         {folderPickerRows.map(({ folder, depth }) => <button aria-pressed={moveTarget === folder.id} className="rm-option" key={folder.id} onClick={() => setMoveTarget(folder.id)} style={{ paddingLeft: 10 + (depth + 1) * 16 }} type="button"><FolderIcon size={ICON_SIZE.md} /> {folder.name}</button>)}
       </div>
+      {itemDialog.kind === "move-folder" ? <FolderMovePreviewNote accessToken={accessToken} folderId={itemDialog.folder.id} parentId={moveTarget} workspaceId={workspace.workspace.id} /> : null}
     </Dialog>;
   })();
 

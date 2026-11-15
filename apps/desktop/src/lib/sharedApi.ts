@@ -1287,6 +1287,12 @@ export function moveSharedFolder(accessToken: string, workspaceId: string, folde
   }, accessToken);
 }
 
+/** What moving a folder would do, before it is done (V0.6.24). */
+export function previewSharedFolderMove(accessToken: string, workspaceId: string, folderId: string, parentId: string | null): Promise<import("../types").FolderMovePreview> {
+  const query = parentId === null ? "" : `?parent_id=${encodeURIComponent(parentId)}`;
+  return request<import("../types").FolderMovePreview>(`/v1/workspaces/${workspaceId}/folders/${folderId}/move-preview${query}`, {}, accessToken);
+}
+
 export interface BulkArtifactsResult {
   done: string[];
   failed: Array<{ artifact_id: string; message: string }>;
