@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.6.28 (2026-11-17)
+
+Check the whole archive journey for knowledge, review policy, templates and recovery state.
+
+### Added
+- **A round trip that keeps its meaning.** An export now carries decisions that were themselves imported from another server (marked `imported`), so a second export of an imported workspace holds the same revisions, the same recorded content for each citation, the same review date and the same approval records as the first. An imported decision is never a local one: it approves nothing and never satisfies or blocks independent review.
+- **What an archive leaves behind is said.** The trash is not carried. The manifest counts the deleted items that were in it (`trash_left_out`), and the import report warns how many were left out and that they cannot be restored from the archive.
+- **Templates are rechecked on import.** An organization's own template is never carried into a different organization: the workspace starts on General, the report says which template was dropped, and importing into the same organization keeps it. A template this server lacks is handled the same way.
+- No migration or setting changes; archives without the new fields still import.
+
+### Checks
+- Version, generated types, styles, accessibility, documentation links, TypeScript, clippy (domain, storage, api, server, all targets) and formatting pass. One server test (history, approval, rule, review date, an organization template and a trashed card; an import into the same organization; a second export compared with the first; an import into another organization) was written and compiles; it was not executed. Nothing was built or run.
+
+### Upgrading
+- No migration or access change.
+
 ## V0.6.27 (2026-11-17)
 
 Route dates and numbers through one locale-aware formatter and put the core journeys' words in a message catalogue.

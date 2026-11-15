@@ -354,6 +354,12 @@ impl WorkspaceArchiveData {
                 "{missing_citations} citation(s) name a file that is not in the archive and will be left out."
             ));
         }
+        if self.trash_left_out > 0 {
+            check.warnings.push(format!(
+                "{} deleted item(s) were in the trash of the workspace this came from. A trash is not part of an archive, so they are not here and cannot be restored from it.",
+                self.trash_left_out
+            ));
+        }
         let approvals: usize = self.memory_cards.iter().map(|card| card.approvals.len()).sum();
         if approvals > 0 {
             check.warnings.push(format!(

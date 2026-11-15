@@ -476,6 +476,21 @@ async fn read_archive(
     let check = data.check();
     problems.extend(check.problems);
     let mut warnings = check.warnings;
+    // The workspace's template is rechecked here (V0.6.28): an organization's own template is never carried into another
+    // organization, and one this server lacks leaves the workspace on General. Either way the person is told.
+    if let Some(reference) = data
+        .workspace
+        .settings
+        .get("template")
+        .and_then(repomemo_domain::WorkspaceTemplateRef::from_setting)
+    {
+        if !template_usable(state, &reference.id, &query.organization_id) {
+            warnings.push(format!(
+                "The workspace used the template {}, which this organization does not have. It starts on General.",
+                reference.id
+            ));
+        }
+    }
 
     // Every file a record names has to be listed, and listed once.
     let mut expected: HashMap<&str, u64> = HashMap::new();
@@ -569,6 +584,12 @@ async fn read_archive(
     Ok(summary)
 }
 
+/// Whether a workspace of the organization can use the template: the server has it and it is not another organization's.
+fn template_usable(state: &AppState, template_id: &str, organization_id: &str) -> bool {
+    state.core.template_catalogue().get(template_id).is_some()
+        && state.core.template_allowed(template_id, Some(organization_id))
+}
+
 fn report(
     manifest: &ArchiveManifest,
     data: Option<&WorkspaceArchiveData>,
@@ -648,6 +669,17 @@ async fn create_workspace(
             return Err(ApiError::internal(error));
         }
     };
+    // A template reference the organization cannot use is dropped, so another organization's template never applies.
+    if let Some(reference) = data
+        .workspace
+        .settings
+        .get("template")
+        .and_then(repomemo_domain::WorkspaceTemplateRef::from_setting)
+    {
+        if !template_usable(state, &reference.id, &query.organization_id) {
+            let _ = state.core.set_workspace_template(&workspace_id, None, None).await;
+        }
+    }
 
     // Passages can be found again once their file is indexed; do that for the
     // cited files now, and let the rest of the workspace index in the background.

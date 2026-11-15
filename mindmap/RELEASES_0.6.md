@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.6 → 0.7 (proposed)
 
-> **Current:** `V0.6.27` (2026-11-17)
+> **Current:** `V0.6.28` (2026-11-17)
 
 > **Theme:** Trusted knowledge in daily work · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -47,7 +47,7 @@
 | **V0.6.25** | ✅ 2026-11-17 | AJ. Daily knowledge | ✨ | Search feedback | Capture an unanswered question or unhelpful result as a permission-scoped improvement request | The user can submit without losing query context; an owner can resolve it to evidence or a memory, and query retention is explicit |
 | **V0.6.26** | 🧪 2026-11-17 | AJ. Daily knowledge | 🔧 | Journey UX | Make the onboarding, personal queue and review flow keyboard/narrow-screen usable | Focus, context and drafts survive navigation, retry and reconnect; the specified journeys work at 200% zoom and in both themes with recorded manual checks |
 | **V0.6.27** | ✅ 2026-11-17 | AJ. Daily knowledge | 🔧 | Locale groundwork | Route dates and numbers through one locale-aware formatter and put core-journey strings in a message catalogue | Core journeys show dates and numbers in the browser's locale; a test locale proves their strings come from the catalogue; no translated language is shipped or claimed |
-| **V0.6.28** | 🔜 | AJ. Daily knowledge | 🔧 | Portability | Check the whole archive journey for knowledge revisions, review policy, templates and recovery state | Round-trip preserves citation meaning and records, rechecks identities and never imports a privileged approval as a trusted local actor |
+| **V0.6.28** | ✅ 2026-11-17 | AJ. Daily knowledge | 🔧 | Portability | Check the whole archive journey for knowledge revisions, review policy, templates and recovery state | Round-trip preserves citation meaning and records, rechecks identities and never imports a privileged approval as a trusted local actor |
 | **V0.6.29** | 🔜 | AJ. Daily knowledge | 🔒 | Security review | Review the 0.6 surfaces: My work, revisions, approvals, drafts, trash, archives and search feedback | No high/medium finding stays open and negative cases have regression coverage; the review is recorded under `mindmap/security/` |
 | **V0.6.30** | 🔜 | AJ. Daily knowledge | 📘 | Closing | Record no-AI activation, review, edit-conflict and recovery walkthroughs | The daily-knowledge exit journey passes; guides distinguish implemented OCR or its explicitly deferred scope |
 

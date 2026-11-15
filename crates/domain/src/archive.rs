@@ -57,6 +57,9 @@ pub struct ArchiveCounts {
     /// Review assignments of memory cards (format 3).
     #[serde(default)]
     pub reviews: u64,
+    /// Deleted memory cards and files that were in the workspace's trash and are not part of the archive (V0.6.28).
+    #[serde(default)]
+    pub trash_left_out: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -205,6 +208,10 @@ pub struct ArchiveRevision {
 /// elsewhere; it never approves anything on the server that reads it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArchiveApproval {
+    /// True for a decision that was itself imported from another server before this archive was made (V0.6.28); the
+    /// archive keeps it as the record it is.
+    #[serde(default)]
+    pub imported: bool,
     pub revision: i64,
     /// `approved` or `withdrawn`.
     pub decision: String,
@@ -339,6 +346,9 @@ pub struct WorkspaceArchiveData {
     /// The workspace's saved searches (format 2).
     #[serde(default)]
     pub saved_searches: Vec<ArchiveSavedSearch>,
+    /// Items in the workspace's trash when the archive was made, which an archive does not carry (V0.6.28).
+    #[serde(default)]
+    pub trash_left_out: u64,
 }
 
 impl WorkspaceArchiveData {
@@ -382,6 +392,7 @@ impl WorkspaceArchiveData {
             revisions: self.memory_cards.iter().map(|card| card.revisions.len() as u64).sum(),
             approvals: self.memory_cards.iter().map(|card| card.approvals.len() as u64).sum(),
             reviews: self.memory_cards.iter().filter(|card| card.review.is_some()).count() as u64,
+            trash_left_out: self.trash_left_out,
         }
     }
 }

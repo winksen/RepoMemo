@@ -113,6 +113,15 @@ impl StorageEngine {
 
         let lifecycle = self.export_lifecycle(workspace_id).await?;
         let (memory_cards, omitted_citations) = self.export_memory_cards(workspace_id).await?;
+        // A trash is not carried, and the archive says how much was left out instead of staying silent (V0.6.28).
+        let trash_left_out: u64 = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM trash_items WHERE workspace_id = ?1 AND expires_at >= ?2",
+        )
+        .bind(workspace_id)
+        .bind(Utc::now().to_rfc3339())
+        .fetch_one(self.reader())
+        .await?
+        .max(0) as u64;
         let tasks = self.export_tasks(workspace_id).await?;
         let comments = self.export_comments(workspace_id).await?;
         let versions = self.export_versions(workspace_id).await?;
@@ -128,6 +137,7 @@ impl StorageEngine {
             tasks,
             comments,
             omitted_citations,
+            trash_left_out,
             versions,
             saved_searches,
         })
@@ -389,19 +399,38 @@ impl StorageEngine {
                     restored_from: stored.restored_from,
                 })
                 .collect();
-            let approvals = self
+            // Decisions imported from another server come first (they are older), then this server's own.
+            let carried: Vec<ArchiveApproval> = self
+                .imported_approvals(&id)
+                .await?
+                .into_iter()
+                .rev()
+                .map(|record| ArchiveApproval {
+                    imported: true,
+                    revision: record.revision,
+                    decision: record.decision,
+                    by: Some(ArchivePerson {
+                        name: record.person,
+                        email: None,
+                    }),
+                    note: record.note,
+                    created_at: record.decided_at,
+                })
+                .collect();
+            let own = self
                 .memory_approval_history(&id)
                 .await?
                 .into_iter()
                 .rev()
                 .map(|decision| ArchiveApproval {
+                    imported: false,
                     revision: decision.revision,
                     decision: decision.decision,
                     by: decision.user.map(person_from_user),
                     note: decision.note,
                     created_at: decision.created_at,
-                })
-                .collect();
+                });
+            let approvals: Vec<ArchiveApproval> = carried.into_iter().chain(own).collect();
             let review = self
                 .review_assignment("memory_card", &id)
                 .await?
