@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.19 (2026-11-18)
+
+Carry the work of the 0.7 line through a workspace archive, so a project moves with every relation intact and nothing starts running by itself.
+
+### Added
+- **Archive format 4.** A new `work` section holds, by the archive's own ids and by name and address (never an account id): projects with their brief citations, milestones, task labels, named workflow states, **each task's number, project, milestone, parent, labels, state, citations, comments and blockers**, recurring schedules with their occurrence history, and project updates with their links. The manifest counts them. A server reads formats 1 to 4; an older archive imports as before.
+- **Relationships survive.** On import every relation is carried through the archive's ids, so a task is in the project, milestone, state and parent it was in, with its labels, citations, discussion and blockers, and a project keeps its brief, milestones and updates, all pointing at the new workspace's records. A project update's milestone ids are carried too, so the next update compares correctly.
+- **Task numbers are kept.** `T-12` is `T-12` after a move, and the counter continues above the highest number ever given out, so a deleted number is not given out again. Tasks without a record (an older archive) are numbered after the others.
+- **An archive that points outside itself is refused.** The check runs before anything is written and refuses, with the reasons, a task in a project that is not in the archive, a milestone of another project, a label or state that is missing, a parent or blocker that is itself, missing or part of a loop, a schedule this server cannot run, a duplicate number or id. Nothing can therefore name a record of another workspace. A citation of a file or card the archive left out is dropped with a warning.
+- **Schedules come back paused.** A running recurring task is imported **paused** (a stopped one stays stopped), with its occurrence history, so nothing is made until someone resumes it; an occurrence that was already made is not made again. The import report says how many were running.
+- **Updates and comments are records.** They come back credited to the person who imports with the original author named in the text; an update keeps the health its author chose, and no one is credited by account.
+- A server test (`tests/archive_work.rs`) builds a project with a brief, milestone, label, named state, sub-task, blocker, comment, schedule and update, moves it through an archive and checks the keys, relations, citations, health, paused schedule and the unreused number, then refuses a forged archive that points outside itself. Three existing tests now expect format 4.
+- No migration.
+
+### Checks
+- Version, migration lock (79 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**, and no archive was written or read. Nothing was built or run.
+
+### Upgrading
+- An archive written by this version is format 4 and cannot be read by an older server (it says so and asks to update first). Archives written before still import.
+
 ## V0.7.18 (2026-11-18)
 
 Move tasks out and in as CSV, with the columns matched by the caller, every row explained before anything is written, and no task made twice.

@@ -12,6 +12,7 @@ mod access_matrix;
 mod ai;
 mod archive_history;
 mod archive_roundtrip;
+mod archive_work;
 mod auth;
 mod card_changes;
 mod citation_durability;

@@ -26,6 +26,7 @@ mod activity;
 mod approvals;
 mod archive;
 mod archive_import;
+mod archive_work;
 mod artifacts;
 mod collaboration;
 mod connectors;

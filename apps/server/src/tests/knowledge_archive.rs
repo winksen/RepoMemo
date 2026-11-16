@@ -85,7 +85,7 @@ async fn an_archive_carries_a_cards_history_and_review_and_returns_approvals_as_
             .into_iter()
             .collect();
     let manifest: Value = serde_json::from_slice(&entries["manifest.json"]).unwrap();
-    assert_eq!(manifest["format_version"], 3);
+    assert_eq!(manifest["format_version"], 4);
     assert!(manifest["counts"]["revisions"].as_u64().unwrap() >= 3);
     assert_eq!(manifest["counts"]["approvals"], 1);
     assert_eq!(manifest["counts"]["reviews"], 1);

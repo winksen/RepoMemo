@@ -473,13 +473,42 @@ impl StorageEngine {
             .await?;
         }
 
-        // Tasks and their checklists.
+        // Tasks and their checklists. A task keeps its number from the archive when it has one (V0.7.19), so T-12 names the same
+        // task after a move; the counter starts above the highest, and above any number that was given out and deleted.
+        let preserved: HashMap<&str, i64> = data
+            .work
+            .task_extras
+            .iter()
+            .filter(|extra| extra.number > 0)
+            .map(|extra| (extra.task_id.as_str(), extra.number))
+            .collect();
+        let counter = preserved
+            .values()
+            .copied()
+            .max()
+            .unwrap_or(0)
+            .max(data.work.task_counter);
+        if counter > 0 {
+            sqlx::query(
+                "INSERT INTO workspace_task_counters (workspace_id, last_number) VALUES (?1, ?2)
+                 ON CONFLICT(workspace_id) DO UPDATE SET last_number = MAX(last_number, excluded.last_number)",
+            )
+            .bind(workspace_id)
+            .bind(counter)
+            .execute(&mut *tx)
+            .await?;
+        }
+        let mut task_ids: HashMap<String, String> = HashMap::new();
         for task in &data.tasks {
             if !TASK_STATUSES.contains(&task.status.as_str()) || !TASK_PRIORITIES.contains(&task.priority.as_str()) {
                 bail!("the task {} has a state this server does not know", task.title);
             }
             let id = Uuid::new_v4().to_string();
-            let number = crate::collaboration::take_task_number(&mut tx, workspace_id).await?;
+            let number = match preserved.get(task.id.as_str()) {
+                Some(number) => *number,
+                None => crate::collaboration::take_task_number(&mut tx, workspace_id).await?,
+            };
+            task_ids.insert(task.id.clone(), id.clone());
             let mut credits = format!("Created by {} in the exported workspace.", credit(&task.created_by));
             if let Some(assignee) = &task.assignee {
                 credits.push_str(&format!(" Assigned to {}.", credit(assignee)));
@@ -536,8 +565,10 @@ impl StorageEngine {
 
         // Memory cards. A file citation is linked now; a passage waits for
         // the file's index.
+        let mut card_ids: HashMap<String, String> = HashMap::new();
         for card in &data.memory_cards {
             let id = Uuid::new_v4().to_string();
+            card_ids.insert(card.id.clone(), id.clone());
             sqlx::query(
                 r#"
                 INSERT INTO memory_cards (
@@ -584,6 +615,18 @@ impl StorageEngine {
             self.import_card_knowledge(&mut tx, workspace_id, &id, card, &imported.artifact_ids)
                 .await?;
         }
+
+        // The work of the 0.7 line: projects, relations between tasks, schedules (paused) and updates (V0.7.19).
+        self.import_work(
+            &mut tx,
+            workspace_id,
+            importer_user_id,
+            &data.work,
+            &imported.artifact_ids,
+            &task_ids,
+            &card_ids,
+        )
+        .await?;
 
         // The settings that make sense on another server.
         if let Some(policy) = data

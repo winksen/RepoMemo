@@ -86,7 +86,7 @@ async fn an_export_imported_elsewhere_shows_the_version_history_and_the_saved_se
             .into_iter()
             .collect();
     let manifest: Value = serde_json::from_slice(&entries["manifest.json"]).unwrap();
-    assert_eq!(manifest["format_version"], 3);
+    assert_eq!(manifest["format_version"], 4);
     assert_eq!(manifest["counts"]["artifacts"], 1);
     assert_eq!(manifest["counts"]["versions"], 2);
     assert_eq!(manifest["counts"]["saved_searches"], 1);

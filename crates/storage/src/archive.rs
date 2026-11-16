@@ -126,6 +126,7 @@ impl StorageEngine {
         let comments = self.export_comments(workspace_id).await?;
         let versions = self.export_versions(workspace_id).await?;
         let saved_searches = self.export_saved_searches(workspace_id).await?;
+        let work = self.export_work(workspace_id).await?;
 
         Ok(WorkspaceArchiveData {
             workspace,
@@ -138,6 +139,7 @@ impl StorageEngine {
             comments,
             omitted_citations,
             trash_left_out,
+            work,
             versions,
             saved_searches,
         })

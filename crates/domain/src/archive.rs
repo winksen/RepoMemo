@@ -14,8 +14,10 @@ use serde_json::Value;
 pub const ARCHIVE_FORMAT: &str = "repomemo-workspace-archive";
 /// Bumped when an archive written by a newer server cannot be read by an older one. Version 2 (V0.3.19) adds the
 /// earlier versions of files and the saved searches; version 3 (V0.6.14) adds each memory card's revisions, the content
-/// its citations recorded, its approvals and its review assignment. A server reads versions 1, 2 and 3.
-pub const ARCHIVE_FORMAT_VERSION: u32 = 3;
+/// its citations recorded, its approvals and its review assignment; version 4 (V0.7.19) adds the work of the 0.7 line
+/// (projects, milestones, task numbers and relations, labels, workflow states, schedules and project updates). A server reads
+/// versions 1 to 4.
+pub const ARCHIVE_FORMAT_VERSION: u32 = 4;
 pub const ARCHIVE_MANIFEST_ENTRY: &str = "manifest.json";
 pub const ARCHIVE_DATA_ENTRY: &str = "workspace.json";
 pub const ARCHIVE_BLOB_PREFIX: &str = "blobs/";
@@ -60,6 +62,24 @@ pub struct ArchiveCounts {
     /// Deleted memory cards and files that were in the workspace's trash and are not part of the archive (V0.6.28).
     #[serde(default)]
     pub trash_left_out: u64,
+    /// Projects, milestones, labels, named workflow states, recurring schedules and project updates (format 4).
+    #[serde(default)]
+    pub projects: u64,
+    #[serde(default)]
+    pub milestones: u64,
+    #[serde(default)]
+    pub labels: u64,
+    #[serde(default)]
+    pub workflow_states: u64,
+    #[serde(default)]
+    pub recurring: u64,
+    #[serde(default)]
+    pub project_updates: u64,
+    /// Comments on tasks, and the blocker links between tasks (format 4).
+    #[serde(default)]
+    pub task_comments: u64,
+    #[serde(default)]
+    pub dependencies: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -326,6 +346,179 @@ pub struct ArchiveSavedSearch {
     pub updated_at: String,
 }
 
+/// A memory card or piece of evidence a project or a task cites (format 4), by the archive's own id.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArchiveReference {
+    /// `evidence` or `memory_card`.
+    pub kind: String,
+    pub target_id: String,
+    pub note: String,
+    pub added_by: Option<ArchivePerson>,
+    pub created_at: String,
+}
+
+/// A project (format 4) with the decisions and evidence its brief cites.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveProject {
+    pub id: String,
+    pub name: String,
+    pub goal: String,
+    /// `active`, `on_hold`, `done` or `archived`.
+    pub status: String,
+    pub owner: Option<ArchivePerson>,
+    pub created_by: Option<ArchivePerson>,
+    pub target_date: Option<String>,
+    pub archived_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    #[serde(default)]
+    pub references: Vec<ArchiveReference>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveMilestone {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub description: String,
+    pub due_date: Option<String>,
+    /// `all_tasks` or `manual`.
+    pub completion_rule: String,
+    pub completed_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveLabel {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+}
+
+/// A named workflow state (format 4); the four built-in states are not carried.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveWorkflowState {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    pub position: i64,
+}
+
+/// A comment on a task (format 4). Like every comment in an archive, it comes back credited to the person who imports, with
+/// the name the archive gives kept in the text.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveTaskComment {
+    pub author: ArchivePerson,
+    pub body: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// What a task has beyond the basics (format 4), named by the archive's own ids: its number, project, milestone, parent, labels,
+/// named state, citations, discussion and the tasks that block it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveTaskExtra {
+    pub task_id: String,
+    /// The number in the workspace it came from, kept so `T-12` names the same task after a move.
+    pub number: i64,
+    pub project_id: Option<String>,
+    pub milestone_id: Option<String>,
+    pub parent_task_id: Option<String>,
+    #[serde(default)]
+    pub label_ids: Vec<String>,
+    pub state_id: Option<String>,
+    #[serde(default)]
+    pub references: Vec<ArchiveReference>,
+    #[serde(default)]
+    pub comments: Vec<ArchiveTaskComment>,
+    /// The archive's ids of the tasks that block this one.
+    #[serde(default)]
+    pub blocked_by: Vec<String>,
+}
+
+/// One occurrence date a schedule looked at (format 4).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveOccurrence {
+    pub occurrence_date: String,
+    /// `created` or `skipped`.
+    pub outcome: String,
+    pub task_id: Option<String>,
+    pub created_at: String,
+}
+
+/// A recurring schedule (format 4). It always comes back **paused** (or stopped, if it was): nothing is made on the server that
+/// reads the archive until someone there resumes it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveRecurring {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub priority: String,
+    pub assignee: Option<ArchivePerson>,
+    pub project_id: Option<String>,
+    pub due_after_days: Option<i64>,
+    pub schedule: crate::RecurringSchedule,
+    pub missed_policy: String,
+    /// `active`, `paused` or `stopped`.
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub stopped_at: Option<String>,
+    #[serde(default)]
+    pub occurrences: Vec<ArchiveOccurrence>,
+}
+
+/// What a project update pointed at (format 4).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveUpdateLink {
+    /// `milestone`, `task`, `evidence` or `memory_card`.
+    pub kind: String,
+    pub target_id: String,
+    pub label: String,
+}
+
+/// A project status update (format 4). It comes back as a record: the person who wrote it is named in its text, and the health is
+/// still the one that person chose.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveProjectUpdate {
+    pub id: String,
+    pub project_id: String,
+    pub author: Option<ArchivePerson>,
+    pub health: String,
+    pub summary: String,
+    pub reason: String,
+    pub snapshot: crate::ProjectSnapshot,
+    #[serde(default)]
+    pub changes: Vec<String>,
+    #[serde(default)]
+    pub links: Vec<ArchiveUpdateLink>,
+    pub created_at: String,
+    pub retracted_at: Option<String>,
+}
+
+/// The work of the 0.7 line (format 4): projects and what hangs on them, and the relations between tasks.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ArchiveWork {
+    /// The last task number given in the workspace, so a number that was deleted is not given out again after a move.
+    #[serde(default)]
+    pub task_counter: i64,
+    #[serde(default)]
+    pub projects: Vec<ArchiveProject>,
+    #[serde(default)]
+    pub milestones: Vec<ArchiveMilestone>,
+    #[serde(default)]
+    pub labels: Vec<ArchiveLabel>,
+    #[serde(default)]
+    pub workflow_states: Vec<ArchiveWorkflowState>,
+    #[serde(default)]
+    pub task_extras: Vec<ArchiveTaskExtra>,
+    #[serde(default)]
+    pub recurring: Vec<ArchiveRecurring>,
+    #[serde(default)]
+    pub updates: Vec<ArchiveProjectUpdate>,
+}
+
 /// The content of `workspace.json`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceArchiveData {
@@ -349,6 +542,9 @@ pub struct WorkspaceArchiveData {
     /// Items in the workspace's trash when the archive was made, which an archive does not carry (V0.6.28).
     #[serde(default)]
     pub trash_left_out: u64,
+    /// Projects, task numbers and relations, labels, workflow states, schedules and updates (format 4). Empty in an older archive.
+    #[serde(default)]
+    pub work: ArchiveWork,
 }
 
 impl WorkspaceArchiveData {
@@ -393,6 +589,24 @@ impl WorkspaceArchiveData {
             approvals: self.memory_cards.iter().map(|card| card.approvals.len() as u64).sum(),
             reviews: self.memory_cards.iter().filter(|card| card.review.is_some()).count() as u64,
             trash_left_out: self.trash_left_out,
+            projects: self.work.projects.len() as u64,
+            milestones: self.work.milestones.len() as u64,
+            labels: self.work.labels.len() as u64,
+            workflow_states: self.work.workflow_states.len() as u64,
+            recurring: self.work.recurring.len() as u64,
+            project_updates: self.work.updates.len() as u64,
+            task_comments: self
+                .work
+                .task_extras
+                .iter()
+                .map(|extra| extra.comments.len() as u64)
+                .sum(),
+            dependencies: self
+                .work
+                .task_extras
+                .iter()
+                .map(|extra| extra.blocked_by.len() as u64)
+                .sum(),
         }
     }
 }

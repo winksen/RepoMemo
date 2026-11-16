@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ArchiveCounts, ArchiveManifest, ArchivePerson, SharedWorkspace, WorkspaceArchiveData, ARCHIVE_FORMAT,
-    ARCHIVE_FORMAT_VERSION, MAX_FOLDER_DEPTH,
+    ArchiveCounts, ArchiveManifest, ArchivePerson, ArchiveReference, SharedWorkspace, WorkspaceArchiveData,
+    ARCHIVE_FORMAT, ARCHIVE_FORMAT_VERSION, MAX_FOLDER_DEPTH,
 };
 
 /// What checking an archive found.
@@ -125,6 +125,19 @@ mod tests {
         assert_eq!(manifest(&[u64::MAX / 2 + 1, u64::MAX / 2 + 1]).blob_bytes(), u64::MAX);
         assert_eq!(manifest(&[u64::MAX, 5]).blob_bytes(), u64::MAX);
     }
+}
+
+/// Whether text is a calendar date, YYYY-MM-DD (this crate has no date library).
+fn chrono_free_date(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+        return false;
+    }
+    let number = |range: std::ops::Range<usize>| text.get(range).and_then(|part| part.parse::<u32>().ok());
+    matches!(
+        (number(0..4), number(5..7), number(8..10)),
+        (Some(_), Some(1..=12), Some(1..=31))
+    )
 }
 
 fn limited(check: &mut ArchiveCheck, found: Vec<String>, what: &str) {
@@ -378,6 +391,7 @@ impl WorkspaceArchiveData {
                 "{passages} citation(s) of earlier revisions cited a passage; they come back as the file they were in."
             ));
         }
+        self.check_work(&mut check);
         if self.omitted_citations > 0 {
             check.warnings.push(format!(
                 "{} citation(s) were already left out of the archive because what they cited no longer existed.",
@@ -385,6 +399,293 @@ impl WorkspaceArchiveData {
             ));
         }
         check
+    }
+
+    /// The work of the 0.7 line (format 4): every relation points at a record that is in the archive, so nothing can name a
+    /// record of another workspace; the relations are acyclic; and what an import will not do is said.
+    fn check_work(&self, check: &mut ArchiveCheck) {
+        let work = &self.work;
+        let tasks: HashSet<&str> = self.tasks.iter().map(|task| task.id.as_str()).collect();
+        let projects: HashSet<&str> = work.projects.iter().map(|project| project.id.as_str()).collect();
+        let milestones: HashMap<&str, &str> = work
+            .milestones
+            .iter()
+            .map(|milestone| (milestone.id.as_str(), milestone.project_id.as_str()))
+            .collect();
+        let labels: HashSet<&str> = work.labels.iter().map(|label| label.id.as_str()).collect();
+        let states: HashSet<&str> = work.workflow_states.iter().map(|state| state.id.as_str()).collect();
+
+        let mut seen = HashSet::new();
+        let repeated = work
+            .projects
+            .iter()
+            .map(|record| record.id.as_str())
+            .chain(work.milestones.iter().map(|record| record.id.as_str()))
+            .chain(work.labels.iter().map(|record| record.id.as_str()))
+            .chain(work.workflow_states.iter().map(|record| record.id.as_str()))
+            .chain(work.recurring.iter().map(|record| record.id.as_str()))
+            .chain(work.updates.iter().map(|record| record.id.as_str()))
+            .filter(|id| !seen.insert(*id))
+            .map(|id| format!("The id {id} is used twice among the projects and what hangs on them."))
+            .collect::<Vec<_>>();
+        limited(check, repeated, "project records");
+
+        let mut problems = Vec::new();
+        for project in &work.projects {
+            if !["active", "on_hold", "done", "archived"].contains(&project.status.as_str()) {
+                problems.push(format!(
+                    "The project {} has a status this server does not know.",
+                    project.name
+                ));
+            }
+        }
+        for milestone in &work.milestones {
+            if !projects.contains(milestone.project_id.as_str()) {
+                problems.push(format!(
+                    "The milestone {} names a project that is not in the archive.",
+                    milestone.name
+                ));
+            }
+            if !["all_tasks", "manual"].contains(&milestone.completion_rule.as_str()) {
+                problems.push(format!(
+                    "The milestone {} has a completion rule this server does not know.",
+                    milestone.name
+                ));
+            }
+        }
+        let mut label_names = HashSet::new();
+        for label in &work.labels {
+            if !label_names.insert(label.name.to_lowercase()) {
+                problems.push(format!("The label {} appears twice.", label.name));
+            }
+        }
+        let mut state_names = HashSet::new();
+        for state in &work.workflow_states {
+            let lower = state.name.to_lowercase();
+            if ["open", "in progress", "blocked", "done"].contains(&lower.as_str()) {
+                problems.push(format!(
+                    "The state {} repeats the name of a built-in state.",
+                    state.name
+                ));
+            }
+            if !state_names.insert(lower) {
+                problems.push(format!("The state {} appears twice.", state.name));
+            }
+            if !TASK_STATUSES.contains(&state.category.as_str()) {
+                problems.push(format!(
+                    "The state {} has a category this server does not know.",
+                    state.name
+                ));
+            }
+        }
+        let mut numbers = HashSet::new();
+        let mut extras_seen = HashSet::new();
+        let mut parents: HashMap<&str, &str> = HashMap::new();
+        let mut blockers: HashMap<&str, Vec<&str>> = HashMap::new();
+        for extra in &work.task_extras {
+            if !tasks.contains(extra.task_id.as_str()) {
+                problems.push(format!(
+                    "A task record names {}, which is not a task of the archive.",
+                    extra.task_id
+                ));
+                continue;
+            }
+            if !extras_seen.insert(extra.task_id.as_str()) {
+                problems.push(format!("The task {} has two records of its relations.", extra.task_id));
+            }
+            if extra.number < 1 || !numbers.insert(extra.number) {
+                problems.push(format!("The task {} has no valid, unique number.", extra.task_id));
+            }
+            if let Some(project) = extra.project_id.as_deref() {
+                if !projects.contains(project) {
+                    problems.push(format!(
+                        "The task {} is in a project that is not in the archive.",
+                        extra.task_id
+                    ));
+                }
+            }
+            if let Some(milestone) = extra.milestone_id.as_deref() {
+                match milestones.get(milestone) {
+                    None => problems.push(format!(
+                        "The task {} is in a milestone that is not in the archive.",
+                        extra.task_id
+                    )),
+                    Some(project) if extra.project_id.as_deref() != Some(*project) => problems.push(format!(
+                        "The task {} is in a milestone of another project than its own.",
+                        extra.task_id
+                    )),
+                    Some(_) => {}
+                }
+            }
+            if extra.label_ids.iter().any(|id| !labels.contains(id.as_str())) {
+                problems.push(format!(
+                    "The task {} carries a label that is not in the archive.",
+                    extra.task_id
+                ));
+            }
+            if extra.state_id.as_deref().is_some_and(|id| !states.contains(id)) {
+                problems.push(format!(
+                    "The task {} is in a state that is not in the archive.",
+                    extra.task_id
+                ));
+            }
+            if let Some(parent) = extra.parent_task_id.as_deref() {
+                if parent == extra.task_id || !tasks.contains(parent) {
+                    problems.push(format!(
+                        "The task {} has a parent that is itself or not in the archive.",
+                        extra.task_id
+                    ));
+                } else {
+                    parents.insert(extra.task_id.as_str(), parent);
+                }
+            }
+            for blocker in &extra.blocked_by {
+                if blocker == &extra.task_id || !tasks.contains(blocker.as_str()) {
+                    problems.push(format!(
+                        "The task {} is blocked by itself or by a task that is not in the archive.",
+                        extra.task_id
+                    ));
+                } else {
+                    blockers
+                        .entry(extra.task_id.as_str())
+                        .or_default()
+                        .push(blocker.as_str());
+                }
+            }
+        }
+        // Parents and blockers must not loop, however long the loop is.
+        for start in parents.keys() {
+            let mut at = *start;
+            let mut steps = 0;
+            while let Some(next) = parents.get(at) {
+                steps += 1;
+                if steps > tasks.len() {
+                    problems.push(format!("The task {start} is part of a loop of parent tasks."));
+                    break;
+                }
+                at = next;
+            }
+        }
+        for start in blockers.keys() {
+            let mut stack = vec![*start];
+            let mut visited = HashSet::new();
+            while let Some(at) = stack.pop() {
+                for next in blockers.get(at).into_iter().flatten() {
+                    if next == start {
+                        problems.push(format!("The task {start} is blocked, through other tasks, by itself."));
+                        stack.clear();
+                        break;
+                    }
+                    if visited.insert(*next) {
+                        stack.push(next);
+                    }
+                }
+            }
+        }
+        for recurring in &work.recurring {
+            if recurring.project_id.as_deref().is_some_and(|id| !projects.contains(id)) {
+                problems.push(format!(
+                    "The recurring task {} is in a project that is not in the archive.",
+                    recurring.title
+                ));
+            }
+            let schedule = &recurring.schedule;
+            let valid = chrono_free_date(&schedule.start_date)
+                && (1..=60).contains(&schedule.interval)
+                && match schedule.kind.as_str() {
+                    "daily" => true,
+                    "weekly" => schedule.weekday.is_some_and(|day| (0..=6).contains(&day)),
+                    "monthly" => schedule.day_of_month.is_some_and(|day| (1..=28).contains(&day)),
+                    _ => false,
+                };
+            if !valid || !["latest", "skip"].contains(&recurring.missed_policy.as_str()) {
+                problems.push(format!(
+                    "The schedule of {} is not one this server can run.",
+                    recurring.title
+                ));
+            }
+            if !["active", "paused", "stopped"].contains(&recurring.status.as_str()) {
+                problems.push(format!(
+                    "The recurring task {} has a status this server does not know.",
+                    recurring.title
+                ));
+            }
+        }
+        for update in &work.updates {
+            if !projects.contains(update.project_id.as_str()) {
+                problems.push("A project update names a project that is not in the archive.".to_owned());
+            }
+            if !["on_track", "at_risk", "blocked"].contains(&update.health.as_str()) {
+                problems.push("A project update has a health this server does not know.".to_owned());
+            }
+        }
+        limited(check, problems, "projects and tasks");
+
+        // What cannot be resolved here is dropped, and said.
+        let artifacts: HashSet<&str> = self.artifacts.iter().map(|artifact| artifact.id.as_str()).collect();
+        let cards: HashSet<&str> = self.memory_cards.iter().map(|card| card.id.as_str()).collect();
+        let dangling = |references: &[ArchiveReference]| {
+            references
+                .iter()
+                .filter(|reference| match reference.kind.as_str() {
+                    "memory_card" => !cards.contains(reference.target_id.as_str()),
+                    _ => !artifacts.contains(reference.target_id.as_str()),
+                })
+                .count()
+        };
+        let lost: usize = work
+            .projects
+            .iter()
+            .map(|project| dangling(&project.references))
+            .sum::<usize>()
+            + work
+                .task_extras
+                .iter()
+                .map(|extra| dangling(&extra.references))
+                .sum::<usize>();
+        if lost > 0 {
+            check.warnings.push(format!(
+                "{lost} citation(s) of projects and tasks name a file or card that is not in the archive and will be left out."
+            ));
+        }
+        let lost_links = work
+            .updates
+            .iter()
+            .flat_map(|update| update.links.iter())
+            .filter(|link| match link.kind.as_str() {
+                "milestone" => !milestones.contains_key(link.target_id.as_str()),
+                "task" => !tasks.contains(link.target_id.as_str()),
+                "memory_card" => !cards.contains(link.target_id.as_str()),
+                _ => !artifacts.contains(link.target_id.as_str()),
+            })
+            .count();
+        if lost_links > 0 {
+            check.warnings.push(format!(
+                "{lost_links} link(s) of project updates name something that is not in the archive and will be left out."
+            ));
+        }
+        let schedules = work
+            .recurring
+            .iter()
+            .filter(|recurring| recurring.status == "active")
+            .count();
+        if schedules > 0 {
+            check.warnings.push(format!(
+                "{schedules} recurring task(s) were running. They come back **paused**: nothing is made until someone here resumes each one."
+            ));
+        }
+        if !work.updates.is_empty() {
+            check.warnings.push(format!(
+                "{} project update(s) come back as a record; the person who wrote each is named in its text.",
+                work.updates.len()
+            ));
+        }
+        if !work.task_extras.is_empty() && self.tasks.iter().any(|task| !extras_seen.contains(task.id.as_str())) {
+            check.warnings.push(
+                "Some tasks have no record of their number or relations; they are numbered after the others."
+                    .to_owned(),
+            );
+        }
     }
 
     /// The distinct people the records name, for the import report.
@@ -404,6 +705,19 @@ impl WorkspaceArchiveData {
             }
         }
         self.comments.iter().for_each(|comment| add(&comment.author));
+        for project in &self.work.projects {
+            project.owner.iter().for_each(&mut add);
+            project.created_by.iter().for_each(&mut add);
+        }
+        for extra in &self.work.task_extras {
+            extra.comments.iter().for_each(|comment| add(&comment.author));
+        }
+        for recurring in &self.work.recurring {
+            recurring.assignee.iter().for_each(&mut add);
+        }
+        for update in &self.work.updates {
+            update.author.iter().for_each(&mut add);
+        }
         for card in &self.memory_cards {
             card.revisions
                 .iter()

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.19` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.19 — Extend workspace archives for projects, task relations, comments, workflow and schedules.
+
+- Moving a workspace with an archive now carries its projects, milestones, labels, named states, task numbers, sub-tasks, blockers, citations, comments, schedules and status updates. Relations stay intact inside the new workspace, an archive that points outside itself is refused, task numbers are kept, and recurring tasks come back paused until someone resumes them.
+
+Checks: `tests/archive_work.rs` compiles; not executed; static checks pass.
 
 ## V0.7.18 — Import and export task CSV with field mapping and a dry-run report.
 
