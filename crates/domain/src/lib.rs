@@ -99,6 +99,9 @@ pub struct CollaborationTask {
     /// How many sub-tasks it has, and how many of them are not done. Completing the task changes neither.
     pub child_count: i64,
     pub open_child_count: i64,
+    /// How many tasks block this one and are not done (V0.7.9), and how many tasks this one blocks.
+    pub open_blocker_count: i64,
+    pub blocks_count: i64,
     pub due_at: Option<String>,
     pub completed_at: Option<String>,
     pub created_at: String,
@@ -149,6 +152,35 @@ pub struct TaskDetail {
     pub references: Vec<TaskReference>,
     /// The task's direct sub-tasks (V0.7.8), open ones first.
     pub children: Vec<CollaborationTask>,
+    /// What blocks this task and what it blocks (V0.7.9).
+    pub dependencies: TaskDependencies,
+}
+
+/// A task named briefly, as the other end of a dependency.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskSummary {
+    pub id: String,
+    pub key: String,
+    pub title: String,
+    pub status: String,
+}
+
+/// "`blocker` blocks `blocked`" (V0.7.9). It informs and never acts: closing the blocker completes nothing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskDependency {
+    pub id: String,
+    pub blocker: TaskSummary,
+    pub blocked: TaskSummary,
+    pub created_by: Option<SharedUser>,
+    pub created_at: String,
+}
+
+/// What blocks a task, what it blocks, and in words why it is blocked (none when nothing blocks it).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskDependencies {
+    pub blocked_by: Vec<TaskDependency>,
+    pub blocks: Vec<TaskDependency>,
+    pub explanation: Option<String>,
 }
 
 /// One memory card or piece of evidence a task cites (V0.7.5). Only the id is stored; the title is read from the target, and

@@ -817,6 +817,7 @@ pub(crate) async fn get_task_detail(
         .list_child_tasks(&task.id)
         .await
         .map_err(map_storage_error)?;
+    let dependencies = crate::task_dependencies::load_dependencies(&state, &task.id).await?;
     Ok(Json(TaskDetail {
         task,
         checklist,
@@ -825,6 +826,7 @@ pub(crate) async fn get_task_detail(
         comment_count,
         references,
         children,
+        dependencies,
     }))
 }
 

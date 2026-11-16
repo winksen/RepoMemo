@@ -272,6 +272,8 @@ export interface CollaborationTask {
   parent_key: string | null;
   child_count: number;
   open_child_count: number;
+  open_blocker_count: number;
+  blocks_count: number;
   due_at: string | null;
   completed_at: string | null;
   created_at: string;

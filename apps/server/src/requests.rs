@@ -492,6 +492,16 @@ pub(crate) struct TaskReferenceInput {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct AddTaskDependencyRequest {
+    /// The task in the path is blocked by this task. Name this or `blocked_task_id`, not both.
+    #[serde(default)]
+    pub(crate) blocker_task_id: Option<String>,
+    /// The task in the path blocks this task.
+    #[serde(default)]
+    pub(crate) blocked_task_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct SaveMilestoneRequest {
     pub(crate) name: String,
     #[serde(default)]

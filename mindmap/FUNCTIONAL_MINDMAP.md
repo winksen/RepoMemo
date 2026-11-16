@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.9` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.9 — Add blocks/blocked-by links and a clear blocker explanation.
+
+- A task can be blocked by other tasks of the same workspace and says in words what is blocking it. A task cannot block itself or form a loop. Closing a blocker updates the explanation and completes nothing.
+
+Checks: `tests/task_dependencies.rs` compiles; not executed; static checks pass.
 
 ## V0.7.8 — Add parent/child tasks separate from checklist steps.
 

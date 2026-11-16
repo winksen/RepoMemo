@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.9 (2026-11-17)
+
+Let one task block another, and say in plain words what is blocking a task.
+
+### Added
+- **Dependencies** (`/v1/tasks/{id}/dependencies`, `/v1/task-dependencies/{id}`): "this task blocks that one". Name the other task as `blocker_task_id` (the task in the path is blocked by it) or `blocked_task_id` (it blocks that one), exactly one. Anyone who can edit adds or removes a link; anyone who can read lists them.
+- **What is refused.** A task blocking itself, a task of another workspace and a link that would close a cycle, directly or through other tasks, are `400` with the reason; the same link twice is `409`; a task has at most 50 links of each kind.
+- **A clear explanation.** The list returns `blocked_by`, `blocks` and an `explanation` such as "Blocked by T-1 Backfill (open)." (the first three open blockers, then "and N more") or "Not blocked: 1 of its blockers is done." A task also reports `open_blocker_count` and `blocks_count`, and its detail carries the lists.
+- **A dependency only informs.** Closing a blocker changes the explanation and the count and nothing else: the blocked task's status is never changed, and nobody is completed for. Deleting a task removes its links.
+- Migration **0072** adds `task_dependencies` (unique per pair, a task cannot link to itself).
+- A server test (`tests/task_dependencies.rs`) follows linking from both sides, the refusals including a cycle through a third task, the explanation, a closed blocker completing nothing, and removal.
+- **Not in this release:** the web screens.
+
+### Checks
+- Version, migration lock (72 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. Tasks report two new counts.
+
 ## V0.7.8 (2026-11-17)
 
 Let a task have sub-tasks that are real tasks, kept separate from checklist steps.

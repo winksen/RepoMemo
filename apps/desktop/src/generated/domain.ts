@@ -79,6 +79,9 @@ export interface CollaborationTask {
   /** How many sub-tasks it has, and how many of them are not done. Completing the task changes neither. */
   child_count: number;
   open_child_count: number;
+  /** How many tasks block this one and are not done (V0.7.9), and how many tasks this one blocks. */
+  open_blocker_count: number;
+  blocks_count: number;
   due_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -129,6 +132,32 @@ export interface TaskDetail {
   references: TaskReference[];
   /** The task's direct sub-tasks (V0.7.8), open ones first. */
   children: CollaborationTask[];
+  /** What blocks this task and what it blocks (V0.7.9). */
+  dependencies: TaskDependencies;
+}
+
+/** A task named briefly, as the other end of a dependency. */
+export interface TaskSummary {
+  id: string;
+  key: string;
+  title: string;
+  status: string;
+}
+
+/** "`blocker` blocks `blocked`" (V0.7.9). It informs and never acts: closing the blocker completes nothing. */
+export interface TaskDependency {
+  id: string;
+  blocker: TaskSummary;
+  blocked: TaskSummary;
+  created_by: SharedUser | null;
+  created_at: string;
+}
+
+/** What blocks a task, what it blocks, and in words why it is blocked (none when nothing blocks it). */
+export interface TaskDependencies {
+  blocked_by: TaskDependency[];
+  blocks: TaskDependency[];
+  explanation: string | null;
 }
 
 /**

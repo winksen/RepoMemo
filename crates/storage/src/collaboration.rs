@@ -26,6 +26,9 @@ pub(crate) const TASK_SELECT: &str = r#"
       parent.number AS parent_number,
       (SELECT COUNT(*) FROM workspace_tasks AS child WHERE child.parent_task_id = task.id) AS child_count,
       (SELECT COUNT(*) FROM workspace_tasks AS child WHERE child.parent_task_id = task.id AND child.status != 'done') AS open_child_count,
+      (SELECT COUNT(*) FROM task_dependencies AS link JOIN workspace_tasks AS blocker ON blocker.id = link.blocker_task_id
+        WHERE link.blocked_task_id = task.id AND blocker.status != 'done') AS open_blocker_count,
+      (SELECT COUNT(*) FROM task_dependencies AS link WHERE link.blocker_task_id = task.id) AS blocks_count,
       task.due_at,
       task.completed_at,
       task.created_at,

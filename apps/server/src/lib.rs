@@ -56,6 +56,7 @@ mod serve;
 mod setup;
 mod streams;
 mod system;
+mod task_dependencies;
 mod task_discussion;
 mod task_hierarchy;
 mod task_references;
@@ -962,6 +963,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             delete(task_references::remove_task_reference),
         )
         .route("/v1/tasks/{task_id}/children", get(task_hierarchy::list_child_tasks))
+        .route(
+            "/v1/tasks/{task_id}/dependencies",
+            get(task_dependencies::list_task_dependencies).post(task_dependencies::add_task_dependency),
+        )
+        .route(
+            "/v1/task-dependencies/{dependency_id}",
+            delete(task_dependencies::remove_task_dependency),
+        )
         .route(
             "/v1/tasks/{task_id}/watch",
             get(task_discussion::get_task_watch).put(task_discussion::set_task_watch),

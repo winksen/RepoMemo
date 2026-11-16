@@ -342,6 +342,9 @@
 | POST | `/v1/milestones/{milestone_id}/complete` | auth | require_workspace_write | — | Milestone (`409` unless the rule is `manual`) |
 | POST | `/v1/milestones/{milestone_id}/reopen` | auth | require_workspace_write | — | Milestone |
 | GET | `/v1/tasks/{task_id}/children` | auth | require_workspace_read | — | Vec<CollaborationTask> |
+| GET | `/v1/tasks/{task_id}/dependencies` | auth | require_workspace_read | — | TaskDependencies |
+| POST | `/v1/tasks/{task_id}/dependencies` | auth | require_workspace_write | AddTaskDependencyRequest | TaskDependency |
+| DELETE | `/v1/task-dependencies/{dependency_id}` | auth | require_workspace_write | — | — |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

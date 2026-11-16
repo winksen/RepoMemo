@@ -10,9 +10,9 @@ use repomemo_domain::{
     CollaborationTask, Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence,
     MemoryReviewReason, Milestone, Organization, OrganizationMember, OrganizationRole, Project, ProjectReference,
     ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace,
-    Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, TaskComment, TaskReference,
-    Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
-    MAX_FOLDER_DEPTH,
+    Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, TaskComment, TaskDependency,
+    TaskReference, TaskSummary, Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership,
+    WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -54,6 +54,7 @@ mod setup;
 mod staging;
 mod stats;
 mod system;
+mod task_dependencies;
 mod task_discussion;
 mod task_hierarchy;
 mod task_references;
@@ -85,6 +86,7 @@ pub use projects::NewProject;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};
 pub use review_assignments::{DueReview, ReminderCandidate, ReviewAssignment};
+pub use task_dependencies::MAX_TASK_DEPENDENCIES;
 pub use task_hierarchy::MAX_TASK_DEPTH;
 pub use task_references::MAX_TASK_REFERENCES;
 mod newer;
@@ -326,6 +328,8 @@ struct CollaborationTaskRow {
     parent_number: Option<i64>,
     child_count: i64,
     open_child_count: i64,
+    open_blocker_count: i64,
+    blocks_count: i64,
     due_at: Option<String>,
     completed_at: Option<String>,
     created_at: String,
@@ -1162,6 +1166,8 @@ impl From<CollaborationTaskRow> for CollaborationTask {
             parent_key: row.parent_number.map(|number| format!("T-{number}")),
             child_count: row.child_count,
             open_child_count: row.open_child_count,
+            open_blocker_count: row.open_blocker_count,
+            blocks_count: row.blocks_count,
             due_at: row.due_at,
             completed_at: row.completed_at,
             created_at: row.created_at,
