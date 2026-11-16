@@ -5,6 +5,7 @@ const TASK_SELECT: &str = r#"
     SELECT
       task.id,
       task.workspace_id,
+      COALESCE(task.number, 0) AS number,
       task.title,
       task.description,
       task.status,
@@ -26,6 +27,18 @@ const TASK_SELECT: &str = r#"
     JOIN users AS creator ON creator.id = task.created_by_user_id
     LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
     LEFT JOIN workspace_projects AS project ON project.id = task.project_id"#;
+
+/// Gives the next number of a workspace's tasks. A number is only ever added, so a deleted task's number is never reused.
+pub(crate) async fn take_task_number(connection: &mut sqlx::SqliteConnection, workspace_id: &str) -> Result<i64> {
+    let number = sqlx::query_scalar(
+        "INSERT INTO workspace_task_counters (workspace_id, last_number) VALUES (?1, 1)
+         ON CONFLICT(workspace_id) DO UPDATE SET last_number = last_number + 1 RETURNING last_number",
+    )
+    .bind(workspace_id)
+    .fetch_one(connection)
+    .await?;
+    Ok(number)
+}
 
 impl StorageEngine {
     pub async fn list_collaboration_tasks(&self, workspace_id: &str) -> Result<Vec<CollaborationTask>> {
@@ -81,13 +94,15 @@ impl StorageEngine {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let completed_at = (task.status == "done").then(|| now.clone());
+        let mut transaction = self.pool.begin().await?;
+        let number = take_task_number(&mut transaction, workspace_id).await?;
         sqlx::query(
             r#"
             INSERT INTO workspace_tasks (
               id, workspace_id, title, description, status, priority,
               assignee_user_id, created_by_user_id, artifact_id, due_at,
-              completed_at, created_at, updated_at, project_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+              completed_at, created_at, updated_at, project_id, number
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
             "#,
         )
         .bind(&id)
@@ -104,8 +119,10 @@ impl StorageEngine {
         .bind(&now)
         .bind(&now)
         .bind(task.project_id.flatten())
-        .execute(&self.pool)
+        .bind(number)
+        .execute(&mut *transaction)
         .await?;
+        transaction.commit().await?;
         self.get_collaboration_task(&id).await
     }
 
@@ -152,14 +169,53 @@ impl StorageEngine {
     }
 
     pub async fn delete_collaboration_task(&self, task_id: &str) -> Result<()> {
+        let mut transaction = self.pool.begin().await?;
+        // Remember the number, so a link to the task says it was deleted and the number is not reused.
+        sqlx::query(
+            "INSERT OR IGNORE INTO workspace_task_tombstones (workspace_id, number, deleted_at)
+             SELECT workspace_id, number, ?2 FROM workspace_tasks WHERE id = ?1 AND number IS NOT NULL",
+        )
+        .bind(task_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *transaction)
+        .await?;
         let result = sqlx::query("DELETE FROM workspace_tasks WHERE id = ?1")
             .bind(task_id)
-            .execute(&self.pool)
+            .execute(&mut *transaction)
             .await?;
         if result.rows_affected() == 0 {
             repomemo_domain::bail_not_found!("Collaboration task was not found.");
         }
+        transaction.commit().await?;
         Ok(())
+    }
+
+    /// The task with this number in this workspace, if it exists.
+    pub async fn find_collaboration_task_by_number(
+        &self,
+        workspace_id: &str,
+        number: i64,
+    ) -> Result<Option<CollaborationTask>> {
+        let row = sqlx::query_as::<_, CollaborationTaskRow>(&format!(
+            "{TASK_SELECT} WHERE task.workspace_id = ?1 AND task.number = ?2"
+        ))
+        .bind(workspace_id)
+        .bind(number)
+        .fetch_optional(self.reader())
+        .await?;
+        Ok(row.map(CollaborationTask::from))
+    }
+
+    /// Whether a task with this number existed here and was deleted.
+    pub async fn task_number_was_deleted(&self, workspace_id: &str, number: i64) -> Result<bool> {
+        let found: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM workspace_task_tombstones WHERE workspace_id = ?1 AND number = ?2",
+        )
+        .bind(workspace_id)
+        .bind(number)
+        .fetch_one(self.reader())
+        .await?;
+        Ok(found > 0)
     }
 
     pub async fn list_saved_searches(&self, workspace_id: &str) -> Result<Vec<SavedSearch>> {

@@ -324,6 +324,7 @@
 | POST | `/v1/projects/{project_id}/references` | auth | require_workspace_write | AddProjectReferenceRequest | ProjectReference |
 | DELETE | `/v1/projects/{project_id}/references/{reference_id}` | auth | require_workspace_write | — | — |
 | GET | `/v1/workspaces/{workspace_id}/projects/citing` | auth | require_workspace_read | — (`?kind=&target_id=`) | Vec<Project> |
+| GET | `/v1/workspaces/{workspace_id}/tasks/{task_ref}` | auth | require_workspace_read | — (`T-12`, `12` or an id) | TaskDetail (`410` when deleted) |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

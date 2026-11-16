@@ -54,6 +54,10 @@ export interface WorkspaceActivityEvent {
 export interface CollaborationTask {
   id: string;
   workspace_id: string;
+  /** The task's number in its workspace (V0.7.3): unique, never reused and unchanged when the title changes. */
+  number: number;
+  /** The human-readable identifier built from it, such as `T-12`. */
+  key: string;
   title: string;
   description: string;
   status: string;
@@ -68,6 +72,16 @@ export interface CollaborationTask {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * A task with what its own page shows (V0.7.3). `path` is the address of the task in the web app and keeps naming the same
+ * task when its title changes.
+ */
+export interface TaskDetail {
+  task: CollaborationTask;
+  checklist: TaskChecklistItem[];
+  path: string;
 }
 
 /** A named piece of work inside one workspace (V0.7.1). It grants no access: whoever can read the workspace can read it. */

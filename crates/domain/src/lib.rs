@@ -74,6 +74,10 @@ pub struct WorkspaceActivityEvent {
 pub struct CollaborationTask {
     pub id: String,
     pub workspace_id: String,
+    /// The task's number in its workspace (V0.7.3): unique, never reused and unchanged when the title changes.
+    pub number: i64,
+    /// The human-readable identifier built from it, such as `T-12`.
+    pub key: String,
     pub title: String,
     pub description: String,
     pub status: String,
@@ -88,6 +92,15 @@ pub struct CollaborationTask {
     pub completed_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// A task with what its own page shows (V0.7.3). `path` is the address of the task in the web app and keeps naming the same
+/// task when its title changes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskDetail {
+    pub task: CollaborationTask,
+    pub checklist: Vec<TaskChecklistItem>,
+    pub path: String,
 }
 
 /// A named piece of work inside one workspace (V0.7.1). It grants no access: whoever can read the workspace can read it.

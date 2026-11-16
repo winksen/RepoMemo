@@ -41,6 +41,7 @@ mod revision_attribution;
 mod revision_limits;
 mod search_feedback;
 mod system;
+mod task_details;
 mod templates;
 mod trash;
 mod workspaces;

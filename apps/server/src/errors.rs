@@ -54,6 +54,11 @@ impl ApiError {
         Self::forbidden_because("Your membership does not allow access to this workspace.")
     }
 
+    /// A resource that existed and was removed on purpose.
+    pub(crate) fn gone(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::GONE, "gone", message)
+    }
+
     pub(crate) fn forbidden_because(message: impl Into<String>) -> Self {
         Self::new(StatusCode::FORBIDDEN, "forbidden", message)
     }

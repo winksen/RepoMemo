@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.3 (2026-11-17)
+
+Give every task a number that names it for good, and a read route that opens a task by it.
+
+### Added
+- **A task number and key.** Each task has a `number` that is unique in its workspace and is never given out again, and a `key` built from it, `T-12`. Changing the title, the status or the project changes neither. Tasks made before this release are numbered in the order they were created; tasks imported from an archive are numbered as they arrive.
+- **A detail route** (`GET /v1/workspaces/{id}/tasks/{ref}`) that takes `T-12`, `12` or the task's id and returns the task, its checklist and its web address (`/workspaces/{id}/tasks/T-12`). Everyone who can read the workspace gets it, a guest included; a task of another workspace is not reachable through this one.
+- **Useful states for a link that no longer works.** A task that was deleted answers `410` with "Task T-12 was deleted."; a number that never existed answers `404` with "There is no task T-12 in this workspace." A deleted task's number is remembered, so it is not reused.
+- Migration **0066** adds `workspace_tasks.number` (a unique index per workspace), a counter per workspace and a record of deleted numbers; existing tasks are numbered by it.
+- A server test (`tests/task_details.rs`) follows numbering, the four ways to open a task, a rename, a guest and a stranger, another workspace, a deleted and an unknown task, and a number not being reused.
+- **Not in this release:** the web page that shows the task; the `path` is its address.
+
+### Checks
+- Version, migration lock (66 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**, and neither was the migration on an existing database. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and numbers existing tasks. A script that reads tasks now also gets `number` and `key`.
+
 ## V0.7.2 (2026-11-17)
 
 Give a project a brief: the decision memories and evidence that explain its goal, cited by reference.

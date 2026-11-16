@@ -479,6 +479,7 @@ impl StorageEngine {
                 bail!("the task {} has a state this server does not know", task.title);
             }
             let id = Uuid::new_v4().to_string();
+            let number = crate::collaboration::take_task_number(&mut tx, workspace_id).await?;
             let mut credits = format!("Created by {} in the exported workspace.", credit(&task.created_by));
             if let Some(assignee) = &task.assignee {
                 credits.push_str(&format!(" Assigned to {}.", credit(assignee)));
@@ -487,8 +488,8 @@ impl StorageEngine {
                 r#"
                 INSERT INTO workspace_tasks (
                   id, workspace_id, title, description, status, priority, assignee_user_id,
-                  created_by_user_id, artifact_id, due_at, completed_at, created_at, updated_at
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7, ?8, ?9, ?10, ?11, ?12)
+                  created_by_user_id, artifact_id, due_at, completed_at, created_at, updated_at, number
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
                 "#,
             )
             .bind(&id)
@@ -507,6 +508,7 @@ impl StorageEngine {
             .bind(&task.completed_at)
             .bind(&task.created_at)
             .bind(&task.updated_at)
+            .bind(number)
             .execute(&mut *tx)
             .await?;
             for item in &task.checklist {

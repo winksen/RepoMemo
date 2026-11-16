@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.3 — Give tasks stable human-readable identifiers, direct URLs and a detail view.
+
+- Every task has a number that names it for good, shown as `T-12`. A link by that number opens the same task after the title changes, a guest who can read the workspace can open it, a deleted task says it was deleted and an unknown number says it does not exist. Numbers are never reused. The page itself is not built yet.
+
+Checks: `tests/task_details.rs` compiles; not executed; static checks pass.
 
 ## V0.7.2 — Attach decision memories and evidence to a project brief with backlinks.
 

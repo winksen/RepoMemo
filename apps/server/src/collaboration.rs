@@ -1,4 +1,5 @@
 use crate::*;
+use repomemo_domain::TaskDetail;
 
 pub(crate) async fn list_collaboration_tasks(
     subject: AuthenticatedSubject,
@@ -624,6 +625,66 @@ pub(crate) async fn suggest_mentions(
         }
     }
     Ok(Json(suggestions))
+}
+
+/// A task by its identifier: `T-12`, `12` or its id. A guest gets the authorized view; a task that was deleted says so, and
+/// one that never existed says that, so an old link is never a bare error.
+pub(crate) async fn get_task_detail(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, task_ref)): Path<(String, String)>,
+) -> Result<Json<TaskDetail>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let reference = task_ref.trim();
+    let number = reference
+        .strip_prefix("T-")
+        .or_else(|| reference.strip_prefix("t-"))
+        .unwrap_or(reference)
+        .parse::<i64>()
+        .ok()
+        .filter(|number| *number > 0);
+    let task = match number {
+        Some(number) => {
+            let found = state
+                .storage
+                .find_collaboration_task_by_number(&workspace_id, number)
+                .await
+                .map_err(map_storage_error)?;
+            match found {
+                Some(task) => task,
+                None => {
+                    let deleted = state
+                        .storage
+                        .task_number_was_deleted(&workspace_id, number)
+                        .await
+                        .map_err(map_storage_error)?;
+                    return Err(if deleted {
+                        ApiError::gone(format!("Task T-{number} was deleted."))
+                    } else {
+                        ApiError::not_found(format!("There is no task T-{number} in this workspace."))
+                    });
+                }
+            }
+        }
+        None => {
+            let task = state
+                .storage
+                .get_collaboration_task(reference)
+                .await
+                .map_err(|_| ApiError::not_found("Task was not found."))?;
+            if task.workspace_id != workspace_id {
+                return Err(ApiError::not_found("Task was not found."));
+            }
+            task
+        }
+    };
+    let checklist = state
+        .storage
+        .list_task_checklist_items(&task.id)
+        .await
+        .map_err(map_storage_error)?;
+    let path = format!("/workspaces/{}/tasks/{}", task.workspace_id, task.key);
+    Ok(Json(TaskDetail { task, checklist, path }))
 }
 
 #[cfg(test)]

@@ -254,6 +254,8 @@ export type CollaborationTaskPriority = "low" | "medium" | "high" | "urgent";
 export interface CollaborationTask {
   id: string;
   workspace_id: string;
+  number: number;
+  key: string;
   title: string;
   description: string;
   status: CollaborationTaskStatus;

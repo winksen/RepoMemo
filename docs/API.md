@@ -98,6 +98,8 @@ A task joins a project with `project_id` on the task routes. **Left out, a save 
 
 **The brief.** `GET /v1/projects/{id}/brief` returns the project with the decision memories and evidence it cites. Cite with `POST /v1/projects/{id}/references` (`{"kind":"memory_card"|"evidence","target_id":"…","note":"…"}`, a note up to 500 characters, at most 100 citations) and remove with `DELETE …/references/{reference_id}`. Nothing is copied: a citation holds the id and your note, and the title is read from the target each time, so a deleted target comes back with `"available": false` and no title. A target of another workspace answers `404`; citing the same item twice answers `409`. `GET /v1/workspaces/{id}/projects/citing?kind=memory_card&target_id=…` is the backlink: the projects (not archived) whose brief cites that card or file.
 
+**Task identifiers.** Every task has a `number` that is unique in its workspace and never reused, and a `key` built from it (`T-12`). A title change does not change them. `GET /v1/workspaces/{id}/tasks/T-12` (also `12`, or the task's id) returns the task, its checklist and its web address (`path`); anyone who can read the workspace gets it, a guest included. A task that was **deleted** answers `410` with "Task T-12 was deleted."; one that never existed answers `404`. Tasks made before 0.7 were numbered in the order they were created.
+
 ## 5. Live updates
 
 `GET /v1/workspaces/{id}/events` (and `GET /v1/system/events` for system administrators) is a **server-sent events** stream, so use `curl -N`:

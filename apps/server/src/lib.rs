@@ -923,6 +923,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/projects/{project_id}/archive", post(projects::archive_project))
         .route("/v1/projects/{project_id}/restore", post(projects::restore_project))
+        .route("/v1/workspaces/{workspace_id}/tasks/{task_ref}", get(get_task_detail))
         .route(
             "/v1/workspaces/{workspace_id}/saved-searches",
             get(list_saved_searches).post(create_saved_search),

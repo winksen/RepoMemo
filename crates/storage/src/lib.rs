@@ -297,6 +297,7 @@ struct WorkspaceActivityRow {
 struct CollaborationTaskRow {
     id: String,
     workspace_id: String,
+    number: i64,
     title: String,
     description: String,
     status: String,
@@ -1106,6 +1107,8 @@ impl From<CollaborationTaskRow> for CollaborationTask {
         Self {
             id: row.id,
             workspace_id: row.workspace_id,
+            number: row.number,
+            key: format!("T-{}", row.number),
             title: row.title,
             description: row.description,
             status: row.status,
