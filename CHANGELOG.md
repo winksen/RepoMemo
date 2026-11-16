@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.20 (2026-11-18)
+
+Close the 0.7 line with what it delivers, what was and was not checked, the exit journey written as a sheet for the maintainer, and how projects sit next to an external tracker.
+
+### Added
+- **[The 0.7 closing record](mindmap/technical/release-evidence-0.7.20.md):** what the line delivers, release by release, with the migrations it added (0064 to 0079) and the archive format 4; the checks that were run and the ones that were not; the scope that was not built; how projects coexist with an external tracker; and the exit journey for a small team in nine steps, from the brief to moving the workspace. **Every result is pending**, so the row is 🧪 until the maintainer fills the sheet in and the [test run](mindmap/technical/release-evidence-0.6.13.md) is recorded.
+- **What is stated plainly.** The line was built API-first: **no web screen of it exists yet**, and the rows that describe a screen behaviour (focus kept on a keyboard move, a card put back visibly, a selection that stays after a refused bulk item) are met by what the API returns and are not claimed as screens. The user guide's "What's not here yet" now says so.
+- **Coexistence with external trackers.** A project reads from no tracker and writes to none; the tracker stays the authority for its own issues; the CSV export and import are the way in and out (a copy at a moment, not a sync, and a second file with the same ids creates nothing twice); mirrored issues arrive in the 0.8 line as read-only evidence.
+- **No unsupported capability is claimed.** The guides state that there is no Gantt chart or critical path, no resource or capacity accounting, no time tracking or budget, no sprint or velocity view, no portfolio across workspaces and no custom field types.
+- The plan is corrected: the ledger of V0.7.18 (migration 0079) and the archive format 4 of V0.7.19 are recorded as built.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock (79 files), generated types, styles, accessibility, documentation links and TypeScript pass. **No test, walkthrough, browser, screen reader, second machine, server start or CI run was done**, none of the 0.7 server tests has been executed, and nothing was pushed, tagged or published.
+
+### Upgrading
+- Nothing to do. When publishing, the tag is `v0.7.20`, not an `RM-V` tag.
+
 ## V0.7.19 (2026-11-18)
 
 Carry the work of the 0.7 line through a workspace archive, so a project moves with every relation intact and nothing starts running by itself.

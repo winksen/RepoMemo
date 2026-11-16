@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.19` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.20` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.20 — Validate a complete small-team project and document coexistence with external trackers.
+
+- The 0.7 line is closed locally: projects with briefs, task numbers and pages, discussion, milestones, sub-tasks, blockers, labels, named states, a list, views and a board, bulk changes, reminders, schedules, status updates, CSV in and out and archives that carry them. It has no screens yet, and the guides say what it does not do (no Gantt, resource accounting, sprints or portfolios) and how it sits next to an external tracker. The walkthroughs are written and not yet done.
+
+Checks: static checks pass; no test, server start or walkthrough was run.
 
 ## V0.7.19 — Extend workspace archives for projects, task relations, comments, workflow and schedules.
 

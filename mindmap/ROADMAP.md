@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.7.19` (2026-11-18) · **Next:** V0.7.20 closing record. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.7.20` (2026-11-18) · **Next:** the maintainer's test run and the 0.7 walkthroughs, then the 0.8 line. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `RM-V0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -96,7 +96,7 @@ timeline
 | 0.5.x team access and identity | 🧪 Built (V0.5.0–V0.5.19): one OIDC provider, restricted workspaces, guest expiry, offboarding and two-step sign-in; the identity checkpoint and the closing walkthroughs have no recorded result yet; [index](RELEASES_0.5.md) |
 | 0.6.x trusted daily knowledge | 🧪 Built (V0.6.0–V0.6.30): activation with no AI, personal work, safe editing, review accountability, history, approvals, citation durability, archives, recovery, organization templates and search feedback; local OCR deferred; the [closing record](technical/release-evidence-0.6.30.md) has every walkthrough result pending; [index](RELEASES_0.6.md) |
 | Gap audit 2026-11-04 | 🔜 Twelve findings against V0.6.9, scheduled in twelve new 0.6 and 0.8 rows and in changes to existing rows; [findings](#gap-audit-of-2026-11-04) |
-| 0.7.x evidence-backed projects | 🔜 Projects, milestones, task discussion, dependencies, views and updates; [index](RELEASES_0.7.md) |
+| 0.7.x evidence-backed projects | 🧪 Built API-first (V0.7.0–V0.7.20): projects with briefs, task numbers and discussion, milestones, sub-tasks, blockers, labels, named states, a list, views and a board, bulk changes, reminders, schedules, updates, CSV and archives; no web screens yet and no test has been run; the [closing record](technical/release-evidence-0.7.20.md) has the journey sheet; [index](RELEASES_0.7.md) |
 | 0.8.x connections and community knowledge | 🔜 Connector trust, tracker/chat adoption, migration and curated publication; [index](RELEASES_0.8.md) |
 | 0.9.x pilot proof → 1.0.0 | 🔜 Observed team journeys, capacity, recovery and exact-candidate release proof; [index](RELEASES_0.9.md) |
 
@@ -1916,7 +1916,7 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.7.17** ✅ 2026-11-18 | ✨ | Project updates | Publish attributed project status updates with milestone, blocker and evidence links | G09 | A reader can inspect what changed and why the lead chose on-track/at-risk/blocked; updates are authored or confirmed by a person |
 | **V0.7.18** ✅ 2026-11-18 | ✨ | CSV migration | Import and export task CSV with field mapping and a dry-run report | G09, G11 | Invalid rows and unknown assignees are explained before commit; retries avoid duplicates and exported cells are safe to open in spreadsheets |
 | **V0.7.19** ✅ 2026-11-18 | 🔧 | Project portability | Extend workspace archives for projects, task relations, comments, workflow and schedules | G09 | Round-trip retains relationships, rejects cross-workspace references and imports schedules paused pending explicit activation |
-| **V0.7.20** 🔜 | 📘 | Closing | Validate a complete small-team project and document coexistence with external trackers | G09 | A team completes the exit journey; no unsupported Gantt, resource accounting, sprint or portfolio capability is claimed |
+| **V0.7.20** 🧪 2026-11-18 | 📘 | Closing | Validate a complete small-team project and document coexistence with external trackers | G09 | A team completes the exit journey; no unsupported Gantt, resource accounting, sprint or portfolio capability is claimed |
 
 ### The 0.8.x line: connected teams and community knowledge
 

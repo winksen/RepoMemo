@@ -63,7 +63,7 @@ New here? Start with the [README](../README.md) to choose how to run RepoMemo.
 | Build, run and test it | [Development commands](DEVELOPMENT_COMMANDS.md), [Windows setup](WINDOWS_SETUP.md) |
 | How it works | [Technical mindmap](../mindmap/TECHNICAL_MINDMAP.md) |
 | Trace a request or a background job to its code and data | [Request and job trace](../mindmap/technical/request-and-job-trace.md) |
-| What shipped and what comes next | [Roadmap](../mindmap/ROADMAP.md), [0.5 releases](../mindmap/RELEASES_0.5.md), [0.6 releases](../mindmap/RELEASES_0.6.md), [0.6 closing record](../mindmap/technical/release-evidence-0.6.30.md) |
+| What shipped and what comes next | [Roadmap](../mindmap/ROADMAP.md), [0.5 releases](../mindmap/RELEASES_0.5.md), [0.6 releases](../mindmap/RELEASES_0.6.md), [0.6 closing record](../mindmap/technical/release-evidence-0.6.30.md), [0.7 releases](../mindmap/RELEASES_0.7.md), [0.7 closing record](../mindmap/technical/release-evidence-0.7.20.md) |
 | Why a choice was made | [Architecture decisions](decisions/) |
 | Visual rules | [Design](../DESIGN.md), [Product](../PRODUCT.md) |
 

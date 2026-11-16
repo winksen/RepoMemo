@@ -526,6 +526,7 @@ To set expectations:
 - Issue and pull-request connectors cover **GitHub and GitLab** only.
 - A workspace **template** arranges what exists; it doesn't add new sections, and an organization can't save its own template for all its workspaces yet.
 - Archives are a copy, not a continuous sync. Assistant chats and the activity feed aren't in them (saved searches are).
+- **Projects and the work around them have no screens yet.** Projects, briefs, milestones, task numbers and pages, discussions, blockers, labels, states, the list, views and board, bulk changes, reminders, schedules, status updates and the CSV import all work through the [API](API.md#4a-projects-07) and the console; the web screens follow. There is **no** Gantt chart or critical path, no resource or capacity accounting, no time tracking or budget, no sprint or velocity view, no portfolio across workspaces and no custom field types. A project never reads from or writes to another tracker: use the CSV export and import to move tasks, and see the [closing record](../mindmap/technical/release-evidence-0.7.20.md) for how projects sit next to an external tracker.
 - `CODEOWNERS` owners are matched to members only when written as an email address; `@handles` and teams stay hints, and nobody is asked to review unless you press **Ask to review**.
 
 ---

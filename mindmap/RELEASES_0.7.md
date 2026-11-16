@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.7 → 0.8 (proposed)
 
-> **Current:** `V0.7.19` (2026-11-18)
+> **Current:** `V0.7.20` (2026-11-18)
 
 > **Theme:** Projects connected to their evidence · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -39,7 +39,7 @@
 | **V0.7.17** | ✅ 2026-11-18 | AK. Project execution | ✨ | Project updates | Publish attributed project status updates with milestone, blocker and evidence links | A reader can inspect what changed and why the lead chose on-track/at-risk/blocked; updates are authored or confirmed by a person |
 | **V0.7.18** | ✅ 2026-11-18 | AK. Project execution | ✨ | CSV migration | Import and export task CSV with field mapping and a dry-run report | Invalid rows and unknown assignees are explained before commit; retries avoid duplicates and exported cells are safe to open in spreadsheets |
 | **V0.7.19** | ✅ 2026-11-18 | AK. Project execution | 🔧 | Project portability | Extend workspace archives for projects, task relations, comments, workflow and schedules | Round-trip retains relationships, rejects cross-workspace references and imports schedules paused pending explicit activation |
-| **V0.7.20** | 🔜 | AK. Project execution | 📘 | Closing | Validate a complete small-team project and document coexistence with external trackers | A team completes the exit journey; no unsupported Gantt, resource accounting, sprint or portfolio capability is claimed |
+| **V0.7.20** | 🧪 2026-11-18 | AK. Project execution | 📘 | Closing | Validate a complete small-team project and document coexistence with external trackers | A team completes the exit journey; no unsupported Gantt, resource accounting, sprint or portfolio capability is claimed |
 
 ## Verification and handoff
 
