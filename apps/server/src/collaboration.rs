@@ -684,7 +684,23 @@ pub(crate) async fn get_task_detail(
         .await
         .map_err(map_storage_error)?;
     let path = format!("/workspaces/{}/tasks/{}", task.workspace_id, task.key);
-    Ok(Json(TaskDetail { task, checklist, path }))
+    let watch = state
+        .storage
+        .task_watch_mode(&task.id, &subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    let comment_count = state
+        .storage
+        .count_task_comments(&task.id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(TaskDetail {
+        task,
+        checklist,
+        path,
+        watch,
+        comment_count,
+    }))
 }
 
 #[cfg(test)]

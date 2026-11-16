@@ -82,6 +82,25 @@ export interface TaskDetail {
   task: CollaborationTask;
   checklist: TaskChecklistItem[];
   path: string;
+  /** How the reader follows the task: `watching`, `muted` or `default` (V0.7.4). */
+  watch: string;
+  comment_count: number;
+}
+
+/** A comment on a task (V0.7.4). It stays with its task and goes with it. */
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  workspace_id: string;
+  author: SharedUser | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** How a person follows a task: `watching`, `muted` or `default`. */
+export interface TaskWatch {
+  mode: string;
 }
 
 /** A named piece of work inside one workspace (V0.7.1). It grants no access: whoever can read the workspace can read it. */

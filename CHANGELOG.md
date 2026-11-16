@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.4 (2026-11-17)
+
+Give a task its own discussion, with mentions that notify once and watching that can be muted.
+
+### Added
+- **Task comments** (`/v1/tasks/{id}/comments`, `/v1/task-comments/{id}`): 1 to 5,000 characters, written by a role that may write, edited by their author and removed by their author or an administrator. A comment stays with its task and is removed with it. Posting is written to the activity feed.
+- **Mentions notify once.** `@` and a member's email in a comment tells that member through the existing "You are mentioned" choice; an edit tells only the people it adds, and the same person does not also get a "new comment" notice for the same comment. A notice leads to the task's own address (`/workspaces/{id}/tasks/T-12`).
+- **Watching** (`/v1/tasks/{id}/watch`): `watching`, `muted` or `default`, open to anyone who can read the workspace, a guest included. A task's creator and assignee follow it by default; anyone else follows it by asking. A new comment notifies followers who can still read the workspace, never its author.
+- **Muting never loses an assignment.** A new notification choice, **A task you follow has a new comment** (in-app, mail, both or none, both by default), covers the optional notices; muting a task stops them for that task, and the notice that a task was assigned to you is a separate choice that muting does not touch.
+- The task detail (`GET …/tasks/T-12`) now also reports the reader's `watch` state and the `comment_count`.
+- Migration **0067** adds `task_comments` and `task_watchers`, both removed with their task.
+- A server test (`tests/task_discussion.rs`) follows comments, refusals, a mention and a follower each told once, an edit telling only the person it adds, muting, an assignment arriving while muted, deleting a comment and the discussion leaving with its task.
+- **Not in this release:** the web screens for the discussion.
+
+### Checks
+- Version, migration lock (67 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. A person who set every notice to "none" keeps that; the new notice follows the usual default (in-app and mail) until they choose.
+
 ## V0.7.3 (2026-11-17)
 
 Give every task a number that names it for good, and a read route that opens a task by it.

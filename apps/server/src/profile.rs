@@ -124,8 +124,9 @@ pub(crate) async fn update_profile(
 
 /// The kinds of notice a person chooses a channel for. Security notices
 /// (password resets) always reach the app and the mail: they are not here.
-const CHOOSABLE_KINDS: [(&str, &str); 4] = [
+const CHOOSABLE_KINDS: [(&str, &str); 5] = [
     ("task_assigned", "A task is assigned to you"),
+    ("task_comment", "A task you follow has a new comment"),
     ("review_due", "A review assigned to you is overdue"),
     (
         "evidence_mention",
@@ -265,6 +266,8 @@ pub(crate) enum MentionedIn<'a> {
     Artifact { id: &'a str, title: &'a str },
     /// The description of a task.
     Task { title: &'a str },
+    /// A comment on a task (V0.7.4); the notice leads to the task's own page.
+    TaskComment { key: &'a str, title: &'a str },
     /// The text of a memory card.
     MemoryCard { id: &'a str, title: &'a str },
 }
@@ -320,17 +323,17 @@ pub(crate) async fn notify_mentions(
     place: MentionedIn<'_>,
     text: &str,
     earlier: &str,
-) {
+) -> Vec<String> {
     let mentioned_emails = mentioned_addresses(text);
     if mentioned_emails.is_empty() {
-        return;
+        return Vec::new();
     }
     let already = mentioned_addresses(earlier);
     let members = match state.storage.list_workspace_members(workspace_id).await {
         Ok(members) => members,
         Err(error) => {
             tracing::error!(error = %error, workspace_id, "Failed to resolve mentions");
-            return;
+            return Vec::new();
         }
     };
     let (notification_type, title, subject_title, action, path) = match place {
@@ -348,6 +351,13 @@ pub(crate) async fn notify_mentions(
             "mentioned you in the task",
             format!("/workspaces/{workspace_id}/tasks"),
         ),
+        MentionedIn::TaskComment { key, title } => (
+            "task_mention",
+            "You were mentioned in a task",
+            title,
+            "mentioned you in the task",
+            format!("/workspaces/{workspace_id}/tasks/{key}"),
+        ),
         MentionedIn::MemoryCard { id, title } => (
             "memory_mention",
             "You were mentioned in team memory",
@@ -356,6 +366,8 @@ pub(crate) async fn notify_mentions(
             format!("/workspaces/{workspace_id}/memory-cards/{id}"),
         ),
     };
+    // The people this text mentioned now: a caller that also tells followers leaves them out, so nobody is told twice.
+    let mut told = Vec::new();
     for member in members {
         let Some(email) = member.user.email.as_deref() else {
             continue;
@@ -364,6 +376,7 @@ pub(crate) async fn notify_mentions(
         if member.user.id == actor_user_id || !mentioned_emails.contains(&email) || already.contains(&email) {
             continue;
         }
+        told.push(member.user.id.clone());
         let (in_app, by_mail) = delivery(state, &member.user.id, "evidence_mention").await;
         if in_app {
             create_notification(
@@ -394,6 +407,7 @@ pub(crate) async fn notify_mentions(
             .await;
         }
     }
+    told
 }
 
 pub(crate) async fn create_notification(state: &AppState, notification: NewSharedNotification) {

@@ -492,6 +492,17 @@ pub(crate) struct AddProjectReferenceRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct SaveTaskCommentRequest {
+    pub(crate) body: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SetTaskWatchRequest {
+    /// `watching`, `muted` or `default`.
+    pub(crate) mode: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct SaveArtifactCommentRequest {
     pub(crate) body: String,
 }

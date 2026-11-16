@@ -325,6 +325,12 @@
 | DELETE | `/v1/projects/{project_id}/references/{reference_id}` | auth | require_workspace_write | — | — |
 | GET | `/v1/workspaces/{workspace_id}/projects/citing` | auth | require_workspace_read | — (`?kind=&target_id=`) | Vec<Project> |
 | GET | `/v1/workspaces/{workspace_id}/tasks/{task_ref}` | auth | require_workspace_read | — (`T-12`, `12` or an id) | TaskDetail (`410` when deleted) |
+| GET | `/v1/tasks/{task_id}/comments` | auth | require_workspace_read | — | Vec<TaskComment> |
+| POST | `/v1/tasks/{task_id}/comments` | auth | require_workspace_write | SaveTaskCommentRequest | TaskComment |
+| PUT | `/v1/task-comments/{comment_id}` | auth | require_workspace_write (author) | SaveTaskCommentRequest | TaskComment |
+| DELETE | `/v1/task-comments/{comment_id}` | auth | require_workspace_write (author or admin) | — | — |
+| GET | `/v1/tasks/{task_id}/watch` | auth | require_workspace_read | — | TaskWatch |
+| PUT | `/v1/tasks/{task_id}/watch` | auth | require_workspace_read | SetTaskWatchRequest | TaskWatch |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

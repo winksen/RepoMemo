@@ -55,6 +55,7 @@ mod serve;
 mod setup;
 mod streams;
 mod system;
+mod task_discussion;
 mod templates;
 mod trash;
 mod verification;
@@ -923,6 +924,18 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/projects/{project_id}/archive", post(projects::archive_project))
         .route("/v1/projects/{project_id}/restore", post(projects::restore_project))
+        .route(
+            "/v1/tasks/{task_id}/comments",
+            get(task_discussion::list_task_comments).post(task_discussion::add_task_comment),
+        )
+        .route(
+            "/v1/task-comments/{comment_id}",
+            put(task_discussion::update_task_comment).delete(task_discussion::delete_task_comment),
+        )
+        .route(
+            "/v1/tasks/{task_id}/watch",
+            get(task_discussion::get_task_watch).put(task_discussion::set_task_watch),
+        )
         .route("/v1/workspaces/{workspace_id}/tasks/{task_ref}", get(get_task_detail))
         .route(
             "/v1/workspaces/{workspace_id}/saved-searches",

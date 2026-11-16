@@ -101,6 +101,27 @@ pub struct TaskDetail {
     pub task: CollaborationTask,
     pub checklist: Vec<TaskChecklistItem>,
     pub path: String,
+    /// How the reader follows the task: `watching`, `muted` or `default` (V0.7.4).
+    pub watch: String,
+    pub comment_count: i64,
+}
+
+/// A comment on a task (V0.7.4). It stays with its task and goes with it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskComment {
+    pub id: String,
+    pub task_id: String,
+    pub workspace_id: String,
+    pub author: Option<SharedUser>,
+    pub body: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// How a person follows a task: `watching`, `muted` or `default`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskWatch {
+    pub mode: String,
 }
 
 /// A named piece of work inside one workspace (V0.7.1). It grants no access: whoever can read the workspace can read it.

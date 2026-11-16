@@ -100,6 +100,8 @@ A task joins a project with `project_id` on the task routes. **Left out, a save 
 
 **Task identifiers.** Every task has a `number` that is unique in its workspace and never reused, and a `key` built from it (`T-12`). A title change does not change them. `GET /v1/workspaces/{id}/tasks/T-12` (also `12`, or the task's id) returns the task, its checklist and its web address (`path`); anyone who can read the workspace gets it, a guest included. A task that was **deleted** answers `410` with "Task T-12 was deleted."; one that never existed answers `404`. Tasks made before 0.7 were numbered in the order they were created.
 
+**Task discussion.** `POST /v1/tasks/{id}/comments` (`{"body":"…"}`, 1 to 5,000 characters; a role that may write) adds a comment that stays with its task; `GET` lists them, `PUT /v1/task-comments/{id}` edits one (its author) and `DELETE` removes it (its author or an administrator). Type `@` and a member's email to mention them: they are told once (a later edit tells only the people it adds), and are not also told "new comment". **Watching** is `PUT /v1/tasks/{id}/watch` with `{"mode":"watching"|"muted"|"default"}`, open to anyone who can read the workspace: a task's creator and assignee follow it by default, anyone else by asking, and `muted` stops the optional "new comment" notices (a choice of its own under the profile's notifications) but never the notice that a task was assigned to you.
+
 ## 5. Live updates
 
 `GET /v1/workspaces/{id}/events` (and `GET /v1/system/events` for system administrators) is a **server-sent events** stream, so use `curl -N`:
