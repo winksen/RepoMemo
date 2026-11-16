@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.11 (2026-11-17)
+
+Let a workspace name its own task states while every report keeps reading the four stable ones.
+
+### Added
+- **Workflow states** (`/v1/workspaces/{id}/workflow`, `/v1/workflow-states/{id}`): the four built-in states (`open`, `in_progress`, `blocked`, `done`) always exist, cannot be changed and need no row, so **every existing task migrates unchanged**: with no named state it is in the built-in state of its status. An owner or administrator adds named states (a name up to 40 characters, unique whatever its case and never a built-in name, up to 20 per workspace), each mapped to one category, and renames or re-maps them.
+- **The category is the status.** A task's `status` is its state's category, so the board, `My work`, milestone counts and every integration keep reading four stable values and never a custom name. A save names a state with `state_id`; a `status` that disagrees with it is `400`, and one left out is taken from the state. A save with only a `status` keeps the named state while it still matches and otherwise puts the task in the built-in one. Tasks report `state_id` and `state_name`.
+- **Explicit moves.** Re-mapping a state moves its tasks to the new category; removing one is `409` while tasks are in it, unless `?move_to=` names a built-in category or another state of the workspace. Moved tasks take that category, entering `done` sets their completion time and leaving it clears it, and each counts as a new version.
+- The change, and each removal with the number of tasks moved, is written to the activity feed.
+- Migration **0074** adds `workflow_states` and `workspace_tasks.state_id` (`ON DELETE RESTRICT`, so a state cannot vanish under its tasks).
+- A server test (`tests/workflow.rs`) follows the built-in states, who may name one, the refused names and categories, a task joining a state, a mismatching status, keeping and leaving a state by saving, a category change, the removal rules and the moved tasks.
+- **Not in this release:** the web screens, and the archive carrying named states (the portability release adds it).
+
+### Checks
+- Version, migration lock (74 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**, and neither was the migration on an existing database. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive; no task changes. A script that sends a task with a `status` works as before. Tasks report `state_id` and `state_name`.
+
 ## V0.7.10 (2026-11-17)
 
 Let a workspace name its kinds of work and filter tasks by them, without losing assignments when a label changes.

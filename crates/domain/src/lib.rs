@@ -104,6 +104,10 @@ pub struct CollaborationTask {
     pub blocks_count: i64,
     /// The task's labels (V0.7.10), by name. They organize and filter; they never decide who can see the task.
     pub labels: Vec<TaskLabelTag>,
+    /// The workflow state the task is in (V0.7.11): a built-in one (its id is the status) or one the workspace named. The
+    /// `status` is always that state's category.
+    pub state_id: String,
+    pub state_name: String,
     pub due_at: Option<String>,
     pub completed_at: Option<String>,
     pub created_at: String,
@@ -156,6 +160,34 @@ pub struct TaskDetail {
     pub children: Vec<CollaborationTask>,
     /// What blocks this task and what it blocks (V0.7.9).
     pub dependencies: TaskDependencies,
+}
+
+/// The four stable categories every workflow state maps to, and the built-in state of each.
+pub const BUILTIN_STATE_CATEGORIES: [&str; 4] = ["open", "in_progress", "blocked", "done"];
+
+/// The name of the built-in state of a category.
+pub fn builtin_state_name(category: &str) -> &'static str {
+    match category {
+        "in_progress" => "In progress",
+        "blocked" => "Blocked",
+        "done" => "Done",
+        _ => "Open",
+    }
+}
+
+/// A state a task can be in (V0.7.11), mapped to one stable category. The four built-in states always exist (their `id` is
+/// the category); a workspace can add named ones. Reports and integrations read `category`, never the name.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowState {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    /// `open`, `in_progress`, `blocked` or `done`.
+    pub category: String,
+    pub builtin: bool,
+    pub position: i64,
+    /// How many tasks are in the state.
+    pub task_count: i64,
 }
 
 /// The colours a label can have: a name, a background and the text colour on it. Every pair reaches a contrast of at least

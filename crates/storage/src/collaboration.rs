@@ -23,6 +23,8 @@ pub(crate) const TASK_SELECT: &str = r#"
       task.milestone_id,
       milestone.name AS milestone_name,
       task.parent_task_id,
+      task.state_id,
+      state.name AS state_name,
       parent.number AS parent_number,
       (SELECT COUNT(*) FROM workspace_tasks AS child WHERE child.parent_task_id = task.id) AS child_count,
       (SELECT COUNT(*) FROM workspace_tasks AS child WHERE child.parent_task_id = task.id AND child.status != 'done') AS open_child_count,
@@ -41,7 +43,8 @@ pub(crate) const TASK_SELECT: &str = r#"
     LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
     LEFT JOIN workspace_projects AS project ON project.id = task.project_id
     LEFT JOIN project_milestones AS milestone ON milestone.id = task.milestone_id
-    LEFT JOIN workspace_tasks AS parent ON parent.id = task.parent_task_id"#;
+    LEFT JOIN workspace_tasks AS parent ON parent.id = task.parent_task_id
+    LEFT JOIN workflow_states AS state ON state.id = task.state_id"#;
 
 /// Gives the next number of a workspace's tasks. A number is only ever added, so a deleted task's number is never reused.
 pub(crate) async fn take_task_number(connection: &mut sqlx::SqliteConnection, workspace_id: &str) -> Result<i64> {
@@ -116,8 +119,8 @@ impl StorageEngine {
             INSERT INTO workspace_tasks (
               id, workspace_id, title, description, status, priority,
               assignee_user_id, created_by_user_id, artifact_id, due_at,
-              completed_at, created_at, updated_at, project_id, number, milestone_id, parent_task_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+              completed_at, created_at, updated_at, project_id, number, milestone_id, parent_task_id, state_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
             "#,
         )
         .bind(&id)
@@ -137,6 +140,7 @@ impl StorageEngine {
         .bind(number)
         .bind(task.milestone_id.flatten())
         .bind(task.parent_task_id.flatten())
+        .bind(task.state_id.flatten())
         .execute(&mut *transaction)
         .await?;
         transaction.commit().await?;
@@ -168,13 +172,30 @@ impl StorageEngine {
             None => current.parent_task_id.clone(),
             Some(parent_task_id) => parent_task_id,
         };
+        // The task keeps its named state only while the status still matches the state's category.
+        let state_id = match task.state_id {
+            Some(state_id) => state_id,
+            None => match current.state_id.as_str() {
+                id if repomemo_domain::BUILTIN_STATE_CATEGORIES.contains(&id) => None,
+                id => {
+                    let category: Option<String> =
+                        sqlx::query_scalar("SELECT category FROM workflow_states WHERE id = ?1")
+                            .bind(id)
+                            .fetch_optional(&self.pool)
+                            .await?;
+                    category
+                        .filter(|category| *category == task.status)
+                        .map(|_| id.to_owned())
+                }
+            },
+        };
         let expected_version = task.expected_version;
         let saved = sqlx::query(
             r#"
             UPDATE workspace_tasks
             SET title = ?1, description = ?2, status = ?3, priority = ?4,
                 assignee_user_id = ?5, artifact_id = ?6, due_at = ?7,
-                completed_at = ?8, updated_at = ?9, project_id = ?11, milestone_id = ?13, parent_task_id = ?14, version = version + 1
+                completed_at = ?8, updated_at = ?9, project_id = ?11, milestone_id = ?13, parent_task_id = ?14, state_id = ?15, version = version + 1
             WHERE id = ?10 AND (?12 IS NULL OR version = ?12)
             "#,
         )
@@ -192,6 +213,7 @@ impl StorageEngine {
         .bind(expected_version)
         .bind(milestone_id)
         .bind(parent_task_id)
+        .bind(state_id)
         .execute(&self.pool)
         .await?;
         if saved.rows_affected() == 0 {

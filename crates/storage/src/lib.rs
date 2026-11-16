@@ -62,6 +62,7 @@ mod task_references;
 mod trash;
 mod users;
 mod vectors;
+mod workflow;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
 pub use approvals::{StoredApproval, StoredImportedApproval};
@@ -91,6 +92,7 @@ pub use task_dependencies::MAX_TASK_DEPENDENCIES;
 pub use task_hierarchy::MAX_TASK_DEPTH;
 pub use task_labels::{MAX_LABELS_PER_TASK, MAX_LABELS_PER_WORKSPACE};
 pub use task_references::MAX_TASK_REFERENCES;
+pub use workflow::MAX_CUSTOM_STATES;
 mod newer;
 pub use search_feedback::{StoredSearchFeedback, CLOSED_RETENTION_DAYS, MAX_OPEN_PER_USER, OPEN_RETENTION_DAYS};
 use secrets::SecretBox;
@@ -333,6 +335,8 @@ struct CollaborationTaskRow {
     open_blocker_count: i64,
     blocks_count: i64,
     labels_json: String,
+    state_id: Option<String>,
+    state_name: Option<String>,
     due_at: Option<String>,
     completed_at: Option<String>,
     created_at: String,
@@ -506,6 +510,9 @@ pub struct NewCollaborationTask {
     pub milestone_id: Option<Option<String>>,
     /// Like `project_id`: `None` leaves the parent as it is, `Some(None)` removes it.
     pub parent_task_id: Option<Option<String>>,
+    /// The named workflow state (V0.7.11). `None` keeps the task's state while its status still matches it and otherwise puts
+    /// it in the built-in state of the status; `Some(None)` is the built-in state; `Some(Some(id))` a named one.
+    pub state_id: Option<Option<String>>,
     pub due_at: Option<String>,
     /// The version the save started from (V0.7.6). `None` saves without the check and overwrites whatever is there.
     pub expected_version: Option<i64>,
@@ -1140,7 +1147,17 @@ impl From<WorkspaceActivityRow> for WorkspaceActivityEvent {
 
 impl From<CollaborationTaskRow> for CollaborationTask {
     fn from(row: CollaborationTaskRow) -> Self {
+        // A task with no named state is in the built-in state of its status.
+        let (state_id, state_name) = match row.state_id.clone() {
+            Some(id) => (id, row.state_name.clone().unwrap_or_default()),
+            None => (
+                row.status.clone(),
+                repomemo_domain::builtin_state_name(&row.status).to_owned(),
+            ),
+        };
         Self {
+            state_id,
+            state_name,
             id: row.id,
             workspace_id: row.workspace_id,
             number: row.number,

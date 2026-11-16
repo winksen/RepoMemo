@@ -454,7 +454,10 @@ pub(crate) async fn normalize_collaboration_task(
             "Task description cannot exceed 5,000 characters.",
         ));
     }
-    if !matches!(request.status.as_str(), "open" | "in_progress" | "blocked" | "done") {
+    let (status, state_id) =
+        crate::workflow::resolve_task_state(state, workspace_id, request.status.trim(), request.state_id.as_deref())
+            .await?;
+    if !matches!(status.as_str(), "open" | "in_progress" | "blocked" | "done") {
         return Err(ApiError::bad_request(
             "Task status must be open, in_progress, blocked, or done.",
         ));
@@ -526,8 +529,9 @@ pub(crate) async fn normalize_collaboration_task(
     Ok(NewCollaborationTask {
         title,
         description,
-        status: request.status,
+        status,
         priority: request.priority,
+        state_id,
         assignee_user_id: request.assignee_user_id,
         artifact_id: request.artifact_id,
         project_id,

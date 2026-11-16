@@ -68,6 +68,7 @@ mod web_files;
 mod web_session;
 mod webhooks;
 mod winservice;
+mod workflow;
 mod workspace_export;
 mod workspace_import;
 mod workspaces;
@@ -964,6 +965,15 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             delete(task_references::remove_task_reference),
         )
         .route("/v1/tasks/{task_id}/children", get(task_hierarchy::list_child_tasks))
+        .route("/v1/workspaces/{workspace_id}/workflow", get(workflow::get_workflow))
+        .route(
+            "/v1/workspaces/{workspace_id}/workflow/states",
+            post(workflow::create_workflow_state),
+        )
+        .route(
+            "/v1/workflow-states/{state_id}",
+            put(workflow::update_workflow_state).delete(workflow::delete_workflow_state),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/task-labels",
             get(task_labels::list_task_labels).post(task_labels::create_task_label),

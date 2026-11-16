@@ -51,6 +51,7 @@ mod task_labels;
 mod task_references;
 mod templates;
 mod trash;
+mod workflow;
 mod workspaces;
 mod write_preconditions;
 

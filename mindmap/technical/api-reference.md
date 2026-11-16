@@ -351,6 +351,10 @@
 | DELETE | `/v1/task-labels/{label_id}` | auth | require_workspace_admin | — | — |
 | POST | `/v1/task-labels/{label_id}/merge` | auth | require_workspace_admin | MergeTaskLabelRequest | TaskLabel |
 | PUT | `/v1/tasks/{task_id}/labels` | auth | require_workspace_write | SetTaskLabelsRequest | Vec<TaskLabelTag> |
+| GET | `/v1/workspaces/{workspace_id}/workflow` | auth | require_workspace_read | — | Vec<WorkflowState> |
+| POST | `/v1/workspaces/{workspace_id}/workflow/states` | auth | require_workspace_admin | SaveWorkflowStateRequest | WorkflowState |
+| PUT | `/v1/workflow-states/{state_id}` | auth | require_workspace_admin | SaveWorkflowStateRequest | WorkflowState |
+| DELETE | `/v1/workflow-states/{state_id}` | auth | require_workspace_admin | — (`?move_to=`) | — (`409` until tasks have a place) |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — (`?label=`) | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

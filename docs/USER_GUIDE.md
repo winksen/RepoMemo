@@ -212,6 +212,7 @@ A workspace is one body of knowledge: a project, a service, a team's runbooks. I
 | **Review** | One list of everything waiting for a person |
 | **Memory** | Your team's memory cards |
 | **Tasks** | The action board |
+| **Workflow** | Besides Open, In progress, Blocked and Done, an administrator can add named task states (Review, Waiting...), each mapped to one of those four. Existing tasks keep their state. Removing a state that holds tasks asks where they go, and reports always count by the four |
 | **Labels** | The workspace's own names for kinds of work (Bug, Docs, ...), each with a colour from a set that stays readable, always shown with its name. Anyone who can edit adds a label to a task; renaming one or merging two keeps every task's label (only an administrator merges or deletes). Filter the tasks by a label. A label never decides who can see a task |
 | **Blockers** | A task can be blocked by other tasks of the workspace. It says in words what is blocking it, and the explanation changes when a blocker is done, but the blocked task is never completed for you. A task cannot block itself or form a loop |
 | **Sub-tasks** | A task can have sub-tasks (up to five levels). Unlike a checklist step, a sub-task has its own owner, status and discussion. Finishing the parent does not finish or hide its sub-tasks: the parent keeps showing how many are still open. Everything stays in one workspace, and a task cannot be placed under its own sub-task |

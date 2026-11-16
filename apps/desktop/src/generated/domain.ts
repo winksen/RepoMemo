@@ -84,6 +84,12 @@ export interface CollaborationTask {
   blocks_count: number;
   /** The task's labels (V0.7.10), by name. They organize and filter; they never decide who can see the task. */
   labels: TaskLabelTag[];
+  /**
+   * The workflow state the task is in (V0.7.11): a built-in one (its id is the status) or one the workspace named. The
+   * `status` is always that state's category.
+   */
+  state_id: string;
+  state_name: string;
   due_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -136,6 +142,22 @@ export interface TaskDetail {
   children: CollaborationTask[];
   /** What blocks this task and what it blocks (V0.7.9). */
   dependencies: TaskDependencies;
+}
+
+/**
+ * A state a task can be in (V0.7.11), mapped to one stable category. The four built-in states always exist (their `id` is
+ * the category); a workspace can add named ones. Reports and integrations read `category`, never the name.
+ */
+export interface WorkflowState {
+  id: string;
+  workspace_id: string;
+  name: string;
+  /** `open`, `in_progress`, `blocked` or `done`. */
+  category: string;
+  builtin: boolean;
+  position: number;
+  /** How many tasks are in the state. */
+  task_count: number;
 }
 
 /** A label as it appears on a task (V0.7.10). */

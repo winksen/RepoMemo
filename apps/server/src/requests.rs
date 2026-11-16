@@ -457,7 +457,13 @@ pub(crate) struct SaveCollaborationTaskRequest {
     pub(crate) title: String,
     #[serde(default)]
     pub(crate) description: String,
+    /// One of the four categories. Optional when `state_id` names a state (its category is used); when both are sent they must
+    /// agree.
+    #[serde(default)]
     pub(crate) status: String,
+    /// A workflow state: a built-in one (open, in_progress, blocked, done) or one the workspace named.
+    #[serde(default)]
+    pub(crate) state_id: Option<String>,
     pub(crate) priority: String,
     pub(crate) assignee_user_id: Option<String>,
     pub(crate) artifact_id: Option<String>,
@@ -489,6 +495,13 @@ pub(crate) struct TaskReferenceInput {
     pub(crate) target_id: String,
     #[serde(default)]
     pub(crate) note: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SaveWorkflowStateRequest {
+    pub(crate) name: String,
+    /// `open`, `in_progress`, `blocked` or `done`.
+    pub(crate) category: String,
 }
 
 #[derive(Debug, Deserialize)]
