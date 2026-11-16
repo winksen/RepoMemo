@@ -48,7 +48,7 @@ pub(crate) async fn create_collaboration_task(
             .map_err(map_storage_error)?;
         citations.push((reference.kind.clone(), reference.target_id.trim().to_owned(), note));
     }
-    let payload = normalize_collaboration_task(&state, &workspace_id, request, None, None).await?;
+    let payload = normalize_collaboration_task(&state, &workspace_id, request, None).await?;
     let task = state
         .storage
         .create_collaboration_task(&workspace_id, &subject.user_id, payload)
@@ -134,16 +134,11 @@ pub(crate) async fn update_collaboration_task(
         assignee_user_id: request.assignee_user_id.clone(),
         artifact_id: request.artifact_id.clone(),
         project_id: request.project_id.clone(),
+        milestone_id: request.milestone_id.clone(),
+        parent_task_id: request.parent_task_id.clone(),
         due_at: request.due_at.clone(),
     };
-    let payload = normalize_collaboration_task(
-        &state,
-        &current.workspace_id,
-        request,
-        current.project_id.as_deref(),
-        current.milestone_id.as_deref(),
-    )
-    .await?;
+    let payload = normalize_collaboration_task(&state, &current.workspace_id, request, Some(&current)).await?;
     let task = match state
         .storage
         .update_collaboration_task(&task_id, payload)
@@ -187,7 +182,14 @@ pub(crate) async fn update_collaboration_task(
         "task_updated",
         "task",
         Some(&task.id),
-        format!("Updated task: {} ({}).", task.title, task.status.replace('_', " ")),
+        if task.status == "done" && task.open_child_count > 0 {
+            format!(
+                "Updated task: {} (done, with {} unfinished sub-tasks).",
+                task.title, task.open_child_count
+            )
+        } else {
+            format!("Updated task: {} ({}).", task.title, task.status.replace('_', " "))
+        },
     )
     .await;
     Ok(Json(task))
@@ -425,9 +427,10 @@ pub(crate) async fn normalize_collaboration_task(
     state: &AppState,
     workspace_id: &str,
     request: SaveCollaborationTaskRequest,
-    current_project_id: Option<&str>,
-    current_milestone_id: Option<&str>,
+    current: Option<&CollaborationTask>,
 ) -> Result<NewCollaborationTask, ApiError> {
+    let current_project_id = current.and_then(|task| task.project_id.as_deref());
+    let current_milestone_id = current.and_then(|task| task.milestone_id.as_deref());
     let title = request.title.trim().to_owned();
     let description = request.description.trim().to_owned();
     if title.is_empty() || title.len() > 180 {
@@ -500,6 +503,15 @@ pub(crate) async fn normalize_collaboration_task(
         }
         None => None,
     };
+    let parent_task_id = match request.parent_task_id.as_deref().map(str::trim) {
+        None => None,
+        Some("") => Some(None),
+        Some(id) => {
+            crate::task_hierarchy::check_task_parent(state, workspace_id, current.map(|task| task.id.as_str()), id)
+                .await?;
+            Some(Some(id.to_owned()))
+        }
+    };
     Ok(NewCollaborationTask {
         title,
         description,
@@ -509,6 +521,7 @@ pub(crate) async fn normalize_collaboration_task(
         artifact_id: request.artifact_id,
         project_id,
         milestone_id,
+        parent_task_id,
         due_at,
         expected_version: request.expected_version,
     })
@@ -799,6 +812,11 @@ pub(crate) async fn get_task_detail(
         .list_task_references(&task.id)
         .await
         .map_err(map_storage_error)?;
+    let children = state
+        .storage
+        .list_child_tasks(&task.id)
+        .await
+        .map_err(map_storage_error)?;
     Ok(Json(TaskDetail {
         task,
         checklist,
@@ -806,6 +824,7 @@ pub(crate) async fn get_task_detail(
         watch,
         comment_count,
         references,
+        children,
     }))
 }
 

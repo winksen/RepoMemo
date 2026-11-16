@@ -57,6 +57,7 @@ mod setup;
 mod streams;
 mod system;
 mod task_discussion;
+mod task_hierarchy;
 mod task_references;
 mod templates;
 mod trash;
@@ -960,6 +961,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/tasks/{task_id}/references/{reference_id}",
             delete(task_references::remove_task_reference),
         )
+        .route("/v1/tasks/{task_id}/children", get(task_hierarchy::list_child_tasks))
         .route(
             "/v1/tasks/{task_id}/watch",
             get(task_discussion::get_task_watch).put(task_discussion::set_task_watch),

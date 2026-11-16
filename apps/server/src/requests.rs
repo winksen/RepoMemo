@@ -468,6 +468,10 @@ pub(crate) struct SaveCollaborationTaskRequest {
     /// an empty value removes it.
     #[serde(default)]
     pub(crate) milestone_id: Option<String>,
+    /// The task this one is a sub-task of. Left out, a save keeps it; an empty value removes it. It must be a task of the same
+    /// workspace, not the task itself or anything below it.
+    #[serde(default)]
+    pub(crate) parent_task_id: Option<String>,
     /// The `version` of the task this save started from (updating only). A save from an older version is refused with the
     /// task as it is now and the attempted change; left out, the save is not checked and overwrites.
     #[serde(default)]

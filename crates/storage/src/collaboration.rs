@@ -1,7 +1,7 @@
 use super::*;
 
 /// The columns and joins every task read shares; each query adds its own WHERE and ORDER BY.
-const TASK_SELECT: &str = r#"
+pub(crate) const TASK_SELECT: &str = r#"
     SELECT
       task.id,
       task.workspace_id,
@@ -22,6 +22,10 @@ const TASK_SELECT: &str = r#"
       project.name AS project_name,
       task.milestone_id,
       milestone.name AS milestone_name,
+      task.parent_task_id,
+      parent.number AS parent_number,
+      (SELECT COUNT(*) FROM workspace_tasks AS child WHERE child.parent_task_id = task.id) AS child_count,
+      (SELECT COUNT(*) FROM workspace_tasks AS child WHERE child.parent_task_id = task.id AND child.status != 'done') AS open_child_count,
       task.due_at,
       task.completed_at,
       task.created_at,
@@ -30,7 +34,8 @@ const TASK_SELECT: &str = r#"
     JOIN users AS creator ON creator.id = task.created_by_user_id
     LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
     LEFT JOIN workspace_projects AS project ON project.id = task.project_id
-    LEFT JOIN project_milestones AS milestone ON milestone.id = task.milestone_id"#;
+    LEFT JOIN project_milestones AS milestone ON milestone.id = task.milestone_id
+    LEFT JOIN workspace_tasks AS parent ON parent.id = task.parent_task_id"#;
 
 /// Gives the next number of a workspace's tasks. A number is only ever added, so a deleted task's number is never reused.
 pub(crate) async fn take_task_number(connection: &mut sqlx::SqliteConnection, workspace_id: &str) -> Result<i64> {
@@ -105,8 +110,8 @@ impl StorageEngine {
             INSERT INTO workspace_tasks (
               id, workspace_id, title, description, status, priority,
               assignee_user_id, created_by_user_id, artifact_id, due_at,
-              completed_at, created_at, updated_at, project_id, number, milestone_id
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+              completed_at, created_at, updated_at, project_id, number, milestone_id, parent_task_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
             "#,
         )
         .bind(&id)
@@ -125,6 +130,7 @@ impl StorageEngine {
         .bind(task.project_id.flatten())
         .bind(number)
         .bind(task.milestone_id.flatten())
+        .bind(task.parent_task_id.flatten())
         .execute(&mut *transaction)
         .await?;
         transaction.commit().await?;
@@ -152,13 +158,17 @@ impl StorageEngine {
             None => current.milestone_id.clone(),
             Some(milestone_id) => milestone_id,
         };
+        let parent_task_id = match task.parent_task_id {
+            None => current.parent_task_id.clone(),
+            Some(parent_task_id) => parent_task_id,
+        };
         let expected_version = task.expected_version;
         let saved = sqlx::query(
             r#"
             UPDATE workspace_tasks
             SET title = ?1, description = ?2, status = ?3, priority = ?4,
                 assignee_user_id = ?5, artifact_id = ?6, due_at = ?7,
-                completed_at = ?8, updated_at = ?9, project_id = ?11, milestone_id = ?13, version = version + 1
+                completed_at = ?8, updated_at = ?9, project_id = ?11, milestone_id = ?13, parent_task_id = ?14, version = version + 1
             WHERE id = ?10 AND (?12 IS NULL OR version = ?12)
             "#,
         )
@@ -175,6 +185,7 @@ impl StorageEngine {
         .bind(project_id)
         .bind(expected_version)
         .bind(milestone_id)
+        .bind(parent_task_id)
         .execute(&self.pool)
         .await?;
         if saved.rows_affected() == 0 {

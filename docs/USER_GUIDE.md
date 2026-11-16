@@ -212,6 +212,7 @@ A workspace is one body of knowledge: a project, a service, a team's runbooks. I
 | **Review** | One list of everything waiting for a person |
 | **Memory** | Your team's memory cards |
 | **Tasks** | The action board |
+| **Sub-tasks** | A task can have sub-tasks (up to five levels). Unlike a checklist step, a sub-task has its own owner, status and discussion. Finishing the parent does not finish or hide its sub-tasks: the parent keeps showing how many are still open. Everything stays in one workspace, and a task cannot be placed under its own sub-task |
 | **Milestones** | Inside a project, a named, dated group of its tasks. It shows how many tasks are done, how many remain and how many are overdue, and says in words what it is counting; it completes by itself when all its tasks are done, or when a person marks it complete. Moving its date never changes a task's own date. In 0.7.7 milestones are managed through the [API](API.md#4a-projects-07) |
 | **People** | Members, invitations and the activity feed *(admins)* |
 | **Settings** | AI, repositories, template, export, rename, delete *(admins)* |

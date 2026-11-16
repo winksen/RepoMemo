@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.7` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.8 — Add parent/child tasks separate from checklist steps.
+
+- A task can have sub-tasks, which are tasks of their own (owner, status, discussion), unlike checklist steps. They stay in the same workspace, cannot form a cycle and go at most five levels deep. Finishing a parent does not finish or hide its sub-tasks; the parent keeps showing how many are still open.
+
+Checks: `tests/task_hierarchy.rs` compiles; not executed; static checks pass.
 
 ## V0.7.7 — Group project tasks into named milestones with due dates and completion rules.
 

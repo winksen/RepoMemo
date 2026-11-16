@@ -55,6 +55,7 @@ mod staging;
 mod stats;
 mod system;
 mod task_discussion;
+mod task_hierarchy;
 mod task_references;
 mod trash;
 mod users;
@@ -84,6 +85,7 @@ pub use projects::NewProject;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};
 pub use review_assignments::{DueReview, ReminderCandidate, ReviewAssignment};
+pub use task_hierarchy::MAX_TASK_DEPTH;
 pub use task_references::MAX_TASK_REFERENCES;
 mod newer;
 pub use search_feedback::{StoredSearchFeedback, CLOSED_RETENTION_DAYS, MAX_OPEN_PER_USER, OPEN_RETENTION_DAYS};
@@ -320,6 +322,10 @@ struct CollaborationTaskRow {
     project_name: Option<String>,
     milestone_id: Option<String>,
     milestone_name: Option<String>,
+    parent_task_id: Option<String>,
+    parent_number: Option<i64>,
+    child_count: i64,
+    open_child_count: i64,
     due_at: Option<String>,
     completed_at: Option<String>,
     created_at: String,
@@ -491,6 +497,8 @@ pub struct NewCollaborationTask {
     pub project_id: Option<Option<String>>,
     /// Like `project_id`: `None` leaves the milestone as it is, `Some(None)` removes it.
     pub milestone_id: Option<Option<String>>,
+    /// Like `project_id`: `None` leaves the parent as it is, `Some(None)` removes it.
+    pub parent_task_id: Option<Option<String>>,
     pub due_at: Option<String>,
     /// The version the save started from (V0.7.6). `None` saves without the check and overwrites whatever is there.
     pub expected_version: Option<i64>,
@@ -1150,6 +1158,10 @@ impl From<CollaborationTaskRow> for CollaborationTask {
             project_name: row.project_name,
             milestone_id: row.milestone_id,
             milestone_name: row.milestone_name,
+            parent_task_id: row.parent_task_id,
+            parent_key: row.parent_number.map(|number| format!("T-{number}")),
+            child_count: row.child_count,
+            open_child_count: row.open_child_count,
             due_at: row.due_at,
             completed_at: row.completed_at,
             created_at: row.created_at,

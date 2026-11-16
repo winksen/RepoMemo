@@ -93,6 +93,12 @@ pub struct CollaborationTask {
     /// The milestone of the task's project it counts toward (V0.7.7).
     pub milestone_id: Option<String>,
     pub milestone_name: Option<String>,
+    /// The task this one is a sub-task of, and that task's key (V0.7.8).
+    pub parent_task_id: Option<String>,
+    pub parent_key: Option<String>,
+    /// How many sub-tasks it has, and how many of them are not done. Completing the task changes neither.
+    pub child_count: i64,
+    pub open_child_count: i64,
     pub due_at: Option<String>,
     pub completed_at: Option<String>,
     pub created_at: String,
@@ -109,6 +115,8 @@ pub struct TaskAttempt {
     pub assignee_user_id: Option<String>,
     pub artifact_id: Option<String>,
     pub project_id: Option<String>,
+    pub milestone_id: Option<String>,
+    pub parent_task_id: Option<String>,
     pub due_at: Option<String>,
 }
 
@@ -139,6 +147,8 @@ pub struct TaskDetail {
     pub comment_count: i64,
     /// The evidence and memory cards the task cites (V0.7.5), including its older single file link.
     pub references: Vec<TaskReference>,
+    /// The task's direct sub-tasks (V0.7.8), open ones first.
+    pub children: Vec<CollaborationTask>,
 }
 
 /// One memory card or piece of evidence a task cites (V0.7.5). Only the id is stored; the title is read from the target, and

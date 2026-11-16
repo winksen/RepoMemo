@@ -268,6 +268,10 @@ export interface CollaborationTask {
   project_name: string | null;
   milestone_id: string | null;
   milestone_name: string | null;
+  parent_task_id: string | null;
+  parent_key: string | null;
+  child_count: number;
+  open_child_count: number;
   due_at: string | null;
   completed_at: string | null;
   created_at: string;

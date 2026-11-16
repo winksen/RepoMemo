@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.8 (2026-11-17)
+
+Let a task have sub-tasks that are real tasks, kept separate from checklist steps.
+
+### Added
+- **Sub-tasks.** `parent_task_id` on the task routes (left out keeps the parent, an empty string removes it). A sub-task is a task of its own, with its own number, owner, status, discussion and references; a checklist step is still a small step with none of these.
+- **Rules that hold when a task is saved.** The parent must be a task of the same workspace; a task cannot be its own parent or be placed under anything below it (a cycle is refused with the reason); the tree is at most five levels deep, counting what already hangs below the task being moved.
+- **Completing a parent hides nothing.** Setting a parent to done does not complete, hide or reorder its sub-tasks; they stay open and listed, and the parent keeps `open_child_count`. The activity feed says "done, with N unfinished sub-tasks".
+- Tasks report `parent_task_id`, `parent_key`, `child_count` and `open_child_count`; `GET /v1/tasks/{id}/children` lists the direct sub-tasks, open ones first, and the task detail carries them. Removing a parent leaves its sub-tasks as ordinary tasks.
+- Migration **0071** adds `workspace_tasks.parent_task_id`.
+- A server test (`tests/task_hierarchy.rs`) follows sub-tasks and their counts, a task under itself or its own sub-task, a parent in another workspace, the depth limit, a done parent with open sub-tasks, and removing a parent.
+- **Not in this release:** the web screens.
+
+### Checks
+- Version, migration lock (71 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. Tasks report four new fields.
+
 ## V0.7.7 (2026-11-17)
 
 Let a lead group a project's tasks under dated milestones and see, with the denominator named, what is done, what remains and what is overdue.

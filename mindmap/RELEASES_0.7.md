@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.7 → 0.8 (proposed)
 
-> **Current:** `V0.7.7` (2026-11-17)
+> **Current:** `V0.7.8` (2026-11-17)
 
 > **Theme:** Projects connected to their evidence · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -27,7 +27,7 @@
 | **V0.7.5** | ✅ 2026-11-17 | AK. Project execution | 🔧 | Task context | Replace the single-artifact limit with multiple evidence and memory references | Existing artifact links migrate intact; new links remain permission-checked and the task can cite the decision that created it |
 | **V0.7.6** | ✅ 2026-11-17 | AK. Project execution | 🔒 | Task editing | Apply optimistic concurrency to task details and status changes | Concurrent edits cannot silently drop assignment, description or status; recoverable conflicts retain the attempted change |
 | **V0.7.7** | ✅ 2026-11-17 | AK. Project execution | ✨ | Milestones | Group project tasks into named milestones with due dates and completion rules | A lead sees completed, remaining and overdue work with an explainable denominator; changing a date does not silently reschedule tasks |
-| **V0.7.8** | 🔜 | AK. Project execution | ✨ | Task hierarchy | Add parent/child tasks separate from checklist steps | Parents and children stay in the same authorized workspace, cycles are refused and parent completion does not hide unfinished children |
+| **V0.7.8** | ✅ 2026-11-17 | AK. Project execution | ✨ | Task hierarchy | Add parent/child tasks separate from checklist steps | Parents and children stay in the same authorized workspace, cycles are refused and parent completion does not hide unfinished children |
 | **V0.7.9** | 🔜 | AK. Project execution | ✨ | Dependencies | Add blocks/blocked-by links and a clear blocker explanation | Self-links and cycles are refused; closing a blocker updates the indication without automatically completing dependent work |
 | **V0.7.10** | 🔜 | AK. Project execution | ✨ | Labels | Add workspace-managed task labels with accessible colors and filters | Labels can be renamed/merged without losing assignments and labels cannot be used as an access-control substitute |
 | **V0.7.11** | 🔜 | AK. Project execution | ✨ | Workflows | Allow named workflow states mapped to stable open/in-progress/blocked/done categories | Existing four states migrate unchanged; reporting and integrations use explicit category mappings, and removal requires remapping occupied states |

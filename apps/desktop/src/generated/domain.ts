@@ -73,6 +73,12 @@ export interface CollaborationTask {
   /** The milestone of the task's project it counts toward (V0.7.7). */
   milestone_id: string | null;
   milestone_name: string | null;
+  /** The task this one is a sub-task of, and that task's key (V0.7.8). */
+  parent_task_id: string | null;
+  parent_key: string | null;
+  /** How many sub-tasks it has, and how many of them are not done. Completing the task changes neither. */
+  child_count: number;
+  open_child_count: number;
   due_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -88,6 +94,8 @@ export interface TaskAttempt {
   assignee_user_id: string | null;
   artifact_id: string | null;
   project_id: string | null;
+  milestone_id: string | null;
+  parent_task_id: string | null;
   due_at: string | null;
 }
 
@@ -119,6 +127,8 @@ export interface TaskDetail {
   comment_count: number;
   /** The evidence and memory cards the task cites (V0.7.5), including its older single file link. */
   references: TaskReference[];
+  /** The task's direct sub-tasks (V0.7.8), open ones first. */
+  children: CollaborationTask[];
 }
 
 /**
