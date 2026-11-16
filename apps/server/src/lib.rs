@@ -56,6 +56,7 @@ mod setup;
 mod streams;
 mod system;
 mod task_discussion;
+mod task_references;
 mod templates;
 mod trash;
 mod verification;
@@ -931,6 +932,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/task-comments/{comment_id}",
             put(task_discussion::update_task_comment).delete(task_discussion::delete_task_comment),
+        )
+        .route(
+            "/v1/tasks/{task_id}/references",
+            get(task_references::list_task_references).post(task_references::add_task_reference),
+        )
+        .route(
+            "/v1/tasks/{task_id}/references/{reference_id}",
+            delete(task_references::remove_task_reference),
         )
         .route(
             "/v1/tasks/{task_id}/watch",

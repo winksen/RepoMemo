@@ -102,6 +102,8 @@ A task joins a project with `project_id` on the task routes. **Left out, a save 
 
 **Task discussion.** `POST /v1/tasks/{id}/comments` (`{"body":"…"}`, 1 to 5,000 characters; a role that may write) adds a comment that stays with its task; `GET` lists them, `PUT /v1/task-comments/{id}` edits one (its author) and `DELETE` removes it (its author or an administrator). Type `@` and a member's email to mention them: they are told once (a later edit tells only the people it adds), and are not also told "new comment". **Watching** is `PUT /v1/tasks/{id}/watch` with `{"mode":"watching"|"muted"|"default"}`, open to anyone who can read the workspace: a task's creator and assignee follow it by default, anyone else by asking, and `muted` stops the optional "new comment" notices (a choice of its own under the profile's notifications) but never the notice that a task was assigned to you.
 
+**Task context.** A task cites any number (up to 50) of evidence files and memory cards of its own workspace: `POST /v1/tasks/{id}/references` with `{"kind":"evidence"|"memory_card","target_id":"…","note":"…"}`, `GET` to list and `DELETE …/references/{reference_id}` to remove. When you create a task you can pass the same objects as `"references"` (for example the decision that created it); every one is checked first, so a bad one means no task. The task's older single `artifact_id` link keeps working and is one of the references. As for projects, a reference holds the id and your note, the title is read each time, and a deleted target comes back with `"available": false`. The task detail lists them.
+
 ## 5. Live updates
 
 `GET /v1/workspaces/{id}/events` (and `GET /v1/system/events` for system administrators) is a **server-sent events** stream, so use `curl -N`:

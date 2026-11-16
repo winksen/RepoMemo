@@ -104,6 +104,24 @@ pub struct TaskDetail {
     /// How the reader follows the task: `watching`, `muted` or `default` (V0.7.4).
     pub watch: String,
     pub comment_count: i64,
+    /// The evidence and memory cards the task cites (V0.7.5), including its older single file link.
+    pub references: Vec<TaskReference>,
+}
+
+/// One memory card or piece of evidence a task cites (V0.7.5). Only the id is stored; the title is read from the target, and
+/// `available` is false when the target is gone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskReference {
+    pub id: String,
+    pub task_id: String,
+    /// `evidence` or `memory_card`.
+    pub kind: String,
+    pub target_id: String,
+    pub title: Option<String>,
+    pub available: bool,
+    pub note: String,
+    pub added_by: Option<SharedUser>,
+    pub created_at: String,
 }
 
 /// A comment on a task (V0.7.4). It stays with its task and goes with it.

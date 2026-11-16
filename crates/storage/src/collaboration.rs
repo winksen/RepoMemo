@@ -123,6 +123,7 @@ impl StorageEngine {
         .execute(&mut *transaction)
         .await?;
         transaction.commit().await?;
+        self.sync_task_artifact_reference(&id).await?;
         self.get_collaboration_task(&id).await
     }
 
@@ -165,6 +166,7 @@ impl StorageEngine {
         .bind(project_id)
         .execute(&self.pool)
         .await?;
+        self.sync_task_artifact_reference(task_id).await?;
         self.get_collaboration_task(task_id).await
     }
 

@@ -85,6 +85,25 @@ export interface TaskDetail {
   /** How the reader follows the task: `watching`, `muted` or `default` (V0.7.4). */
   watch: string;
   comment_count: number;
+  /** The evidence and memory cards the task cites (V0.7.5), including its older single file link. */
+  references: TaskReference[];
+}
+
+/**
+ * One memory card or piece of evidence a task cites (V0.7.5). Only the id is stored; the title is read from the target, and
+ * `available` is false when the target is gone.
+ */
+export interface TaskReference {
+  id: string;
+  task_id: string;
+  /** `evidence` or `memory_card`. */
+  kind: string;
+  target_id: string;
+  title: string | null;
+  available: boolean;
+  note: string;
+  added_by: SharedUser | null;
+  created_at: string;
 }
 
 /** A comment on a task (V0.7.4). It stays with its task and goes with it. */

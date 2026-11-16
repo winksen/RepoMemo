@@ -43,6 +43,7 @@ mod search_feedback;
 mod system;
 mod task_details;
 mod task_discussion;
+mod task_references;
 mod templates;
 mod trash;
 mod workspaces;

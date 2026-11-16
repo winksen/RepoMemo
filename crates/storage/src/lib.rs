@@ -10,8 +10,9 @@ use repomemo_domain::{
     CollaborationTask, Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence,
     MemoryReviewReason, Organization, OrganizationMember, OrganizationRole, Project, ProjectReference,
     ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace,
-    Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, TaskComment, Workspace,
-    WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
+    Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, TaskComment, TaskReference,
+    Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
+    MAX_FOLDER_DEPTH,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -53,6 +54,7 @@ mod staging;
 mod stats;
 mod system;
 mod task_discussion;
+mod task_references;
 mod trash;
 mod users;
 mod vectors;
@@ -80,6 +82,7 @@ pub use projects::NewProject;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};
 pub use review_assignments::{DueReview, ReminderCandidate, ReviewAssignment};
+pub use task_references::MAX_TASK_REFERENCES;
 mod newer;
 pub use search_feedback::{StoredSearchFeedback, CLOSED_RETENTION_DAYS, MAX_OPEN_PER_USER, OPEN_RETENTION_DAYS};
 use secrets::SecretBox;

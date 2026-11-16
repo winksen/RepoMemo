@@ -464,7 +464,19 @@ pub(crate) struct SaveCollaborationTaskRequest {
     /// The project to put the task in. Left out, a save keeps the project the task has; an empty value removes it.
     #[serde(default)]
     pub(crate) project_id: Option<String>,
+    /// Evidence and memory cards the new task cites, for example the decision that created it (creating only).
+    #[serde(default)]
+    pub(crate) references: Vec<TaskReferenceInput>,
     pub(crate) due_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct TaskReferenceInput {
+    /// `evidence` or `memory_card`.
+    pub(crate) kind: String,
+    pub(crate) target_id: String,
+    #[serde(default)]
+    pub(crate) note: String,
 }
 
 #[derive(Debug, Deserialize)]

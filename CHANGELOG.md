@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.5 (2026-11-17)
+
+Let a task cite several files and memory cards, not one, without losing the link tasks already had.
+
+### Added
+- **Task references** (`/v1/tasks/{id}/references`): a task cites up to 50 pieces of evidence or memory cards of its own workspace, each with a note of up to 500 characters. Anyone who can read the workspace lists them; anyone who can edit adds or removes one. The same item twice is refused (`409`); an unknown item or one of another workspace is `404`.
+- **The old link is kept.** `artifact_id` still exists, still works and is still how a file review task knows its file; every task that had one is migrated into a reference with its original creator and date, and a link set the old way afterwards appears among the references too.
+- **A task can cite the decision that created it.** Creating a task accepts `references`; each is checked before the task is made, so a bad one means no task, and the same item twice is one citation.
+- Nothing cited is copied: the title is read from the target each time, and a deleted target comes back with `available: false`. The task detail (`GET …/tasks/T-12`) lists the references.
+- Migration **0068** adds `task_references` (unique per task, kind and target) and copies the existing links into it.
+- A server test (`tests/task_references.rs`) follows the old link appearing as a reference, adding a card and a file, the refusals, a reader, citing a decision when creating a task, a bad citation leaving no task, and a deleted file shown as unavailable.
+- **Not in this release:** the web screens.
+
+### Checks
+- Version, migration lock (68 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**, and neither was the migration on an existing database. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive; `artifact_id` is unchanged. A script that reads a task's detail also gets `references`.
+
 ## V0.7.4 (2026-11-17)
 
 Give a task its own discussion, with mentions that notify once and watching that can be muted.

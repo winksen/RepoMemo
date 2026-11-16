@@ -36,12 +36,39 @@ pub(crate) async fn create_collaboration_task(
     Json(request): Json<SaveCollaborationTaskRequest>,
 ) -> Result<(StatusCode, Json<CollaborationTask>), ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
+    // Every citation is checked before the task is made, so a bad one leaves nothing behind.
+    let mut citations = Vec::new();
+    for reference in &request.references {
+        let note = crate::task_references::check_task_reference_input(&reference.kind, &reference.note)?;
+        state
+            .storage
+            .check_reference_target(&workspace_id, &reference.kind, reference.target_id.trim())
+            .await
+            .map_err(map_storage_error)?;
+        citations.push((reference.kind.clone(), reference.target_id.trim().to_owned(), note));
+    }
     let payload = normalize_collaboration_task(&state, &workspace_id, request, None).await?;
     let task = state
         .storage
         .create_collaboration_task(&workspace_id, &subject.user_id, payload)
         .await
         .map_err(map_storage_error)?;
+    for (kind, target_id, note) in citations {
+        // The same item twice in one request is one citation.
+        match state
+            .storage
+            .add_task_reference(&task, &subject.user_id, &kind, &target_id, &note)
+            .await
+        {
+            Ok(_) => {}
+            Err(error)
+                if matches!(
+                    repomemo_domain::classify(&error),
+                    Some((repomemo_domain::ErrorKind::Conflict, _))
+                ) => {}
+            Err(error) => return Err(map_storage_error(error)),
+        }
+    }
     notify_task_assignee(&state, &subject.user_id, &task).await;
     notify_mentions(
         &state,
@@ -694,12 +721,18 @@ pub(crate) async fn get_task_detail(
         .count_task_comments(&task.id)
         .await
         .map_err(map_storage_error)?;
+    let references = state
+        .storage
+        .list_task_references(&task.id)
+        .await
+        .map_err(map_storage_error)?;
     Ok(Json(TaskDetail {
         task,
         checklist,
         path,
         watch,
         comment_count,
+        references,
     }))
 }
 
