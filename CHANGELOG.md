@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.0 (2026-11-17)
+
+Open the 0.7 line by writing down what a project is, what it is not and the journey the line must deliver.
+
+### Added
+- **[The 0.7 plan](mindmap/plans/2026-11-17-0.7-projects.md):** the meaning of project, brief, milestone, task, checklist step, evidence and update; six rules for the whole line (legacy tasks need no project, the four states stay the categories, references are checked when used, nothing reschedules or completes silently, a person decides project health, stale saves are refused); the migration each release adds; and a nine-step journey for a three-person team that V0.7.20 walks.
+- **What is excluded on purpose:** Gantt charts, critical path, resource or capacity accounting, time tracking, sprints and portfolios. The guides will not claim them.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock, generated types, styles, documentation links and TypeScript pass. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.6.30 (2026-11-17)
 
 Close the 0.6 line with its walkthroughs recorded as owed and the deferral of OCR stated.

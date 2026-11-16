@@ -1,5 +1,7 @@
 # RepoMemo releases: 0.7 → 0.8 (proposed)
 
+> **Current:** `V0.7.0` (2026-11-17)
+
 > **Theme:** Projects connected to their evidence · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
 **Status:** proposed on 2026-10-29; no row below is shipped or a release commitment. One intended commit per row, named `Update V0.N.P`, with a short body describing the change. Split oversized rows before implementation and renumber only unshipped rows. Update the changelog, user/API guides, mindmaps, archive compatibility and focused checks with the implementation, not in this planning change. No product version is bumped by this plan.
@@ -17,7 +19,7 @@
 
 | Release | Status | Track | Type | Area | What changes | Done when |
 |---|---|---|---|---|---|---|
-| **V0.7.0** | 🔜 | AK. Project execution | 📘 | Opening | Specify the lightweight project model and its limits with a sample team journey | Project, milestone, task, checklist and evidence have distinct meanings; legacy tasks need no project and advanced portfolio/sprint planning is excluded |
+| **V0.7.0** | ✅ 2026-11-17 | AK. Project execution | 📘 | Opening | Specify the lightweight project model and its limits with a sample team journey | Project, milestone, task, checklist and evidence have distinct meanings; legacy tasks need no project and advanced portfolio/sprint planning is excluded |
 | **V0.7.1** | 🔜 | AK. Project execution | ✨ | Projects | Add workspace-scoped projects with owner, goal, lifecycle and target date | Members can create and archive a project; its access is exactly the workspace's and legacy tasks continue to work |
 | **V0.7.2** | 🔜 | AK. Project execution | ✨ | Project brief | Attach decision memories and evidence to a project brief with backlinks | A teammate can explain the project's goal and supporting decisions without copying source text or following a broken access link |
 | **V0.7.3** | 🔜 | AK. Project execution | ✨ | Task details | Give tasks stable human-readable identifiers, direct URLs and a dedicated detail view on the existing task route | A link opens the same task after title changes; guests receive an authorized view and missing/deleted tasks have useful states |

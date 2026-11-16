@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.6.30` (2026-11-17) · **Next:** the 0.7 line (projects), after the maintainer's test run and walkthroughs. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.7.0` (2026-11-17) · **Next:** V0.7.1 projects. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `RM-V0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -1896,7 +1896,7 @@ The documentation sequence is deliberately after the feature and interface track
 
 | Release | Type | Section | The one change | IDs | Done when |
 |---|---|---|---|---|---|
-| **V0.7.0** 🔜 | 📘 | Opening | Specify the lightweight project model and its limits with a sample team journey | G09 | Project, milestone, task, checklist and evidence have distinct meanings; legacy tasks need no project and advanced portfolio/sprint planning is excluded |
+| **V0.7.0** ✅ 2026-11-17 | 📘 | Opening | Specify the lightweight project model and its limits with a sample team journey | G09 | Project, milestone, task, checklist and evidence have distinct meanings; legacy tasks need no project and advanced portfolio/sprint planning is excluded |
 | **V0.7.1** 🔜 | ✨ | Projects | Add workspace-scoped projects with owner, goal, lifecycle and target date | G09 | Members can create and archive a project; its access is exactly the workspace's and legacy tasks continue to work |
 | **V0.7.2** 🔜 | ✨ | Project brief | Attach decision memories and evidence to a project brief with backlinks | G09 | A teammate can explain the project's goal and supporting decisions without copying source text or following a broken access link |
 | **V0.7.3** 🔜 | ✨ | Task details | Give tasks stable human-readable identifiers, direct URLs and a dedicated detail view on the existing task route | G09 | A link opens the same task after title changes; guests receive an authorized view and missing/deleted tasks have useful states |
