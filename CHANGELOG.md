@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.6 (2026-11-17)
+
+Stop two people editing one task from silently overwriting each other.
+
+### Added
+- **A task version.** Every task has a `version` that starts at 1 and grows by one with each save. Tasks that exist before this release start at 1.
+- **`expected_version` on `PUT /v1/tasks/{id}`.** When the save names the version it started from and the task has moved on, nothing is written and the answer is `409` with the usual `error`, `current` (the task as it is now) and `attempted` (the title, description, status, priority, assignee, file, project and due date that were sent). A client can show both and let the person keep their change on top of the current task, so a changed assignment, description or status is never dropped quietly and an attempted change is never lost.
+- **The check is part of the write.** It is one conditional update, so two saves from the same version cannot both succeed; the loser gets the conflict.
+- A save that sends no `expected_version` still works and is unchecked, as before; it counts as a new version. This is the same compatibility choice as for memory cards and file versions, and the API guide says so.
+- Migration **0069** adds `workspace_tasks.version`.
+- A server test (`tests/task_conflicts.rs`) follows a stale save refused with the current task and the attempted text, nothing dropped, a retry on top of the current version, two simultaneous saves from one version (exactly one stored) and an unchecked save.
+- **Not in this release:** the web conflict screen; the API returns what it needs.
+
+### Checks
+- Version, migration lock (69 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. A script that edits tasks should send `expected_version`; one that does not behaves as before. Tasks now report `version`.
+
 ## V0.7.5 (2026-11-17)
 
 Let a task cite several files and memory cards, not one, without losing the link tasks already had.

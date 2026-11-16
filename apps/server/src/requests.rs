@@ -464,6 +464,10 @@ pub(crate) struct SaveCollaborationTaskRequest {
     /// The project to put the task in. Left out, a save keeps the project the task has; an empty value removes it.
     #[serde(default)]
     pub(crate) project_id: Option<String>,
+    /// The `version` of the task this save started from (updating only). A save from an older version is refused with the
+    /// task as it is now and the attempted change; left out, the save is not checked and overwrites.
+    #[serde(default)]
+    pub(crate) expected_version: Option<i64>,
     /// Evidence and memory cards the new task cites, for example the decision that created it (creating only).
     #[serde(default)]
     pub(crate) references: Vec<TaskReferenceInput>,

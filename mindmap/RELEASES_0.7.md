@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.7 → 0.8 (proposed)
 
-> **Current:** `V0.7.5` (2026-11-17)
+> **Current:** `V0.7.6` (2026-11-17)
 
 > **Theme:** Projects connected to their evidence · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -25,7 +25,7 @@
 | **V0.7.3** | ✅ 2026-11-17 | AK. Project execution | ✨ | Task details | Give tasks stable human-readable identifiers, direct URLs and a dedicated detail view on the existing task route | A link opens the same task after title changes; guests receive an authorized view and missing/deleted tasks have useful states |
 | **V0.7.4** | ✅ 2026-11-17 | AK. Project execution | ✨ | Task discussion | Add task comments, mentions and explicit watching using existing notification preferences | A discussion stays with its task, mentions notify once and unwatch/mute stops optional delivery without losing assignment notices |
 | **V0.7.5** | ✅ 2026-11-17 | AK. Project execution | 🔧 | Task context | Replace the single-artifact limit with multiple evidence and memory references | Existing artifact links migrate intact; new links remain permission-checked and the task can cite the decision that created it |
-| **V0.7.6** | 🔜 | AK. Project execution | 🔒 | Task editing | Apply optimistic concurrency to task details and status changes | Concurrent edits cannot silently drop assignment, description or status; recoverable conflicts retain the attempted change |
+| **V0.7.6** | ✅ 2026-11-17 | AK. Project execution | 🔒 | Task editing | Apply optimistic concurrency to task details and status changes | Concurrent edits cannot silently drop assignment, description or status; recoverable conflicts retain the attempted change |
 | **V0.7.7** | 🔜 | AK. Project execution | ✨ | Milestones | Group project tasks into named milestones with due dates and completion rules | A lead sees completed, remaining and overdue work with an explainable denominator; changing a date does not silently reschedule tasks |
 | **V0.7.8** | 🔜 | AK. Project execution | ✨ | Task hierarchy | Add parent/child tasks separate from checklist steps | Parents and children stay in the same authorized workspace, cycles are refused and parent completion does not hide unfinished children |
 | **V0.7.9** | 🔜 | AK. Project execution | ✨ | Dependencies | Add blocks/blocked-by links and a clear blocker explanation | Self-links and cycles are refused; closing a blocker updates the indication without automatically completing dependent work |

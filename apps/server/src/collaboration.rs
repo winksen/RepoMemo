@@ -1,5 +1,6 @@
 use crate::*;
-use repomemo_domain::TaskDetail;
+use repomemo_domain::{TaskAttempt, TaskConflict, TaskConflictError, TaskDetail};
+use repomemo_storage::TaskUpdate;
 
 pub(crate) async fn list_collaboration_tasks(
     subject: AuthenticatedSubject,
@@ -92,25 +93,72 @@ pub(crate) async fn create_collaboration_task(
     Ok((StatusCode::CREATED, Json(task)))
 }
 
+/// An error from saving a task: the usual one, or a refusal that carries the task as it is and the change that was attempted.
+pub(crate) enum TaskSaveError {
+    Api(ApiError),
+    Stale(Box<TaskConflict>),
+}
+
+impl From<ApiError> for TaskSaveError {
+    fn from(error: ApiError) -> Self {
+        Self::Api(error)
+    }
+}
+
+impl axum::response::IntoResponse for TaskSaveError {
+    fn into_response(self) -> axum::response::Response {
+        match self {
+            Self::Api(error) => error.into_response(),
+            Self::Stale(conflict) => (StatusCode::CONFLICT, Json(*conflict)).into_response(),
+        }
+    }
+}
+
 pub(crate) async fn update_collaboration_task(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(task_id): Path<String>,
     Json(request): Json<SaveCollaborationTaskRequest>,
-) -> Result<Json<CollaborationTask>, ApiError> {
+) -> Result<Json<CollaborationTask>, TaskSaveError> {
     let current = state
         .storage
         .get_collaboration_task(&task_id)
         .await
         .map_err(map_storage_error)?;
     require_workspace_write(&state, &subject, &current.workspace_id).await?;
+    let attempted = TaskAttempt {
+        title: request.title.clone(),
+        description: request.description.clone(),
+        status: request.status.clone(),
+        priority: request.priority.clone(),
+        assignee_user_id: request.assignee_user_id.clone(),
+        artifact_id: request.artifact_id.clone(),
+        project_id: request.project_id.clone(),
+        due_at: request.due_at.clone(),
+    };
     let payload =
         normalize_collaboration_task(&state, &current.workspace_id, request, current.project_id.as_deref()).await?;
-    let task = state
+    let task = match state
         .storage
         .update_collaboration_task(&task_id, payload)
         .await
-        .map_err(map_storage_error)?;
+        .map_err(map_storage_error)?
+    {
+        TaskUpdate::Saved(task) => *task,
+        TaskUpdate::Stale(now) => {
+            return Err(TaskSaveError::Stale(Box::new(TaskConflict {
+                error: TaskConflictError {
+                    code: "conflict".to_owned(),
+                    message: format!(
+                        "{} was changed by someone else (now at version {}). Your change is returned with it so nothing is lost.",
+                        now.key, now.version
+                    ),
+                },
+                current: *now,
+                attempted,
+            })));
+        }
+    };
     if current.assignee.as_ref().map(|member| member.id.as_str())
         != task.assignee.as_ref().map(|member| member.id.as_str())
     {
@@ -438,6 +486,7 @@ pub(crate) async fn normalize_collaboration_task(
         artifact_id: request.artifact_id,
         project_id,
         due_at,
+        expected_version: request.expected_version,
     })
 }
 

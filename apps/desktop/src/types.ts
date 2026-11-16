@@ -256,6 +256,7 @@ export interface CollaborationTask {
   workspace_id: string;
   number: number;
   key: string;
+  version: number;
   title: string;
   description: string;
   status: CollaborationTaskStatus;

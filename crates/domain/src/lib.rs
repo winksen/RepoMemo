@@ -78,6 +78,8 @@ pub struct CollaborationTask {
     pub number: i64,
     /// The human-readable identifier built from it, such as `T-12`.
     pub key: String,
+    /// Starts at 1 and grows by one with every save (V0.7.6); send it back as `expected_version` to save safely.
+    pub version: i64,
     pub title: String,
     pub description: String,
     pub status: String,
@@ -92,6 +94,34 @@ pub struct CollaborationTask {
     pub completed_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// What a refused save of a task said (V0.7.6): kept and returned with the task as it is now, so the change is not lost.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskAttempt {
+    pub title: String,
+    pub description: String,
+    pub status: String,
+    pub priority: String,
+    pub assignee_user_id: Option<String>,
+    pub artifact_id: Option<String>,
+    pub project_id: Option<String>,
+    pub due_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskConflictError {
+    pub code: String,
+    pub message: String,
+}
+
+/// The answer to a save of a task that started from an older version: the usual error, the task as it is now and the change
+/// that was attempted.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskConflict {
+    pub error: TaskConflictError,
+    pub current: CollaborationTask,
+    pub attempted: TaskAttempt,
 }
 
 /// A task with what its own page shows (V0.7.3). `path` is the address of the task in the web app and keeps naming the same

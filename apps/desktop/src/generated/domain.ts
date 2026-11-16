@@ -58,6 +58,8 @@ export interface CollaborationTask {
   number: number;
   /** The human-readable identifier built from it, such as `T-12`. */
   key: string;
+  /** Starts at 1 and grows by one with every save (V0.7.6); send it back as `expected_version` to save safely. */
+  version: number;
   title: string;
   description: string;
   status: string;
@@ -72,6 +74,33 @@ export interface CollaborationTask {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** What a refused save of a task said (V0.7.6): kept and returned with the task as it is now, so the change is not lost. */
+export interface TaskAttempt {
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assignee_user_id: string | null;
+  artifact_id: string | null;
+  project_id: string | null;
+  due_at: string | null;
+}
+
+export interface TaskConflictError {
+  code: string;
+  message: string;
+}
+
+/**
+ * The answer to a save of a task that started from an older version: the usual error, the task as it is now and the change
+ * that was attempted.
+ */
+export interface TaskConflict {
+  error: TaskConflictError;
+  current: CollaborationTask;
+  attempted: TaskAttempt;
 }
 
 /**

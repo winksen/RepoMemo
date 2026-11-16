@@ -302,6 +302,7 @@ struct CollaborationTaskRow {
     id: String,
     workspace_id: String,
     number: i64,
+    version: i64,
     title: String,
     description: String,
     status: String,
@@ -485,6 +486,16 @@ pub struct NewCollaborationTask {
     /// The project to put the task in. `None` leaves it as it is (no project on a new task); `Some(None)` removes it.
     pub project_id: Option<Option<String>>,
     pub due_at: Option<String>,
+    /// The version the save started from (V0.7.6). `None` saves without the check and overwrites whatever is there.
+    pub expected_version: Option<i64>,
+}
+
+/// The result of saving a task: saved, or refused because it changed since the version the save started from.
+#[derive(Debug, Clone)]
+pub enum TaskUpdate {
+    Saved(Box<CollaborationTask>),
+    /// Refused; holds the task as it is now.
+    Stale(Box<CollaborationTask>),
 }
 
 #[derive(Debug, Clone)]
@@ -1113,6 +1124,7 @@ impl From<CollaborationTaskRow> for CollaborationTask {
             workspace_id: row.workspace_id,
             number: row.number,
             key: format!("T-{}", row.number),
+            version: row.version,
             title: row.title,
             description: row.description,
             status: row.status,

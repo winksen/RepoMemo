@@ -6,6 +6,7 @@ const TASK_SELECT: &str = r#"
       task.id,
       task.workspace_id,
       COALESCE(task.number, 0) AS number,
+      task.version,
       task.title,
       task.description,
       task.status,
@@ -127,11 +128,10 @@ impl StorageEngine {
         self.get_collaboration_task(&id).await
     }
 
-    pub async fn update_collaboration_task(
-        &self,
-        task_id: &str,
-        task: NewCollaborationTask,
-    ) -> Result<CollaborationTask> {
+    /// Saves a task. When the save names the version it started from and the task has moved on since, nothing is written and
+    /// the task as it is now is returned; the check is part of the write itself, so two saves from the same version cannot both
+    /// succeed.
+    pub async fn update_collaboration_task(&self, task_id: &str, task: NewCollaborationTask) -> Result<TaskUpdate> {
         let current = self.get_collaboration_task(task_id).await?;
         let now = Utc::now().to_rfc3339();
         let completed_at = if task.status == "done" {
@@ -144,13 +144,14 @@ impl StorageEngine {
             None => current.project_id.clone(),
             Some(project_id) => project_id,
         };
-        sqlx::query(
+        let expected_version = task.expected_version;
+        let saved = sqlx::query(
             r#"
             UPDATE workspace_tasks
             SET title = ?1, description = ?2, status = ?3, priority = ?4,
                 assignee_user_id = ?5, artifact_id = ?6, due_at = ?7,
-                completed_at = ?8, updated_at = ?9, project_id = ?11
-            WHERE id = ?10
+                completed_at = ?8, updated_at = ?9, project_id = ?11, version = version + 1
+            WHERE id = ?10 AND (?12 IS NULL OR version = ?12)
             "#,
         )
         .bind(task.title)
@@ -164,10 +165,14 @@ impl StorageEngine {
         .bind(now)
         .bind(task_id)
         .bind(project_id)
+        .bind(expected_version)
         .execute(&self.pool)
         .await?;
+        if saved.rows_affected() == 0 {
+            return Ok(TaskUpdate::Stale(Box::new(self.get_collaboration_task(task_id).await?)));
+        }
         self.sync_task_artifact_reference(task_id).await?;
-        self.get_collaboration_task(task_id).await
+        Ok(TaskUpdate::Saved(Box::new(self.get_collaboration_task(task_id).await?)))
     }
 
     pub async fn delete_collaboration_task(&self, task_id: &str) -> Result<()> {

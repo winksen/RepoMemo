@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.5` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.6` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.6 — Apply optimistic concurrency to task details and status changes.
+
+- Two people editing the same task can no longer overwrite each other without noticing: a save from an older version is refused and shown the task as it is now together with what was attempted, so assignment, description and status are never dropped quietly. Scripts that do not send a version are unchecked, as before.
+
+Checks: `tests/task_conflicts.rs` compiles; not executed; static checks pass.
 
 ## V0.7.5 — Replace the single-artifact limit with multiple evidence and memory references.
 
