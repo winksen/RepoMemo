@@ -492,6 +492,24 @@ pub(crate) struct TaskReferenceInput {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct SaveTaskLabelRequest {
+    pub(crate) name: String,
+    /// One of gray (the default), red, orange, yellow, green, teal, blue, purple, pink.
+    #[serde(default)]
+    pub(crate) color: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MergeTaskLabelRequest {
+    pub(crate) into_label_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SetTaskLabelsRequest {
+    pub(crate) label_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct AddTaskDependencyRequest {
     /// The task in the path is blocked by this task. Name this or `blocked_task_id`, not both.
     #[serde(default)]

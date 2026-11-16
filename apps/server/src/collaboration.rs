@@ -2,18 +2,29 @@ use crate::*;
 use repomemo_domain::{TaskAttempt, TaskConflict, TaskConflictError, TaskDetail};
 use repomemo_storage::TaskUpdate;
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct TaskListFilter {
+    /// Only the tasks that carry this label (V0.7.10). A label filters; it never limits who can see a task.
+    label: Option<String>,
+}
+
 pub(crate) async fn list_collaboration_tasks(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
+    Query(filter): Query<TaskListFilter>,
 ) -> Result<Json<Vec<CollaborationTask>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
-    state
-        .storage
-        .list_collaboration_tasks(&workspace_id)
-        .await
-        .map(Json)
-        .map_err(map_storage_error)
+    let tasks = match filter.label.as_deref() {
+        Some(label_id) => {
+            state
+                .storage
+                .list_collaboration_tasks_by_label(&workspace_id, label_id)
+                .await
+        }
+        None => state.storage.list_collaboration_tasks(&workspace_id).await,
+    };
+    tasks.map(Json).map_err(map_storage_error)
 }
 
 pub(crate) async fn get_collaboration_task(

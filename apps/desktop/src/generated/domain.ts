@@ -82,6 +82,8 @@ export interface CollaborationTask {
   /** How many tasks block this one and are not done (V0.7.9), and how many tasks this one blocks. */
   open_blocker_count: number;
   blocks_count: number;
+  /** The task's labels (V0.7.10), by name. They organize and filter; they never decide who can see the task. */
+  labels: TaskLabelTag[];
   due_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -134,6 +136,28 @@ export interface TaskDetail {
   children: CollaborationTask[];
   /** What blocks this task and what it blocks (V0.7.9). */
   dependencies: TaskDependencies;
+}
+
+/** A label as it appears on a task (V0.7.10). */
+export interface TaskLabelTag {
+  id: string;
+  name: string;
+  color: string;
+  background_color: string;
+  text_color: string;
+}
+
+/** A workspace's label with how many tasks carry it (V0.7.10). */
+export interface TaskLabel {
+  id: string;
+  workspace_id: string;
+  name: string;
+  color: string;
+  background_color: string;
+  text_color: string;
+  task_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 /** A task named briefly, as the other end of a dependency. */

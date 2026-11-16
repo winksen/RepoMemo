@@ -274,6 +274,7 @@ export interface CollaborationTask {
   open_child_count: number;
   open_blocker_count: number;
   blocks_count: number;
+  labels: { id: string; name: string; color: string; background_color: string; text_color: string }[];
   due_at: string | null;
   completed_at: string | null;
   created_at: string;

@@ -11,7 +11,7 @@ use repomemo_domain::{
     MemoryReviewReason, Milestone, Organization, OrganizationMember, OrganizationRole, Project, ProjectReference,
     ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace,
     Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, TaskComment, TaskDependency,
-    TaskReference, TaskSummary, Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership,
+    TaskLabelTag, TaskReference, TaskSummary, Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership,
     WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
 };
 use serde_json::Value;
@@ -57,6 +57,7 @@ mod system;
 mod task_dependencies;
 mod task_discussion;
 mod task_hierarchy;
+mod task_labels;
 mod task_references;
 mod trash;
 mod users;
@@ -88,6 +89,7 @@ pub use repo::{RepoFileRecord, RepoFileWrite};
 pub use review_assignments::{DueReview, ReminderCandidate, ReviewAssignment};
 pub use task_dependencies::MAX_TASK_DEPENDENCIES;
 pub use task_hierarchy::MAX_TASK_DEPTH;
+pub use task_labels::{MAX_LABELS_PER_TASK, MAX_LABELS_PER_WORKSPACE};
 pub use task_references::MAX_TASK_REFERENCES;
 mod newer;
 pub use search_feedback::{StoredSearchFeedback, CLOSED_RETENTION_DAYS, MAX_OPEN_PER_USER, OPEN_RETENTION_DAYS};
@@ -330,6 +332,7 @@ struct CollaborationTaskRow {
     open_child_count: i64,
     open_blocker_count: i64,
     blocks_count: i64,
+    labels_json: String,
     due_at: Option<String>,
     completed_at: Option<String>,
     created_at: String,
@@ -1168,6 +1171,18 @@ impl From<CollaborationTaskRow> for CollaborationTask {
             open_child_count: row.open_child_count,
             open_blocker_count: row.open_blocker_count,
             blocks_count: row.blocks_count,
+            labels: {
+                let mut labels: Vec<TaskLabelTag> = serde_json::from_str::<Vec<Value>>(&row.labels_json)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|label| {
+                        let text = |key: &str| label[key].as_str().unwrap_or_default().to_owned();
+                        task_labels::tag(text("id"), text("name"), text("color"))
+                    })
+                    .collect();
+                labels.sort_by_key(|label| label.name.to_lowercase());
+                labels
+            },
             due_at: row.due_at,
             completed_at: row.completed_at,
             created_at: row.created_at,

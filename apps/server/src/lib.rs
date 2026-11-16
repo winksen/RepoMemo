@@ -59,6 +59,7 @@ mod system;
 mod task_dependencies;
 mod task_discussion;
 mod task_hierarchy;
+mod task_labels;
 mod task_references;
 mod templates;
 mod trash;
@@ -963,6 +964,16 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             delete(task_references::remove_task_reference),
         )
         .route("/v1/tasks/{task_id}/children", get(task_hierarchy::list_child_tasks))
+        .route(
+            "/v1/workspaces/{workspace_id}/task-labels",
+            get(task_labels::list_task_labels).post(task_labels::create_task_label),
+        )
+        .route(
+            "/v1/task-labels/{label_id}",
+            put(task_labels::update_task_label).delete(task_labels::delete_task_label),
+        )
+        .route("/v1/task-labels/{label_id}/merge", post(task_labels::merge_task_labels))
+        .route("/v1/tasks/{task_id}/labels", put(task_labels::set_task_labels))
         .route(
             "/v1/tasks/{task_id}/dependencies",
             get(task_dependencies::list_task_dependencies).post(task_dependencies::add_task_dependency),

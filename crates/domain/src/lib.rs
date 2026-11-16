@@ -102,6 +102,8 @@ pub struct CollaborationTask {
     /// How many tasks block this one and are not done (V0.7.9), and how many tasks this one blocks.
     pub open_blocker_count: i64,
     pub blocks_count: i64,
+    /// The task's labels (V0.7.10), by name. They organize and filter; they never decide who can see the task.
+    pub labels: Vec<TaskLabelTag>,
     pub due_at: Option<String>,
     pub completed_at: Option<String>,
     pub created_at: String,
@@ -154,6 +156,59 @@ pub struct TaskDetail {
     pub children: Vec<CollaborationTask>,
     /// What blocks this task and what it blocks (V0.7.9).
     pub dependencies: TaskDependencies,
+}
+
+/// The colours a label can have: a name, a background and the text colour on it. Every pair reaches a contrast of at least
+/// 4.5 to 1 (a test checks it), and a label is always shown with its name, so colour is never the only signal.
+pub const LABEL_COLORS: [(&str, &str, &str); 9] = [
+    ("gray", "#E5E7EB", "#111827"),
+    ("red", "#FECACA", "#7F1D1D"),
+    ("orange", "#FED7AA", "#7C2D12"),
+    ("yellow", "#FEF08A", "#713F12"),
+    ("green", "#BBF7D0", "#14532D"),
+    ("teal", "#99F6E4", "#134E4A"),
+    ("blue", "#BFDBFE", "#1E3A8A"),
+    ("purple", "#E9D5FF", "#581C87"),
+    ("pink", "#FBCFE8", "#831843"),
+];
+
+/// The names in `LABEL_COLORS`.
+pub const LABEL_COLOR_NAMES: [&str; 9] = [
+    "gray", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink",
+];
+
+/// The background and text colour of a label colour; an unknown name gets gray.
+pub fn label_colors(name: &str) -> (&'static str, &'static str) {
+    LABEL_COLORS
+        .iter()
+        .find(|(known, _, _)| *known == name)
+        .map_or((LABEL_COLORS[0].1, LABEL_COLORS[0].2), |(_, background, text)| {
+            (*background, *text)
+        })
+}
+
+/// A label as it appears on a task (V0.7.10).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskLabelTag {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+    pub background_color: String,
+    pub text_color: String,
+}
+
+/// A workspace's label with how many tasks carry it (V0.7.10).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskLabel {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub color: String,
+    pub background_color: String,
+    pub text_color: String,
+    pub task_count: i64,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 /// A task named briefly, as the other end of a dependency.
@@ -2647,4 +2702,34 @@ pub struct MailOverview {
     pub sent_last_day: i64,
     pub failed_last_day: i64,
     pub entries: Vec<MailOutboxEntry>,
+}
+
+#[cfg(test)]
+mod label_color_tests {
+    use super::{label_colors, LABEL_COLORS, LABEL_COLOR_NAMES};
+
+    fn channel(hex: &str, at: usize) -> f64 {
+        let value = u8::from_str_radix(&hex[at..at + 2], 16).unwrap() as f64 / 255.0;
+        if value <= 0.03928 {
+            value / 12.92
+        } else {
+            ((value + 0.055) / 1.055).powf(2.4)
+        }
+    }
+
+    fn luminance(hex: &str) -> f64 {
+        0.2126 * channel(hex, 1) + 0.7152 * channel(hex, 3) + 0.0722 * channel(hex, 5)
+    }
+
+    #[test]
+    fn every_label_colour_reaches_the_contrast_a_reader_needs() {
+        for (name, background, text) in LABEL_COLORS {
+            let (light, dark) = (luminance(background), luminance(text));
+            let ratio = (light.max(dark) + 0.05) / (light.min(dark) + 0.05);
+            assert!(ratio >= 4.5, "{name}: {ratio:.2} to 1");
+        }
+        let names: Vec<&str> = LABEL_COLORS.iter().map(|(name, _, _)| *name).collect();
+        assert_eq!(names, LABEL_COLOR_NAMES);
+        assert_eq!(label_colors("unknown"), label_colors("gray"));
+    }
 }

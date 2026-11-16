@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.10 (2026-11-17)
+
+Let a workspace name its kinds of work and filter tasks by them, without losing assignments when a label changes.
+
+### Added
+- **Task labels** (`/v1/workspaces/{id}/task-labels`, `/v1/task-labels/{id}`): a name of up to 40 characters, unique whatever its case, and a colour. Anyone who can edit creates, renames and recolours a label; a workspace can have 200 and a task 10.
+- **Accessible colours.** The colour comes from nine names (gray, red, orange, yellow, green, teal, blue, purple, pink), each with a background and a text colour that reach at least 4.5 to 1 contrast; a unit test computes it for every pair. A label is always shown with its name, so colour is never the only signal.
+- **Rename and merge lose nothing.** A task's link holds the label's id, so renaming keeps every assignment; merging (`POST /v1/task-labels/{id}/merge`) moves the tasks of one label to another, and a task that had both keeps one. Only an owner or administrator merges or deletes a label, because it changes many tasks.
+- **Apply and filter.** `PUT /v1/tasks/{id}/labels` sets a task's labels; tasks report their `labels` (name, colour, background and text colour); `GET …/tasks?label={id}` lists the tasks that carry one.
+- **A label is not access control.** No route reads a label to decide who can see or change a task; a reader sees every task and its labels, and the filter only narrows a list.
+- Migration **0073** adds `task_labels` (unique per workspace and lower-case name) and `task_label_links`.
+- A server test (`tests/task_labels.rs`) and a domain unit test of the colours follow creating, the refusals, applying, counts, the filter, a foreign label and too many labels, rename, merge, delete and reader access.
+- **Not in this release:** the web screens.
+
+### Checks
+- Version, migration lock (73 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new tests compile; **they were not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. Tasks report `labels` (empty for existing tasks).
+
 ## V0.7.9 (2026-11-17)
 
 Let one task block another, and say in plain words what is blocking a task.

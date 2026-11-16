@@ -29,6 +29,9 @@ pub(crate) const TASK_SELECT: &str = r#"
       (SELECT COUNT(*) FROM task_dependencies AS link JOIN workspace_tasks AS blocker ON blocker.id = link.blocker_task_id
         WHERE link.blocked_task_id = task.id AND blocker.status != 'done') AS open_blocker_count,
       (SELECT COUNT(*) FROM task_dependencies AS link WHERE link.blocker_task_id = task.id) AS blocks_count,
+      (SELECT COALESCE(json_group_array(json_object('id', label.id, 'name', label.name, 'color', label.color)), '[]')
+         FROM task_label_links AS link JOIN task_labels AS label ON label.id = link.label_id
+         WHERE link.task_id = task.id) AS labels_json,
       task.due_at,
       task.completed_at,
       task.created_at,

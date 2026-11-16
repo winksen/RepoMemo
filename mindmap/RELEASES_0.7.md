@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.7 → 0.8 (proposed)
 
-> **Current:** `V0.7.9` (2026-11-17)
+> **Current:** `V0.7.10` (2026-11-17)
 
 > **Theme:** Projects connected to their evidence · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -29,7 +29,7 @@
 | **V0.7.7** | ✅ 2026-11-17 | AK. Project execution | ✨ | Milestones | Group project tasks into named milestones with due dates and completion rules | A lead sees completed, remaining and overdue work with an explainable denominator; changing a date does not silently reschedule tasks |
 | **V0.7.8** | ✅ 2026-11-17 | AK. Project execution | ✨ | Task hierarchy | Add parent/child tasks separate from checklist steps | Parents and children stay in the same authorized workspace, cycles are refused and parent completion does not hide unfinished children |
 | **V0.7.9** | ✅ 2026-11-17 | AK. Project execution | ✨ | Dependencies | Add blocks/blocked-by links and a clear blocker explanation | Self-links and cycles are refused; closing a blocker updates the indication without automatically completing dependent work |
-| **V0.7.10** | 🔜 | AK. Project execution | ✨ | Labels | Add workspace-managed task labels with accessible colors and filters | Labels can be renamed/merged without losing assignments and labels cannot be used as an access-control substitute |
+| **V0.7.10** | ✅ 2026-11-17 | AK. Project execution | ✨ | Labels | Add workspace-managed task labels with accessible colors and filters | Labels can be renamed/merged without losing assignments and labels cannot be used as an access-control substitute |
 | **V0.7.11** | 🔜 | AK. Project execution | ✨ | Workflows | Allow named workflow states mapped to stable open/in-progress/blocked/done categories | Existing four states migrate unchanged; reporting and integrations use explicit category mappings, and removal requires remapping occupied states |
 | **V0.7.12** | 🔜 | AK. Project execution | ✨ | Task list | Add a paged task list with saved filters for project, milestone, assignee, priority, label and due date | Saved views re-evaluate current rights; URLs retain the chosen view and large lists do not require downloading all tasks |
 | **V0.7.13** | 🔜 | AK. Project execution | 🔧 | Task board | Use the same query/view model for the board with keyboard status movement | Board and list show the same filtered work; movement preserves focus and failed changes roll back visibly |

@@ -47,6 +47,7 @@ mod task_dependencies;
 mod task_details;
 mod task_discussion;
 mod task_hierarchy;
+mod task_labels;
 mod task_references;
 mod templates;
 mod trash;
