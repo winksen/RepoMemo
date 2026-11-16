@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.18 (2026-11-18)
+
+Move tasks out and in as CSV, with the columns matched by the caller, every row explained before anything is written, and no task made twice.
+
+### Added
+- **Export** (`GET /v1/workspaces/{id}/tasks/export.csv`): the tasks a reader can see, narrowed by the task list's filters and saved views, as UTF-8 CSV with a byte order mark (so a spreadsheet reads it as UTF-8). **Cells are safe to open in a spreadsheet:** text that starts with `=`, `+`, `-`, `@`, a tab or a carriage return is written with a leading apostrophe so it stays text, and cells with commas, quotes or line breaks are quoted.
+- **Import with a mapping** (`POST /v1/workspaces/{id}/tasks/import`): the CSV text (up to 1,000 rows, about 2 MB, quoted cells and line breaks read as RFC 4180) and a `mapping` of fields (`external_id`, `title`, `description`, `status`, `priority`, `assignee`, `due_at`, `project`, `labels`) to the file's column names. Fields left out are found by their own name or a common one (`summary`, `state`, `assignee_email`, `due`, `tags`, `id`...). A mapping to a column the file does not have, or a file with no title column, is `400` and says what the columns are.
+- **A dry run is the default, and it explains.** The report gives the mapping used, the counts, the **unknown assignees** and an entry for every row with its problems in words: an empty or over-long title, a status that is not open, in progress, blocked, done or a state of the workspace (common words such as "To Do" and "Waiting" are understood), a priority or date that cannot be read (a date or a UTC time is accepted), an assignee who is not a member, an unknown project or label. Nothing is written.
+- **Committing is all or skipping.** With `dry_run: false` one invalid row refuses the whole import (`409`, nothing written, the same report) unless `skip_invalid` is true, which imports the valid rows and says which were skipped.
+- **A retry creates nothing twice.** A row is identified by its id in the file or, without one, by what it says within the import; each row is written in one transaction with its entry in a ledger, so a retry, a second attempt after other rows were fixed and a restart skip what was imported. A row whose id is the key of a task here (a file exported from this workspace) is reported as that task. The same id twice in a file is one task.
+- Imported tasks are made by the person who imports and send no assignment notices; one activity entry records the import.
+- Migration **0079** adds `task_imports`, the ledger of imported rows.
+- A server test (`tests/task_csv.rs`) and unit tests of the reader and the spreadsheet-safe cells follow a hostile title, quoting, a filter, a stranger, the export brought back as duplicates, a file from another tool with problems in six rows, the refused commit, the skipped commit and its tasks, a retry and a second attempt, and the bad requests.
+- **Not in this release:** the web upload and mapping screens.
+
+### Checks
+- Version, migration lock (79 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new tests compile; **they were not executed**, and no real spreadsheet program opened an export. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive.
+
 ## V0.7.17 (2026-11-18)
 
 Let a person publish where a project stands, with the health they chose, why, and what it rests on.

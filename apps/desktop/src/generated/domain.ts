@@ -441,6 +441,37 @@ export interface Milestone {
   updated_at: string;
 }
 
+/**
+ * What a CSV import found in one row (V0.7.18). `outcome` is `valid` (would be made), `invalid`, `duplicate` (already
+ * imported), or `created` once it was made. `row` is the row as a spreadsheet numbers it (the header is row 1).
+ */
+export interface CsvRowReport {
+  row: number;
+  outcome: string;
+  title: string;
+  problems: string[];
+  task_key: string | null;
+}
+
+/**
+ * The report of a CSV import, preview or committed (V0.7.18): how the columns were mapped, every row explained, the assignees
+ * that are not members and what was made.
+ */
+export interface CsvImportReport {
+  dry_run: boolean;
+  committed: boolean;
+  rows: number;
+  valid: number;
+  invalid: number;
+  duplicates: number;
+  created: number;
+  /** Field to the column of the file that feeds it. */
+  mapping: Record<string, string>;
+  unknown_assignees: string[];
+  items: CsvRowReport[];
+  note: string;
+}
+
 /** A milestone as an update recorded it (V0.7.17). */
 export interface MilestoneBrief {
   id: string;

@@ -59,6 +59,7 @@ mod setup;
 mod streams;
 mod system;
 mod task_bulk;
+mod task_csv;
 mod task_dependencies;
 mod task_discussion;
 mod task_hierarchy;
@@ -995,6 +996,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(task_list::get_task_board),
         )
         .route("/v1/tasks/{task_id}/move", post(task_list::move_task))
+        .route(
+            "/v1/workspaces/{workspace_id}/tasks/export.csv",
+            get(task_csv::export_tasks_csv),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/tasks/import",
+            post(task_csv::import_tasks_csv),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/recurring-tasks",
             get(recurring::list_recurring_tasks).post(recurring::create_recurring_task),

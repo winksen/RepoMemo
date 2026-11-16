@@ -510,6 +510,35 @@ pub struct Milestone {
     pub updated_at: String,
 }
 
+/// What a CSV import found in one row (V0.7.18). `outcome` is `valid` (would be made), `invalid`, `duplicate` (already
+/// imported), or `created` once it was made. `row` is the row as a spreadsheet numbers it (the header is row 1).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CsvRowReport {
+    pub row: i64,
+    pub outcome: String,
+    pub title: String,
+    pub problems: Vec<String>,
+    pub task_key: Option<String>,
+}
+
+/// The report of a CSV import, preview or committed (V0.7.18): how the columns were mapped, every row explained, the assignees
+/// that are not members and what was made.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CsvImportReport {
+    pub dry_run: bool,
+    pub committed: bool,
+    pub rows: i64,
+    pub valid: i64,
+    pub invalid: i64,
+    pub duplicates: i64,
+    pub created: i64,
+    /// Field to the column of the file that feeds it.
+    pub mapping: BTreeMap<String, String>,
+    pub unknown_assignees: Vec<String>,
+    pub items: Vec<CsvRowReport>,
+    pub note: String,
+}
+
 /// A milestone as an update recorded it (V0.7.17).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MilestoneBrief {

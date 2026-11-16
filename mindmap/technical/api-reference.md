@@ -376,6 +376,8 @@
 | GET | `/v1/projects/{project_id}/update-draft` | auth | require_workspace_read | — | ProjectUpdateDraft |
 | GET | `/v1/project-updates/{update_id}` | auth | require_workspace_read | — | ProjectUpdate |
 | POST | `/v1/project-updates/{update_id}/retract` | auth | require_workspace_write (author or admin) | — | ProjectUpdate |
+| GET | `/v1/workspaces/{workspace_id}/tasks/export.csv` | auth | require_workspace_read | — (the list's filters) | `text/csv` |
+| POST | `/v1/workspaces/{workspace_id}/tasks/import` | auth | require_workspace_write | ImportTasksRequest | CsvImportReport (`409` when refused) |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — (`?label=`) | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

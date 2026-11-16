@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.18 — Import and export task CSV with field mapping and a dry-run report.
+
+- Tasks can be exported as a CSV that a spreadsheet opens safely, and imported from another tool's CSV by matching its columns to the task's fields. A preview explains every row (a missing title, an unknown assignee, a bad date) before anything is written; one bad row stops the import unless skipped, and sending the same file again never makes a task twice.
+
+Checks: `tests/task_csv.rs` and the CSV unit tests compile; not executed; static checks pass.
 
 ## V0.7.17 — Publish attributed project status updates with milestone, blocker and evidence links.
 

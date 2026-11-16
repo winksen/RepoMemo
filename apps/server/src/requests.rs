@@ -497,6 +497,30 @@ pub(crate) struct TaskReferenceInput {
     pub(crate) note: String,
 }
 
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ImportTasksRequest {
+    /// The CSV text, at most about 2 MB and 1,000 data rows, with a header row.
+    pub(crate) csv: String,
+    /// Which column feeds which field: `{"title": "Summary", "assignee": "Owner email"}`. Fields left out are found by their own
+    /// name or a common one (summary, state, assignee_email, due, tags, id...). Fields: external_id, title, description, status,
+    /// priority, assignee, due_at, project, labels.
+    #[serde(default)]
+    pub(crate) mapping: std::collections::BTreeMap<String, String>,
+    /// Preview only (the default): every row is explained and nothing is written. Send `false` to import.
+    #[serde(default = "default_true")]
+    pub(crate) dry_run: bool,
+    /// Import the valid rows even when some are invalid; by default one invalid row refuses the whole import.
+    #[serde(default)]
+    pub(crate) skip_invalid: bool,
+    /// Names the import; the same key and file is the same import. Left out, the file's own content names it.
+    #[serde(default)]
+    pub(crate) import_key: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct SaveProjectUpdateRequest {
     /// `on_track`, `at_risk` or `blocked`: the author's choice, always sent.
