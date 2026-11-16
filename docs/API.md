@@ -96,6 +96,8 @@ curl -s -X POST -H "$auth" "$REPOMEMO_URL/v1/projects/$PROJECT_ID/archive"
 
 A task joins a project with `project_id` on the task routes. **Left out, a save keeps the task's project; an empty string removes it.** The project must belong to the task's workspace (`400` otherwise), and an archived project keeps its tasks but takes no new ones (`409`; restore it first with `POST /v1/projects/{id}/restore`). Tasks made without a project work as before. Each project reports its `task_count` and `open_task_count`.
 
+**The brief.** `GET /v1/projects/{id}/brief` returns the project with the decision memories and evidence it cites. Cite with `POST /v1/projects/{id}/references` (`{"kind":"memory_card"|"evidence","target_id":"…","note":"…"}`, a note up to 500 characters, at most 100 citations) and remove with `DELETE …/references/{reference_id}`. Nothing is copied: a citation holds the id and your note, and the title is read from the target each time, so a deleted target comes back with `"available": false` and no title. A target of another workspace answers `404`; citing the same item twice answers `409`. `GET /v1/workspaces/{id}/projects/citing?kind=memory_card&target_id=…` is the backlink: the projects (not archived) whose brief cites that card or file.
+
 ## 5. Live updates
 
 `GET /v1/workspaces/{id}/events` (and `GET /v1/system/events` for system administrators) is a **server-sent events** stream, so use `curl -N`:

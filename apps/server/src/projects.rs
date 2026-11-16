@@ -2,7 +2,7 @@
 //! grants nothing: reading one needs workspace read access, changing one needs a role that may write content.
 
 use crate::*;
-use repomemo_domain::Project;
+use repomemo_domain::{Project, ProjectBrief, ProjectReference};
 use repomemo_storage::NewProject;
 
 const MAX_NAME_CHARS: usize = 120;
@@ -242,4 +242,139 @@ pub(crate) async fn check_task_project(
         ));
     }
     Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CitingFilter {
+    kind: String,
+    target_id: String,
+}
+
+fn check_reference_kind(kind: &str) -> Result<(), ApiError> {
+    if matches!(kind, "memory_card" | "evidence") {
+        Ok(())
+    } else {
+        Err(ApiError::bad_request("The kind must be memory_card or evidence."))
+    }
+}
+
+/// The project with what its brief cites. Titles are read from the targets now, so a deleted target is shown as unavailable.
+pub(crate) async fn get_project_brief(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(project_id): Path<String>,
+) -> Result<Json<ProjectBrief>, ApiError> {
+    let project = state
+        .storage
+        .get_project(&project_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_read(&state, &subject, &project.workspace_id).await?;
+    let references = state
+        .storage
+        .list_project_references(&project_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(ProjectBrief { project, references }))
+}
+
+pub(crate) async fn add_project_reference(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(project_id): Path<String>,
+    Json(request): Json<AddProjectReferenceRequest>,
+) -> Result<(StatusCode, Json<ProjectReference>), ApiError> {
+    let project = state
+        .storage
+        .get_project(&project_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &project.workspace_id).await?;
+    check_reference_kind(&request.kind)?;
+    let note = request.note.trim().to_owned();
+    if note.chars().count() > 500 {
+        return Err(ApiError::bad_request("A note cannot exceed 500 characters."));
+    }
+    if project.status == "archived" {
+        return Err(ApiError::conflict(
+            "An archived project is restored before it is changed.",
+        ));
+    }
+    let reference = state
+        .storage
+        .add_project_reference(
+            &project,
+            &subject.user_id,
+            &request.kind,
+            request.target_id.trim(),
+            &note,
+        )
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &project.workspace_id,
+        &subject.user_id,
+        "project_reference_added",
+        "project",
+        Some(&project.id),
+        format!(
+            "Cited {} in project: {}.",
+            reference.title.as_deref().unwrap_or("an item"),
+            project.name
+        ),
+    )
+    .await;
+    Ok((StatusCode::CREATED, Json(reference)))
+}
+
+pub(crate) async fn remove_project_reference(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path((project_id, reference_id)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    let project = state
+        .storage
+        .get_project(&project_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &project.workspace_id).await?;
+    if project.status == "archived" {
+        return Err(ApiError::conflict(
+            "An archived project is restored before it is changed.",
+        ));
+    }
+    state
+        .storage
+        .remove_project_reference(&project_id, &reference_id)
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &project.workspace_id,
+        &subject.user_id,
+        "project_reference_removed",
+        "project",
+        Some(&project.id),
+        format!("Removed a citation from project: {}.", project.name),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// The backlinks of a card or a file: the projects whose brief cites it. Anyone who can read the workspace can ask.
+pub(crate) async fn list_projects_citing(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Query(filter): Query<CitingFilter>,
+) -> Result<Json<Vec<Project>>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    check_reference_kind(&filter.kind)?;
+    state
+        .storage
+        .list_projects_citing(&workspace_id, &filter.kind, &filter.target_id)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }

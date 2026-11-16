@@ -483,6 +483,15 @@ pub(crate) struct SaveProjectRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct AddProjectReferenceRequest {
+    /// `memory_card` or `evidence`.
+    pub(crate) kind: String,
+    pub(crate) target_id: String,
+    #[serde(default)]
+    pub(crate) note: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct SaveArtifactCommentRequest {
     pub(crate) body: String,
 }

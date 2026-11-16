@@ -111,6 +111,29 @@ pub struct Project {
     pub updated_at: String,
 }
 
+/// One memory card or piece of evidence a project's brief cites (V0.7.2). Only the id is stored; the title is read from the
+/// target when the brief is read, and `available` is false when the target is gone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectReference {
+    pub id: String,
+    pub project_id: String,
+    /// `memory_card` or `evidence`.
+    pub kind: String,
+    pub target_id: String,
+    pub title: Option<String>,
+    pub available: bool,
+    pub note: String,
+    pub added_by: Option<SharedUser>,
+    pub created_at: String,
+}
+
+/// A project with the decisions and evidence it cites.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectBrief {
+    pub project: Project,
+    pub references: Vec<ProjectReference>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedSearch {
     pub id: String,

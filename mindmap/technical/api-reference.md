@@ -320,6 +320,10 @@
 | PUT | `/v1/projects/{project_id}` | auth | require_workspace_write | SaveProjectRequest | Project |
 | POST | `/v1/projects/{project_id}/archive` | auth | require_workspace_write | — | Project |
 | POST | `/v1/projects/{project_id}/restore` | auth | require_workspace_write | — | Project |
+| GET | `/v1/projects/{project_id}/brief` | auth | require_workspace_read | — | ProjectBrief |
+| POST | `/v1/projects/{project_id}/references` | auth | require_workspace_write | AddProjectReferenceRequest | ProjectReference |
+| DELETE | `/v1/projects/{project_id}/references/{reference_id}` | auth | require_workspace_write | — | — |
+| GET | `/v1/workspaces/{workspace_id}/projects/citing` | auth | require_workspace_read | — (`?kind=&target_id=`) | Vec<Project> |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

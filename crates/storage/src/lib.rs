@@ -8,10 +8,10 @@ use repomemo_domain::{
     AgentConversation, AgentMessage, AgentReply, AgentTurn, ArtifactComment, ArtifactDetail, ArtifactIndexFailure,
     ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, ArtifactVersion, Chunk, Citation,
     CollaborationTask, Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence,
-    MemoryReviewReason, Organization, OrganizationMember, OrganizationRole, Project, ProviderSettings, SavedSearch,
-    SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace, Source, SourceType, Symbol,
-    SymbolKind, SymbolSearchResult, TaskChecklistItem, Workspace, WorkspaceActivityEvent, WorkspaceMember,
-    WorkspaceMembership, WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
+    MemoryReviewReason, Organization, OrganizationMember, OrganizationRole, Project, ProjectReference,
+    ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace,
+    Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, Workspace, WorkspaceActivityEvent,
+    WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -40,6 +40,7 @@ mod mentions;
 mod mfa;
 mod organization_templates;
 mod organizations;
+mod project_references;
 mod projects;
 mod providers;
 mod repo;
@@ -73,6 +74,7 @@ pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;
 pub use organization_templates::StoredOrganizationTemplate;
 pub use organizations::StarterSetup;
+pub use project_references::MAX_PROJECT_REFERENCES;
 pub use projects::NewProject;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};

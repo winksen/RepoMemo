@@ -908,6 +908,19 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/projects/{project_id}",
             get(projects::get_project).put(projects::update_project),
         )
+        .route("/v1/projects/{project_id}/brief", get(projects::get_project_brief))
+        .route(
+            "/v1/projects/{project_id}/references",
+            post(projects::add_project_reference),
+        )
+        .route(
+            "/v1/projects/{project_id}/references/{reference_id}",
+            delete(projects::remove_project_reference),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/projects/citing",
+            get(projects::list_projects_citing),
+        )
         .route("/v1/projects/{project_id}/archive", post(projects::archive_project))
         .route("/v1/projects/{project_id}/restore", post(projects::restore_project))
         .route(

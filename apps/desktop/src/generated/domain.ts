@@ -90,6 +90,29 @@ export interface Project {
   updated_at: string;
 }
 
+/**
+ * One memory card or piece of evidence a project's brief cites (V0.7.2). Only the id is stored; the title is read from the
+ * target when the brief is read, and `available` is false when the target is gone.
+ */
+export interface ProjectReference {
+  id: string;
+  project_id: string;
+  /** `memory_card` or `evidence`. */
+  kind: string;
+  target_id: string;
+  title: string | null;
+  available: boolean;
+  note: string;
+  added_by: SharedUser | null;
+  created_at: string;
+}
+
+/** A project with the decisions and evidence it cites. */
+export interface ProjectBrief {
+  project: Project;
+  references: ProjectReference[];
+}
+
 export interface SavedSearch {
   id: string;
   workspace_id: string;

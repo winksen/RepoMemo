@@ -260,3 +260,220 @@ async fn a_member_creates_and_archives_a_project_and_legacy_tasks_keep_working()
     .await;
     assert!(removed["project_id"].is_null());
 }
+
+#[tokio::test]
+async fn a_brief_cites_decisions_and_evidence_without_copying_them_and_shows_a_deleted_one_as_unavailable() {
+    let fixture = knowledge_fixture("project-brief").await;
+    let app = fixture.app.clone();
+    let workspace = fixture.workspace_id.clone();
+    let call = |method: &'static str, uri: String, who: String, body: Value| {
+        let app = app.clone();
+        async move { app.oneshot(json_request(method, &uri, &who, body)).await.unwrap() }
+    };
+    let project = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace}/projects"),
+            fixture.member.clone(),
+            json!({"name": "Refund rework", "goal": "Settle the refund window."}),
+        )
+        .await,
+    )
+    .await;
+    let project_id = project["id"].as_str().unwrap().to_owned();
+    let references = format!("/v1/projects/{project_id}/references");
+
+    // A decision memory and a piece of evidence are cited; only the title is read back, never the text.
+    let card = call(
+        "POST",
+        references.clone(),
+        fixture.member.clone(),
+        json!({"kind": "memory_card", "target_id": fixture.card_on_stale_id, "note": "The decision this project follows."}),
+    )
+    .await;
+    assert_eq!(card.status(), 201);
+    let card = response_json(card).await;
+    assert_eq!(card["title"], "Refund window");
+    assert_eq!(card["available"], true);
+    assert!(card.get("body_markdown").is_none());
+    let evidence = call(
+        "POST",
+        references.clone(),
+        fixture.member.clone(),
+        json!({"kind": "evidence", "target_id": fixture.current_id}),
+    )
+    .await;
+    assert_eq!(evidence.status(), 201);
+    let evidence = response_json(evidence).await;
+    assert_eq!(evidence["title"], "Deploy checklist");
+
+    // What cannot be cited is refused: the same item twice, an unknown target, another workspace's file, a bad kind, a reader.
+    assert_eq!(
+        call(
+            "POST",
+            references.clone(),
+            fixture.member.clone(),
+            json!({"kind": "evidence", "target_id": fixture.current_id})
+        )
+        .await
+        .status(),
+        409
+    );
+    assert_eq!(
+        call(
+            "POST",
+            references.clone(),
+            fixture.member.clone(),
+            json!({"kind": "evidence", "target_id": "not-a-file"})
+        )
+        .await
+        .status(),
+        404
+    );
+    let other_workspace = create_workspace(&app, &fixture.owner).await;
+    let foreign = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{other_workspace}/artifacts/text"),
+            fixture.owner.clone(),
+            json!({"title": "Elsewhere", "content": "Not in this workspace."}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        call(
+            "POST",
+            references.clone(),
+            fixture.member.clone(),
+            json!({"kind": "evidence", "target_id": foreign["id"]})
+        )
+        .await
+        .status(),
+        404
+    );
+    assert_eq!(
+        call(
+            "POST",
+            references.clone(),
+            fixture.member.clone(),
+            json!({"kind": "link", "target_id": "x"})
+        )
+        .await
+        .status(),
+        400
+    );
+    assert_eq!(
+        call(
+            "POST",
+            references.clone(),
+            fixture.guest.clone(),
+            json!({"kind": "evidence", "target_id": fixture.stale_id})
+        )
+        .await
+        .status(),
+        403
+    );
+
+    // A reader can read the brief; the backlink from the card finds the project.
+    let brief = call(
+        "GET",
+        format!("/v1/projects/{project_id}/brief"),
+        fixture.guest.clone(),
+        Value::Null,
+    )
+    .await;
+    assert_eq!(brief.status(), 200);
+    let brief = response_json(brief).await;
+    assert_eq!(brief["project"]["name"], "Refund rework");
+    assert_eq!(brief["references"].as_array().unwrap().len(), 2);
+    let citing = response_json(
+        call(
+            "GET",
+            format!(
+                "/v1/workspaces/{workspace}/projects/citing?kind=memory_card&target_id={}",
+                fixture.card_on_stale_id
+            ),
+            fixture.guest.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(citing.as_array().unwrap().len(), 1);
+    assert_eq!(citing[0]["id"], project_id.as_str());
+
+    // Deleting the cited file leaves the reference, shown as unavailable and without its old title.
+    let removed = call(
+        "POST",
+        format!("/v1/workspaces/{workspace}/artifacts/bulk"),
+        fixture.owner.clone(),
+        json!({"action": "delete", "artifact_ids": [fixture.current_id]}),
+    )
+    .await;
+    assert_eq!(removed.status(), 200);
+    let brief = response_json(
+        call(
+            "GET",
+            format!("/v1/projects/{project_id}/brief"),
+            fixture.member.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    let gone = brief["references"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|reference| reference["kind"] == "evidence")
+        .unwrap();
+    assert_eq!(gone["available"], false);
+    assert!(gone["title"].is_null());
+
+    // A citation is removed by anyone who can edit; an archived project is restored before its brief changes.
+    assert_eq!(
+        call(
+            "DELETE",
+            format!("{references}/{}", gone["id"].as_str().unwrap()),
+            fixture.member.clone(),
+            Value::Null
+        )
+        .await
+        .status(),
+        204
+    );
+    call(
+        "POST",
+        format!("/v1/projects/{project_id}/archive"),
+        fixture.member.clone(),
+        Value::Null,
+    )
+    .await;
+    assert_eq!(
+        call(
+            "POST",
+            references,
+            fixture.member.clone(),
+            json!({"kind": "evidence", "target_id": fixture.stale_id})
+        )
+        .await
+        .status(),
+        409
+    );
+    // An archived project drops out of the backlinks.
+    let citing = response_json(
+        call(
+            "GET",
+            format!(
+                "/v1/workspaces/{workspace}/projects/citing?kind=memory_card&target_id={}",
+                fixture.card_on_stale_id
+            ),
+            fixture.member.clone(),
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(citing.as_array().unwrap().len(), 0);
+}

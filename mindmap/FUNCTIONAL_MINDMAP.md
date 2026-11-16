@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.2 — Attach decision memories and evidence to a project brief with backlinks.
+
+- A project's brief cites the decision memories and evidence behind its goal, by reference and with a note. A deleted source shows as unavailable instead of stale text, and a card or file lists the projects citing it. Reading needs only workspace access; editing needs a role that can edit.
+
+Checks: `tests/projects.rs` compiles; not executed; static checks pass.
 
 ## V0.7.1 — Add workspace-scoped projects with owner, goal, lifecycle and target date.
 

@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.7 → 0.8 (proposed)
 
-> **Current:** `V0.7.1` (2026-11-17)
+> **Current:** `V0.7.2` (2026-11-17)
 
 > **Theme:** Projects connected to their evidence · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -21,7 +21,7 @@
 |---|---|---|---|---|---|---|
 | **V0.7.0** | ✅ 2026-11-17 | AK. Project execution | 📘 | Opening | Specify the lightweight project model and its limits with a sample team journey | Project, milestone, task, checklist and evidence have distinct meanings; legacy tasks need no project and advanced portfolio/sprint planning is excluded |
 | **V0.7.1** | ✅ 2026-11-17 | AK. Project execution | ✨ | Projects | Add workspace-scoped projects with owner, goal, lifecycle and target date | Members can create and archive a project; its access is exactly the workspace's and legacy tasks continue to work |
-| **V0.7.2** | 🔜 | AK. Project execution | ✨ | Project brief | Attach decision memories and evidence to a project brief with backlinks | A teammate can explain the project's goal and supporting decisions without copying source text or following a broken access link |
+| **V0.7.2** | ✅ 2026-11-17 | AK. Project execution | ✨ | Project brief | Attach decision memories and evidence to a project brief with backlinks | A teammate can explain the project's goal and supporting decisions without copying source text or following a broken access link |
 | **V0.7.3** | 🔜 | AK. Project execution | ✨ | Task details | Give tasks stable human-readable identifiers, direct URLs and a dedicated detail view on the existing task route | A link opens the same task after title changes; guests receive an authorized view and missing/deleted tasks have useful states |
 | **V0.7.4** | 🔜 | AK. Project execution | ✨ | Task discussion | Add task comments, mentions and explicit watching using existing notification preferences | A discussion stays with its task, mentions notify once and unwatch/mute stops optional delivery without losing assignment notices |
 | **V0.7.5** | 🔜 | AK. Project execution | 🔧 | Task context | Replace the single-artifact limit with multiple evidence and memory references | Existing artifact links migrate intact; new links remain permission-checked and the task can cite the decision that created it |

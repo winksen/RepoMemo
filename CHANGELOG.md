@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.2 (2026-11-17)
+
+Give a project a brief: the decision memories and evidence that explain its goal, cited by reference.
+
+### Added
+- **A project brief** (`GET /v1/projects/{id}/brief`): the project and what it cites. A citation (`POST /v1/projects/{id}/references`) names a memory card or a piece of evidence of the same workspace, with a note of up to 500 characters; a project cites at most 100 items, the same item once. Anyone who can edit adds or removes a citation, an archived project must be restored first (`409`), and everyone who can read the workspace reads the brief.
+- **Nothing is copied.** A citation stores the id and the note. The title is read from the card or file each time the brief is read, so a renamed target shows its new title and a deleted one comes back with `available: false` and no title, never stale text and never a link that leads nowhere. A target of another workspace, or one that does not exist, is refused with `404`.
+- **Backlinks** (`GET /v1/workspaces/{id}/projects/citing?kind=&target_id=`): the projects whose brief cites a card or a file; an archived project drops out.
+- Adding and removing a citation is written to the workspace activity feed.
+- Migration **0065** adds `project_references` (unique per project, kind and target; removed with its project or workspace).
+- A second server test in `tests/projects.rs` follows citing a card and a file, the refusals, a reader reading the brief, the backlink, a deleted file shown as unavailable and the archived-project rule.
+- **Not in this release:** the web screens, as in 0.7.1.
+
+### Checks
+- Version, migration lock (65 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive.
+
 ## V0.7.1 (2026-11-17)
 
 Add projects: a named piece of work inside a workspace, so tasks can be grouped without changing who can see them.
