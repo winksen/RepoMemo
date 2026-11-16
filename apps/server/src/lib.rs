@@ -35,6 +35,7 @@ mod mail;
 mod maintenance;
 mod memory_history;
 mod mfa;
+mod milestones;
 mod my_work;
 mod onboarding;
 mod organization_templates;
@@ -925,6 +926,24 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/projects/{project_id}/archive", post(projects::archive_project))
         .route("/v1/projects/{project_id}/restore", post(projects::restore_project))
+        .route(
+            "/v1/projects/{project_id}/milestones",
+            get(milestones::list_milestones).post(milestones::create_milestone),
+        )
+        .route(
+            "/v1/milestones/{milestone_id}",
+            get(milestones::get_milestone)
+                .put(milestones::update_milestone)
+                .delete(milestones::delete_milestone),
+        )
+        .route(
+            "/v1/milestones/{milestone_id}/complete",
+            post(milestones::complete_milestone),
+        )
+        .route(
+            "/v1/milestones/{milestone_id}/reopen",
+            post(milestones::reopen_milestone),
+        )
         .route(
             "/v1/tasks/{task_id}/comments",
             get(task_discussion::list_task_comments).post(task_discussion::add_task_comment),

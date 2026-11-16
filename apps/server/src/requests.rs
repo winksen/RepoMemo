@@ -464,6 +464,10 @@ pub(crate) struct SaveCollaborationTaskRequest {
     /// The project to put the task in. Left out, a save keeps the project the task has; an empty value removes it.
     #[serde(default)]
     pub(crate) project_id: Option<String>,
+    /// The milestone of the task's project it counts toward. Left out, a save keeps it (and drops it when the project changes);
+    /// an empty value removes it.
+    #[serde(default)]
+    pub(crate) milestone_id: Option<String>,
     /// The `version` of the task this save started from (updating only). A save from an older version is refused with the
     /// task as it is now and the attempted change; left out, the save is not checked and overwrites.
     #[serde(default)]
@@ -481,6 +485,19 @@ pub(crate) struct TaskReferenceInput {
     pub(crate) target_id: String,
     #[serde(default)]
     pub(crate) note: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SaveMilestoneRequest {
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) description: String,
+    /// A calendar date, YYYY-MM-DD.
+    #[serde(default)]
+    pub(crate) due_date: Option<String>,
+    /// `all_tasks` (the default) or `manual`.
+    #[serde(default)]
+    pub(crate) completion_rule: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

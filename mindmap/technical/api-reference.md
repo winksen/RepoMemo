@@ -334,6 +334,13 @@
 | GET | `/v1/tasks/{task_id}/references` | auth | require_workspace_read | — | Vec<TaskReference> |
 | POST | `/v1/tasks/{task_id}/references` | auth | require_workspace_write | TaskReferenceInput | TaskReference |
 | DELETE | `/v1/tasks/{task_id}/references/{reference_id}` | auth | require_workspace_write | — | — |
+| GET | `/v1/projects/{project_id}/milestones` | auth | require_workspace_read | — | Vec<Milestone> |
+| POST | `/v1/projects/{project_id}/milestones` | auth | require_workspace_write | SaveMilestoneRequest | Milestone |
+| GET | `/v1/milestones/{milestone_id}` | auth | require_workspace_read | — | Milestone |
+| PUT | `/v1/milestones/{milestone_id}` | auth | require_workspace_write | SaveMilestoneRequest | Milestone |
+| DELETE | `/v1/milestones/{milestone_id}` | auth | require_workspace_write | — | — |
+| POST | `/v1/milestones/{milestone_id}/complete` | auth | require_workspace_write | — | Milestone (`409` unless the rule is `manual`) |
+| POST | `/v1/milestones/{milestone_id}/reopen` | auth | require_workspace_write | — | Milestone |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

@@ -8,7 +8,7 @@ use repomemo_domain::{
     AgentConversation, AgentMessage, AgentReply, AgentTurn, ArtifactComment, ArtifactDetail, ArtifactIndexFailure,
     ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, ArtifactVersion, Chunk, Citation,
     CollaborationTask, Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence,
-    MemoryReviewReason, Organization, OrganizationMember, OrganizationRole, Project, ProjectReference,
+    MemoryReviewReason, Milestone, Organization, OrganizationMember, OrganizationRole, Project, ProjectReference,
     ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace,
     Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, TaskComment, TaskReference,
     Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole,
@@ -39,6 +39,7 @@ mod memory;
 mod memory_revisions;
 mod mentions;
 mod mfa;
+mod milestones;
 mod organization_templates;
 mod organizations;
 mod project_references;
@@ -75,6 +76,7 @@ pub use memory_revisions::{
 };
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;
+pub use milestones::NewMilestone;
 pub use organization_templates::StoredOrganizationTemplate;
 pub use organizations::StarterSetup;
 pub use project_references::MAX_PROJECT_REFERENCES;
@@ -316,6 +318,8 @@ struct CollaborationTaskRow {
     artifact_id: Option<String>,
     project_id: Option<String>,
     project_name: Option<String>,
+    milestone_id: Option<String>,
+    milestone_name: Option<String>,
     due_at: Option<String>,
     completed_at: Option<String>,
     created_at: String,
@@ -485,6 +489,8 @@ pub struct NewCollaborationTask {
     pub artifact_id: Option<String>,
     /// The project to put the task in. `None` leaves it as it is (no project on a new task); `Some(None)` removes it.
     pub project_id: Option<Option<String>>,
+    /// Like `project_id`: `None` leaves the milestone as it is, `Some(None)` removes it.
+    pub milestone_id: Option<Option<String>>,
     pub due_at: Option<String>,
     /// The version the save started from (V0.7.6). `None` saves without the check and overwrites whatever is there.
     pub expected_version: Option<i64>,
@@ -1142,6 +1148,8 @@ impl From<CollaborationTaskRow> for CollaborationTask {
             artifact_id: row.artifact_id,
             project_id: row.project_id,
             project_name: row.project_name,
+            milestone_id: row.milestone_id,
+            milestone_name: row.milestone_name,
             due_at: row.due_at,
             completed_at: row.completed_at,
             created_at: row.created_at,

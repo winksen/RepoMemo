@@ -90,6 +90,9 @@ pub struct CollaborationTask {
     /// The project the task belongs to (V0.7.1); a task with none keeps working in the workspace list.
     pub project_id: Option<String>,
     pub project_name: Option<String>,
+    /// The milestone of the task's project it counts toward (V0.7.7).
+    pub milestone_id: Option<String>,
+    pub milestone_name: Option<String>,
     pub due_at: Option<String>,
     pub completed_at: Option<String>,
     pub created_at: String,
@@ -189,6 +192,33 @@ pub struct Project {
     pub task_count: i64,
     pub open_task_count: i64,
     pub archived_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// A named, dated group of a project's tasks (V0.7.7). The counts say what they count: `task_count` is the denominator,
+/// `explanation` says it in words, and a date never moves a task.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Milestone {
+    pub id: String,
+    pub project_id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub description: String,
+    /// A calendar date (YYYY-MM-DD, UTC) or none.
+    pub due_date: Option<String>,
+    /// `all_tasks` (complete when it has tasks and all are done) or `manual` (a person marks it complete).
+    pub completion_rule: String,
+    pub completed: bool,
+    pub completed_at: Option<String>,
+    /// Every task counted toward the milestone, those done, those not done, and those not done past their own due date.
+    pub task_count: i64,
+    pub done_count: i64,
+    pub remaining_count: i64,
+    pub overdue_task_count: i64,
+    /// Not complete and past its date.
+    pub overdue: bool,
+    pub explanation: String,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -30,6 +30,7 @@ mod knowledge_token_scopes;
 mod load;
 mod memory;
 mod memory_history;
+mod milestones;
 mod my_work;
 mod onboarding;
 mod operations;

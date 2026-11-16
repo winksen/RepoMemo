@@ -70,6 +70,9 @@ export interface CollaborationTask {
   /** The project the task belongs to (V0.7.1); a task with none keeps working in the workspace list. */
   project_id: string | null;
   project_name: string | null;
+  /** The milestone of the task's project it counts toward (V0.7.7). */
+  milestone_id: string | null;
+  milestone_name: string | null;
   due_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -167,6 +170,34 @@ export interface Project {
   task_count: number;
   open_task_count: number;
   archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * A named, dated group of a project's tasks (V0.7.7). The counts say what they count: `task_count` is the denominator,
+ * `explanation` says it in words, and a date never moves a task.
+ */
+export interface Milestone {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  /** A calendar date (YYYY-MM-DD, UTC) or none. */
+  due_date: string | null;
+  /** `all_tasks` (complete when it has tasks and all are done) or `manual` (a person marks it complete). */
+  completion_rule: string;
+  completed: boolean;
+  completed_at: string | null;
+  /** Every task counted toward the milestone, those done, those not done, and those not done past their own due date. */
+  task_count: number;
+  done_count: number;
+  remaining_count: number;
+  overdue_task_count: number;
+  /** Not complete and past its date. */
+  overdue: boolean;
+  explanation: string;
   created_at: string;
   updated_at: string;
 }

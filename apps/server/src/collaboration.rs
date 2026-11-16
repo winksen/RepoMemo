@@ -48,7 +48,7 @@ pub(crate) async fn create_collaboration_task(
             .map_err(map_storage_error)?;
         citations.push((reference.kind.clone(), reference.target_id.trim().to_owned(), note));
     }
-    let payload = normalize_collaboration_task(&state, &workspace_id, request, None).await?;
+    let payload = normalize_collaboration_task(&state, &workspace_id, request, None, None).await?;
     let task = state
         .storage
         .create_collaboration_task(&workspace_id, &subject.user_id, payload)
@@ -136,8 +136,14 @@ pub(crate) async fn update_collaboration_task(
         project_id: request.project_id.clone(),
         due_at: request.due_at.clone(),
     };
-    let payload =
-        normalize_collaboration_task(&state, &current.workspace_id, request, current.project_id.as_deref()).await?;
+    let payload = normalize_collaboration_task(
+        &state,
+        &current.workspace_id,
+        request,
+        current.project_id.as_deref(),
+        current.milestone_id.as_deref(),
+    )
+    .await?;
     let task = match state
         .storage
         .update_collaboration_task(&task_id, payload)
@@ -420,6 +426,7 @@ pub(crate) async fn normalize_collaboration_task(
     workspace_id: &str,
     request: SaveCollaborationTaskRequest,
     current_project_id: Option<&str>,
+    current_milestone_id: Option<&str>,
 ) -> Result<NewCollaborationTask, ApiError> {
     let title = request.title.trim().to_owned();
     let description = request.description.trim().to_owned();
@@ -477,6 +484,22 @@ pub(crate) async fn normalize_collaboration_task(
             Some(Some(id.to_owned()))
         }
     };
+    // The task's milestone belongs to the project it ends up in; moving it to another project drops the milestone.
+    let ends_in: Option<String> = match &project_id {
+        None => current_project_id.map(str::to_owned),
+        Some(project) => project.clone(),
+    };
+    let milestone_id = match request.milestone_id.as_deref().map(str::trim) {
+        Some("") => Some(None),
+        Some(id) => {
+            crate::milestones::check_task_milestone(state, workspace_id, id, ends_in.as_deref()).await?;
+            Some(Some(id.to_owned()))
+        }
+        None if project_id.is_some() && current_milestone_id.is_some() && ends_in.as_deref() != current_project_id => {
+            Some(None)
+        }
+        None => None,
+    };
     Ok(NewCollaborationTask {
         title,
         description,
@@ -485,6 +508,7 @@ pub(crate) async fn normalize_collaboration_task(
         assignee_user_id: request.assignee_user_id,
         artifact_id: request.artifact_id,
         project_id,
+        milestone_id,
         due_at,
         expected_version: request.expected_version,
     })

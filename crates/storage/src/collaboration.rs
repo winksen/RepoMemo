@@ -20,6 +20,8 @@ const TASK_SELECT: &str = r#"
       task.artifact_id,
       task.project_id,
       project.name AS project_name,
+      task.milestone_id,
+      milestone.name AS milestone_name,
       task.due_at,
       task.completed_at,
       task.created_at,
@@ -27,7 +29,8 @@ const TASK_SELECT: &str = r#"
     FROM workspace_tasks AS task
     JOIN users AS creator ON creator.id = task.created_by_user_id
     LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
-    LEFT JOIN workspace_projects AS project ON project.id = task.project_id"#;
+    LEFT JOIN workspace_projects AS project ON project.id = task.project_id
+    LEFT JOIN project_milestones AS milestone ON milestone.id = task.milestone_id"#;
 
 /// Gives the next number of a workspace's tasks. A number is only ever added, so a deleted task's number is never reused.
 pub(crate) async fn take_task_number(connection: &mut sqlx::SqliteConnection, workspace_id: &str) -> Result<i64> {
@@ -102,8 +105,8 @@ impl StorageEngine {
             INSERT INTO workspace_tasks (
               id, workspace_id, title, description, status, priority,
               assignee_user_id, created_by_user_id, artifact_id, due_at,
-              completed_at, created_at, updated_at, project_id, number
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+              completed_at, created_at, updated_at, project_id, number, milestone_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
             "#,
         )
         .bind(&id)
@@ -121,6 +124,7 @@ impl StorageEngine {
         .bind(&now)
         .bind(task.project_id.flatten())
         .bind(number)
+        .bind(task.milestone_id.flatten())
         .execute(&mut *transaction)
         .await?;
         transaction.commit().await?;
@@ -144,13 +148,17 @@ impl StorageEngine {
             None => current.project_id.clone(),
             Some(project_id) => project_id,
         };
+        let milestone_id = match task.milestone_id {
+            None => current.milestone_id.clone(),
+            Some(milestone_id) => milestone_id,
+        };
         let expected_version = task.expected_version;
         let saved = sqlx::query(
             r#"
             UPDATE workspace_tasks
             SET title = ?1, description = ?2, status = ?3, priority = ?4,
                 assignee_user_id = ?5, artifact_id = ?6, due_at = ?7,
-                completed_at = ?8, updated_at = ?9, project_id = ?11, version = version + 1
+                completed_at = ?8, updated_at = ?9, project_id = ?11, milestone_id = ?13, version = version + 1
             WHERE id = ?10 AND (?12 IS NULL OR version = ?12)
             "#,
         )
@@ -166,6 +174,7 @@ impl StorageEngine {
         .bind(task_id)
         .bind(project_id)
         .bind(expected_version)
+        .bind(milestone_id)
         .execute(&self.pool)
         .await?;
         if saved.rows_affected() == 0 {

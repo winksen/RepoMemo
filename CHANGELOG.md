@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.7 (2026-11-17)
+
+Let a lead group a project's tasks under dated milestones and see, with the denominator named, what is done, what remains and what is overdue.
+
+### Added
+- **Milestones** (`/v1/projects/{id}/milestones`, `/v1/milestones/{id}`): a name, a description, an optional date and a completion rule. A task joins with `milestone_id`; the milestone must belong to the project the task is in (`400` otherwise), and moving the task to another project, or out of its project, drops the milestone. Removing a milestone leaves its tasks in the project.
+- **An explainable count.** Each milestone reports `task_count` (the denominator), `done_count`, `remaining_count`, `overdue_task_count`, `overdue`, `completed` and an `explanation` in words, for example "1 of 3 tasks are done and 2 remain, 1 of them overdue. It is complete when it has tasks and every one is done." A milestone with no task is not complete by rule.
+- **Two completion rules.** `all_tasks` (the default) completes when it has tasks and every one is done; `manual` is completed and reopened by a person. The other rule answers `409` to a hand completion.
+- **A date moves nothing.** Changing a milestone's date, or completing it, changes no task's own due date or status, and closing a task completes nothing else.
+- **Time is defined.** Dates and times are in UTC; a due date without a time is overdue from the next day, a due time once it has passed. The same rule will serve the reminders.
+- Tasks report `milestone_id` and `milestone_name`. Creating, changing, completing and removing a milestone is written to the activity feed.
+- Migration **0070** adds `project_milestones` and `workspace_tasks.milestone_id`.
+- A server test (`tests/milestones.rs`) follows a lead planning a milestone, the counts and the explanation, a date change that moves no task, the project rule, completion by rule and by hand, and removal.
+- **Not in this release:** the web screens.
+
+### Checks
+- Version, migration lock (70 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. Tasks report two new fields (`null` for existing tasks).
+
 ## V0.7.6 (2026-11-17)
 
 Stop two people editing one task from silently overwriting each other.

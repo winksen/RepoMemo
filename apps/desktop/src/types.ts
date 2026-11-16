@@ -266,6 +266,8 @@ export interface CollaborationTask {
   artifact_id: string | null;
   project_id: string | null;
   project_name: string | null;
+  milestone_id: string | null;
+  milestone_name: string | null;
   due_at: string | null;
   completed_at: string | null;
   created_at: string;
