@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.13 (2026-11-17)
+
+Show the board and the list from one query, and make moving a card an ordinary checked save that can be undone by the client.
+
+### Added
+- **A board from the list's query** (`GET /v1/workspaces/{id}/task-board`): the same filters, saved view and sort as the task list, returning one column for each workflow state (the four built-in ones, then the named ones). Each column carries its `total`, its first `column_limit` tasks (1 to 100, default 25) and a `next_offset`; the rest of a column is read with the list's new `state` filter. Because both read the same query, the board and the list show the same work, and every task is in exactly one column.
+- **A state filter** on the task list (`?state=open`, or the id of a named state) and in saved views.
+- **Moving a card** (`POST /v1/tasks/{id}/move` with `state_id` and an optional `expected_version`): the usual task save, changing nothing but the column. It needs a role that may write and adds a version. A move from a stale board is `409` with the task as it is now and the attempted change; an unknown column is `400`; a reader is `403`. Each answer tells the client what to show, so a failed move can put the card back visibly.
+- Moves are written to the activity feed.
+- A server test (`tests/task_board.rs`) follows the columns and their statuses, the board matching the list for four different filters, a small column and the list reading the rest, a move, a stale move, a move into a named column and the refusals.
+- **Not in this release:** the web board, its keyboard movement and focus handling. The server returns what they need; the screen follows.
+- No migration.
+
+### Checks
+- Version, migration lock (75 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run. (A full disk from the build cache stopped one check midway; the cache was cleared and the check repeated.)
+
+### Upgrading
+- Nothing to do.
+
 ## V0.7.12 (2026-11-17)
 
 Read a workspace's tasks a page at a time through one query model, and keep named filters as views that never carry rights.

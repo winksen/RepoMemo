@@ -125,6 +125,34 @@ impl axum::response::IntoResponse for TaskSaveError {
     }
 }
 
+/// Saves a task. A save from an older version is refused with the task as it is now and the change that was attempted.
+pub(crate) async fn save_task(
+    state: &AppState,
+    task_id: &str,
+    payload: NewCollaborationTask,
+    attempted: TaskAttempt,
+) -> Result<CollaborationTask, TaskSaveError> {
+    match state
+        .storage
+        .update_collaboration_task(task_id, payload)
+        .await
+        .map_err(map_storage_error)?
+    {
+        TaskUpdate::Saved(task) => Ok(*task),
+        TaskUpdate::Stale(now) => Err(TaskSaveError::Stale(Box::new(TaskConflict {
+            error: TaskConflictError {
+                code: "conflict".to_owned(),
+                message: format!(
+                    "{} was changed by someone else (now at version {}). Your change is returned with it so nothing is lost.",
+                    now.key, now.version
+                ),
+            },
+            current: *now,
+            attempted,
+        }))),
+    }
+}
+
 pub(crate) async fn update_collaboration_task(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -150,27 +178,7 @@ pub(crate) async fn update_collaboration_task(
         due_at: request.due_at.clone(),
     };
     let payload = normalize_collaboration_task(&state, &current.workspace_id, request, Some(&current)).await?;
-    let task = match state
-        .storage
-        .update_collaboration_task(&task_id, payload)
-        .await
-        .map_err(map_storage_error)?
-    {
-        TaskUpdate::Saved(task) => *task,
-        TaskUpdate::Stale(now) => {
-            return Err(TaskSaveError::Stale(Box::new(TaskConflict {
-                error: TaskConflictError {
-                    code: "conflict".to_owned(),
-                    message: format!(
-                        "{} was changed by someone else (now at version {}). Your change is returned with it so nothing is lost.",
-                        now.key, now.version
-                    ),
-                },
-                current: *now,
-                attempted,
-            })));
-        }
-    };
+    let task = save_task(&state, &task_id, payload, attempted).await?;
     if current.assignee.as_ref().map(|member| member.id.as_str())
         != task.assignee.as_ref().map(|member| member.id.as_str())
     {

@@ -161,6 +161,8 @@ export interface TaskQuery {
   due_after: string | null;
   /** Not done and past its own due date. */
   overdue: boolean;
+  /** Only tasks in one workflow state (V0.7.13): a built-in category name or the id of a named state. */
+  state_id: string | null;
   /** Words in the title. */
   q: string | null;
   /** `priority` (the usual order), `due`, `updated` or `number`. */
@@ -177,6 +179,21 @@ export interface TaskPage {
   limit: number;
   offset: number;
   next_offset: number | null;
+}
+
+/** One column of the board (V0.7.13): a workflow state, how many tasks match the board's filters in it, and the first of them. */
+export interface BoardColumn {
+  state: WorkflowState;
+  tasks: CollaborationTask[];
+  total: number;
+  /** Where the column's next page starts in the task list (`state` and the same filters), none when all are shown. */
+  next_offset: number | null;
+}
+
+/** The board: the task list's filtered work grouped by workflow state. The same query gives the same tasks in the list. */
+export interface TaskBoard {
+  columns: BoardColumn[];
+  total: number;
 }
 
 /** A named set of filters (V0.7.12), private to its owner until shared with the workspace. */

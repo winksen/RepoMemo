@@ -971,6 +971,11 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(task_list::list_task_page),
         )
         .route(
+            "/v1/workspaces/{workspace_id}/task-board",
+            get(task_list::get_task_board),
+        )
+        .route("/v1/tasks/{task_id}/move", post(task_list::move_task))
+        .route(
             "/v1/workspaces/{workspace_id}/task-views",
             get(task_list::list_task_views).post(task_list::create_task_view),
         )

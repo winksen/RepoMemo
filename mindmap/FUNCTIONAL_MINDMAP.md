@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.13 — Use the same query/view model for the board with keyboard status movement.
+
+- The board shows the same filtered work as the task list, one column for each task state, and a card can be moved between columns. A move that is refused (someone changed the task first, or the person may not edit) says why, so the card can go back. The screen is not built yet.
+
+Checks: `tests/task_board.rs` compiles; not executed; static checks pass.
 
 ## V0.7.12 — Add a paged task list with saved filters for project, milestone, assignee, priority, label and due date.
 

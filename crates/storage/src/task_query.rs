@@ -62,6 +62,15 @@ fn push_filters(builder: &mut QueryBuilder<'_, Sqlite>, query: &TaskQuery, reque
             separated.push_unseparated(")");
         }
     }
+    if let Some(state) = &query.state_id {
+        if repomemo_domain::BUILTIN_STATE_CATEGORIES.contains(&state.as_str()) {
+            builder
+                .push(" AND task.state_id IS NULL AND task.status = ")
+                .push_bind(state.clone());
+        } else {
+            builder.push(" AND task.state_id = ").push_bind(state.clone());
+        }
+    }
     if let Some(label) = &query.label_id {
         builder
             .push(" AND EXISTS (SELECT 1 FROM task_label_links AS wanted WHERE wanted.task_id = task.id AND wanted.label_id = ")

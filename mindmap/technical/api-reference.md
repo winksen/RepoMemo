@@ -361,6 +361,8 @@
 | PUT | `/v1/task-views/{view_id}` | auth | require_workspace_read (owner) | SaveTaskViewRequest | TaskView |
 | DELETE | `/v1/task-views/{view_id}` | auth | require_workspace_read (owner) | — | — |
 | PUT | `/v1/task-views/{view_id}/sharing` | auth | require_workspace_read (owner) | SetViewSharingRequest | TaskView |
+| GET | `/v1/workspaces/{workspace_id}/task-board` | auth | require_workspace_read | — (the list's filters, `?column_limit=`) | TaskBoard |
+| POST | `/v1/tasks/{task_id}/move` | auth | require_workspace_write | MoveTaskRequest | CollaborationTask (`409` with the current task when stale) |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — (`?label=`) | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

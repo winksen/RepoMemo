@@ -3,7 +3,8 @@
 //! rights on every use; the same query model serves the board.
 
 use crate::*;
-use repomemo_domain::{TaskPage, TaskQuery, TaskView};
+use repomemo_domain::{BoardColumn, TaskAttempt, TaskBoard, TaskPage, TaskQuery, TaskView};
+use repomemo_storage::NewCollaborationTask;
 use repomemo_storage::{DEFAULT_TASK_PAGE, MAX_TASK_PAGE};
 
 #[derive(Debug, Default, Deserialize)]
@@ -19,6 +20,8 @@ pub(crate) struct TaskListParams {
     /// One or more of the four statuses, separated by commas.
     status: Option<String>,
     label: Option<String>,
+    /// One workflow state: a built-in category name or the id of a named state (the board's column).
+    state: Option<String>,
     due_before: Option<String>,
     due_after: Option<String>,
     overdue: Option<bool>,
@@ -26,6 +29,8 @@ pub(crate) struct TaskListParams {
     sort: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
+    /// The board only: how many tasks each column holds (1 to 100, default 25).
+    column_limit: Option<i64>,
 }
 
 fn words(value: &str) -> Vec<String> {
@@ -34,6 +39,99 @@ fn words(value: &str) -> Vec<String> {
         .map(|part| part.trim().to_lowercase())
         .filter(|part| !part.is_empty())
         .collect()
+}
+
+/// The board: the same filtered work as the list, one column for each workflow state, each with its count and its first tasks.
+pub(crate) async fn get_task_board(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Query(params): Query<TaskListParams>,
+) -> Result<Json<TaskBoard>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let query = resolve_query(&state, &subject, &workspace_id, &params).await?;
+    let column_limit = params.column_limit.unwrap_or(25);
+    if !(1..=100).contains(&column_limit) {
+        return Err(ApiError::bad_request("A column holds between 1 and 100 tasks."));
+    }
+    let states = state
+        .storage
+        .list_workflow_states(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let mut columns = Vec::with_capacity(states.len());
+    let mut total = 0;
+    for workflow_state in states {
+        let mut column_query = query.clone();
+        column_query.state_id = Some(workflow_state.id.clone());
+        let page = state
+            .storage
+            .query_collaboration_tasks(&workspace_id, &column_query, &subject.user_id, column_limit, 0)
+            .await
+            .map_err(map_storage_error)?;
+        total += page.total;
+        columns.push(BoardColumn {
+            state: workflow_state,
+            tasks: page.tasks,
+            total: page.total,
+            next_offset: page.next_offset,
+        });
+    }
+    Ok(Json(TaskBoard { columns, total }))
+}
+
+/// Moves a task to another column: the same save as any status change, with the same version check, so a move that loses a race
+/// or is not allowed answers with the reason and (for a stale one) the task as it is now, and the client can put the card back.
+pub(crate) async fn move_task(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(task_id): Path<String>,
+    Json(request): Json<MoveTaskRequest>,
+) -> Result<Json<CollaborationTask>, crate::collaboration::TaskSaveError> {
+    let current = state
+        .storage
+        .get_collaboration_task(&task_id)
+        .await
+        .map_err(map_storage_error)?;
+    require_workspace_write(&state, &subject, &current.workspace_id).await?;
+    let (status, state_id) =
+        crate::workflow::resolve_task_state(&state, &current.workspace_id, "", Some(&request.state_id)).await?;
+    let attempted = TaskAttempt {
+        title: current.title.clone(),
+        description: current.description.clone(),
+        status: status.clone(),
+        priority: current.priority.clone(),
+        assignee_user_id: current.assignee.as_ref().map(|member| member.id.clone()),
+        artifact_id: current.artifact_id.clone(),
+        project_id: current.project_id.clone(),
+        milestone_id: current.milestone_id.clone(),
+        parent_task_id: current.parent_task_id.clone(),
+        due_at: current.due_at.clone(),
+    };
+    let moved = NewCollaborationTask {
+        title: current.title.clone(),
+        description: current.description.clone(),
+        status,
+        priority: current.priority.clone(),
+        assignee_user_id: current.assignee.as_ref().map(|member| member.id.clone()),
+        artifact_id: current.artifact_id.clone(),
+        state_id,
+        due_at: current.due_at.clone(),
+        expected_version: request.expected_version,
+        ..Default::default()
+    };
+    let task = crate::collaboration::save_task(&state, &task_id, moved, attempted).await?;
+    record_workspace_activity(
+        &state,
+        &task.workspace_id,
+        &subject.user_id,
+        "task_moved",
+        "task",
+        Some(&task.id),
+        format!("Moved {} to {}.", task.key, task.state_name),
+    )
+    .await;
+    Ok(Json(task))
 }
 
 /// Checks a query and tidies it; says what is wrong in words.
@@ -73,13 +171,14 @@ pub(crate) fn validate_query(query: &mut TaskQuery) -> Result<(), ApiError> {
     Ok(())
 }
 
-pub(crate) async fn list_task_page(
-    subject: AuthenticatedSubject,
-    State(state): State<AppState>,
-    Path(workspace_id): Path<String>,
-    Query(params): Query<TaskListParams>,
-) -> Result<Json<TaskPage>, ApiError> {
-    require_workspace_read(&state, &subject, &workspace_id).await?;
+/// Turns the parameters of a request (and the saved view they name) into a checked query. The list and the board both call
+/// it, so they show the same filtered work.
+pub(crate) async fn resolve_query(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: &str,
+    params: &TaskListParams,
+) -> Result<TaskQuery, ApiError> {
     let mut query = TaskQuery::default();
     if let Some(view_id) = params.view.as_deref() {
         let view = state.storage.get_task_view(view_id).await.map_err(map_storage_error)?;
@@ -89,40 +188,54 @@ pub(crate) async fn list_task_page(
         }
         query = view.query;
     }
-    if let Some(value) = params.project_id {
-        query.project_id = Some(value);
+    if let Some(value) = &params.project_id {
+        query.project_id = Some(value.clone());
     }
-    if let Some(value) = params.milestone_id {
-        query.milestone_id = Some(value);
+    if let Some(value) = &params.milestone_id {
+        query.milestone_id = Some(value.clone());
     }
-    if let Some(value) = params.assignee {
-        query.assignee = Some(value);
+    if let Some(value) = &params.assignee {
+        query.assignee = Some(value.clone());
     }
-    if let Some(value) = params.priority {
-        query.priority = words(&value);
+    if let Some(value) = &params.priority {
+        query.priority = words(value);
     }
-    if let Some(value) = params.status {
-        query.status = words(&value);
+    if let Some(value) = &params.status {
+        query.status = words(value);
     }
-    if let Some(value) = params.label {
-        query.label_id = Some(value);
+    if let Some(value) = &params.label {
+        query.label_id = Some(value.clone());
     }
-    if let Some(value) = params.due_before {
-        query.due_before = Some(value);
+    if let Some(value) = &params.state {
+        query.state_id = Some(value.clone());
     }
-    if let Some(value) = params.due_after {
-        query.due_after = Some(value);
+    if let Some(value) = &params.due_before {
+        query.due_before = Some(value.clone());
+    }
+    if let Some(value) = &params.due_after {
+        query.due_after = Some(value.clone());
     }
     if let Some(value) = params.overdue {
         query.overdue = value;
     }
-    if let Some(value) = params.q {
-        query.q = Some(value);
+    if let Some(value) = &params.q {
+        query.q = Some(value.clone());
     }
-    if let Some(value) = params.sort {
-        query.sort = Some(value);
+    if let Some(value) = &params.sort {
+        query.sort = Some(value.clone());
     }
     validate_query(&mut query)?;
+    Ok(query)
+}
+
+pub(crate) async fn list_task_page(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Query(params): Query<TaskListParams>,
+) -> Result<Json<TaskPage>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let query = resolve_query(&state, &subject, &workspace_id, &params).await?;
     let limit = params.limit.unwrap_or(DEFAULT_TASK_PAGE);
     if !(1..=MAX_TASK_PAGE).contains(&limit) {
         return Err(ApiError::bad_request(format!(

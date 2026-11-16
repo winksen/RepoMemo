@@ -179,6 +179,8 @@ pub struct TaskQuery {
     pub due_after: Option<String>,
     /// Not done and past its own due date.
     pub overdue: bool,
+    /// Only tasks in one workflow state (V0.7.13): a built-in category name or the id of a named state.
+    pub state_id: Option<String>,
     /// Words in the title.
     pub q: Option<String>,
     /// `priority` (the usual order), `due`, `updated` or `number`.
@@ -194,6 +196,23 @@ pub struct TaskPage {
     pub limit: i64,
     pub offset: i64,
     pub next_offset: Option<i64>,
+}
+
+/// One column of the board (V0.7.13): a workflow state, how many tasks match the board's filters in it, and the first of them.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BoardColumn {
+    pub state: WorkflowState,
+    pub tasks: Vec<CollaborationTask>,
+    pub total: i64,
+    /// Where the column's next page starts in the task list (`state` and the same filters), none when all are shown.
+    pub next_offset: Option<i64>,
+}
+
+/// The board: the task list's filtered work grouped by workflow state. The same query gives the same tasks in the list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskBoard {
+    pub columns: Vec<BoardColumn>,
+    pub total: i64,
 }
 
 /// A named set of filters (V0.7.12), private to its owner until shared with the workspace.

@@ -498,6 +498,15 @@ pub(crate) struct TaskReferenceInput {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct MoveTaskRequest {
+    /// The column to move the task to: a built-in category name or the id of a named state.
+    pub(crate) state_id: String,
+    /// The task's `version` as the board showed it; a move from an older one is refused with the task as it is now.
+    #[serde(default)]
+    pub(crate) expected_version: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct SaveTaskViewRequest {
     pub(crate) name: String,
     #[serde(default)]
