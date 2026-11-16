@@ -1627,6 +1627,7 @@ pub(crate) async fn request_artifact_review(
                 assignee_user_id: Some(request.user_id.clone()),
                 artifact_id: Some(artifact_id.clone()),
                 due_at: None,
+                ..Default::default()
             },
         )
         .await

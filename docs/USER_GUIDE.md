@@ -385,6 +385,7 @@ flowchart TD
 |---|---|
 | **Discussion** | Threaded comments on any evidence. Type `@` to mention a teammate, in a comment, a task's description or a memory card: they get notified (in the app and, if they like, by email), only if they are members of the workspace, and only once for each text you add them to |
 | **Task board** | Open, In progress, Blocked and Done columns. Tasks have a priority, an assignee, a due date, linked evidence and **checklists**. Assigning notifies the person, and the task shows on their profile |
+| **Projects** | A named piece of work with an owner, a goal and a target date, inside the workspace. A task can belong to one project; tasks with no project work as before. Anyone who can read the workspace can read a project and anyone who can edit can change or archive it, so a project never gives or removes access. In 0.7.1 projects are managed through the [API](API.md#4a-projects-07); the screens follow |
 | **People** | Members, invitations and a summary of what *your* role allows |
 | **Activity feed** | Who did what, with a 365-day calendar *(admins)* |
 | **Live updates** | New files, indexing progress and changes from teammates appear without reloading |

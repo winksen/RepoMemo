@@ -61,8 +61,31 @@ export interface CollaborationTask {
   assignee: SharedUser | null;
   created_by: SharedUser;
   artifact_id: string | null;
+  /** The project the task belongs to (V0.7.1); a task with none keeps working in the workspace list. */
+  project_id: string | null;
+  project_name: string | null;
   due_at: string | null;
   completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A named piece of work inside one workspace (V0.7.1). It grants no access: whoever can read the workspace can read it. */
+export interface Project {
+  id: string;
+  workspace_id: string;
+  name: string;
+  goal: string;
+  /** `active`, `on_hold`, `done` or `archived`. */
+  status: string;
+  owner: SharedUser | null;
+  created_by: SharedUser | null;
+  /** A calendar date (YYYY-MM-DD) stating the intent; no task follows it automatically. */
+  target_date: string | null;
+  /** Every task of the project, and how many of them are not done. */
+  task_count: number;
+  open_task_count: number;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }

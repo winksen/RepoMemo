@@ -81,6 +81,21 @@ curl -s -H "$auth" -H 'Content-Type: application/json' \
 
 **Expected:** each call returns the created object with its `id`. The note or file appears in the workspace with *Indexing…*, then *Indexed*, and a search for a word in it finds it within a minute or so. The same file uploaded twice is stored once. The task is on the board; the card is under *Memory*. Check by `GET` on the list route of each. A viewer's token answers `403`; a token with `read` scope answers `403`.
 
+## 4a. Projects (0.7)
+
+A project is a named piece of work **inside one workspace**: a name, a goal, a lifecycle (`active`, `on_hold`, `done`) and an optional target date (`YYYY-MM-DD`), with an optional owner who must be a member. It grants no access: whoever can read the workspace can read its projects, and a role that may write content can change them (a viewer's token answers `403`).
+
+```bash
+# Create a project, list the active ones, archive it (the archived are left out unless you ask: ?status=archived)
+curl -s -X POST -H "$auth" -H "Content-Type: application/json" \
+  -d '{"name":"Queue migration","goal":"Move the worker to the managed queue.","target_date":"2027-02-01"}' \
+  "$REPOMEMO_URL/v1/workspaces/$WORKSPACE_ID/projects"
+curl -s -H "$auth" "$REPOMEMO_URL/v1/workspaces/$WORKSPACE_ID/projects"
+curl -s -X POST -H "$auth" "$REPOMEMO_URL/v1/projects/$PROJECT_ID/archive"
+```
+
+A task joins a project with `project_id` on the task routes. **Left out, a save keeps the task's project; an empty string removes it.** The project must belong to the task's workspace (`400` otherwise), and an archived project keeps its tasks but takes no new ones (`409`; restore it first with `POST /v1/projects/{id}/restore`). Tasks made without a project work as before. Each project reports its `task_count` and `open_task_count`.
+
 ## 5. Live updates
 
 `GET /v1/workspaces/{id}/events` (and `GET /v1/system/events` for system administrators) is a **server-sent events** stream, so use `curl -N`:

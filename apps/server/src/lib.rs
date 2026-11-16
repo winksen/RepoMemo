@@ -40,6 +40,7 @@ mod onboarding;
 mod organization_templates;
 mod organizations;
 mod profile;
+mod projects;
 mod quotas;
 mod repositories;
 mod requests;
@@ -899,6 +900,16 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/tasks",
             get(list_collaboration_tasks).post(create_collaboration_task),
         )
+        .route(
+            "/v1/workspaces/{workspace_id}/projects",
+            get(projects::list_projects).post(projects::create_project),
+        )
+        .route(
+            "/v1/projects/{project_id}",
+            get(projects::get_project).put(projects::update_project),
+        )
+        .route("/v1/projects/{project_id}/archive", post(projects::archive_project))
+        .route("/v1/projects/{project_id}/restore", post(projects::restore_project))
         .route(
             "/v1/workspaces/{workspace_id}/saved-searches",
             get(list_saved_searches).post(create_saved_search),

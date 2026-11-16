@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.1 (2026-11-17)
+
+Add projects: a named piece of work inside a workspace, so tasks can be grouped without changing who can see them.
+
+### Added
+- **Projects** (`/v1/workspaces/{id}/projects`, `/v1/projects/{id}`): a name (1 to 120 characters), a goal (5,000), a lifecycle (`active`, `on_hold`, `done`), an optional owner who must be a workspace member and an optional target date (`YYYY-MM-DD`). Each project reports how many tasks it has and how many are not done. Creating, editing and archiving use the same rule as other content work, so a viewer can read a project and cannot change it, and a stranger cannot see it: **a project grants nothing**.
+- **Archive and restore:** archiving keeps the project and its tasks readable, leaves it out of the default list (`?status=archived` lists it) and stops new tasks joining it (`409`); an archived project is restored before it is edited.
+- **A task can belong to one project** (`project_id` on the task routes; the task reports `project_id` and `project_name`). Left out of a save, the task keeps its project; an empty string removes it. A project of another workspace is refused. Tasks made before 0.7, from a health finding or from a file review have no project and work as before.
+- Creating, changing, archiving and restoring a project is written to the workspace activity feed.
+- Migration **0064** adds `workspace_projects` and `workspace_tasks.project_id`. A task keeps its row when its project is removed.
+- A server test (`tests/projects.rs`) follows a member creating and archiving a project, a reader and a stranger refused, a task joining, keeping and leaving a project, and the archived-project rules.
+- **Not in this release:** the web screens. Projects are used through the API until a later release; the user guide and API guide say so.
+
+### Checks
+- Version, migration lock (64 files), generated types, styles, documentation links, TypeScript and formatting pass; clippy passes for the domain, storage, API and server crates, all targets (the templates crate's test target has one older warning, from a newer Rust lint, unchanged by this release). The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. A script that reads tasks now also gets `project_id` and `project_name` (both `null` for existing tasks).
+
 ## V0.7.0 (2026-11-17)
 
 Open the 0.7 line by writing down what a project is, what it is not and the journey the line must deliver.

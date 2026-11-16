@@ -461,7 +461,25 @@ pub(crate) struct SaveCollaborationTaskRequest {
     pub(crate) priority: String,
     pub(crate) assignee_user_id: Option<String>,
     pub(crate) artifact_id: Option<String>,
+    /// The project to put the task in. Left out, a save keeps the project the task has; an empty value removes it.
+    #[serde(default)]
+    pub(crate) project_id: Option<String>,
     pub(crate) due_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SaveProjectRequest {
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) goal: String,
+    /// `active` (the default), `on_hold` or `done`.
+    #[serde(default)]
+    pub(crate) status: Option<String>,
+    #[serde(default)]
+    pub(crate) owner_user_id: Option<String>,
+    /// A calendar date, YYYY-MM-DD.
+    #[serde(default)]
+    pub(crate) target_date: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

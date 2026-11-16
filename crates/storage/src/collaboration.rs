@@ -1,39 +1,44 @@
 use super::*;
 
+/// The columns and joins every task read shares; each query adds its own WHERE and ORDER BY.
+const TASK_SELECT: &str = r#"
+    SELECT
+      task.id,
+      task.workspace_id,
+      task.title,
+      task.description,
+      task.status,
+      task.priority,
+      assignee.id AS assignee_id,
+      assignee.email AS assignee_email,
+      assignee.display_name AS assignee_display_name,
+      creator.id AS creator_id,
+      creator.email AS creator_email,
+      creator.display_name AS creator_display_name,
+      task.artifact_id,
+      task.project_id,
+      project.name AS project_name,
+      task.due_at,
+      task.completed_at,
+      task.created_at,
+      task.updated_at
+    FROM workspace_tasks AS task
+    JOIN users AS creator ON creator.id = task.created_by_user_id
+    LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
+    LEFT JOIN workspace_projects AS project ON project.id = task.project_id"#;
+
 impl StorageEngine {
     pub async fn list_collaboration_tasks(&self, workspace_id: &str) -> Result<Vec<CollaborationTask>> {
-        let rows = sqlx::query_as::<_, CollaborationTaskRow>(
-            r#"
-            SELECT
-              task.id,
-              task.workspace_id,
-              task.title,
-              task.description,
-              task.status,
-              task.priority,
-              assignee.id AS assignee_id,
-              assignee.email AS assignee_email,
-              assignee.display_name AS assignee_display_name,
-              creator.id AS creator_id,
-              creator.email AS creator_email,
-              creator.display_name AS creator_display_name,
-              task.artifact_id,
-              task.due_at,
-              task.completed_at,
-              task.created_at,
-              task.updated_at
-            FROM workspace_tasks AS task
-            JOIN users AS creator ON creator.id = task.created_by_user_id
-            LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
+        let rows = sqlx::query_as::<_, CollaborationTaskRow>(&format!(
+            r#"{TASK_SELECT}
             WHERE task.workspace_id = ?1
             ORDER BY
               CASE task.status WHEN 'in_progress' THEN 0 WHEN 'blocked' THEN 1 WHEN 'open' THEN 2 ELSE 3 END,
               CASE task.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
               task.due_at IS NULL,
               task.due_at ASC,
-              task.updated_at DESC
-            "#,
-        )
+              task.updated_at DESC"#
+        ))
         .bind(workspace_id)
         .fetch_all(self.reader())
         .await?;
@@ -41,29 +46,8 @@ impl StorageEngine {
     }
 
     pub async fn list_assigned_collaboration_tasks(&self, user_id: &str) -> Result<Vec<CollaborationTask>> {
-        let rows = sqlx::query_as::<_, CollaborationTaskRow>(
-            r#"
-            SELECT
-              task.id,
-              task.workspace_id,
-              task.title,
-              task.description,
-              task.status,
-              task.priority,
-              assignee.id AS assignee_id,
-              assignee.email AS assignee_email,
-              assignee.display_name AS assignee_display_name,
-              creator.id AS creator_id,
-              creator.email AS creator_email,
-              creator.display_name AS creator_display_name,
-              task.artifact_id,
-              task.due_at,
-              task.completed_at,
-              task.created_at,
-              task.updated_at
-            FROM workspace_tasks AS task
-            JOIN users AS creator ON creator.id = task.created_by_user_id
-            JOIN users AS assignee ON assignee.id = task.assignee_user_id
+        let rows = sqlx::query_as::<_, CollaborationTaskRow>(&format!(
+            r#"{TASK_SELECT}
             JOIN workspace_memberships AS membership
               ON membership.workspace_id = task.workspace_id AND membership.user_id = ?1 AND (membership.expires_at IS NULL OR membership.expires_at > ?2)
             WHERE task.assignee_user_id = ?1 AND task.status != 'done'
@@ -71,46 +55,20 @@ impl StorageEngine {
               CASE task.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
               task.due_at IS NULL,
               task.due_at ASC,
-              task.updated_at DESC
-            "#,
-        )
+              task.updated_at DESC"#
+        ))
         .bind(user_id)
-        .bind(chrono::Utc::now().to_rfc3339())
+        .bind(Utc::now().to_rfc3339())
         .fetch_all(self.reader())
         .await?;
         Ok(rows.into_iter().map(CollaborationTask::from).collect())
     }
 
     pub async fn get_collaboration_task(&self, task_id: &str) -> Result<CollaborationTask> {
-        let row = sqlx::query_as::<_, CollaborationTaskRow>(
-            r#"
-            SELECT
-              task.id,
-              task.workspace_id,
-              task.title,
-              task.description,
-              task.status,
-              task.priority,
-              assignee.id AS assignee_id,
-              assignee.email AS assignee_email,
-              assignee.display_name AS assignee_display_name,
-              creator.id AS creator_id,
-              creator.email AS creator_email,
-              creator.display_name AS creator_display_name,
-              task.artifact_id,
-              task.due_at,
-              task.completed_at,
-              task.created_at,
-              task.updated_at
-            FROM workspace_tasks AS task
-            JOIN users AS creator ON creator.id = task.created_by_user_id
-            LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
-            WHERE task.id = ?1
-            "#,
-        )
-        .bind(task_id)
-        .fetch_one(self.reader())
-        .await?;
+        let row = sqlx::query_as::<_, CollaborationTaskRow>(&format!("{TASK_SELECT} WHERE task.id = ?1"))
+            .bind(task_id)
+            .fetch_one(self.reader())
+            .await?;
         Ok(CollaborationTask::from(row))
     }
 
@@ -128,8 +86,8 @@ impl StorageEngine {
             INSERT INTO workspace_tasks (
               id, workspace_id, title, description, status, priority,
               assignee_user_id, created_by_user_id, artifact_id, due_at,
-              completed_at, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+              completed_at, created_at, updated_at, project_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             "#,
         )
         .bind(&id)
@@ -145,6 +103,7 @@ impl StorageEngine {
         .bind(completed_at)
         .bind(&now)
         .bind(&now)
+        .bind(task.project_id.flatten())
         .execute(&self.pool)
         .await?;
         self.get_collaboration_task(&id).await
@@ -162,12 +121,17 @@ impl StorageEngine {
         } else {
             None
         };
+        // Left out of the request means unchanged; an empty value removes the task from its project.
+        let project_id = match task.project_id {
+            None => current.project_id.clone(),
+            Some(project_id) => project_id,
+        };
         sqlx::query(
             r#"
             UPDATE workspace_tasks
             SET title = ?1, description = ?2, status = ?3, priority = ?4,
                 assignee_user_id = ?5, artifact_id = ?6, due_at = ?7,
-                completed_at = ?8, updated_at = ?9
+                completed_at = ?8, updated_at = ?9, project_id = ?11
             WHERE id = ?10
             "#,
         )
@@ -181,6 +145,7 @@ impl StorageEngine {
         .bind(completed_at)
         .bind(now)
         .bind(task_id)
+        .bind(project_id)
         .execute(&self.pool)
         .await?;
         self.get_collaboration_task(task_id).await

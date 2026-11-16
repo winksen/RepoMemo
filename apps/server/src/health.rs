@@ -136,6 +136,7 @@ pub(crate) async fn apply_health_action(
                         assignee_user_id: None,
                         artifact_id: finding.files.first().map(|file| file.artifact_id.clone()),
                         due_at: None,
+                        ..Default::default()
                     },
                 )
                 .await

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.1 — Add workspace-scoped projects with owner, goal, lifecycle and target date.
+
+- A workspace can hold projects: a name, goal, owner, lifecycle and target date. A task belongs to at most one project; tasks without one work as before. A project never changes who can see anything; archiving it keeps it and its tasks readable but stops new tasks joining. The screens are not built yet.
+
+Checks: `tests/projects.rs` compiles; not executed; static checks pass.
 
 ## V0.7.0 — Specify the lightweight project model and its limits with a sample team journey.
 

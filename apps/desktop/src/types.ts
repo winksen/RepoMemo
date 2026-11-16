@@ -261,6 +261,8 @@ export interface CollaborationTask {
   assignee: SharedUser | null;
   created_by: SharedUser;
   artifact_id: string | null;
+  project_id: string | null;
+  project_name: string | null;
   due_at: string | null;
   completed_at: string | null;
   created_at: string;

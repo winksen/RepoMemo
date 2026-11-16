@@ -35,7 +35,7 @@ pub(crate) async fn create_collaboration_task(
     Json(request): Json<SaveCollaborationTaskRequest>,
 ) -> Result<(StatusCode, Json<CollaborationTask>), ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
-    let payload = normalize_collaboration_task(&state, &workspace_id, request).await?;
+    let payload = normalize_collaboration_task(&state, &workspace_id, request, None).await?;
     let task = state
         .storage
         .create_collaboration_task(&workspace_id, &subject.user_id, payload)
@@ -76,7 +76,8 @@ pub(crate) async fn update_collaboration_task(
         .await
         .map_err(map_storage_error)?;
     require_workspace_write(&state, &subject, &current.workspace_id).await?;
-    let payload = normalize_collaboration_task(&state, &current.workspace_id, request).await?;
+    let payload =
+        normalize_collaboration_task(&state, &current.workspace_id, request, current.project_id.as_deref()).await?;
     let task = state
         .storage
         .update_collaboration_task(&task_id, payload)
@@ -342,6 +343,7 @@ pub(crate) async fn normalize_collaboration_task(
     state: &AppState,
     workspace_id: &str,
     request: SaveCollaborationTaskRequest,
+    current_project_id: Option<&str>,
 ) -> Result<NewCollaborationTask, ApiError> {
     let title = request.title.trim().to_owned();
     let description = request.description.trim().to_owned();
@@ -390,6 +392,15 @@ pub(crate) async fn normalize_collaboration_task(
     if due_at.as_ref().is_some_and(|value| value.len() > 64) {
         return Err(ApiError::bad_request("Task due date is invalid."));
     }
+    // Left out keeps the project; an empty value removes it; anything else must be a project of this workspace.
+    let project_id = match request.project_id.as_deref().map(str::trim) {
+        None => None,
+        Some("") => Some(None),
+        Some(id) => {
+            crate::projects::check_task_project(state, workspace_id, id, current_project_id).await?;
+            Some(Some(id.to_owned()))
+        }
+    };
     Ok(NewCollaborationTask {
         title,
         description,
@@ -397,6 +408,7 @@ pub(crate) async fn normalize_collaboration_task(
         priority: request.priority,
         assignee_user_id: request.assignee_user_id,
         artifact_id: request.artifact_id,
+        project_id,
         due_at,
     })
 }

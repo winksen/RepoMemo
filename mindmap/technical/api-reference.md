@@ -314,6 +314,12 @@
 |---|---|---|---|---|---|
 | GET | `/v1/workspaces/{workspace_id}/activity` | auth | require_workspace_admin | — | Vec<WorkspaceActivityEvent |
 | GET | `/v1/workspaces/{workspace_id}/activity/calendar` | auth | require_workspace_admin | — | WorkspaceActivityCalendarResponse |
+| GET | `/v1/workspaces/{workspace_id}/projects` | auth | require_workspace_read | — (`?status=`) | Vec<Project> |
+| POST | `/v1/workspaces/{workspace_id}/projects` | auth | require_workspace_write | SaveProjectRequest | Project |
+| GET | `/v1/projects/{project_id}` | auth | require_workspace_read | — | Project |
+| PUT | `/v1/projects/{project_id}` | auth | require_workspace_write | SaveProjectRequest | Project |
+| POST | `/v1/projects/{project_id}/archive` | auth | require_workspace_write | — | Project |
+| POST | `/v1/projects/{project_id}/restore` | auth | require_workspace_write | — | Project |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

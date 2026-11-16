@@ -81,8 +81,32 @@ pub struct CollaborationTask {
     pub assignee: Option<SharedUser>,
     pub created_by: SharedUser,
     pub artifact_id: Option<String>,
+    /// The project the task belongs to (V0.7.1); a task with none keeps working in the workspace list.
+    pub project_id: Option<String>,
+    pub project_name: Option<String>,
     pub due_at: Option<String>,
     pub completed_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// A named piece of work inside one workspace (V0.7.1). It grants no access: whoever can read the workspace can read it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub goal: String,
+    /// `active`, `on_hold`, `done` or `archived`.
+    pub status: String,
+    pub owner: Option<SharedUser>,
+    pub created_by: Option<SharedUser>,
+    /// A calendar date (YYYY-MM-DD) stating the intent; no task follows it automatically.
+    pub target_date: Option<String>,
+    /// Every task of the project, and how many of them are not done.
+    pub task_count: i64,
+    pub open_task_count: i64,
+    pub archived_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

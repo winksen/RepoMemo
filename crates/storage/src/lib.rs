@@ -8,7 +8,7 @@ use repomemo_domain::{
     AgentConversation, AgentMessage, AgentReply, AgentTurn, ArtifactComment, ArtifactDetail, ArtifactIndexFailure,
     ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, ArtifactVersion, Chunk, Citation,
     CollaborationTask, Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence,
-    MemoryReviewReason, Organization, OrganizationMember, OrganizationRole, ProviderSettings, SavedSearch,
+    MemoryReviewReason, Organization, OrganizationMember, OrganizationRole, Project, ProviderSettings, SavedSearch,
     SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace, Source, SourceType, Symbol,
     SymbolKind, SymbolSearchResult, TaskChecklistItem, Workspace, WorkspaceActivityEvent, WorkspaceMember,
     WorkspaceMembership, WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
@@ -40,6 +40,7 @@ mod mentions;
 mod mfa;
 mod organization_templates;
 mod organizations;
+mod projects;
 mod providers;
 mod repo;
 mod review_assignments;
@@ -72,6 +73,7 @@ pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;
 pub use organization_templates::StoredOrganizationTemplate;
 pub use organizations::StarterSetup;
+pub use projects::NewProject;
 pub use repo::RepoLastChange;
 pub use repo::{RepoFileRecord, RepoFileWrite};
 pub use review_assignments::{DueReview, ReminderCandidate, ReviewAssignment};
@@ -304,6 +306,8 @@ struct CollaborationTaskRow {
     creator_email: String,
     creator_display_name: String,
     artifact_id: Option<String>,
+    project_id: Option<String>,
+    project_name: Option<String>,
     due_at: Option<String>,
     completed_at: Option<String>,
     created_at: String,
@@ -463,7 +467,7 @@ struct SharedNotificationRow {
     created_at: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NewCollaborationTask {
     pub title: String,
     pub description: String,
@@ -471,6 +475,8 @@ pub struct NewCollaborationTask {
     pub priority: String,
     pub assignee_user_id: Option<String>,
     pub artifact_id: Option<String>,
+    /// The project to put the task in. `None` leaves it as it is (no project on a new task); `Some(None)` removes it.
+    pub project_id: Option<Option<String>>,
     pub due_at: Option<String>,
 }
 
@@ -1113,6 +1119,8 @@ impl From<CollaborationTaskRow> for CollaborationTask {
                 email: Some(row.creator_email),
             },
             artifact_id: row.artifact_id,
+            project_id: row.project_id,
+            project_name: row.project_name,
             due_at: row.due_at,
             completed_at: row.completed_at,
             created_at: row.created_at,

@@ -35,6 +35,7 @@ mod onboarding;
 mod operations;
 mod organization_templates;
 mod performance;
+mod projects;
 mod review_ownership;
 mod revision_attribution;
 mod revision_limits;
