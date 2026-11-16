@@ -181,6 +181,30 @@ export interface TaskPage {
   next_offset: number | null;
 }
 
+/**
+ * What happened to one task in a bulk change (V0.7.14). `outcome` is `ok`, `refused` or `unchanged`; a refused task is left
+ * exactly as it was and `reason` says why. In a preview `ok` means "would be changed".
+ */
+export interface BulkItem {
+  task_id: string;
+  key: string;
+  title: string;
+  outcome: string;
+  reason: string | null;
+  /** The task after the change (applied changes only). */
+  task: CollaborationTask | null;
+}
+
+/** The result of a bulk change, preview or applied: an outcome for every task named. */
+export interface BulkResult {
+  dry_run: boolean;
+  requested: number;
+  succeeded: number;
+  refused: number;
+  unchanged: number;
+  items: BulkItem[];
+}
+
 /** One column of the board (V0.7.13): a workflow state, how many tasks match the board's filters in it, and the first of them. */
 export interface BoardColumn {
   state: WorkflowState;

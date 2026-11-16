@@ -198,6 +198,30 @@ pub struct TaskPage {
     pub next_offset: Option<i64>,
 }
 
+/// What happened to one task in a bulk change (V0.7.14). `outcome` is `ok`, `refused` or `unchanged`; a refused task is left
+/// exactly as it was and `reason` says why. In a preview `ok` means "would be changed".
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BulkItem {
+    pub task_id: String,
+    pub key: String,
+    pub title: String,
+    pub outcome: String,
+    pub reason: Option<String>,
+    /// The task after the change (applied changes only).
+    pub task: Option<CollaborationTask>,
+}
+
+/// The result of a bulk change, preview or applied: an outcome for every task named.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BulkResult {
+    pub dry_run: bool,
+    pub requested: i64,
+    pub succeeded: i64,
+    pub refused: i64,
+    pub unchanged: i64,
+    pub items: Vec<BulkItem>,
+}
+
 /// One column of the board (V0.7.13): a workflow state, how many tasks match the board's filters in it, and the first of them.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoardColumn {

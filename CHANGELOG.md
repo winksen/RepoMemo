@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.14 (2026-11-17)
+
+Change many tasks at once, previewed first, with an honest outcome for every task.
+
+### Added
+- **A bulk change** (`POST /v1/workspaces/{id}/tasks/bulk`) for up to 100 tasks: an assignee (an empty string unassigns), labels to add or remove, and a milestone (an empty string removes it).
+- **A preview.** `dry_run` runs the same checks and writes nothing, reporting for each task whether it would change, would not, or would be refused, with the reason.
+- **An outcome for every task.** The answer lists each task as `ok`, `unchanged` or `refused` with a `reason` and, once applied, the task after the change, plus the counts. A refused task is left exactly as it was and the other tasks still go through, so a client keeps the refused ones selected.
+- **Checked for each task.** The task must belong to the workspace (another workspace's task is "not found", never confirmed); an `expected_versions` entry, when sent, must still be current, so a task that someone changed since it was shown is refused and not overwritten; a milestone must be in the task's project; a task carries at most ten labels. The assignment and milestone are one version-checked save, the same as `PUT /v1/tasks/{id}`, and labels follow once it has gone through.
+- **What is wrong for every task is a bad request**, not many refusals: no change named, a label both added and removed, an assignee who is not a member, a milestone or label of another workspace, no tasks or more than 100. A reader gets `403`.
+- A new assignee is told once for each task they are given, and the change is written to the activity feed as one entry.
+- A server test (`tests/task_bulk.rs`) follows a preview that writes nothing, an applied change with one refusal left untouched, the assignee told once for each task, a repeat that changes nothing, a stale version refused for one task while the other goes through, adding and removing labels, the limit of ten, an unknown and a foreign task, and the bad requests.
+- **Not in this release:** the web selection and preview screens.
+- No migration.
+
+### Checks
+- Version, migration lock (75 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.7.13 (2026-11-17)
 
 Show the board and the list from one query, and make moving a card an ordinary checked save that can be undone by the client.

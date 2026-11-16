@@ -43,6 +43,7 @@ mod revision_limits;
 mod search_feedback;
 mod system;
 mod task_board;
+mod task_bulk;
 mod task_conflicts;
 mod task_dependencies;
 mod task_details;

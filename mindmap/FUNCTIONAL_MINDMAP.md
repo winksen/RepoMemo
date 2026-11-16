@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.14 — Add previewed multi-task assignment, labels and milestone updates.
+
+- Many tasks can be given an assignee, labels or a milestone together. The person sees a preview first, then an outcome for each task: a task that was changed meanwhile, is in another project or would have too many labels is refused and left as it was while the others still change.
+
+Checks: `tests/task_bulk.rs` compiles; not executed; static checks pass.
 
 ## V0.7.13 — Use the same query/view model for the board with keyboard status movement.
 

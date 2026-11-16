@@ -497,6 +497,30 @@ pub(crate) struct TaskReferenceInput {
     pub(crate) note: String,
 }
 
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub(crate) struct BulkTaskChanges {
+    /// The new assignee for every task; an empty string unassigns. Left out, assignees are untouched.
+    pub(crate) assignee_user_id: Option<String>,
+    pub(crate) add_label_ids: Vec<String>,
+    pub(crate) remove_label_ids: Vec<String>,
+    /// The milestone for every task (each must be in the milestone's project); an empty string removes it.
+    pub(crate) milestone_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct BulkTasksRequest {
+    /// Up to 100 task ids.
+    pub(crate) task_ids: Vec<String>,
+    pub(crate) changes: BulkTaskChanges,
+    /// The `version` of each task as it was shown, by task id. A task that has moved on is refused, not overwritten.
+    #[serde(default)]
+    pub(crate) expected_versions: std::collections::BTreeMap<String, i64>,
+    /// Report what would happen and write nothing.
+    #[serde(default)]
+    pub(crate) dry_run: bool,
+}
+
 #[derive(Debug, Deserialize)]
 pub(crate) struct MoveTaskRequest {
     /// The column to move the task to: a built-in category name or the id of a named state.
