@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.15` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.15 — Add task due/overdue reminders through the existing inbox and digests.
+
+- The person a task is assigned to gets one notice when it falls due and one when it is overdue, in the inbox, by mail and in the daily digest as they chose. Dates are UTC, finished work sends nothing, a repeated pass sends nothing twice and moving the due date sends one new reminder.
+
+Checks: `tests/task_reminders.rs` and the due-rule unit tests compile; not executed; static checks pass.
 
 ## V0.7.14 — Add previewed multi-task assignment, labels and milestone updates.
 

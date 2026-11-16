@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.15 (2026-11-17)
+
+Tell the person a task is assigned to when it falls due and when it is overdue, once each, through the notices they already choose.
+
+### Added
+- **Due and overdue reminders.** The periodic maintenance pass (and `POST /v1/system/maintenance/run`) sends the assignee of an open task one notice when it falls due and one when it is overdue, to the inbox and by mail as they chose. The inbox notices (`task_due`, `task_overdue`) lead to the task's page and are carried by the existing daily digest like any unread notice.
+- **A notification choice of its own**, **A task assigned to you is due or overdue** (kind `task_due`; in-app, mail, both or none, both by default), next to the assignment and mention choices.
+- **Time and dates are defined.** Everything is UTC. A due date without a time is due from 00:00 UTC that day and overdue from 00:00 UTC the next; a due time is due from 24 hours before it and overdue once it has passed. The milestone counts use the same rule.
+- **Completed work is excluded**, and so are tasks with no assignee and assignees who were deactivated, whose membership ended or who left the workspace.
+- **No duplicates.** A reminder is claimed in a ledger before it is sent, one row for each task, person and kind with the due value it was sent for, so a second pass, a retry and a restart send nothing twice; moving the due date allows one new reminder. When nothing could be delivered the claim is given back and the next pass tries again; a person who chose "none" is not asked again.
+- Migration **0076** adds `task_reminders` (removed with its task, person or workspace).
+- A server test (`tests/task_reminders.rs`) and unit tests of the due/overdue rule follow an overdue, a due-today, a later, a finished and an unassigned task, repeated passes, a moved due date, a new assignee, a task completed before a pass and a person who turned the notice off.
+- No web screen is needed beyond the inbox that already shows notices.
+
+### Checks
+- Version, migration lock (76 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new tests compile; **they were not executed**, and no mail was sent. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. After the first maintenance pass, people with tasks already due or overdue get one notice for each; turn the choice off in the profile to avoid it.
+
 ## V0.7.14 (2026-11-17)
 
 Change many tasks at once, previewed first, with an honest outcome for every task.

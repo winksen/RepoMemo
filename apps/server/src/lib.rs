@@ -63,6 +63,7 @@ mod task_hierarchy;
 mod task_labels;
 mod task_list;
 mod task_references;
+mod task_reminders;
 mod templates;
 mod trash;
 mod verification;

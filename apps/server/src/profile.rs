@@ -124,8 +124,9 @@ pub(crate) async fn update_profile(
 
 /// The kinds of notice a person chooses a channel for. Security notices
 /// (password resets) always reach the app and the mail: they are not here.
-const CHOOSABLE_KINDS: [(&str, &str); 5] = [
+const CHOOSABLE_KINDS: [(&str, &str); 6] = [
     ("task_assigned", "A task is assigned to you"),
+    ("task_due", "A task assigned to you is due or overdue"),
     ("task_comment", "A task you follow has a new comment"),
     ("review_due", "A review assigned to you is overdue"),
     (

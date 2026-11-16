@@ -186,6 +186,13 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         Err(error) => failed(&mut report, "review reminders", error),
     }
 
+    // The people whose tasks are due or overdue are told once for each due date.
+    match crate::task_reminders::send_due(state).await {
+        Ok(0) => {}
+        Ok(count) => tracing::info!(count, "Task reminders were sent"),
+        Err(error) => failed(&mut report, "task reminders", error),
+    }
+
     // Access to a workspace ends at a guest's end date whether or not this has run; it writes the end to the trail.
     if let Err(error) = storage.record_expired_guests().await {
         failed(&mut report, "guest expiry", error);
