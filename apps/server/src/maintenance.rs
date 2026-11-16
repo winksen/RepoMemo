@@ -186,6 +186,13 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         Err(error) => failed(&mut report, "review reminders", error),
     }
 
+    // Recurring tasks make the tasks that are owed, once for each occurrence date.
+    match crate::recurring::make_due(state).await {
+        Ok(0) => {}
+        Ok(count) => tracing::info!(count, "Recurring tasks made tasks"),
+        Err(error) => failed(&mut report, "recurring tasks", error),
+    }
+
     // The people whose tasks are due or overdue are told once for each due date.
     match crate::task_reminders::send_due(state).await {
         Ok(0) => {}

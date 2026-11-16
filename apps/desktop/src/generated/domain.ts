@@ -182,6 +182,69 @@ export interface TaskPage {
 }
 
 /**
+ * When a recurring task is made (V0.7.16): a kind (`daily`, `weekly` on a weekday, `monthly` on a day 1 to 28), an interval
+ * and a start date. Every occurrence is a calendar date in UTC.
+ */
+export interface RecurringSchedule {
+  kind: string;
+  /** Every this many days, weeks or months (1 to 60). */
+  interval: number;
+  /** Weekly: 0 (Monday) to 6 (Sunday). */
+  weekday: number | null;
+  /** Monthly: 1 to 28, so every month has the day. */
+  day_of_month: number | null;
+  /** YYYY-MM-DD; the first occurrence is on or after it. */
+  start_date: string;
+}
+
+/**
+ * A task that is made again on a schedule (V0.7.16). `missed_policy` says what happens when occurrences were due while nothing
+ * ran: `latest` makes only the newest missed one, `skip` makes one only on its own day. Nothing is made while it is paused, and
+ * a stopped one keeps every task it made.
+ */
+export interface RecurringTask {
+  id: string;
+  workspace_id: string;
+  title: string;
+  description: string;
+  priority: string;
+  assignee: SharedUser | null;
+  project_id: string | null;
+  /** Each task made is due this many days after its occurrence date; none means no due date. */
+  due_after_days: number | null;
+  schedule: RecurringSchedule;
+  missed_policy: string;
+  /** `active`, `paused` or `stopped`. */
+  status: string;
+  /** Every occurrence up to and including this date has been made or skipped. */
+  processed_through: string;
+  /** The next occurrence dates from today, so the schedule can be checked before it runs. */
+  next_occurrences: string[];
+  occurrences_made: number;
+  created_by: SharedUser | null;
+  created_at: string;
+  updated_at: string;
+  stopped_at: string | null;
+}
+
+/** One occurrence date that was looked at: made (with its task) or skipped. */
+export interface RecurringOccurrence {
+  occurrence_date: string;
+  /** `created` or `skipped`. */
+  outcome: string;
+  task_id: string | null;
+  task_key: string | null;
+  task_title: string | null;
+  task_status: string | null;
+}
+
+/** A recurring task with the occurrences it has looked at, newest first. */
+export interface RecurringDetail {
+  recurring: RecurringTask;
+  occurrences: RecurringOccurrence[];
+}
+
+/**
  * What happened to one task in a bulk change (V0.7.14). `outcome` is `ok`, `refused` or `unchanged`; a refused task is left
  * exactly as it was and `reason` says why. In a preview `ok` means "would be changed".
  */

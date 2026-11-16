@@ -364,6 +364,13 @@
 | GET | `/v1/workspaces/{workspace_id}/task-board` | auth | require_workspace_read | — (the list's filters, `?column_limit=`) | TaskBoard |
 | POST | `/v1/tasks/{task_id}/move` | auth | require_workspace_write | MoveTaskRequest | CollaborationTask (`409` with the current task when stale) |
 | POST | `/v1/workspaces/{workspace_id}/tasks/bulk` | auth | require_workspace_write | BulkTasksRequest | BulkResult |
+| GET | `/v1/workspaces/{workspace_id}/recurring-tasks` | auth | require_workspace_read | — | Vec<RecurringTask> |
+| POST | `/v1/workspaces/{workspace_id}/recurring-tasks` | auth | require_workspace_write | SaveRecurringTaskRequest | RecurringTask |
+| GET | `/v1/recurring-tasks/{recurring_id}` | auth | require_workspace_read | — | RecurringDetail |
+| PUT | `/v1/recurring-tasks/{recurring_id}` | auth | require_workspace_write | SaveRecurringTaskRequest | RecurringTask (`409` when stopped) |
+| POST | `/v1/recurring-tasks/{recurring_id}/pause` | auth | require_workspace_write | — | RecurringTask |
+| POST | `/v1/recurring-tasks/{recurring_id}/resume` | auth | require_workspace_write | — | RecurringTask |
+| POST | `/v1/recurring-tasks/{recurring_id}/stop` | auth | require_workspace_write | — | RecurringTask |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — (`?label=`) | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

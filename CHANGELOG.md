@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.16 (2026-11-18)
+
+Make a task again on an explicit schedule, once for each occurrence, with a stated policy for what was missed.
+
+### Added
+- **Recurring tasks** (`/v1/workspaces/{id}/recurring-tasks`, `/v1/recurring-tasks/{id}`): a title, description, priority, assignee, project and an optional number of days until due, made on a schedule that is `daily`, `weekly` (on a weekday) or `monthly` (on a day from 1 to 28, so every month has it), every 1 to 60 days, weeks or months from a start date. The answer lists the next five dates, so a schedule is checked before it runs. Dates are calendar dates in UTC.
+- **An occurrence identity.** An occurrence is a date, and (recurring task, date) is its key. The maintenance pass makes what is owed in one transaction for each schedule (the occurrence records, the new tasks and the date looked at through), so a repeated pass, a retry or a restart cannot make a task twice, and a crash cannot leave one half made.
+- **A missed-run policy, documented.** When several occurrences were owed (the server was off, or the start date is in the past), `latest` (the default) makes only the newest and records the others as skipped; `skip` makes one only on its own day. Neither makes a flood of old tasks. At most 400 dates are looked back over.
+- **Pause, resume and stop.** A paused schedule makes nothing, and resuming does not make up the time it was paused. Stopping is final and **deletes nothing**: every task it made stays, and the schedule still lists every occurrence, made or skipped, with its task. A stopped schedule is not edited or restarted (`409`); an edit to an active one never makes the past again.
+- Each task made is open, has the schedule's assignee and project, is due the stated number of days after its occurrence date and says which date made it. Its assignee is told as for any assignment, and it is written to the activity feed.
+- Migration **0077** adds `recurring_tasks` and `recurring_occurrences`.
+- A server test (`tests/recurring.rs`) and unit tests of the date rules follow the refused schedules, the newest-only policy and the skip policy, repeated passes, the record of made and skipped dates, pausing and resuming, stopping with its history kept, and an edit that does not remake the past.
+- **Not in this release:** the web screens. Time of day is not part of a schedule (each occurrence is a date).
+
+### Checks
+- Version, migration lock (77 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new tests compile; **they were not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. Nothing is scheduled until someone makes a recurring task.
+
 ## V0.7.15 (2026-11-17)
 
 Tell the person a task is assigned to when it falls due and when it is overdue, once each, through the notices they already choose.

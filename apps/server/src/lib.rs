@@ -43,6 +43,7 @@ mod organizations;
 mod profile;
 mod projects;
 mod quotas;
+mod recurring;
 mod repositories;
 mod requests;
 mod retrieval;
@@ -977,6 +978,26 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(task_list::get_task_board),
         )
         .route("/v1/tasks/{task_id}/move", post(task_list::move_task))
+        .route(
+            "/v1/workspaces/{workspace_id}/recurring-tasks",
+            get(recurring::list_recurring_tasks).post(recurring::create_recurring_task),
+        )
+        .route(
+            "/v1/recurring-tasks/{recurring_id}",
+            get(recurring::get_recurring_task).put(recurring::update_recurring_task),
+        )
+        .route(
+            "/v1/recurring-tasks/{recurring_id}/pause",
+            post(recurring::pause_recurring_task),
+        )
+        .route(
+            "/v1/recurring-tasks/{recurring_id}/resume",
+            post(recurring::resume_recurring_task),
+        )
+        .route(
+            "/v1/recurring-tasks/{recurring_id}/stop",
+            post(recurring::stop_recurring_task),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/tasks/bulk",
             post(task_bulk::bulk_update_tasks),

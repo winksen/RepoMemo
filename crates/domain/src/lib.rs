@@ -198,6 +198,71 @@ pub struct TaskPage {
     pub next_offset: Option<i64>,
 }
 
+/// When a recurring task is made (V0.7.16): a kind (`daily`, `weekly` on a weekday, `monthly` on a day 1 to 28), an interval
+/// and a start date. Every occurrence is a calendar date in UTC.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecurringSchedule {
+    pub kind: String,
+    /// Every this many days, weeks or months (1 to 60).
+    pub interval: i64,
+    /// Weekly: 0 (Monday) to 6 (Sunday).
+    #[serde(default)]
+    pub weekday: Option<i64>,
+    /// Monthly: 1 to 28, so every month has the day.
+    #[serde(default)]
+    pub day_of_month: Option<i64>,
+    /// YYYY-MM-DD; the first occurrence is on or after it.
+    pub start_date: String,
+}
+
+/// A task that is made again on a schedule (V0.7.16). `missed_policy` says what happens when occurrences were due while nothing
+/// ran: `latest` makes only the newest missed one, `skip` makes one only on its own day. Nothing is made while it is paused, and
+/// a stopped one keeps every task it made.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecurringTask {
+    pub id: String,
+    pub workspace_id: String,
+    pub title: String,
+    pub description: String,
+    pub priority: String,
+    pub assignee: Option<SharedUser>,
+    pub project_id: Option<String>,
+    /// Each task made is due this many days after its occurrence date; none means no due date.
+    pub due_after_days: Option<i64>,
+    pub schedule: RecurringSchedule,
+    pub missed_policy: String,
+    /// `active`, `paused` or `stopped`.
+    pub status: String,
+    /// Every occurrence up to and including this date has been made or skipped.
+    pub processed_through: String,
+    /// The next occurrence dates from today, so the schedule can be checked before it runs.
+    pub next_occurrences: Vec<String>,
+    pub occurrences_made: i64,
+    pub created_by: Option<SharedUser>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub stopped_at: Option<String>,
+}
+
+/// One occurrence date that was looked at: made (with its task) or skipped.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecurringOccurrence {
+    pub occurrence_date: String,
+    /// `created` or `skipped`.
+    pub outcome: String,
+    pub task_id: Option<String>,
+    pub task_key: Option<String>,
+    pub task_title: Option<String>,
+    pub task_status: Option<String>,
+}
+
+/// A recurring task with the occurrences it has looked at, newest first.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecurringDetail {
+    pub recurring: RecurringTask,
+    pub occurrences: Vec<RecurringOccurrence>,
+}
+
 /// What happened to one task in a bulk change (V0.7.14). `outcome` is `ok`, `refused` or `unchanged`; a refused task is left
 /// exactly as it was and `reason` says why. In a preview `ok` means "would be changed".
 #[derive(Debug, Clone, Serialize, Deserialize)]

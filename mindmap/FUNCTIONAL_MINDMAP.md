@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.15` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.16` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.16 — Create recurring tasks from explicit schedules with an occurrence identity.
+
+- A task can come back on a schedule (daily, weekly or monthly), with the next dates shown before it runs. Each occurrence makes one task however often the server restarts; missed days follow the stated policy; pausing makes nothing and makes nothing up; stopping ends the schedule and keeps every task and the record of each occurrence.
+
+Checks: `tests/recurring.rs` and the date-rule unit tests compile; not executed; static checks pass.
 
 ## V0.7.15 — Add task due/overdue reminders through the existing inbox and digests.
 

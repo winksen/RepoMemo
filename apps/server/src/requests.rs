@@ -497,6 +497,30 @@ pub(crate) struct TaskReferenceInput {
     pub(crate) note: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct SaveRecurringTaskRequest {
+    pub(crate) title: String,
+    #[serde(default)]
+    pub(crate) description: String,
+    /// low, medium (the default), high or urgent.
+    #[serde(default)]
+    pub(crate) priority: Option<String>,
+    #[serde(default)]
+    pub(crate) assignee_user_id: Option<String>,
+    #[serde(default)]
+    pub(crate) project_id: Option<String>,
+    /// Each task is due this many days after its occurrence date (0 to 365); left out, it has no due date.
+    #[serde(default)]
+    pub(crate) due_after_days: Option<i64>,
+    pub(crate) schedule: repomemo_domain::RecurringSchedule,
+    /// `latest` (the default) or `skip`.
+    #[serde(default)]
+    pub(crate) missed_policy: Option<String>,
+    /// Make it paused: nothing is made until it is resumed.
+    #[serde(default)]
+    pub(crate) paused: bool,
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub(crate) struct BulkTaskChanges {

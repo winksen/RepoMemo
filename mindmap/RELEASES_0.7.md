@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.7 → 0.8 (proposed)
 
-> **Current:** `V0.7.15` (2026-11-17)
+> **Current:** `V0.7.16` (2026-11-18)
 
 > **Theme:** Projects connected to their evidence · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -35,7 +35,7 @@
 | **V0.7.13** | ✅ 2026-11-17 | AK. Project execution | 🔧 | Task board | Use the same query/view model for the board with keyboard status movement | Board and list show the same filtered work; movement preserves focus and failed changes roll back visibly |
 | **V0.7.14** | ✅ 2026-11-17 | AK. Project execution | 🔧 | Bulk work | Add previewed multi-task assignment, labels and milestone updates | Each item reports success or refusal, failed items remain selected and authorization/concurrency are checked per task |
 | **V0.7.15** | ✅ 2026-11-17 | AK. Project execution | ✨ | Due reminders | Add task due/overdue reminders through the existing inbox and digests | Timezone and date-only behavior are defined, completed work is excluded and retries do not duplicate notifications |
-| **V0.7.16** | 🔜 | AK. Project execution | ✨ | Recurring work | Create recurring tasks from explicit schedules with an occurrence identity | Retries and restarts create only one occurrence, missed runs have a documented policy and a recurring task can be stopped without deleting history |
+| **V0.7.16** | ✅ 2026-11-18 | AK. Project execution | ✨ | Recurring work | Create recurring tasks from explicit schedules with an occurrence identity | Retries and restarts create only one occurrence, missed runs have a documented policy and a recurring task can be stopped without deleting history |
 | **V0.7.17** | 🔜 | AK. Project execution | ✨ | Project updates | Publish attributed project status updates with milestone, blocker and evidence links | A reader can inspect what changed and why the lead chose on-track/at-risk/blocked; updates are authored or confirmed by a person |
 | **V0.7.18** | 🔜 | AK. Project execution | ✨ | CSV migration | Import and export task CSV with field mapping and a dry-run report | Invalid rows and unknown assignees are explained before commit; retries avoid duplicates and exported cells are safe to open in spreadsheets |
 | **V0.7.19** | 🔜 | AK. Project execution | 🔧 | Project portability | Extend workspace archives for projects, task relations, comments, workflow and schedules | Round-trip retains relationships, rejects cross-workspace references and imports schedules paused pending explicit activation |
