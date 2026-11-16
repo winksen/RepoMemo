@@ -498,6 +498,18 @@ pub(crate) struct TaskReferenceInput {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct SaveTaskViewRequest {
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) query: repomemo_domain::TaskQuery,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SetViewSharingRequest {
+    pub(crate) shared: bool,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct SaveWorkflowStateRequest {
     pub(crate) name: String,
     /// `open`, `in_progress`, `blocked` or `done`.

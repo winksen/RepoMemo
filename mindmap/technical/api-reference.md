@@ -355,6 +355,12 @@
 | POST | `/v1/workspaces/{workspace_id}/workflow/states` | auth | require_workspace_admin | SaveWorkflowStateRequest | WorkflowState |
 | PUT | `/v1/workflow-states/{state_id}` | auth | require_workspace_admin | SaveWorkflowStateRequest | WorkflowState |
 | DELETE | `/v1/workflow-states/{state_id}` | auth | require_workspace_admin | — (`?move_to=`) | — (`409` until tasks have a place) |
+| GET | `/v1/workspaces/{workspace_id}/task-list` | auth | require_workspace_read | — (`?project_id=&milestone_id=&assignee=&priority=&status=&label=&due_before=&due_after=&overdue=&q=&sort=&limit=&offset=&view=`) | TaskPage |
+| GET | `/v1/workspaces/{workspace_id}/task-views` | auth | require_workspace_read | — | Vec<TaskView> |
+| POST | `/v1/workspaces/{workspace_id}/task-views` | auth | require_workspace_read | SaveTaskViewRequest | TaskView |
+| PUT | `/v1/task-views/{view_id}` | auth | require_workspace_read (owner) | SaveTaskViewRequest | TaskView |
+| DELETE | `/v1/task-views/{view_id}` | auth | require_workspace_read (owner) | — | — |
+| PUT | `/v1/task-views/{view_id}/sharing` | auth | require_workspace_read (owner) | SetViewSharingRequest | TaskView |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — (`?label=`) | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

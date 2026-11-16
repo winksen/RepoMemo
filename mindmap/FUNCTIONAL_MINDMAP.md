@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.11` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.7.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.7.12 — Add a paged task list with saved filters for project, milestone, assignee, priority, label and due date.
+
+- The task list can be read a page at a time and filtered by project, milestone, assignee, priority, status, label, due date or title words. A filter can be saved as a view, private until shared; a view keeps only filters, so it always shows each reader what their own access allows, and "me" means whoever opens it.
+
+Checks: `tests/task_list.rs` compiles; not executed; static checks pass.
 
 ## V0.7.11 — Allow named workflow states mapped to stable open/in-progress/blocked/done categories.
 

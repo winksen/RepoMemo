@@ -145,6 +145,53 @@ export interface TaskDetail {
 }
 
 /**
+ * The filters of the task list (V0.7.12), and what a saved view stores. Only filters: a view never holds task ids or
+ * rights, so it is evaluated against the reader's current access every time. `assignee` is a user id, `me` or `none`;
+ * `project_id` and `milestone_id` may be `none`.
+ */
+export interface TaskQuery {
+  project_id: string | null;
+  milestone_id: string | null;
+  assignee: string | null;
+  priority: string[];
+  status: string[];
+  label_id: string | null;
+  /** Calendar dates (YYYY-MM-DD): due on or before / on or after. */
+  due_before: string | null;
+  due_after: string | null;
+  /** Not done and past its own due date. */
+  overdue: boolean;
+  /** Words in the title. */
+  q: string | null;
+  /** `priority` (the usual order), `due`, `updated` or `number`. */
+  sort: string | null;
+}
+
+/**
+ * A page of tasks (V0.7.12). `total` counts every task that matches; `next_offset` is where the next page starts, none on the
+ * last.
+ */
+export interface TaskPage {
+  tasks: CollaborationTask[];
+  total: number;
+  limit: number;
+  offset: number;
+  next_offset: number | null;
+}
+
+/** A named set of filters (V0.7.12), private to its owner until shared with the workspace. */
+export interface TaskView {
+  id: string;
+  workspace_id: string;
+  name: string;
+  query: TaskQuery;
+  shared: boolean;
+  owner: SharedUser;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * A state a task can be in (V0.7.11), mapped to one stable category. The four built-in states always exist (their `id` is
  * the category); a workspace can add named ones. Reports and integrations read `category`, never the name.
  */

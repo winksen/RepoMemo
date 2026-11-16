@@ -162,6 +162,53 @@ pub struct TaskDetail {
     pub dependencies: TaskDependencies,
 }
 
+/// The filters of the task list (V0.7.12), and what a saved view stores. Only filters: a view never holds task ids or
+/// rights, so it is evaluated against the reader's current access every time. `assignee` is a user id, `me` or `none`;
+/// `project_id` and `milestone_id` may be `none`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TaskQuery {
+    pub project_id: Option<String>,
+    pub milestone_id: Option<String>,
+    pub assignee: Option<String>,
+    pub priority: Vec<String>,
+    pub status: Vec<String>,
+    pub label_id: Option<String>,
+    /// Calendar dates (YYYY-MM-DD): due on or before / on or after.
+    pub due_before: Option<String>,
+    pub due_after: Option<String>,
+    /// Not done and past its own due date.
+    pub overdue: bool,
+    /// Words in the title.
+    pub q: Option<String>,
+    /// `priority` (the usual order), `due`, `updated` or `number`.
+    pub sort: Option<String>,
+}
+
+/// A page of tasks (V0.7.12). `total` counts every task that matches; `next_offset` is where the next page starts, none on the
+/// last.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskPage {
+    pub tasks: Vec<CollaborationTask>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+    pub next_offset: Option<i64>,
+}
+
+/// A named set of filters (V0.7.12), private to its owner until shared with the workspace.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskView {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub query: TaskQuery,
+    pub shared: bool,
+    pub owner: SharedUser,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 /// The four stable categories every workflow state maps to, and the built-in state of each.
 pub const BUILTIN_STATE_CATEGORIES: [&str; 4] = ["open", "in_progress", "blocked", "done"];
 

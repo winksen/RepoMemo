@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.7 → 0.8 (proposed)
 
-> **Current:** `V0.7.11` (2026-11-17)
+> **Current:** `V0.7.12` (2026-11-17)
 
 > **Theme:** Projects connected to their evidence · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -31,7 +31,7 @@
 | **V0.7.9** | ✅ 2026-11-17 | AK. Project execution | ✨ | Dependencies | Add blocks/blocked-by links and a clear blocker explanation | Self-links and cycles are refused; closing a blocker updates the indication without automatically completing dependent work |
 | **V0.7.10** | ✅ 2026-11-17 | AK. Project execution | ✨ | Labels | Add workspace-managed task labels with accessible colors and filters | Labels can be renamed/merged without losing assignments and labels cannot be used as an access-control substitute |
 | **V0.7.11** | ✅ 2026-11-17 | AK. Project execution | ✨ | Workflows | Allow named workflow states mapped to stable open/in-progress/blocked/done categories | Existing four states migrate unchanged; reporting and integrations use explicit category mappings, and removal requires remapping occupied states |
-| **V0.7.12** | 🔜 | AK. Project execution | ✨ | Task list | Add a paged task list with saved filters for project, milestone, assignee, priority, label and due date | Saved views re-evaluate current rights; URLs retain the chosen view and large lists do not require downloading all tasks |
+| **V0.7.12** | ✅ 2026-11-17 | AK. Project execution | ✨ | Task list | Add a paged task list with saved filters for project, milestone, assignee, priority, label and due date | Saved views re-evaluate current rights; URLs retain the chosen view and large lists do not require downloading all tasks |
 | **V0.7.13** | 🔜 | AK. Project execution | 🔧 | Task board | Use the same query/view model for the board with keyboard status movement | Board and list show the same filtered work; movement preserves focus and failed changes roll back visibly |
 | **V0.7.14** | 🔜 | AK. Project execution | 🔧 | Bulk work | Add previewed multi-task assignment, labels and milestone updates | Each item reports success or refusal, failed items remain selected and authorization/concurrency are checked per task |
 | **V0.7.15** | 🔜 | AK. Project execution | ✨ | Due reminders | Add task due/overdue reminders through the existing inbox and digests | Timezone and date-only behavior are defined, completed work is excluded and retries do not duplicate notifications |

@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.12 (2026-11-17)
+
+Read a workspace's tasks a page at a time through one query model, and keep named filters as views that never carry rights.
+
+### Added
+- **A paged task list** (`GET /v1/workspaces/{id}/task-list`): `limit` (1 to 200, default 50) and `offset`; the answer holds `tasks`, `total` and `next_offset`, so a large list is never downloaded whole. Every order ends on the task number, so pages do not shuffle or repeat.
+- **One query model.** Filters by `project_id` and `milestone_id` (or `none`), `assignee` (a user id, `me` or `none`), `priority` and `status` (comma-separated), `label`, `due_before` and `due_after` (inclusive dates), `overdue`, `q` (words in the title; `%` and `_` are plain text) and `sort`, combined with "and". Anything else is `400` with the reason. The unpaged `GET …/tasks` is unchanged, and the board of the next release uses this same query.
+- **Saved views** (`/v1/workspaces/{id}/task-views`, `/v1/task-views/{id}`): a name and the filters, nothing else: no task ids and no rights. `?view={id}` applies one and any other parameter replaces the view's own, so a link keeps the chosen view and can still be adjusted. `me` is whoever reads it.
+- **A view re-evaluates current rights.** Every use checks the reader's access to the workspace at that moment: a person who has lost it gets `403` and nothing from a view they saved or were shown. A view is private to its owner until they share it with the workspace; a shared view is read by everyone there and changed or removed only by its owner (a reader cannot reach a private one, and a shared one answers `403` to a change). Anyone who can read the workspace can keep up to 50 views.
+- Migration **0075** adds `saved_task_views`.
+- A server test (`tests/task_list.rs`) follows paging across seven tasks with no repeats, every filter alone and together, the refused parameters, a stranger, a private and then shared view, `me` for two readers, an override, a view in another reader's hands and removal.
+- **Not in this release:** the web list and the saved-view picker.
+
+### Checks
+- Version, migration lock (75 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**, so the dynamic SQL has not run. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. Nothing changes for existing callers.
+
 ## V0.7.11 (2026-11-17)
 
 Let a workspace name its own task states while every report keeps reading the four stable ones.

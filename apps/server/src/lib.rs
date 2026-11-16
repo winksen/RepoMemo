@@ -60,6 +60,7 @@ mod task_dependencies;
 mod task_discussion;
 mod task_hierarchy;
 mod task_labels;
+mod task_list;
 mod task_references;
 mod templates;
 mod trash;
@@ -965,6 +966,22 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             delete(task_references::remove_task_reference),
         )
         .route("/v1/tasks/{task_id}/children", get(task_hierarchy::list_child_tasks))
+        .route(
+            "/v1/workspaces/{workspace_id}/task-list",
+            get(task_list::list_task_page),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/task-views",
+            get(task_list::list_task_views).post(task_list::create_task_view),
+        )
+        .route(
+            "/v1/task-views/{view_id}",
+            put(task_list::update_task_view).delete(task_list::delete_task_view),
+        )
+        .route(
+            "/v1/task-views/{view_id}/sharing",
+            put(task_list::set_task_view_sharing),
+        )
         .route("/v1/workspaces/{workspace_id}/workflow", get(workflow::get_workflow))
         .route(
             "/v1/workspaces/{workspace_id}/workflow/states",
