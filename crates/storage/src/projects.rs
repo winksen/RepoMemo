@@ -20,7 +20,11 @@ const SELECT_PROJECT: &str = r#"
            owner.id AS owner_id, owner.display_name AS owner_name, owner.email AS owner_email,
            creator.id AS creator_id, creator.display_name AS creator_name, creator.email AS creator_email,
            (SELECT COUNT(*) FROM workspace_tasks AS task WHERE task.project_id = project.id) AS task_count,
-           (SELECT COUNT(*) FROM workspace_tasks AS task WHERE task.project_id = project.id AND task.status != 'done') AS open_task_count
+           (SELECT COUNT(*) FROM workspace_tasks AS task WHERE task.project_id = project.id AND task.status != 'done') AS open_task_count,
+           (SELECT health FROM project_updates AS latest WHERE latest.project_id = project.id AND latest.retracted_at IS NULL
+              ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1) AS health,
+           (SELECT created_at FROM project_updates AS latest WHERE latest.project_id = project.id AND latest.retracted_at IS NULL
+              ORDER BY latest.created_at DESC, latest.id DESC LIMIT 1) AS health_updated_at
     FROM workspace_projects AS project
     LEFT JOIN users AS owner ON owner.id = project.owner_user_id
     LEFT JOIN users AS creator ON creator.id = project.created_by_user_id"#;
@@ -46,6 +50,8 @@ fn project_from(row: &SqliteRow) -> Project {
         target_date: row.get("target_date"),
         task_count: row.get("task_count"),
         open_task_count: row.get("open_task_count"),
+        health: row.get("health"),
+        health_updated_at: row.get("health_updated_at"),
         archived_at: row.get("archived_at"),
         created_at: row.get("created_at"),
         updated_at: row.get("updated_at"),

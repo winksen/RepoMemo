@@ -41,6 +41,7 @@ mod onboarding;
 mod organization_templates;
 mod organizations;
 mod profile;
+mod project_updates;
 mod projects;
 mod quotas;
 mod recurring;
@@ -934,6 +935,22 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/projects/{project_id}/archive", post(projects::archive_project))
         .route("/v1/projects/{project_id}/restore", post(projects::restore_project))
+        .route(
+            "/v1/projects/{project_id}/updates",
+            get(project_updates::list_project_updates).post(project_updates::publish_project_update),
+        )
+        .route(
+            "/v1/projects/{project_id}/update-draft",
+            get(project_updates::get_project_update_draft),
+        )
+        .route(
+            "/v1/project-updates/{update_id}",
+            get(project_updates::get_project_update),
+        )
+        .route(
+            "/v1/project-updates/{update_id}/retract",
+            post(project_updates::retract_project_update),
+        )
         .route(
             "/v1/projects/{project_id}/milestones",
             get(milestones::list_milestones).post(milestones::create_milestone),

@@ -498,6 +498,26 @@ pub(crate) struct TaskReferenceInput {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct SaveProjectUpdateRequest {
+    /// `on_track`, `at_risk` or `blocked`: the author's choice, always sent.
+    pub(crate) health: String,
+    /// What changed.
+    pub(crate) summary: String,
+    /// Why this health.
+    pub(crate) reason: String,
+    /// Milestones of the project the update points at.
+    #[serde(default)]
+    pub(crate) milestone_ids: Vec<String>,
+    /// Tasks the update points at, such as the blockers.
+    #[serde(default)]
+    pub(crate) task_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) evidence_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) memory_card_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct SaveRecurringTaskRequest {
     pub(crate) title: String,
     #[serde(default)]

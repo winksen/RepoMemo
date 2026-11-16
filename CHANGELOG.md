@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.7.17 (2026-11-18)
+
+Let a person publish where a project stands, with the health they chose, why, and what it rests on.
+
+### Added
+- **Project updates** (`/v1/projects/{id}/updates`, `/v1/project-updates/{id}`): a health of `on_track`, `at_risk` or `blocked`, a summary of what changed and the reason for the choice (1 to 2,000 characters each), attributed to the person who published it and dated. Anyone who can read the workspace reads them; a role that may write content publishes.
+- **A person decides the health.** It is required and is never computed or defaulted. `GET /v1/projects/{id}/update-draft` offers a starting point: the task counts, the milestones and the blocked tasks, with the previous update, and a note that the health is the author's to choose; it contains no health. A project reports the health of its newest update that was not retracted, and none before the first.
+- **Links the reader can inspect.** An update can point at milestones of the project, tasks (the blockers) and evidence or memory cards of the workspace, at most 30; every link is checked before anything is written. Each keeps its label as published, plus the title now and whether it still exists, so a renamed blocker or a deleted file is visible instead of silent.
+- **What changed, kept at the time.** An update stores the project's counts and milestones as they were and a list of what differs from the update before (health, tasks, done, blocked, overdue, milestones added, completed, moved or removed), or says it is the first.
+- **Never edited, retractable.** An update is not changed; its author or an administrator can retract it, which hides it from the list (`?include=retracted` shows it) and keeps the record with who retracted it. An archived project takes no new update (`409`). Publishing and retracting are written to the activity feed.
+- Migration **0078** adds `project_updates` and `project_update_links`.
+- A server test (`tests/project_updates.rs`) follows the draft with no health, the refused updates, a published one with its snapshot and links, a second one with its changes, the links read after a rename and a deletion, retracting, the health falling back, and an archived project.
+- **Not in this release:** the web screens.
+
+### Checks
+- Version, migration lock (78 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- The migration runs by itself and is additive. Projects report `health` and `health_updated_at` (`null` until an update is published).
+
 ## V0.7.16 (2026-11-18)
 
 Make a task again on an explicit schedule, once for each occurrence, with a stated policy for what was missed.

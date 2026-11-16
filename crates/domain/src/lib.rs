@@ -475,6 +475,9 @@ pub struct Project {
     /// Every task of the project, and how many of them are not done.
     pub task_count: i64,
     pub open_task_count: i64,
+    /// The health in the newest update that was not retracted (V0.7.17), chosen by the person who published it; none until then.
+    pub health: Option<String>,
+    pub health_updated_at: Option<String>,
     pub archived_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -505,6 +508,73 @@ pub struct Milestone {
     pub explanation: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// A milestone as an update recorded it (V0.7.17).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MilestoneBrief {
+    pub id: String,
+    pub name: String,
+    pub due_date: Option<String>,
+    pub completed: bool,
+    pub overdue: bool,
+    pub done_count: i64,
+    pub task_count: i64,
+}
+
+/// A project's counts and milestones at one moment: what an update records as it was, and what the draft offers now.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ProjectSnapshot {
+    pub task_count: i64,
+    pub done_count: i64,
+    pub open_count: i64,
+    pub blocked_count: i64,
+    pub overdue_count: i64,
+    pub milestones: Vec<MilestoneBrief>,
+}
+
+/// What a project update points at (V0.7.17): a milestone or task of the project, or evidence or a memory card. `label` is the
+/// name when it was published; `title` is the name now and `available` is false when the target is gone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectUpdateLink {
+    /// `milestone`, `task`, `evidence` or `memory_card`.
+    pub kind: String,
+    pub target_id: String,
+    pub label: String,
+    pub title: Option<String>,
+    pub available: bool,
+}
+
+/// A person's statement of a project's health (V0.7.17). The health, the summary and the reason are the author's; the snapshot is
+/// the project as it was when they published, and `changes` says what differs from the update before. Never edited, only
+/// retracted.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectUpdate {
+    pub id: String,
+    pub project_id: String,
+    pub workspace_id: String,
+    pub author: Option<SharedUser>,
+    /// `on_track`, `at_risk` or `blocked`.
+    pub health: String,
+    /// What changed.
+    pub summary: String,
+    /// Why the author chose this health.
+    pub reason: String,
+    pub snapshot: ProjectSnapshot,
+    pub changes: Vec<String>,
+    pub links: Vec<ProjectUpdateLink>,
+    pub created_at: String,
+    pub retracted_at: Option<String>,
+    pub retracted_by: Option<SharedUser>,
+}
+
+/// What the product offers someone about to write an update. It carries no health: that is the author's to choose.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectUpdateDraft {
+    pub snapshot: ProjectSnapshot,
+    pub open_blockers: Vec<TaskSummary>,
+    pub previous: Option<ProjectUpdate>,
+    pub note: String,
 }
 
 /// One memory card or piece of evidence a project's brief cites (V0.7.2). Only the id is stored; the title is read from the

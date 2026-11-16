@@ -405,6 +405,9 @@ export interface Project {
   /** Every task of the project, and how many of them are not done. */
   task_count: number;
   open_task_count: number;
+  /** The health in the newest update that was not retracted (V0.7.17), chosen by the person who published it; none until then. */
+  health: string | null;
+  health_updated_at: string | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -436,6 +439,72 @@ export interface Milestone {
   explanation: string;
   created_at: string;
   updated_at: string;
+}
+
+/** A milestone as an update recorded it (V0.7.17). */
+export interface MilestoneBrief {
+  id: string;
+  name: string;
+  due_date: string | null;
+  completed: boolean;
+  overdue: boolean;
+  done_count: number;
+  task_count: number;
+}
+
+/** A project's counts and milestones at one moment: what an update records as it was, and what the draft offers now. */
+export interface ProjectSnapshot {
+  task_count: number;
+  done_count: number;
+  open_count: number;
+  blocked_count: number;
+  overdue_count: number;
+  milestones: MilestoneBrief[];
+}
+
+/**
+ * What a project update points at (V0.7.17): a milestone or task of the project, or evidence or a memory card. `label` is the
+ * name when it was published; `title` is the name now and `available` is false when the target is gone.
+ */
+export interface ProjectUpdateLink {
+  /** `milestone`, `task`, `evidence` or `memory_card`. */
+  kind: string;
+  target_id: string;
+  label: string;
+  title: string | null;
+  available: boolean;
+}
+
+/**
+ * A person's statement of a project's health (V0.7.17). The health, the summary and the reason are the author's; the snapshot is
+ * the project as it was when they published, and `changes` says what differs from the update before. Never edited, only
+ * retracted.
+ */
+export interface ProjectUpdate {
+  id: string;
+  project_id: string;
+  workspace_id: string;
+  author: SharedUser | null;
+  /** `on_track`, `at_risk` or `blocked`. */
+  health: string;
+  /** What changed. */
+  summary: string;
+  /** Why the author chose this health. */
+  reason: string;
+  snapshot: ProjectSnapshot;
+  changes: string[];
+  links: ProjectUpdateLink[];
+  created_at: string;
+  retracted_at: string | null;
+  retracted_by: SharedUser | null;
+}
+
+/** What the product offers someone about to write an update. It carries no health: that is the author's to choose. */
+export interface ProjectUpdateDraft {
+  snapshot: ProjectSnapshot;
+  open_blockers: TaskSummary[];
+  previous: ProjectUpdate | null;
+  note: string;
 }
 
 /**

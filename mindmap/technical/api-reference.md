@@ -371,6 +371,11 @@
 | POST | `/v1/recurring-tasks/{recurring_id}/pause` | auth | require_workspace_write | — | RecurringTask |
 | POST | `/v1/recurring-tasks/{recurring_id}/resume` | auth | require_workspace_write | — | RecurringTask |
 | POST | `/v1/recurring-tasks/{recurring_id}/stop` | auth | require_workspace_write | — | RecurringTask |
+| GET | `/v1/projects/{project_id}/updates` | auth | require_workspace_read | — (`?include=retracted`) | Vec<ProjectUpdate> |
+| POST | `/v1/projects/{project_id}/updates` | auth | require_workspace_write | SaveProjectUpdateRequest | ProjectUpdate |
+| GET | `/v1/projects/{project_id}/update-draft` | auth | require_workspace_read | — | ProjectUpdateDraft |
+| GET | `/v1/project-updates/{update_id}` | auth | require_workspace_read | — | ProjectUpdate |
+| POST | `/v1/project-updates/{update_id}/retract` | auth | require_workspace_write (author or admin) | — | ProjectUpdate |
 | GET | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_read | — (`?label=`) | Vec<CollaborationTask |
 | POST | `/v1/workspaces/{workspace_id}/tasks` | auth | require_workspace_write | SaveCollaborationTaskRequest | CollaborationTask |
 | GET | `/v1/workspaces/{workspace_id}/saved-searches` | auth | require_workspace_read | — | Vec<SavedSearch |

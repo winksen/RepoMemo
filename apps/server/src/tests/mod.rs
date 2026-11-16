@@ -36,6 +36,7 @@ mod onboarding;
 mod operations;
 mod organization_templates;
 mod performance;
+mod project_updates;
 mod projects;
 mod recurring;
 mod review_ownership;
