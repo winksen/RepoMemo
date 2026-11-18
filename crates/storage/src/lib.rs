@@ -33,6 +33,7 @@ mod collaboration;
 mod connector_quarantine;
 mod connectors;
 mod credentials;
+mod directory_imports;
 mod environment;
 mod identity;
 mod jobs;
@@ -81,6 +82,7 @@ pub use connector_quarantine::StoredQuarantine;
 pub(crate) use connector_quarantine::NOT_QUARANTINED;
 pub use connectors::{ConnectorItemOutcome, ConnectorItemWrite};
 pub use credentials::{RepoCredentialInfo, RepoSecret, RepoWebhookInfo};
+pub use directory_imports::ImportedFile;
 pub use environment::{inspect_environment, inspect_environment_split, EnvironmentState};
 pub use identity::{
     identity_confirmation_hash, valid_group_role, FlowGate, GroupChange, GroupMapping, GroupSyncPlan, IdentityProvider,

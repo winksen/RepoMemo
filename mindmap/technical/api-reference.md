@@ -299,6 +299,7 @@
 | DELETE | `/v1/chat-destinations/{id}` | managing | require_workspace_admin | — | status |
 | POST | `/v1/chat-destinations/{id}/test` | managing | require_workspace_admin | — | `{delivered, error?}` |
 | POST | `/v1/chat-destinations/{id}/digest` | managing | require_workspace_admin | — | `{sent}`; 409 when off |
+| POST | `/v1/workspaces/{workspace_id}/imports/directory` | auth | require_workspace_write | DirectoryImportRequest (`source_key`, `files[{path, text\|base64}]`, `dry_run` default true, `skip_invalid`) | DirectoryImportReport (200; 409 with the report when a file has a problem and `skip_invalid` is not set) |
 | POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |
 | PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |

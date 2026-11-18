@@ -22,6 +22,7 @@ mod config;
 mod connectors;
 mod conversion;
 mod derived;
+mod directory_import;
 mod embedding;
 mod environment;
 mod errors;
@@ -1236,6 +1237,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/chat-destinations/{id}/test", post(chat::test_destination))
         .route("/v1/chat-destinations/{id}/digest", post(chat::send_digest_now))
+        .route(
+            "/v1/workspaces/{workspace_id}/imports/directory",
+            post(directory_import::import_directory).layer(DefaultBodyLimit::max(directory_import::body_limit())),
+        )
         .route(
             "/v1/artifacts/{artifact_id}/follow-ups",
             get(follow_ups::list_follow_ups),

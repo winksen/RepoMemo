@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.10` (2026-11-18)
+> **Current:** `V0.8.11` (2026-11-18)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -30,7 +30,7 @@
 | **V0.8.8** | ✅ 2026-11-18 | AL. Connections and sharing | 🔧 | Tracker context | Link mirrored issues and pull requests to local projects and tasks without duplicating ownership | A user can distinguish remote state from local follow-up, navigate both directions through links and never mistakes a local edit for a remote update |
 | **V0.8.9** | ✅ 2026-11-18 | AL. Connections and sharing | ✨ | Slack delivery | Send opted-in review/project digests to approved Slack destinations as authenticated links | A pilot receives deduplicated links without sensitive titles/excerpts, unauthorized readers cannot open them and disconnect stops delivery |
 | **V0.8.10** | ⏸ deferred 2026-11-18 | AL. Connections and sharing | ✨ | Teams delivery (conditional) | Add equivalent link-only delivery for Microsoft Teams using the same destination and retry policy | A company pilot validates the destination, receives one digest per window and verifies revocation; unsupported delivery modes are named |
-| **V0.8.11** | 🔜 | AL. Connections and sharing | ✨ | Knowledge migration | Import a Markdown/asset directory with link mapping, preview and resumable progress | A representative wiki migrates with internal links and attachments intact; unsupported and unsafe paths are reported and retries do not duplicate records |
+| **V0.8.11** | ✅ 2026-11-18 | AL. Connections and sharing | ✨ | Knowledge migration | Import a Markdown/asset directory with link mapping, preview and resumable progress | A representative wiki migrates with internal links and attachments intact; unsupported and unsafe paths are reported and retries do not duplicate records |
 | **V0.8.12** | 🔜 | AL. Connections and sharing | ✨ | Confluence migration | Add a bounded importer for a documented Confluence export format | A representative space export preserves supported hierarchy, links and source attribution; restrictions require explicit mapping and unsupported macros are reported |
 | **V0.8.13** | 🔜 | AL. Connections and sharing | 🔧 | AI administration | Extend existing AI limits with visible workspace budgets, usage, stored counts and provider-failure behavior | Admins see consumption and limit reasons, spending limits stop calls predictably and survive a restart, and keyword search remains available when AI is disabled or unavailable |
 | **V0.8.14** | 🔜 | AL. Connections and sharing | 🔒 | Answer quality | Add a versioned retrieval/answer evaluation set and in-product correction feedback | Known/absent/conflicting evidence, stale sources and hostile source instructions are covered; answers cite accessible evidence and never treat source text as action authority |

@@ -60,6 +60,10 @@ No migration: the link is the existing `task_references` citation (and `project_
 
 Migration 0082: `chat_destinations` (provider `slack`, name, host, **sealed** address, digests, enabled, last sent and error) and `chat_digest_log` (primary key destination, kind, window: the ledger). `chat.rs` accepts an address only when the host is on `REPOMEMO_OUTBOUND_HOSTS` (the same list and check as outbound webhooks) and is `hooks.slack.com/services/...` (a loopback `http` address is accepted for a test receiver). `deliver_digests` counts (`count_due_reviews`, `count_overdue_tasks`), skips a zero, **claims** the (destination, kind, UTC day) row before the call, posts `{"text": …}` (no redirect, 10 s), and releases the claim when the call fails, so the next pass retries and a success is never repeated in a window. `digest_text` makes only a count and `state.mail.link(...)` (the signed-in app). The pass runs in the maintenance loop (`send_due`) and on `POST /v1/chat-destinations/{id}/digest`; an off or deleted destination is not read.
 
+## Directory migration (V0.8.11)
+
+Not a connector (the source is a `manual` one named `Import: <source_key>`), but the same rules of identity and safety. Migration 0083 `directory_imports` (workspace, source key, path → artifact, hash of the file as sent). `directory_import.rs`: `normalize_path` (relative only; no `..`, backslash, control character, hidden segment, `:`), `classify` (md, txt, png, jpg, gif, webp, pdf), `scan_links` (`[t](target)` and `![a](target)` outside fenced code; `[[wiki]]` counted) and `resolve_link` (file of the import, missing, unsafe, other). Commit: folders by `ensure_folder`; pass 1 stores or replaces each file as sent (`store_artifact`, or `replace_artifact_content` for a changed file so its id, comments and versions stay) and records it in the ledger; pass 2 rewrites resolved links to `/workspaces/{ws}/artifacts/{id}` (with the fragment) and replaces the content when it differs; touched files are queued for indexing. The route takes up to 40 MB of JSON (500 files, 5 MiB each, 25 MiB in all).
+
 ## Rules for the outside connection (S6)
 
 | Rule | How |

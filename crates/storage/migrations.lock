@@ -86,3 +86,4 @@
 0.8.2  0080_connector_quarantine.sql  68f9b53adf92210df0477ca6bd849bcdfdcc49aec6072e988cc05358ff7d9e01
 0.8.4  0081_outbound_webhooks.sql  625a4a7c2fcf0cac4dc47095cc014f6bcd5923b273ba5319945e4b34415aa2d0
 0.8.9  0082_chat_destinations.sql  a0fa86206e5a493fd8d600fc699f5a26801b15e7dddfc7312e211a14143fc658
+0.8.11  0083_directory_imports.sql  e957bd37d1b07065b3bf690451c0f50625c6228f0041c6dbcc8df6afc1a4d804

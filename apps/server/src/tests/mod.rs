@@ -26,6 +26,7 @@ mod connectors_jira;
 mod connectors_jira_lifecycle;
 mod connectors_quarantine;
 mod cross_search;
+mod directory_import;
 mod edit_conflicts;
 mod evidence;
 mod evidence_tools;

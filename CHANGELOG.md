@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.11 (2026-11-18)
+
+Bring a wiki or a folder of notes in with a preview first, links that keep working, and nothing made twice when it is sent again.
+
+### Added
+- **Import a directory** (`POST /v1/workspaces/{id}/imports/directory`): the files of a directory as `path` and `text` (Markdown, text) or `base64` (png, jpg, gif, webp, pdf), under a name for the import (`source_key`). Up to 500 files, 5 MiB each and 25 MiB in all.
+- **A dry run is the default and explains every file:** whether it would be created, replaced or left alone, what is wrong with it, and its links. Directories become folders; a heading becomes the title, or the file name does.
+- **Link mapping.** A relative Markdown link (or image) to another file of the import is rewritten to that file's address in the app (`/workspaces/{id}/artifacts/{id}`, keeping `#position`), so it keeps working. A link to something the import does not hold, one that leaves the directory and a `[[wiki link]]` are **reported and left as written**; web, mail and in-page links are untouched; code fences are skipped.
+- **Unsafe and unsupported paths are reported and never written:** an absolute path, `..`, a backslash or control character, a hidden file or folder, a repeated path, a file with no content, one over the size limit, or a type that is not Markdown, text, png, jpg, gif, webp or pdf.
+- **All or skipping.** With `dry_run: false`, one file with a problem refuses the import (`409` with the report, nothing written) unless `skip_invalid` is true, which imports the rest and lists the skipped files.
+- **No duplicates, and resumable.** A ledger keeps each file by import name and path: the same directory sent again skips the unchanged files, a changed file is **replaced in place** (same file, comments and earlier versions kept), and an import that was interrupted carries on from the files already done.
+- Unit tests of the paths, links, rewriting, titles and decoding, and a server test (`tests/directory_import.rs`): a stranger refused, a dry run that writes nothing, a refused commit, a skip-invalid commit with folders and rewritten links, search finding the text, a second send that makes nothing and a changed file replaced under the same id.
+- Migration **0083** adds `directory_imports`.
+- **Not in this release:** a web upload screen, ZIP upload, images or PDFs read for text, Confluence (V0.8.12), and live synchronisation of a folder.
+
+### Checks
+- Version, migration lock (83 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (storage, server, all targets) pass. The new tests compile; **they were not executed**. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.10 (2026-11-18)
 
 Record the deferral of the conditional Microsoft Teams delivery, because no company pilot needs it, and name the one delivery mode that exists.

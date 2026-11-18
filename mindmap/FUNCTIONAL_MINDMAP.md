@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.10` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.11` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.11 — Import a Markdown/asset directory with link mapping, preview and resumable progress.
+
+- Directory migration: migration 0083 `directory_imports`; `directory_import.rs` plans every file (safe path, type, links) with a dry run by default, refuses or skips invalid files, makes folders, stores or replaces each file in place through a ledger, then rewrites resolved relative links to in-app addresses. Test `tests/directory_import.rs` and unit tests in the module.
+
+Checks: static checks pass; the new tests compile but were not executed; nothing was built or run.
 
 ## V0.8.10 — Add equivalent link-only delivery for Microsoft Teams using the same destination and retry policy.
 
