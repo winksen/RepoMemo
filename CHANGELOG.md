@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.6 (2026-11-18)
+
+Keep the Jira copy in step with Jira: edits replace it, what Jira deleted or restricted leaves the evidence, and the failure cases of the connector contract have fixtures.
+
+### Added
+- **Removals.** After a sync that read the whole project, the connector lists every issue of the project (ids and security only) and **takes out of the evidence** each stored issue that Jira no longer lists for this account (deleted, or moved to another project) or that now carries a **security level**: its file, index and links go with it. The sync report counts them (`removed`), and the activity entry says so.
+- **Safe against a bad list.** A project too long to list within one sync, or a list that would remove **every** stored issue, is not trusted and removes nothing; a lost project is the access check's business (a denial confirmed twice holds the copy back, V0.8.2).
+- **A restriction added later is honoured.** An issue that is given a security level after it was copied is removed on the next sync, not only skipped.
+- **A repeated page stops the sync.** A tracker that answers with a page token it already gave ends the sync with a clear message instead of looping.
+- **Ownership is explicit.** Jira owns status, assignee, priority and text; an edit in Jira replaces the copy in place (same file, re-indexed, nothing added twice), nothing is sent back, and the health block says so.
+- Two server tests (`tests/connectors_jira_lifecycle.rs`) are the conformance fixtures: an edit that updates in place, a deleted issue and a restricted one leaving search, the untrusted empty list, a repeated page, a rate limit that pauses with its end and refuses a new sync, and a missing project that holds the copy back.
+- No migration.
+
+### Checks
+- Version, migration lock (81 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new tests compile; **they were not executed** and no real Jira site was contacted. Nothing was built or run.
+
+### Upgrading
+- Nothing to do. The first sync after the upgrade also reconciles removals.
+
 ## V0.8.5 (2026-11-18)
 
 Read the issues of one Jira Cloud project into the same connector evidence as GitHub and GitLab, with a dry run first and nothing ever written to Jira.

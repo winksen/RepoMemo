@@ -1699,6 +1699,10 @@ pub struct ConnectorSyncReport {
     /// Items not copied because the tracker restricts who may see them (V0.8.5).
     #[serde(default)]
     pub restricted_skipped: usize,
+    /// Items taken out of the evidence because the tracker no longer lists them for this account: deleted, moved away,
+    /// or restricted since (V0.8.6).
+    #[serde(default)]
+    pub removed: usize,
 }
 
 /// What the tracker answered for a link, before it is connected.

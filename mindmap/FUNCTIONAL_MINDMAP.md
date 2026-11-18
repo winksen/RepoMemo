@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.5` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.6` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.6 — Reconcile Jira edits, removals and access changes through the connector contract.
+
+- Jira lifecycle: `reconcile_jira` lists the project after a complete sync and removes stored issues that are gone or restricted (`remove_connector_item`, `connector_external_ids`), refusing to trust a list that is too long or would remove everything; `next_page_token` stops a repeated page; `ConnectorSyncReport.removed`. Fixtures in `tests/connectors_jira_lifecycle.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; no Jira site was contacted; nothing was built or run.
 
 ## V0.8.5 — Read selected Jira Cloud project issues into existing connector evidence with stable remote IDs.
 

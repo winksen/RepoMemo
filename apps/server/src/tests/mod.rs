@@ -22,6 +22,7 @@ mod connectors;
 mod connectors_gitlab;
 mod connectors_health;
 mod connectors_jira;
+mod connectors_jira_lifecycle;
 mod connectors_quarantine;
 mod cross_search;
 mod edit_conflicts;

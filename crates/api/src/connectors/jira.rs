@@ -360,6 +360,7 @@ impl RepoMemoCore {
         jql.push_str(" ORDER BY updated ASC");
         let mut report = ConnectorSyncReport::default();
         let mut page_token: Option<String> = None;
+        let mut seen_tokens = std::collections::HashSet::new();
         let mut pages = 0;
         'pages: loop {
             if pages >= MAX_PAGES_PER_SYNC {
@@ -392,12 +393,20 @@ impl RepoMemoCore {
                 report.items_seen += 1;
                 let fields = issue.get("fields").cloned().unwrap_or(Value::Null);
                 // An issue with a security level is never copied: Jira hides it from some people.
-                if fields.get("security").is_some_and(|security| !security.is_null()) {
-                    report.restricted_skipped += 1;
-                    continue;
-                }
                 let issue_key = text_of(&issue, "key");
                 let remote_id = text_of(&issue, "id");
+                if fields.get("security").is_some_and(|security| !security.is_null()) {
+                    report.restricted_skipped += 1;
+                    // A copy made before the issue was restricted goes too.
+                    if self
+                        .storage
+                        .remove_connector_item(&source.id, &format!("issue:{remote_id}"))
+                        .await?
+                    {
+                        report.removed += 1;
+                    }
+                    continue;
+                }
                 let (comment_page, _) = client
                     .get(&jira_url(
                         &client.api_base,
@@ -465,18 +474,100 @@ impl RepoMemoCore {
                     metadata.cursor = Some(updated);
                 }
             }
-            page_token = page
-                .get("nextPageToken")
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-                .filter(|_| !page.get("isLast").and_then(Value::as_bool).unwrap_or(false));
+            page_token = next_page_token(&page, &mut seen_tokens)?;
             // The page is stored: an interruption resumes after it.
             self.checkpoint_connector(source, &metadata).await?;
             if page_token.is_none() {
                 break;
             }
         }
+        // Only a sync that read everything can tell what is gone.
+        if !report.more_to_fetch {
+            self.reconcile_jira(source, &client, key, &mut report).await?;
+        }
         self.finish_connector_sync(source, metadata, report, job_id).await
+    }
+}
+
+/// The token of the next page, or none at the last. A token seen before is a tracker that repeats itself: the sync stops
+/// instead of looping.
+fn next_page_token(page: &Value, seen: &mut std::collections::HashSet<String>) -> Result<Option<String>> {
+    if page.get("isLast").and_then(Value::as_bool).unwrap_or(false) {
+        return Ok(None);
+    }
+    let Some(token) = page.get("nextPageToken").and_then(Value::as_str) else {
+        return Ok(None);
+    };
+    if !seen.insert(token.to_owned()) {
+        repomemo_domain::bail_invalid!(
+            "The tracker repeated a page of results, so the sync stopped. Choose Sync now to try again."
+        );
+    }
+    Ok(Some(token.to_owned()))
+}
+
+impl RepoMemoCore {
+    /// Takes out of the evidence the issues Jira no longer lists for this account: deleted, moved to another project, or
+    /// given a security level since. The whole project is listed (ids and security only); a list that is too long to read in
+    /// one sync, or that would remove every issue kept, is not trusted and changes nothing (the access check handles a
+    /// lost project).
+    async fn reconcile_jira(
+        &self,
+        source: &Source,
+        client: &GitHub,
+        key: &str,
+        report: &mut ConnectorSyncReport,
+    ) -> Result<()> {
+        let jql = format!("project = \"{key}\" ORDER BY created ASC");
+        let mut visible = std::collections::HashSet::new();
+        let mut seen_tokens = std::collections::HashSet::new();
+        let mut token: Option<String> = None;
+        let mut complete = false;
+        for _ in 0..MAX_PAGES_PER_SYNC {
+            let mut params = vec![("jql", jql.as_str()), ("fields", "security"), ("maxResults", "100")];
+            if let Some(next) = token.as_deref() {
+                params.push(("nextPageToken", next));
+            }
+            let (page, _) = client.get(&jira_url(&client.api_base, "/search/jql", &params)).await?;
+            for issue in page.get("issues").and_then(Value::as_array).into_iter().flatten() {
+                let restricted = issue
+                    .get("fields")
+                    .and_then(|fields| fields.get("security"))
+                    .is_some_and(|security| !security.is_null());
+                if !restricted {
+                    visible.insert(format!("issue:{}", text_of(issue, "id")));
+                }
+            }
+            token = next_page_token(&page, &mut seen_tokens)?;
+            if token.is_none() {
+                complete = true;
+                break;
+            }
+        }
+        if !complete {
+            return Ok(());
+        }
+        let stored = self
+            .storage
+            .connector_external_ids(&source.id)
+            .await?
+            .into_iter()
+            .filter(|id| id.starts_with("issue:"))
+            .collect::<Vec<_>>();
+        let gone = stored.iter().filter(|id| !visible.contains(*id)).collect::<Vec<_>>();
+        if gone.is_empty() {
+            return Ok(());
+        }
+        if gone.len() == stored.len() {
+            tracing::warn!(connector = %source.name, "Jira listed none of the stored issues; nothing was removed");
+            return Ok(());
+        }
+        for id in gone {
+            if self.storage.remove_connector_item(&source.id, id).await? {
+                report.removed += 1;
+            }
+        }
+        Ok(())
     }
 }
 

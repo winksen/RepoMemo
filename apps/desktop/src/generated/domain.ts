@@ -1537,6 +1537,11 @@ export interface ConnectorSyncReport {
   more_to_fetch: boolean;
   /** Items not copied because the tracker restricts who may see them (V0.8.5). */
   restricted_skipped: number;
+  /**
+   * Items taken out of the evidence because the tracker no longer lists them for this account: deleted, moved away,
+   * or restricted since (V0.8.6).
+   */
+  removed: number;
 }
 
 /** What the tracker answered for a link, before it is connected. */

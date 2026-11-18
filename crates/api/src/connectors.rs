@@ -225,9 +225,15 @@ fn connector_health(
     ];
     match metadata.provider.as_str() {
         "gitlab" => exclusions.push("System notes (label and assignment changes) are not copied".to_owned()),
-        "jira" => exclusions.push(
-            "Only the first 100 comments of an issue, plain text of descriptions, no attachments, work logs, sub-task trees or custom fields; an issue with a security level is skipped".to_owned(),
-        ),
+        "jira" => {
+            exclusions.push(
+                "Status, assignee and priority are Jira's: nothing is sent back, and the next sync shows Jira's value"
+                    .to_owned(),
+            );
+            exclusions.push(
+                "Only the first 100 comments of an issue, plain text of descriptions, no attachments, work logs, sub-task trees or custom fields; an issue with a security level is skipped".to_owned(),
+            );
+        }
         _ => {}
     }
     ConnectorHealth {

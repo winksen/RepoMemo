@@ -135,14 +135,22 @@ impl ConnectorRunner {
                     self.embeddings.request(&source.workspace_id);
                 }
                 // A background sync that found nothing new is not news.
-                if report.added + report.updated == 0 && actor_user_id.is_none() {
+                if report.added + report.updated + report.removed == 0 && actor_user_id.is_none() {
                     return;
                 }
                 (
                     "connector_synced",
                     format!(
-                        "Synced {}: {} added, {} updated, {} unchanged.",
-                        source.name, report.added, report.updated, report.unchanged
+                        "Synced {}: {} added, {} updated, {} unchanged{}.",
+                        source.name,
+                        report.added,
+                        report.updated,
+                        report.unchanged,
+                        if report.removed > 0 {
+                            format!(", {} removed", report.removed)
+                        } else {
+                            String::new()
+                        }
                     ),
                 )
             }

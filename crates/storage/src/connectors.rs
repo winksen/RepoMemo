@@ -78,6 +78,34 @@ impl StorageEngine {
         self.get_source(&id).await
     }
 
+    /// The tracker ids of the items kept for a source.
+    pub async fn connector_external_ids(&self, source_id: &str) -> Result<Vec<String>> {
+        Ok(
+            sqlx::query_scalar::<_, String>("SELECT external_id FROM connector_items WHERE source_id = ?1")
+                .bind(source_id)
+                .fetch_all(self.reader())
+                .await?,
+        )
+    }
+
+    /// Takes one item out of the evidence: its file, index and links go with it. `true` when there was one.
+    pub async fn remove_connector_item(&self, source_id: &str, external_id: &str) -> Result<bool> {
+        let artifact_id = sqlx::query_scalar::<_, String>(
+            "SELECT artifact_id FROM connector_items WHERE source_id = ?1 AND external_id = ?2",
+        )
+        .bind(source_id)
+        .bind(external_id)
+        .fetch_optional(self.reader())
+        .await?;
+        match artifact_id {
+            Some(artifact_id) => {
+                self.delete_artifact(&artifact_id).await?;
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
+
     /// Items kept for a source, by state: `(open, closed)`.
     pub async fn connector_item_counts(&self, source_id: &str) -> Result<(i64, i64)> {
         let row = sqlx::query(
