@@ -1258,6 +1258,12 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(publications::preview),
         )
         .route("/v1/artifacts/{artifact_id}/publication", post(publications::publish))
+        .route(
+            "/v1/publications/{id}/public-preview",
+            get(publications::public_preview),
+        )
+        .route("/v1/publications/{id}/withdraw", post(publications::withdraw))
+        .route("/v1/publications/{id}/republish", post(publications::republish))
         .route("/v1/workspaces/{workspace_id}/publications", get(publications::list))
         .route(
             "/v1/artifacts/{artifact_id}/follow-ups",

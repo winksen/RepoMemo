@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.17 (2026-11-18)
+
+Give publishers control over a snapshot: see what readers get, withdraw it, update it after a new review, and see when it is stale or its original is gone.
+
+### Added
+- **Public preview** (`GET /v1/publications/{id}/public-preview`): exactly what a reader is served now (the title and text while the snapshot is `published`, nothing once it is withdrawn or stale), its version and the cache time (60 seconds), so a publisher knows how soon a withdrawal is seen everywhere.
+- **Withdraw** (`POST /v1/publications/{id}/withdraw`): stops serving it, keeps the record and raises the version so a cache revalidates and finds it gone. The private original is not touched.
+- **Publish again** (`POST /v1/publications/{id}/republish` with a fresh preview token): replaces the text with the original as it is now, after review, and makes it live again with a new version.
+- **Visible state.** The publications list says how the original stands: `current`, `original_changed` (publish again to update) or `source_removed`. The snapshot never changes by itself.
+- **Source revocation unpublishes.** When a source's access is lost and its items are held back, every snapshot made from that source becomes `stale` and stops being served until a publisher confirms it again.
+- A server test (`tests/publications.rs`) previews the public view, withdraws and sees nothing served with a new version, refuses an old token, publishes again, and deletes the original to see `source_removed` with the snapshot unchanged.
+- No migration.
+- **Not in this release:** the public routes themselves (V0.8.18) and a screen.
+
+### Checks
+- Version, migration lock (86 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (storage, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.16 (2026-11-18)
 
 Let an administrator publish a reviewed snapshot of a file as a record that holds only the previewed text, under the rules written in V0.8.15. Nothing is public yet.

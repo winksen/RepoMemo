@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.16` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.17 — Add public preview, publish, unpublish and visible stale/source-revoked state.
+
+- Publication controls: `public-preview` (what readers get, version, cache time), `withdraw`, `republish` with a reviewed token, an `original` state (current, original_changed, source_removed), and `quarantine_connector` marks the source's snapshots stale. No migration. Test in `tests/publications.rs`.
+
+Checks: static checks pass; the new test compiles but was not executed; nothing was built or run.
 
 ## V0.8.16 — Create an opt-in publication record containing only explicitly reviewed snapshot content.
 

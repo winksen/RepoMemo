@@ -264,18 +264,163 @@ pub(crate) async fn publish(
     Ok((StatusCode::CREATED, Json(publication)))
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct PublicationView {
+    #[serde(flatten)]
+    publication: Publication,
+    /// How the private original stands against the snapshot: `current`, `original_changed` (publish again to update) or
+    /// `source_removed`. The snapshot itself never changes by itself.
+    original: &'static str,
+}
+
+async fn view_of(state: &AppState, publication: Publication) -> Result<PublicationView, ApiError> {
+    let original = match publication.source_artifact_id.as_deref() {
+        None => "source_removed",
+        Some(id) => match state.storage.get_artifact_summary(id).await {
+            Err(_) => "source_removed",
+            Ok(_) => match state.storage.read_artifact_blob(id).await {
+                Ok(bytes) => {
+                    let (body, _) = make_snapshot(&String::from_utf8_lossy(&bytes));
+                    if hash(&body) == publication.snapshot_hash {
+                        "current"
+                    } else {
+                        "original_changed"
+                    }
+                }
+                Err(_) => "source_removed",
+            },
+        },
+    };
+    Ok(PublicationView { publication, original })
+}
+
 pub(crate) async fn list(
     ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,
     Path(workspace_id): Path<String>,
-) -> Result<Json<Vec<Publication>>, ApiError> {
+) -> Result<Json<Vec<PublicationView>>, ApiError> {
     require_workspace_admin(&state, &subject, &workspace_id).await?;
-    state
+    let mut views = Vec::new();
+    for publication in state
         .storage
         .list_publications(&workspace_id)
         .await
-        .map(Json)
-        .map_err(map_storage_error)
+        .map_err(map_storage_error)?
+    {
+        views.push(view_of(&state, publication).await?);
+    }
+    Ok(Json(views))
+}
+
+async fn admin_publication(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    id: &str,
+) -> Result<Publication, ApiError> {
+    if !state.public_publishing {
+        return Err(ApiError::not_found("Public publishing is off on this server."));
+    }
+    let publication = state.storage.publication(id).await.map_err(map_storage_error)?;
+    require_workspace_admin(state, subject, &publication.workspace_id).await?;
+    Ok(publication)
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PublicPreview {
+    status: String,
+    version: i64,
+    /// What an anonymous reader is served now: the title and text while it is `published`, nothing otherwise.
+    served: bool,
+    title: Option<String>,
+    body_markdown: Option<String>,
+    /// How long a shared cache may keep a page, so the publisher knows how soon a withdrawal is seen everywhere.
+    cache_seconds: u32,
+}
+
+/// Shows the publisher exactly what readers get (V0.8.17): the snapshot while it is live, and nothing once it is withdrawn or stale.
+pub(crate) async fn public_preview(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<PublicPreview>, ApiError> {
+    let publication = admin_publication(&state, &subject, &id).await?;
+    let served = publication.status == "published";
+    let body = if served {
+        Some(state.storage.publication_body(&id).await.map_err(map_storage_error)?)
+    } else {
+        None
+    };
+    Ok(Json(PublicPreview {
+        status: publication.status,
+        version: publication.version,
+        served,
+        title: served.then_some(publication.title),
+        body_markdown: body,
+        cache_seconds: 60,
+    }))
+}
+
+pub(crate) async fn withdraw(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<PublicationView>, ApiError> {
+    let publication = admin_publication(&state, &subject, &id).await?;
+    let updated = state
+        .storage
+        .set_publication_status(&id, "withdrawn")
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &publication.workspace_id,
+        &subject.user_id,
+        "publication_withdrawn",
+        "publication",
+        Some(&id),
+        format!("Withdrew the snapshot of {}.", publication.title),
+    )
+    .await;
+    Ok(Json(view_of(&state, updated).await?))
+}
+
+/// Replaces the snapshot with the original as it is now, after the publisher reviewed the new preview, and makes it live again.
+pub(crate) async fn republish(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<PublishRequest>,
+) -> Result<Json<PublicationView>, ApiError> {
+    let publication = admin_publication(&state, &subject, &id).await?;
+    let Some(artifact_id) = publication.source_artifact_id.clone() else {
+        return Err(ApiError::conflict(
+            "The original was removed, so there is nothing to publish again.",
+        ));
+    };
+    let (_, text) = load_publishable(&state, &subject, &artifact_id).await?;
+    let (body, _) = make_snapshot(&text);
+    let snapshot_hash = hash(&body);
+    if request.review_token != snapshot_hash {
+        return Err(ApiError::conflict(
+            "The file changed since it was previewed. Preview it again and review what would be public.",
+        ));
+    }
+    let updated = state
+        .storage
+        .replace_publication_snapshot(&id, &body, &snapshot_hash)
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &publication.workspace_id,
+        &subject.user_id,
+        "publication_updated",
+        "publication",
+        Some(&id),
+        format!("Published a new version of {}.", publication.title),
+    )
+    .await;
+    Ok(Json(view_of(&state, updated).await?))
 }
 
 #[cfg(test)]

@@ -101,4 +101,63 @@ impl StorageEngine {
         .await?;
         Ok(row.map(publication_of))
     }
+
+    /// The text a snapshot holds, for the publisher's preview of what readers see (and, later, for the public routes).
+    pub async fn publication_body(&self, id: &str) -> Result<String> {
+        match sqlx::query_scalar::<_, String>("SELECT body_markdown FROM publications WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(self.reader())
+            .await?
+        {
+            Some(body) => Ok(body),
+            None => repomemo_domain::bail_not_found!("Publication was not found."),
+        }
+    }
+
+    /// Withdraws or marks stale. The version grows, so a cache holding an older one revalidates and finds it gone.
+    pub async fn set_publication_status(&self, id: &str, status: &str) -> Result<Publication> {
+        if !matches!(status, "published" | "withdrawn" | "stale") {
+            repomemo_domain::bail_invalid!("That is not a publication status.");
+        }
+        self.publication(id).await?;
+        sqlx::query("UPDATE publications SET status = ?2, version = version + 1, updated_at = ?3 WHERE id = ?1")
+            .bind(id)
+            .bind(status)
+            .bind(Utc::now().to_rfc3339())
+            .execute(&self.pool)
+            .await?;
+        self.publication(id).await
+    }
+
+    /// Replaces the snapshot with a newly reviewed one and makes it live again.
+    pub async fn replace_publication_snapshot(
+        &self,
+        id: &str,
+        body_markdown: &str,
+        snapshot_hash: &str,
+    ) -> Result<Publication> {
+        self.publication(id).await?;
+        sqlx::query(
+            "UPDATE publications SET body_markdown = ?2, snapshot_hash = ?3, status = 'published', version = version + 1, updated_at = ?4 WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(body_markdown)
+        .bind(snapshot_hash)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        self.publication(id).await
+    }
+
+    /// Stops serving every live snapshot made from files of a source (its access was lost). They stay recorded as stale.
+    pub async fn mark_source_publications_stale(&self, source_id: &str) -> Result<u64> {
+        let done = sqlx::query(
+            "UPDATE publications SET status = 'stale', version = version + 1, updated_at = ?2 WHERE status = 'published' AND source_artifact_id IN (SELECT id FROM artifacts WHERE source_id = ?1)",
+        )
+        .bind(source_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(done.rows_affected())
+    }
 }

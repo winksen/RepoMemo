@@ -306,6 +306,9 @@
 | POST | `/v1/artifacts/{artifact_id}/publication-preview` | managing | require_workspace_admin | — | SnapshotPreview (`body_markdown`, `removed`, `review_token`); 404 when publishing is off |
 | POST | `/v1/artifacts/{artifact_id}/publication` | managing | require_workspace_admin | `{review_token, title?}` | Publication (201); 409 when the file changed since the preview or is already published |
 | GET | `/v1/workspaces/{workspace_id}/publications` | managing | require_workspace_admin | — | Publication[] |
+| GET | `/v1/publications/{id}/public-preview` | managing | require_workspace_admin | — | PublicPreview (what readers are served now, its version and the cache time) |
+| POST | `/v1/publications/{id}/withdraw` | managing | require_workspace_admin | — | PublicationView (status `withdrawn`, version raised) |
+| POST | `/v1/publications/{id}/republish` | managing | require_workspace_admin | `{review_token}` | PublicationView (live again with the newly reviewed text) |
 | POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |
 | PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |

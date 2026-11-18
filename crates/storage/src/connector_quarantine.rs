@@ -42,6 +42,8 @@ impl StorageEngine {
         .bind(Utc::now().to_rfc3339())
         .execute(&self.pool)
         .await?;
+        // Anything made public from this source stops being served until a publisher confirms it again (V0.8.17).
+        self.mark_source_publications_stale(source_id).await?;
         Ok(())
     }
 
