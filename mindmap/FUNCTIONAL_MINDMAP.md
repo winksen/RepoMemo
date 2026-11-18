@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.4` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.5` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.5 — Read selected Jira Cloud project issues into existing connector evidence with stable remote IDs.
+
+- Jira Cloud connector (`connectors/jira.rs`, no migration): `email:token` basic authentication, a read-only dry run (project, Browse permission, security-level scheme refused), JQL read by `updated` with `nextPageToken`, per-page checkpoints, the first 100 comments, document text flattened, remote id = Jira's numeric id, issues with a security level skipped and counted. Tests: unit tests in `jira.rs` and `tests/connectors_jira.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; no Jira site was contacted; nothing was built or run.
 
 ## V0.8.4 — Add opt-in signed outbound webhooks with event IDs, bounded retries and delivery inspection (existing webhooks are inbound only).
 

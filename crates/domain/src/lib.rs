@@ -1696,6 +1696,9 @@ pub struct ConnectorSyncReport {
     pub index_failed: usize,
     /// The sync stopped at its page limit; the next one carries on.
     pub more_to_fetch: bool,
+    /// Items not copied because the tracker restricts who may see them (V0.8.5).
+    #[serde(default)]
+    pub restricted_skipped: usize,
 }
 
 /// What the tracker answered for a link, before it is connected.

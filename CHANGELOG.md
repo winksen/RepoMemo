@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.5 (2026-11-18)
+
+Read the issues of one Jira Cloud project into the same connector evidence as GitHub and GitLab, with a dry run first and nothing ever written to Jira.
+
+### Added
+- **A Jira Cloud connector.** Connect a project by its address (`https://acme.atlassian.net/browse/APP`, `/projects/APP` or a board address) with `provider: "jira"`, or let a `*.atlassian.net` host say so. The account is the person's **email and an API token written as `email:token`**, sent as basic authentication and stored sealed like any token; it is never returned. The operator adds the site to `REPOMEMO_GIT_ALLOWED_HOSTS`.
+- **A dry run that reports scope and permissions.** *Check access* reads the project, asks whether the account may **browse** it, looks for **issue security levels** and counts open issues, with `GET` requests only, shows what would be copied and stores nothing. A project with security levels, or one the account cannot browse, is **refused**.
+- **A paged, resumable import.** Issues are read oldest update first (`/search/jql`, `nextPageToken`), the cursor is saved after each stored page, and the first 100 comments of each issue are read. Descriptions and comments in Atlassian document format become plain text, so they are searchable and citable. The time is read back with a 26-hour overlap because JQL reads minutes in the token owner's time zone; issues read again are found unchanged, never stored twice.
+- **Stable remote ids and source links.** An issue is kept by Jira's own numeric id (so a rename or a move does not make a second copy), with its key, link and state (a *done* status category is closed) in its metadata.
+- **An issue with a security level is never copied.** It is skipped and counted in the sync report (`restricted_skipped`); the health block lists the limits (comments, no attachments, work logs, sub-task trees or custom fields).
+- **The web client** offers *Jira Cloud* and explains the `email:token` form.
+- Unit tests of the address, the account, the document text and issue markdown and the cursor, and a server test (`tests/connectors_jira.rs`) with a fake Jira: a bare token refused, a dry run that stores nothing and shows no secret, a project with security levels refused, two pages read with the restricted issue left out and its text and comments found by search, and a second sync that asks only for what changed.
+- No migration.
+- **Not in this release:** how edits, removals and lost access are reconciled (V0.8.6), webhooks from Jira, boards, sprints and attachments.
+
+### Checks
+- Version, migration lock (81 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new tests compile; **they were not executed** and no real Jira site was contacted. Nothing was built or run.
+
+### Upgrading
+- Nothing to do. To use Jira, add the site (for example `acme.atlassian.net`) to `REPOMEMO_GIT_ALLOWED_HOSTS`.
+
 ## V0.8.4 (2026-11-18)
 
 Let an administrator send signed events to a destination of their own, only to hosts the operator approved, with identifiable repeats, bounded retries and a list of every attempt.

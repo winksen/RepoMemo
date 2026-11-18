@@ -258,7 +258,15 @@ impl RepoMemoCore {
             .and_then(|(issues, _)| issues.as_array().map(|issues| !issues.is_empty()))
             .unwrap_or(false);
         let preview = self
-            .connector_preview(workspace_id, "gitlab", &name, private, restricted)
+            .connector_preview(
+                workspace_id,
+                "gitlab",
+                &name,
+                private,
+                restricted.then(|| {
+                    "This project has confidential issues. Importing it would show them to every member of the workspace, including people the tracker hides them from, so it cannot be connected.".to_owned()
+                }),
+            )
             .await?;
         Ok(ConnectorAccessCheck {
             provider: "gitlab".to_owned(),

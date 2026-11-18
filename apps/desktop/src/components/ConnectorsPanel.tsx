@@ -266,13 +266,13 @@ export function ConnectorSettings({
     <form className="rm-repo-form" onSubmit={runCheck}>
       <h3>Connect a repository's issues</h3>
       <Field hint="A github.com or gitlab.com repository, or a self-hosted GitHub Enterprise Server or GitLab one. The server's operator names the hosts a tracker may be on." label="Repository address">
-        <Input onChange={(event) => setLink(event.target.value)} placeholder="https://github.com/acme/app or https://gitlab.com/group/project" value={link} />
+        <Input onChange={(event) => setLink(event.target.value)} placeholder="https://github.com/acme/app, https://gitlab.com/group/project or https://acme.atlassian.net/browse/APP" value={link} />
       </Field>
       <Field hint="Needed only for a self-hosted address whose name does not say which it is." label="Tracker">
-        {(control) => <Dropdown id={control.id} onValueChange={(value) => setProvider(value === "__detect__" ? "" : value)} options={[{ label: "Detect from the address", value: "__detect__" }, { label: "GitHub", value: "github" }, { label: "GitLab", value: "gitlab" }]} value={provider || "__detect__"} />}
+        {(control) => <Dropdown id={control.id} onValueChange={(value) => setProvider(value === "__detect__" ? "" : value)} options={[{ label: "Detect from the address", value: "__detect__" }, { label: "GitHub", value: "github" }, { label: "GitLab", value: "gitlab" }, { label: "Jira Cloud", value: "jira" }]} value={provider || "__detect__"} />}
       </Field>
-      <Field hint="A read-only token with access to issues. It is stored encrypted and never shown again." label="Access token">
-        <Input autoComplete="off" onChange={(event) => setToken(event.target.value)} placeholder="Only for a private repository" type="password" value={token} />
+      <Field hint="A read-only token with access to issues; for Jira Cloud, the account's email and an API token written as email:token. It is stored encrypted and never shown again." label="Access token">
+        <Input autoComplete="off" onChange={(event) => setToken(event.target.value)} placeholder="Only for a private repository (always for Jira)" type="password" value={token} />
       </Field>
       {checkIsCurrent && check ? <div className="rm-repo-check">
         <strong><CircleCheck size={ICON_SIZE.md} /> The server can read this {check.provider === "gitlab" ? "project" : "repository"}'s issues</strong>

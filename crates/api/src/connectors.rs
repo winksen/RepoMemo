@@ -35,7 +35,9 @@ use serde_json::{json, Value};
 use crate::RepoMemoCore;
 
 mod gitlab;
+mod jira;
 use gitlab::{parse_gitlab_link, project_id};
+use jira::parse_jira_link;
 
 /// Issues read in one sync before it stops and resumes at the next.
 const MAX_PAGES_PER_SYNC: usize = 30;
@@ -221,8 +223,12 @@ fn connector_health(
         format!("Text longer than {MAX_BODY_CHARS} characters is cut"),
         "Attachments, images and code are not copied".to_owned(),
     ];
-    if metadata.provider == "gitlab" {
-        exclusions.push("System notes (label and assignment changes) are not copied".to_owned());
+    match metadata.provider.as_str() {
+        "gitlab" => exclusions.push("System notes (label and assignment changes) are not copied".to_owned()),
+        "jira" => exclusions.push(
+            "Only the first 100 comments of an issue, plain text of descriptions, no attachments, work logs, sub-task trees or custom fields; an issue with a security level is skipped".to_owned(),
+        ),
+        _ => {}
     }
     ConnectorHealth {
         state: state.to_owned(),
@@ -387,7 +393,8 @@ pub(crate) fn parse_tracker_link(link: &str, provider: Option<&str>) -> Result<T
     let provider = match provider.map(str::trim).filter(|value| !value.is_empty()) {
         Some("github") => "github",
         Some("gitlab") => "gitlab",
-        Some(_) => repomemo_domain::bail_invalid!("The tracker is GitHub or GitLab."),
+        Some("jira") => "jira",
+        Some(_) => repomemo_domain::bail_invalid!("The tracker is GitHub, GitLab or Jira."),
         None => {
             let host = link
                 .split_once("://")
@@ -395,22 +402,35 @@ pub(crate) fn parse_tracker_link(link: &str, provider: Option<&str>) -> Result<T
                 .unwrap_or_default();
             if host.contains("gitlab") {
                 "gitlab"
+            } else if host
+                .split(':')
+                .next()
+                .is_some_and(|name| name.ends_with(".atlassian.net"))
+            {
+                "jira"
             } else {
                 "github"
             }
         }
     };
-    if provider == "gitlab" {
-        parse_gitlab_link(link)
-    } else {
-        parse_github_link(link)
+    target_of(provider, link)
+}
+
+/// The target a stored connector reads, from its provider and its address.
+fn target_of(provider: &str, location: &str) -> Result<TrackerTarget> {
+    match provider {
+        "gitlab" => parse_gitlab_link(location),
+        "jira" => parse_jira_link(location),
+        _ => parse_github_link(location),
     }
 }
 
 /// The address that describes a project (repository) and answers whether the
 /// token can see it.
 fn project_url(target: &TrackerTarget) -> String {
-    if target.provider == "gitlab" {
+    if target.provider == "jira" {
+        format!("{}/project/{}", target.api_base, target.repo)
+    } else if target.provider == "gitlab" {
         format!("{}/projects/{}", target.api_base, project_id(target))
     } else {
         format!("{}/repos/{}/{}", target.api_base, target.owner, target.repo)
@@ -424,6 +444,8 @@ struct GitHub {
     token: Option<String>,
     /// GitLab: the token goes in `PRIVATE-TOKEN` and no GitHub headers are sent.
     gitlab: bool,
+    /// Jira Cloud: the token is `email:token`, sent as basic authentication.
+    jira: bool,
     /// Requests made so far.
     calls: AtomicUsize,
 }
@@ -441,6 +463,7 @@ impl GitHub {
             api_base: api_base.trim_end_matches('/').to_owned(),
             token,
             gitlab: false,
+            jira: false,
             calls: AtomicUsize::new(0),
         })
     }
@@ -476,7 +499,13 @@ impl GitHub {
         }
         self.calls.fetch_add(1, Ordering::Relaxed);
         let mut request = self.http.get(url);
-        if self.gitlab {
+        if self.jira {
+            request = request.header("Accept", "application/json");
+            if let Some(token) = &self.token {
+                let (email, secret) = jira::split_jira_token(token)?;
+                request = request.basic_auth(email, Some(secret));
+            }
+        } else if self.gitlab {
             request = request.header("Accept", "application/json");
             if let Some(token) = &self.token {
                 request = request.header("PRIVATE-TOKEN", token);
@@ -908,6 +937,7 @@ impl RepoMemoCore {
         };
         let mut client = GitHub::new(&target.api_base, token)?;
         client.gitlab = target.provider == "gitlab";
+        client.jira = target.provider == "jira";
         Ok(client)
     }
 
@@ -929,6 +959,9 @@ impl RepoMemoCore {
         if target.provider == "gitlab" {
             return self.check_gitlab(workspace_id, &target, token).await;
         }
+        if target.provider == "jira" {
+            return self.check_jira(workspace_id, &target, token).await;
+        }
         let mut client = self.github_for(None, &target).await?;
         client.token = token
             .map(str::trim)
@@ -948,7 +981,7 @@ impl RepoMemoCore {
         // GitHub shows every issue of a repository to everyone who can read
         // the repository, so there is no item-level restriction to refuse.
         let preview = self
-            .connector_preview(workspace_id, "github", &name, private, false)
+            .connector_preview(workspace_id, "github", &name, private, None)
             .await?;
         Ok(ConnectorAccessCheck {
             provider: "github".to_owned(),
@@ -971,7 +1004,7 @@ impl RepoMemoCore {
         provider: &str,
         partition: &str,
         private: bool,
-        restricted_items: bool,
+        refusal: Option<String>,
     ) -> Result<ConnectorPreview> {
         let members = self.storage.list_workspace_members(workspace_id).await?.len() as i64;
         let workspace = self
@@ -980,7 +1013,12 @@ impl RepoMemoCore {
             .await?
             .remove(workspace_id)
             .unwrap_or_else(|| "this workspace".to_owned());
-        let (items, discussion) = if provider == "gitlab" {
+        let (items, discussion) = if provider == "jira" {
+            (
+                "Issues: summary, status, type, priority, reporter, assignee, labels, link and description",
+                "The first 100 comments of each issue",
+            )
+        } else if provider == "gitlab" {
             (
                 "Issues and merge requests: title, state, author, labels, assignees, link and description",
                 "The discussion, commits, approvals and review comments of each merge request",
@@ -1000,11 +1038,6 @@ impl RepoMemoCore {
                 ""
             }
         );
-        let refusal = restricted_items.then(|| {
-            "This project has confidential issues. Importing it would show them to every member of the workspace, \
-             including people the tracker hides them from, so it cannot be connected."
-                .to_owned()
-        });
         Ok(ConnectorPreview {
             partition: partition.to_owned(),
             copies: vec![items.to_owned(), discussion.to_owned()],
@@ -1172,11 +1205,7 @@ impl RepoMemoCore {
     pub async fn set_connector_token(&self, source_id: &str, token: &str, actor_user_id: Option<&str>) -> Result<()> {
         let source = self.connector_source_row(source_id).await?;
         let metadata = ConnectorMetadata::of(&source);
-        let target = if metadata.provider == "gitlab" {
-            parse_gitlab_link(source.root_uri.as_deref().unwrap_or_default())?
-        } else {
-            parse_github_link(source.root_uri.as_deref().unwrap_or_default())?
-        };
+        let target = target_of(&metadata.provider, source.root_uri.as_deref().unwrap_or_default())?;
         let mut client = self.github_for(None, &target).await?;
         client.token = Some(token.trim().to_owned());
         client.get(&project_url(&target)).await?;
@@ -1290,11 +1319,7 @@ impl RepoMemoCore {
     async fn confirm_access_loss(&self, source: &Source, first: Denial) -> Option<Denial> {
         let metadata = ConnectorMetadata::of(source);
         let location = source.root_uri.as_deref().unwrap_or_default();
-        let target = if metadata.provider == "gitlab" {
-            parse_gitlab_link(location).ok()?
-        } else {
-            parse_github_link(location).ok()?
-        };
+        let target = target_of(&metadata.provider, location).ok()?;
         let client = self.github_for(Some(&source.id), &target).await.ok()?;
         match client.get(&project_url(&target)).await {
             Ok(_) => None,
@@ -1315,11 +1340,7 @@ impl RepoMemoCore {
         }
         let metadata = ConnectorMetadata::of(&source);
         let location = source.root_uri.as_deref().unwrap_or_default();
-        let target = if metadata.provider == "gitlab" {
-            parse_gitlab_link(location)?
-        } else {
-            parse_github_link(location)?
-        };
+        let target = target_of(&metadata.provider, location)?;
         let client = self.github_for(Some(source_id), &target).await?;
         if let Err(error) = client.get(&project_url(&target)).await {
             if error.downcast_ref::<Denial>().is_some() {
@@ -1347,6 +1368,9 @@ impl RepoMemoCore {
     async fn sync_connector(&self, source_id: &str, job_id: &str) -> Result<ConnectorSyncReport> {
         let source = self.connector_source_row(source_id).await?;
         let mut metadata = ConnectorMetadata::of(&source);
+        if metadata.provider == "jira" {
+            return self.sync_jira(&source, metadata, job_id).await;
+        }
         if metadata.provider == "gitlab" {
             return self.sync_gitlab(&source, metadata, job_id).await;
         }

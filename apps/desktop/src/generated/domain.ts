@@ -1535,6 +1535,8 @@ export interface ConnectorSyncReport {
   index_failed: number;
   /** The sync stopped at its page limit; the next one carries on. */
   more_to_fetch: boolean;
+  /** Items not copied because the tracker restricts who may see them (V0.8.5). */
+  restricted_skipped: number;
 }
 
 /** What the tracker answered for a link, before it is connected. */
