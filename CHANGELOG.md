@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.10 (2026-11-18)
+
+Record the deferral of the conditional Microsoft Teams delivery, because no company pilot needs it, and name the one delivery mode that exists.
+
+### Changed
+- **Teams is deferred.** The row was conditional on a company pilot that validates the destination and its revocation; none has been named. **No Teams destination type was written**, chat destinations accept only `slack`, no Teams host is accepted and no setting was added. The [0.8 plan](mindmap/plans/2026-11-18-0.8-connections.md) records the decision and what a Teams delivery would reuse (the destination, the once-a-day ledger and the retry rule of V0.8.9).
+- **The supported delivery mode is named:** a Slack channel through an incoming webhook, with a count and a link once a day. There are no direct messages, threads or replies, and the user guide says so and that Teams is not offered.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock (82 files), generated types, styles, documentation links and TypeScript pass. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.9 (2026-11-18)
 
 Send an opted-in daily digest to a Slack channel as a count and a link, never as content, once a day, and stop when the channel is turned off.

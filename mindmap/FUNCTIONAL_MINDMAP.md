@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.9` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.10` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.10 — Add equivalent link-only delivery for Microsoft Teams using the same destination and retry policy.
+
+- Documentation only: Microsoft Teams is **deferred** (no pilot owner): no destination type, only `slack` is accepted, no support claim; Slack channel delivery by incoming webhook is the one named mode. The plan keeps the V0.8.9 destination, ledger and retry rule as what a Teams delivery would reuse.
+
+Checks: static checks pass; nothing was built or run.
 
 ## V0.8.9 — Send opted-in review/project digests to approved Slack destinations as authenticated links.
 
