@@ -434,3 +434,38 @@ async fn a_mirrored_issue_and_its_local_follow_up_link_both_ways_and_keep_their_
     assert!(references[0]["remote"].is_null());
     let _ = std::fs::remove_dir_all(&scene.dir);
 }
+
+/// V0.8.15: a connector held back by a quarantine is not readable by guessing an id, through any route that reads a file.
+#[tokio::test]
+async fn a_held_back_file_cannot_be_read_by_its_id_through_any_route() {
+    let scene = Scene::new("jira-quarantine-reads").await;
+    let artifacts = response_json(
+        scene
+            .call(
+                "GET",
+                format!("/v1/workspaces/{}/artifacts", scene.workspace_id),
+                json!({}),
+            )
+            .await,
+    )
+    .await;
+    let id = artifacts[0]["id"].as_str().unwrap().to_owned();
+    for path in ["file", "chunks", "comments", "lifecycle", "mentions"] {
+        let before = scene.call("GET", format!("/v1/artifacts/{id}/{path}"), json!({})).await;
+        assert_eq!(before.status(), 200, "{path} works before the quarantine");
+    }
+    *scene.fake.deny.lock().unwrap() = 404;
+    scene.sync("quarantined").await;
+    for path in ["file", "chunks", "comments", "lifecycle", "mentions"] {
+        let held = scene.call("GET", format!("/v1/artifacts/{id}/{path}"), json!({})).await;
+        assert_eq!(held.status(), 404, "{path} must not serve a held-back file");
+    }
+    assert_eq!(
+        scene
+            .call("GET", format!("/v1/artifacts/{id}"), json!({}))
+            .await
+            .status(),
+        404
+    );
+    let _ = std::fs::remove_dir_all(&scene.dir);
+}

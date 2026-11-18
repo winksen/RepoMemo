@@ -583,6 +583,11 @@ impl StorageEngine {
         .bind(artifact_id)
         .fetch_one(self.reader())
         .await?;
+        // Every read of a file by its id (the file itself, its passages, versions, comments and previews) starts here, so a
+        // connector held back by a quarantine is not readable by guessing an id (V0.8.15).
+        if self.artifact_is_quarantined(artifact_id).await? {
+            repomemo_domain::bail_not_found!("File was not found.");
+        }
 
         Ok(ArtifactSummary::from(row))
     }

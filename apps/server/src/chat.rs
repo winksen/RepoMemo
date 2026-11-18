@@ -82,6 +82,7 @@ async fn post(state: &AppState, destination: &ChatDestination, text: &str) -> Re
     if state.outbound.check_destination(&url).is_err() {
         return Err("The address is no longer an approved destination.".to_owned());
     }
+    crate::outbound::check_resolved(&url).await?;
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .timeout(SEND_TIMEOUT)

@@ -358,7 +358,9 @@ impl StorageEngine {
         if chunk_ids.is_empty() {
             return Ok(HashMap::new());
         }
-        let mut builder = QueryBuilder::<Sqlite>::new("SELECT id, text FROM chunks WHERE id IN (");
+        let mut builder = QueryBuilder::<Sqlite>::new(
+            "SELECT chunks.id AS id, chunks.text AS text FROM chunks JOIN artifacts ON artifacts.id = chunks.artifact_id WHERE NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = artifacts.source_id) AND chunks.id IN (",
+        );
         let mut separated = builder.separated(", ");
         for chunk_id in chunk_ids {
             separated.push_bind(chunk_id);

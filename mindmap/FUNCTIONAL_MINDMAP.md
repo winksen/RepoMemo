@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.15` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.15 — Review the connector, outbound webhook and chat delivery surfaces and the threat model for public publishing, before any public route is added.
+
+- Security review of the 0.8 surfaces: four medium findings fixed (quarantine check in `get_artifact_summary`, confidential GitLab issues skipped by sync, sharing re-checked on token replacement, destination host resolved before each send), one low hardened, one accepted; the rules for public publishing are written in `security/2026-11-18-0.8-security-review.md`.
+
+Checks: static checks pass; the new tests compile but were not executed; nothing was built or run.
 
 ## V0.8.14 — Add a versioned retrieval/answer evaluation set and in-product correction feedback.
 

@@ -1215,6 +1215,19 @@ impl RepoMemoCore {
         let mut client = self.github_for(None, &target).await?;
         client.token = Some(token.trim().to_owned());
         client.get(&project_url(&target)).await?;
+        // The approval of sharing was given for what the first token could see. A token that sees more (confidential
+        // issues, restricted issues) is refused the same way a new connection would be (V0.8.15).
+        let check = self
+            .check_tracker_link(
+                &source.workspace_id,
+                source.root_uri.as_deref().unwrap_or_default(),
+                Some(&metadata.provider),
+                Some(token),
+            )
+            .await?;
+        if let Some(reason) = check.preview.refusal {
+            repomemo_domain::bail_conflict!("This token cannot replace the current one. {reason}");
+        }
         self.storage
             .set_repo_credential(source_id, "token", None, token, actor_user_id)
             .await?;

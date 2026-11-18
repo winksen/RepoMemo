@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.15 (2026-11-18)
+
+Review the 0.8 connector, webhook and chat surfaces, fix what the review found, and write the rules for public publishing before any public route exists.
+
+### Security
+- **[The review](mindmap/security/2026-11-18-0.8-security-review.md):** 0 high, 4 medium (all fixed), 2 low (one hardened, one accepted and documented) and 2 info. No high or medium finding is open. It was made by reading the code; nothing was run and no scanner or penetration test was used.
+- **RM-1 (medium, fixed):** a file held back by a quarantine could still be read by its id through the file, passages, comments, versions, previews and mentions routes. The check now sits in `get_artifact_summary`, which every read by id passes through.
+- **RM-2 (medium, fixed):** a GitLab issue made confidential after connecting was copied by the next sync. A sync now skips it, counts it and removes an earlier copy.
+- **RM-3 (medium, fixed):** replacing a connector's token did not repeat the sharing check. The same check as a new connection now refuses a token that sees restricted items (409).
+- **RM-4 (medium, fixed):** an outbound webhook or Slack destination whose name resolves to a link-local or metadata address is now refused at send time. A rebinding trick between lookups is narrowed, not closed; an egress rule remains the operator's control.
+- **RM-5 (low, hardened):** `chunk_texts` applies the quarantine condition. **RM-6 (low, accepted):** wildcard host lists, tokens in an endpoint's query, replay and unthrottled administrator test routes are documented.
+- **Rules for public publishing** are written before V0.8.16 starts: a separate store read by separate routes, only reviewed content, exclusions, private references removed, plain anonymous routes, one answer for everything not served, caches that never outlive a withdrawal, revocation that unpublishes, an off-by-default operator switch and no personal logging.
+- Regression tests: a held-back file answers 404 on five routes, a confidential issue is removed by a later sync, a wider token is refused, and the forbidden-address list is checked. They compile; **they were not executed**.
+- No migration.
+
+### Checks
+- Version, migration lock (85 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (storage, API, server, all targets) pass. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.14 (2026-11-18)
 
 Check what Ask is given with a versioned evaluation set, make clear that a source's text is never an instruction, and let people report a wrong answer with a correction.

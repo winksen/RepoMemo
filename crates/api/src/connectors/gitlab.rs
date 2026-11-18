@@ -326,6 +326,22 @@ impl RepoMemoCore {
                     report.items_seen += 1;
                     let iid = item.get("iid").and_then(Value::as_i64).unwrap_or(0);
                     let updated = text_of(&item, "updated_at");
+                    // A confidential issue is visible to some people only. The check at connection time looked at the
+                    // project then; an issue made confidential later, or created after, is never copied (V0.8.15).
+                    if !merge_requests && item.get("confidential").and_then(Value::as_bool).unwrap_or(false) {
+                        report.restricted_skipped += 1;
+                        if self
+                            .storage
+                            .remove_connector_item(&source.id, &format!("issue:{iid}"))
+                            .await?
+                        {
+                            report.removed += 1;
+                        }
+                        if !updated.is_empty() {
+                            metadata.cursor = Some(updated);
+                        }
+                        continue;
+                    }
                     let issue = issue_like(&item);
                     let notes = if item.get("user_notes_count").and_then(Value::as_i64).unwrap_or(0) > 0
                         || merge_requests

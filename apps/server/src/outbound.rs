@@ -120,6 +120,10 @@ impl OutboundService {
                 .await;
             return false;
         }
+        if let Err(reason) = check_resolved(&delivery.url).await {
+            let _ = storage.record_outbound_attempt(delivery, None, Some(&reason)).await;
+            return true;
+        }
         let Some(secret) = storage.open_outbound_secret(&delivery.endpoint_id).await.ok().flatten() else {
             let _ = storage
                 .record_outbound_attempt(delivery, None, Some("The signing secret could not be opened."))
@@ -174,6 +178,32 @@ impl OutboundService {
                 }
             }
         })
+    }
+}
+
+/// The first address of a list that is never allowed as a destination (link-local, cloud metadata, multicast, unspecified).
+pub(crate) fn first_forbidden(addresses: &[std::net::IpAddr]) -> Option<std::net::IpAddr> {
+    addresses.iter().copied().find(repomemo_ai::is_forbidden_address)
+}
+
+/// Resolves the host of a destination and refuses it when any address it names is never allowed. The host list and the literal
+/// address check cannot see where a name points, so this runs just before each send (V0.8.15). A name is resolved again by the
+/// connection itself, so this narrows the window for a rebinding trick and does not close it: an egress rule is what enforces it.
+pub(crate) async fn check_resolved(url: &str) -> Result<(), String> {
+    let parsed = reqwest::Url::parse(url).map_err(|_| "The address is not valid.".to_owned())?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "The address has no host.".to_owned())?
+        .to_owned();
+    let port = parsed.port_or_known_default().unwrap_or(443);
+    let addresses = tokio::net::lookup_host((host.trim_matches(['[', ']']).to_owned(), port))
+        .await
+        .map_err(|_| "The host could not be resolved.".to_owned())?
+        .map(|socket| socket.ip())
+        .collect::<Vec<_>>();
+    match first_forbidden(&addresses) {
+        Some(_) => Err("The host resolves to an address that is never allowed as a destination.".to_owned()),
+        None => Ok(()),
     }
 }
 
@@ -454,6 +484,24 @@ mod tests {
         assert_ne!(a, sign("whsec_x", "1700000001", "{\"a\":1}"));
         assert_ne!(a, sign("whsec_x", "1700000000", "{\"a\":2}"));
         assert_ne!(a, sign("whsec_y", "1700000000", "{\"a\":1}"));
+    }
+
+    #[test]
+    fn a_destination_that_resolves_to_a_forbidden_address_is_refused() {
+        use std::net::IpAddr;
+        let ok: Vec<IpAddr> = vec!["93.184.216.34".parse().unwrap(), "127.0.0.1".parse().unwrap()];
+        assert_eq!(first_forbidden(&ok), None);
+        for bad in [
+            "169.254.169.254",
+            "100.100.100.200",
+            "fe80::1",
+            "fd00:ec2::254",
+            "::ffff:169.254.169.254",
+            "0.0.0.0",
+        ] {
+            let mixed: Vec<IpAddr> = vec!["93.184.216.34".parse().unwrap(), bad.parse().unwrap()];
+            assert!(first_forbidden(&mixed).is_some(), "{bad}");
+        }
     }
 
     #[test]

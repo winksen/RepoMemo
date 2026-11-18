@@ -8,6 +8,8 @@ struct FakeGitLab {
     queries: Arc<Mutex<Vec<String>>>,
     /// The project holds a confidential issue.
     confidential: Arc<Mutex<bool>>,
+    /// The second issue is made confidential.
+    second_confidential: Arc<Mutex<bool>>,
 }
 
 fn note_token(state: &FakeGitLab, headers: &axum::http::HeaderMap) {
@@ -48,6 +50,7 @@ async fn start_fake_gitlab(state: FakeGitLab) -> String {
                     });
                 }
                 state.queries.lock().unwrap().push(query);
+                let second_confidential = *state.second_confidential.lock().unwrap();
                 axum::Json(json!([
                     {"iid": 5, "title": "Cache stampede", "state": "opened", "author": {"username": "ana"},
                      "created_at": "2026-03-01T00:00:00Z", "updated_at": "2026-03-02T00:00:00Z",
@@ -58,7 +61,8 @@ async fn start_fake_gitlab(state: FakeGitLab) -> String {
                      "created_at": "2026-02-01T00:00:00Z", "updated_at": "2026-03-03T00:00:00Z",
                      "closed_at": "2026-03-03T00:00:00Z",
                      "web_url": "https://gitlab.example.com/acme/app/-/issues/6",
-                     "description": "Retry three times.", "labels": [], "assignees": [], "user_notes_count": 0}
+                     "description": "Retry three times.", "labels": [], "assignees": [], "user_notes_count": 0,
+                     "confidential": second_confidential}
                 ]))
             }),
         )
@@ -333,5 +337,85 @@ async fn a_project_with_confidential_issues_is_refused_and_sharing_needs_approva
     .await;
     assert_eq!(unapproved.status(), 400);
     assert!(response_json(unapproved).await.to_string().contains("Approve sharing"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+/// V0.8.15: the approval of sharing covers what the first token could see. An issue made confidential later is removed, and a
+/// token that sees more cannot replace the first one.
+#[tokio::test]
+async fn confidential_issues_never_reach_the_workspace_by_a_later_sync_or_a_wider_token() {
+    let fake = FakeGitLab::default();
+    let base = start_fake_gitlab(fake.clone()).await;
+    let link = format!("{base}/acme/app");
+    let data_dir = temp_data_dir("connectors-gitlab-review");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.git_allowed_hosts = vec!["127.0.0.1".to_owned()];
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "gitlab-review@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let connected = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/connectors"),
+            json!({"link": link, "provider": "gitlab", "token": "glpat-first", "approve_sharing": true}),
+        )
+        .await,
+    )
+    .await;
+    let source_id = connected["connector"]["id"].as_str().unwrap().to_owned();
+    let wait = |status: &'static str| {
+        let call = &call;
+        let source_id = source_id.clone();
+        async move {
+            for _ in 0..150 {
+                let connector =
+                    response_json(call("GET", format!("/v1/connectors/{source_id}"), json!({})).await).await;
+                if connector["status"] == status && connector["active_job"].is_null() {
+                    return connector;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            panic!("never {status}");
+        }
+    };
+    let first = wait("ready").await;
+    assert_eq!(
+        first["open_items"].as_i64().unwrap() + first["closed_items"].as_i64().unwrap(),
+        3,
+        "{first}"
+    );
+
+    // An issue that becomes confidential is skipped and its copy is taken out of the evidence.
+    *fake.second_confidential.lock().unwrap() = true;
+    call("POST", format!("/v1/connectors/{source_id}/sync"), json!({})).await;
+    let mut after = wait("ready").await;
+    for _ in 0..20 {
+        if after["last_report"]["restricted_skipped"] == 1 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        after = response_json(call("GET", format!("/v1/connectors/{source_id}"), json!({})).await).await;
+    }
+    assert_eq!(after["last_report"]["restricted_skipped"], 1, "{after}");
+    assert_eq!(after["last_report"]["removed"], 1, "{after}");
+    let artifacts =
+        response_json(call("GET", format!("/v1/workspaces/{workspace_id}/artifacts"), json!({})).await).await;
+    assert!(!artifacts.to_string().contains("Old retry rule"), "{artifacts}");
+
+    // A token that can see confidential issues cannot replace the first one.
+    *fake.confidential.lock().unwrap() = true;
+    let wider = call(
+        "PUT",
+        format!("/v1/connectors/{source_id}/token"),
+        json!({"token": "glpat-wider"}),
+    )
+    .await;
+    assert_eq!(wider.status(), 409);
+    assert!(response_json(wider).await.to_string().contains("confidential"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
