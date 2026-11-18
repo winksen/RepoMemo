@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.19` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.20` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.20 — Validate one real tracker/chat pilot, knowledge migration and community publication journey.
+
+- Documentation only: `technical/release-evidence-0.8.20.md` (delivered, checked and unchecked, not built, support claims, the nine-step exit-journey sheet with every result pending, fixture-to-test map). No code, route, setting or migration changes.
+
+Checks: static checks pass; no test, server start or walkthrough was run.
 
 ## V0.8.19 — Carry connector provenance and publication metadata safely in archives.
 

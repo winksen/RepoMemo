@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.20 (2026-11-18)
+
+Close the 0.8 line with what it delivers, what was and was not checked, the exit journey written as a sheet for the maintainer, and the support claims.
+
+### Added
+- **[The 0.8 closing record](mindmap/technical/release-evidence-0.8.20.md):** what the line delivers, release by release, with the migrations it added (0080 to 0086) and the archive format 5; the checks that were run and the ones that were not; the scope that was not built; the support claims; and the exit journey in nine steps, from the connection preview to moving the workspace. **Every result is pending**, so the row is 🧪 until the maintainer fills the sheet in and the test run is recorded.
+- **What is stated plainly.** No pilot was run and no real tracker, Slack workspace or Confluence export was contacted. The line is **API-first**: apart from the connection preview, approval, health and quarantine in the connectors panel, no web screen exists for it, and the rows that describe screen behaviour are met by what the API returns. No test was executed, only compiled.
+- **Deferrals are explicit.** Linear (0.8.7) and Microsoft Teams (0.8.10) were deferred for want of a pilot owner and nothing is claimed for them. The supported trackers are GitHub, GitLab and Jira Cloud; the supported chat delivery is a Slack channel by incoming webhook.
+- The connector denial fixtures are mapped to the tests that cover them.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock (86 files), generated types, styles, accessibility, documentation links and TypeScript pass. **No test, walkthrough, browser, screen reader, second machine, server start or CI run was done**, none of the 0.8 server tests has been executed, and nothing was pushed, tagged or published.
+
+### Upgrading
+- Nothing to do. When publishing, the tag is `v0.8.20`, not an `RM-V` tag.
+
 ## V0.8.19 (2026-11-18)
 
 Carry where tracker items came from and what was published through a workspace archive, as records only: nothing comes back connected, sending or public.
