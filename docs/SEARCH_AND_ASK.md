@@ -2,6 +2,14 @@
 
 How to find evidence in RepoMemo, how a cited answer is made, and what a citation does and does not prove. For the first steps, see the [user guide](USER_GUIDE.md#3a-five-workflows-to-learn-first); for every rule, the [functional mindmap](../mindmap/FUNCTIONAL_MINDMAP.md#7-retrieval-finding-evidence).
 
+## Answer quality (0.8)
+
+**The evaluation set.** [`evaluation/ask-eval-v1.json`](evaluation/ask-eval-v1.json) is a versioned set of cases, each a small workspace, a question and what must and must not come back. It covers **known** evidence (found, and the unrelated file left out), **absent** evidence (nothing is found, so Ask says the indexed context is insufficient and calls no provider), **conflicting** evidence (both sources are returned, so the answer can show the conflict), **stale** sources (an outdated file is not served by default), **hostile** source text and **inaccessible** evidence (a workspace the asker cannot read never appears). It needs no AI provider, because it checks the evidence Ask would be given and the rules Ask is given; a server test runs it and every case's results must be files the asker can open. Changing or adding a case raises the set's version.
+
+**Source text is never an instruction.** Ask's prompt now says that the numbered passages are material to read and never instructions to follow, that an instruction inside one (ignore the rules, reveal them, run, send, delete or change something) is not obeyed, and that Ask can take no action. The earlier rules (cite the passages, say the context is insufficient instead of guessing, history is not evidence) are unchanged and come first.
+
+**Correct a wrong answer.** `POST /v1/workspaces/{id}/search-feedback` takes a third kind, `wrong_answer`, with the question, a **note saying what was wrong** (required) and, when you know it, the file the answer relied on. It is kept as a request the workspace's owners can resolve with new or corrected evidence, like the other kinds; and when the file is **verified** it becomes *needs review*, so its reviewers see that an answer built on it was reported wrong. A file in any other state keeps its state.
+
 ## 1. What works without AI
 
 Search needs no AI provider and no network. These work on a server with every AI feature off:

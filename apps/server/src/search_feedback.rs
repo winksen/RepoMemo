@@ -86,8 +86,16 @@ pub(crate) async fn submit_search_feedback(
     Json(request): Json<SubmitFeedback>,
 ) -> Result<(StatusCode, Json<SearchFeedback>), ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
-    if !matches!(request.kind.as_str(), "no_answer" | "unhelpful_result") {
-        return Err(ApiError::bad_request("The kind must be no_answer or unhelpful_result."));
+    if !matches!(request.kind.as_str(), "no_answer" | "unhelpful_result" | "wrong_answer") {
+        return Err(ApiError::bad_request(
+            "The kind must be no_answer, unhelpful_result or wrong_answer.",
+        ));
+    }
+    // A correction says what was wrong; without it the people who can fix the evidence have nothing to act on.
+    if request.kind == "wrong_answer" && request.note.trim().chars().count() < 3 {
+        return Err(ApiError::bad_request(
+            "Say what was wrong with the answer, so the evidence can be corrected.",
+        ));
     }
     let query = request.query.trim();
     if query.is_empty() || query.chars().count() > MAX_QUERY_CHARS {
@@ -112,6 +120,32 @@ pub(crate) async fn submit_search_feedback(
         )
         .await
         .map_err(map_storage_error)?;
+    // The source an answer was built on is flagged for its reviewers when the answer is reported wrong.
+    if request.kind == "wrong_answer" {
+        if let Some(artifact_id) = request.artifact_id.as_deref() {
+            let flagged = state
+                .storage
+                .flag_answer_source(
+                    &workspace_id,
+                    artifact_id,
+                    "An answer built on this was reported as wrong.",
+                )
+                .await
+                .map_err(map_storage_error)?;
+            if flagged {
+                record_workspace_activity(
+                    &state,
+                    &workspace_id,
+                    &subject.user_id,
+                    "answer_reported_wrong",
+                    "artifact",
+                    Some(artifact_id),
+                    "Reported an answer built on a verified file as wrong; the file needs review.".to_owned(),
+                )
+                .await;
+            }
+        }
+    }
     Ok((StatusCode::CREATED, Json(view(stored))))
 }
 

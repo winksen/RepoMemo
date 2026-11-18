@@ -68,6 +68,10 @@ Not a connector (the source is a `manual` one named `Import: <source_key>`), but
 
 No migration. `confluence_import.rs` reads a space exported as HTML (sent as its files, like a directory): `page_tree` reads `index.html` as nested lists to give each page its ancestors, `html_to_markdown` is a small tolerant converter (headings, paragraphs, lists, links, images, code, quotes, simple tables; script, style and head dropped; `ac:structured-macro` names and `conf-macro` classes collected as unsupported), pages become `Ancestors/Title.md` (a repeated title keeps its page id), links to pages and attachments are rewritten as relative paths, each page gets an attribution line, and the result is handed to `run_import` of the directory import (dry run, link mapping, ledger, in-place replacement). The report's `notes` carry the macros, the ignored files and the restrictions statement. A commit needs `acknowledge_restrictions` (409 otherwise) because the export holds no restrictions to map. The unit tests cover the converter and the tree.
 
+## Answer quality (V0.8.14)
+
+Not a connector, but the same rule that a source's text is data. `ASK_SOURCE_RULE` is appended to `ASK_SYSTEM` by `ask_system` (the V0.2.162 text stays first and byte for byte). Migration 0085 rebuilds `search_feedback` with the kind `wrong_answer`; the server requires its note and calls `flag_answer_source` (`set_system_lifecycle` from `verified` to `needs_review`). The evaluation set is `docs/evaluation/ask-eval-v1.json` and runs in `tests/answer_quality.rs` (no provider needed).
+
 ## Rules for the outside connection (S6)
 
 | Rule | How |

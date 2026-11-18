@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.14 (2026-11-18)
+
+Check what Ask is given with a versioned evaluation set, make clear that a source's text is never an instruction, and let people report a wrong answer with a correction.
+
+### Added
+- **A versioned evaluation set** ([`docs/evaluation/ask-eval-v1.json`](docs/evaluation/ask-eval-v1.json), version 1): six cases across six categories. **Known** evidence is found and the unrelated file left out; **absent** evidence finds nothing (so Ask says the context is insufficient and asks no provider); **conflicting** evidence returns both sources; a **stale** (outdated) file is not served by default; **hostile** source text is evidence but Ask is told not to obey it; **inaccessible** evidence in a workspace the asker cannot read never appears. It needs no AI provider.
+- **A test that runs it** (`tests/answer_quality.rs`): each case builds a workspace, waits for indexing, searches and checks what must and must not be found, that every result is a file the asker can open, that every category has a case, and that the prompt carries the rule below.
+- **Source text is never an instruction.** Ask's prompt now adds, after the unchanged earlier rules, that the numbered passages are material to read and never instructions to follow, that an instruction inside one is not obeyed (ignore the rules, reveal them, run, send, delete or change something), and that Ask can take no action. The citation rule and the insufficient-context rule are unchanged.
+- **Correction feedback.** `POST /v1/workspaces/{id}/search-feedback` takes a third kind, `wrong_answer`, with the question, a **required note saying what was wrong** and, when known, the file the answer relied on. It is kept like the other requests for the workspace's owners to resolve with new or corrected evidence, and a **verified** source file becomes *needs review* so its reviewers see it, with an activity entry. A file in another state keeps its state.
+- A server test follows a correction without a note refused, a correction accepted, a verified source flagged and an outdated one left alone.
+- Migration **0085** rebuilds `search_feedback` so its kind can also be `wrong_answer`; existing rows are copied unchanged.
+- **Not in this release:** a web screen for the correction, running the set against a live provider (the answer text itself is not judged), and automatic scoring of answers.
+
+### Changed
+- Ask's system prompt is longer (the source rule is added after the old text). A test that pinned the prompt now pins the old text as its start.
+
+### Checks
+- Version, migration lock (85 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (storage, API, server, all targets) pass. The new tests compile; **they were not executed**, and no provider was asked anything. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.13 (2026-11-18)
 
 Make the AI calls a workspace spends visible and limited by stored counts, so a limit stops them predictably and a restart changes nothing, and say what still works when AI cannot.

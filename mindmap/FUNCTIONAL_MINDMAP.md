@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.14 — Add a versioned retrieval/answer evaluation set and in-product correction feedback.
+
+- Answer quality: `ASK_SOURCE_RULE` appended to Ask's prompt (source text is material, Ask takes no action); `docs/evaluation/ask-eval-v1.json` is the versioned evaluation set (known, absent, conflicting, stale, hostile, inaccessible) run by `tests/answer_quality.rs` with no provider; migration 0085 adds the `wrong_answer` feedback kind, which needs a note and flags a verified source `needs_review`.
+
+Checks: static checks pass; the new tests compile but were not executed; no provider was asked anything; nothing was built or run.
 
 ## V0.8.13 — Extend existing AI limits with visible workspace budgets, usage, stored counts and provider-failure behavior.
 

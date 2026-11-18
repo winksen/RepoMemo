@@ -94,6 +94,36 @@ impl StorageEngine {
     }
 
     /// Records a request. A result that did not help must be a file of this workspace.
+    /// Marks the source of a wrong answer for review (V0.8.14): a verified file becomes *needs review*, so its reviewers see
+    /// that an answer built on it was reported as wrong. A file in any other state is left as it is. `true` when it was flagged.
+    pub async fn flag_answer_source(&self, workspace_id: &str, artifact_id: &str, note: &str) -> Result<bool> {
+        let now = Utc::now().to_rfc3339();
+        let mut tx = self.pool.begin().await?;
+        let before: Option<String> =
+            sqlx::query_scalar("SELECT status FROM artifact_lifecycle WHERE artifact_id = ?1 AND workspace_id = ?2")
+                .bind(artifact_id)
+                .bind(workspace_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        super::repo::set_system_lifecycle(
+            &mut tx,
+            artifact_id,
+            workspace_id,
+            &["verified"],
+            "needs_review",
+            note,
+            "answer_reported_wrong",
+            &now,
+        )
+        .await?;
+        tx.commit().await?;
+        let after: Option<String> = sqlx::query_scalar("SELECT status FROM artifact_lifecycle WHERE artifact_id = ?1")
+            .bind(artifact_id)
+            .fetch_optional(self.reader())
+            .await?;
+        Ok(before.as_deref() == Some("verified") && after.as_deref() == Some("needs_review"))
+    }
+
     pub async fn submit_search_feedback(
         &self,
         workspace_id: &str,

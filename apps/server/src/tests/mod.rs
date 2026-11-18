@@ -11,6 +11,7 @@ use tower::ServiceExt;
 mod access_matrix;
 mod ai;
 mod ai_admin;
+mod answer_quality;
 mod archive_history;
 mod archive_roundtrip;
 mod archive_work;
