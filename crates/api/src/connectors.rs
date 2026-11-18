@@ -24,8 +24,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use repomemo_domain::{
-    ArtifactType, ConnectorAccessCheck, ConnectorPreview, ConnectorSource, ConnectorSyncReport, IndexingJobStatus,
-    Source, CONNECTOR_SYNC_JOB_KIND,
+    ArtifactType, ConnectorAccessCheck, ConnectorPreview, ConnectorQuarantine, ConnectorSource, ConnectorSyncReport,
+    IndexingJobStatus, Source, CONNECTOR_SYNC_JOB_KIND,
 };
 use repomemo_indexer::INDEXER_VERSION;
 use repomemo_storage::{ConnectorItemOutcome, ConnectorItemWrite, StorageEngine};
@@ -66,6 +66,35 @@ pub(crate) enum Pause {
 impl std::fmt::Display for Pause {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("the tracker asked for a pause")
+    }
+}
+
+/// How a tracker denied a request for the partition (V0.8.2). It rides on the
+/// error as its context, like [`Pause`]. A denial is not yet a loss of access:
+/// it is checked a second time before anything is held back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Denial {
+    /// `401`: the token is no longer accepted.
+    Unauthorized,
+    /// `403` with allowance left: the token cannot read the partition.
+    Forbidden,
+    /// `404`: the tracker does not know the partition, or hides it.
+    NotFound,
+}
+
+impl Denial {
+    fn reason(self) -> &'static str {
+        match self {
+            Denial::Unauthorized => "access_revoked",
+            Denial::Forbidden => "access_denied",
+            Denial::NotFound => "not_found",
+        }
+    }
+}
+
+impl std::fmt::Display for Denial {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the tracker denied access")
     }
 }
 
@@ -359,7 +388,8 @@ impl GitHub {
                 return Err(repomemo_domain::invalid!(
                     "The tracker refused the token. Check that it is valid, not expired, and can read issues."
                 )
-                .context(Pause::TokenRefused));
+                .context(Pause::TokenRefused)
+                .context(Denial::Unauthorized));
             }
             if status.as_u16() == 429 || (status.as_u16() == 403 && remaining.as_deref() == Some("0")) {
                 let seconds = retry_after.unwrap_or(60).clamp(1, MAX_PAUSE_SECS);
@@ -374,14 +404,16 @@ impl GitHub {
                 .context(Pause::RateLimited { seconds }));
             }
             if status.as_u16() == 403 {
-                repomemo_domain::bail_invalid!(
+                return Err(repomemo_domain::invalid!(
                     "The tracker refused the request: the token cannot read this repository's issues."
-                );
+                )
+                .context(Denial::Forbidden));
             }
             if status.as_u16() == 404 {
-                repomemo_domain::bail_invalid!(
+                return Err(repomemo_domain::invalid!(
                     "The tracker does not know this repository, or the token cannot see it."
-                );
+                )
+                .context(Denial::NotFound));
             }
             repomemo_domain::bail_invalid!("The tracker answered {status}.");
         }
@@ -966,6 +998,7 @@ impl RepoMemoCore {
             .latest_source_job(&source.id, CONNECTOR_SYNC_JOB_KIND)
             .await?
             .filter(|job| job.status == "running");
+        let id = source.id.clone();
         let has_credential = self.storage.repo_credential_info(&source.id).await?.is_some();
         let webhook = self.storage.repo_webhook_info(&source.id).await.ok().flatten();
         Ok(ConnectorSource {
@@ -988,6 +1021,16 @@ impl RepoMemoCore {
             paused_until: metadata.paused.as_ref().and_then(|paused| paused.until.clone()),
             sharing_approved_by: metadata.sharing_approved_by,
             sharing_approved_at: metadata.sharing_approved_at,
+            quarantine: self
+                .storage
+                .connector_quarantine(&id)
+                .await?
+                .map(|held| ConnectorQuarantine {
+                    reason: held.reason,
+                    detail: held.detail,
+                    items: held.items,
+                    since: held.quarantined_at,
+                }),
             created_at: source.created_at,
         })
     }
@@ -1061,9 +1104,22 @@ impl RepoMemoCore {
                     .map(|(_, message)| message.to_owned())
                     .unwrap_or_else(|| format!("{error:#}"));
                 let pause = error.downcast_ref::<Pause>().copied();
+                let denial = error.downcast_ref::<Denial>().copied();
                 if let Ok(source) = self.storage.get_source(source_id).await {
                     let mut metadata = ConnectorMetadata::of(&source);
                     metadata.last_error = Some(message.clone());
+                    // A denial is checked once more before the evidence is held
+                    // back: one refused answer is not a loss of access.
+                    let lost = match denial {
+                        Some(denial) => self.confirm_access_loss(&source, denial).await,
+                        None => None,
+                    };
+                    if let Some(denial) = lost {
+                        let _ = self
+                            .storage
+                            .quarantine_connector(source_id, denial.reason(), &message)
+                            .await;
+                    }
                     // A tracker that asked for a pause is not a failure to
                     // look at: the connector waits, and says why.
                     let status = match pause {
@@ -1081,6 +1137,7 @@ impl RepoMemoCore {
                         }
                         None => "error",
                     };
+                    let status = if lost.is_some() { "quarantined" } else { status };
                     let _ = self
                         .storage
                         .update_source(source_id, &source.name, status, &metadata.to_value(), false)
@@ -1093,6 +1150,66 @@ impl RepoMemoCore {
                 Err(error)
             }
         }
+    }
+
+    /// Asks the tracker for the partition once more, with the stored token. The
+    /// loss is confirmed only when this answer is a denial too; a partition that
+    /// answers is a transient refusal and nothing is held back.
+    async fn confirm_access_loss(&self, source: &Source, first: Denial) -> Option<Denial> {
+        let metadata = ConnectorMetadata::of(source);
+        let location = source.root_uri.as_deref().unwrap_or_default();
+        let target = if metadata.provider == "gitlab" {
+            parse_gitlab_link(location).ok()?
+        } else {
+            parse_github_link(location).ok()?
+        };
+        let client = self.github_for(Some(&source.id), &target).await.ok()?;
+        match client.get(&project_url(&target)).await {
+            Ok(_) => None,
+            Err(error) => {
+                error
+                    .downcast_ref::<Denial>()
+                    .map(|second| if first == Denial::Unauthorized { first } else { *second })
+            }
+        }
+    }
+
+    /// Ends a quarantine after the access is back: the partition is read with
+    /// the stored token first, and a denial keeps the evidence held back.
+    pub async fn release_connector_quarantine(&self, source_id: &str) -> Result<ConnectorSource> {
+        let source = self.connector_source_row(source_id).await?;
+        if self.storage.connector_quarantine(source_id).await?.is_none() {
+            repomemo_domain::bail_conflict!("This connector is not in quarantine.");
+        }
+        let metadata = ConnectorMetadata::of(&source);
+        let location = source.root_uri.as_deref().unwrap_or_default();
+        let target = if metadata.provider == "gitlab" {
+            parse_gitlab_link(location)?
+        } else {
+            parse_github_link(location)?
+        };
+        let client = self.github_for(Some(source_id), &target).await?;
+        if let Err(error) = client.get(&project_url(&target)).await {
+            if error.downcast_ref::<Denial>().is_some() {
+                repomemo_domain::bail_conflict!(
+                    "Access to the source is still denied, so its evidence stays held back. Replace the token or restore the access first."
+                );
+            }
+            return Err(error);
+        }
+        self.storage.release_connector_quarantine(source_id).await?;
+        let mut metadata = metadata;
+        metadata.last_error = None;
+        metadata.paused = None;
+        let status = if metadata.last_synced_at.is_some() {
+            "ready"
+        } else {
+            "pending"
+        };
+        self.storage
+            .update_source(source_id, &source.name, status, &metadata.to_value(), false)
+            .await?;
+        self.connector_source(source_id).await
     }
 
     async fn sync_connector(&self, source_id: &str, job_id: &str) -> Result<ConnectorSyncReport> {

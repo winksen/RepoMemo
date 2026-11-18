@@ -32,6 +32,12 @@ Syncs run in the background through a runner of their own (one at a time, never 
 
 `check_tracker_link` returns a `ConnectorPreview`: the partition, what is copied and what is not, the audience (the workspace's name and member count) and `sharing` (`uniform` or `refused` with the reason). It holds no token. A GitLab project with confidential issues (`issues?confidential=true` finds one) is refused; a GitHub repository has no item-level restriction. `connect_tracker` takes `approved_by`: the route passes the administrator only when the request says `approve_sharing: true`, otherwise it is `400`; a refusal is `409` whatever the request says. The approver and time are kept in the connector's metadata (`sharing_approved_by`, `sharing_approved_at`), shown on `ConnectorSource`. See [the 0.8 plan](../plans/2026-11-18-0.8-connections.md).
 
+## Quarantine (V0.8.2)
+
+`connector_quarantine` (migration 0080, one row per connector: reason, detail, items held back, since) holds a connector's evidence back. `Denial` (`Unauthorized` for 401, `Forbidden` for a 403 with allowance left, `NotFound` for 404) rides on the tracker client's error beside `Pause`. When a sync ends in a denial, `confirm_access_loss` asks for the partition once more with the stored token: a second denial quarantines (reason `access_revoked`, `access_denied` or `not_found`) and sets the status `quarantined`; an answer means the refusal was transient and the sync only failed. The `NOT_QUARANTINED` condition is in `push_search_filters` (keyword, vector and the other searches that share it, so Ask and the assistant too), `list_artifacts`, `list_artifacts_page` (and its count), `list_artifacts_after`, the workspace export (artifacts and the citations kept) and `get_artifact` (which answers not found). A quarantined connector is not synced (409) and polling skips it. `POST /v1/connectors/{id}/release` (admin) reads the partition with the stored token; a denial is 409 and keeps it held, otherwise the row is deleted and the status is `ready`. Replacing the token does not release it.
+
+**Stale-access window.** Access loss is found when a sync runs: at the repository polling interval (300 s by default, `REPOMEMO_REPO_POLL_SECONDS`), after a webhook, or on *Sync now*, plus the time of a sync in progress. With polling off, until the next webhook or manual sync. Loss of one item is not loss of access; deletion of one item is told by 0.8.6.
+
 ## Rules for the outside connection (S6)
 
 | Rule | How |
@@ -58,6 +64,7 @@ Syncs run in the background through a runner of their own (one at a time, never 
 | POST | `/v1/workspaces/{id}/connectors/check` | A | what the tracker answers for a link and token, with the import preview (V0.8.1); nothing stored |
 | GET, DELETE | `/v1/connectors/{id}` | R / A | detail; remove with its items |
 | POST | `/v1/connectors/{id}/sync` | W | queue a sync; 409 if one runs |
+| POST | `/v1/connectors/{id}/release` | A | end a quarantine once the source answers again (V0.8.2); 409 while it is still denied |
 | PUT | `/v1/connectors/{id}/token` | A | replace the token, tried against the tracker first; clears a pause |
 | POST, DELETE | `/v1/connectors/{id}/webhook` | A | make or renew (secret shown once) or remove the webhook secret |
 | POST | `/v1/webhooks/connectors/{id}` | pub | a signed tracker event queues one sync (`202 {queued, note}`; `ping` `200`), anything else `401` |

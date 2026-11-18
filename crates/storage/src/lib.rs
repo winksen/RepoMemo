@@ -29,6 +29,7 @@ mod archive_import;
 mod archive_work;
 mod artifacts;
 mod collaboration;
+mod connector_quarantine;
 mod connectors;
 mod credentials;
 mod environment;
@@ -73,6 +74,8 @@ pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_T
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
 pub use approvals::{StoredApproval, StoredImportedApproval};
 pub use archive_import::{ImportedWorkspace, PendingPassage};
+pub use connector_quarantine::StoredQuarantine;
+pub(crate) use connector_quarantine::NOT_QUARANTINED;
 pub use connectors::{ConnectorItemOutcome, ConnectorItemWrite};
 pub use credentials::{RepoCredentialInfo, RepoSecret, RepoWebhookInfo};
 pub use environment::{inspect_environment, inspect_environment_split, EnvironmentState};
@@ -1790,6 +1793,9 @@ pub fn encode_embedding(values: &[f32]) -> Vec<u8> {
 /// The filters every search shares. `folders` is the folder of the request and
 /// the ones below it, already resolved (empty: no folder filter).
 fn push_search_filters<'a>(query: &mut QueryBuilder<'a, Sqlite>, request: &'a SearchRequest, folders: &'a [String]) {
+    // A connector whose source access was lost is never served (V0.8.2).
+    query.push(" AND ");
+    query.push(NOT_QUARANTINED);
     // Retired evidence is hidden unless a state is asked for by name: an
     // outdated or superseded file must not be served as current.
     query.push(

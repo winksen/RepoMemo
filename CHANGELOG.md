@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.2 (2026-11-18)
+
+Hold a connector's copied evidence back when its source stops answering for the partition, so a revoked token or a removed repository cannot leave a stale copy in search.
+
+### Added
+- **Quarantine.** When a sync ends in a denial (the token is refused, the tracker forbids the partition, or it does not know it), the server asks for the partition **once more**. A second denial puts the connector in **quarantine** with a reason (`access_revoked`, `access_denied`, `not_found`) and the tracker's own words; an answer means the refusal was transient, the sync only failed and **nothing is held back**.
+- **What a quarantine hides.** The connector's items leave **search and Ask** (keyword and semantic), the **file list** and its pages and count, **file detail** (not found) and the **workspace export** with the citations that pointed at them. Nothing is deleted. A quarantined connector is not synced (`409`) and the background poll skips it.
+- **Release** (`POST /v1/connectors/{id}/release`, administrators): reads the partition with the stored token. While it is still denied the answer is `409` and the evidence stays held; otherwise the evidence is served again and the status is `ready`. Replacing the token does not release it by itself. The web client shows *Held back* with the reason, how many items and a **Release** button.
+- **A stated stale-access window:** loss is found when a sync runs, so at most the polling interval (300 s by default, `REPOMEMO_REPO_POLL_SECONDS`), after a webhook, or on *Sync now*, plus a sync in progress.
+- A server test (`tests/connectors_quarantine.rs`) follows a transient `403` that holds nothing back, a `404` confirmed twice that hides the item from search, the file list and detail, the refused sync and release while denied, a release once the access is back, and a refused token reported as `access_revoked`.
+- Migration **0080** adds `connector_quarantine`.
+
+### Checks
+- Version, migration lock (80 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**, so the export exclusion and the new queries have not run against a database. Nothing was built or run.
+
+### Upgrading
+- Nothing to do. Existing connectors are not in quarantine.
+
 ## V0.8.1 (2026-11-18)
 
 Show an administrator what a connection copies and to whom before anything is imported, and import nothing until they approve sharing it with the whole workspace.

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.2 — Quarantine affected mirrored evidence when access is revoked or sharing can no longer be established.
+
+- Quarantine: migration 0080 `connector_quarantine`; `Denial` (401, 403, 404) on the tracker client; `confirm_access_loss` asks twice before holding back; the `NOT_QUARANTINED` condition sits in the shared search filter, the three file lists, the export and file detail; `POST /v1/connectors/{id}/release`. Test `tests/connectors_quarantine.rs`. Stale window is the polling interval.
+
+Checks: static checks pass; the new test compiles but was not executed; nothing was built or run.
 
 ## V0.8.1 — Preview the selected source partition, copied data and destination audience before importing.
 

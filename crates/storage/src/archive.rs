@@ -87,6 +87,7 @@ impl StorageEngine {
             SELECT id, source_id, folder_id, type, title, path, content_hash, mime_type, language,
                    size_bytes, created_at, updated_at, metadata_json
             FROM artifacts WHERE workspace_id = ?1
+              AND NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = artifacts.source_id)
             ORDER BY created_at ASC, id ASC
             "#,
         )
@@ -357,7 +358,9 @@ impl StorageEngine {
             });
         }
 
-        let artifact_ids: HashSet<String> = sqlx::query_scalar("SELECT id FROM artifacts WHERE workspace_id = ?1")
+        let artifact_ids: HashSet<String> = sqlx::query_scalar(
+            "SELECT id FROM artifacts WHERE workspace_id = ?1 AND NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = artifacts.source_id)",
+        )
             .bind(workspace_id)
             .fetch_all(self.reader())
             .await?

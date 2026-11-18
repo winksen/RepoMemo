@@ -1590,7 +1590,24 @@ pub struct ConnectorSource {
     pub sharing_approved_by: Option<String>,
     #[serde(default)]
     pub sharing_approved_at: Option<String>,
+    /// Set while the connector's evidence is held back because access to the
+    /// source was lost or cannot be established (V0.8.2).
+    #[serde(default)]
+    pub quarantine: Option<ConnectorQuarantine>,
     pub created_at: String,
+}
+
+/// Why a connector's evidence is held back. The detail is the tracker's own
+/// words and never holds a secret.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectorQuarantine {
+    /// `access_revoked` (the token is refused), `access_denied` (the tracker
+    /// forbids the partition) or `not_found` (the tracker does not know it).
+    pub reason: String,
+    pub detail: String,
+    /// How many copied items are held back.
+    pub items: i64,
+    pub since: String,
 }
 
 /// What one connector sync did.

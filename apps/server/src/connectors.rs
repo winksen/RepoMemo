@@ -67,6 +67,14 @@ impl ConnectorRunner {
         source: &ConnectorSource,
         actor_user_id: Option<String>,
     ) -> anyhow::Result<Option<IndexingJobStatus>> {
+        // Evidence held back for lost access is not refreshed until an
+        // administrator has released it.
+        if source.quarantine.is_some() {
+            repomemo_domain::bail_conflict!(
+                "{} is in quarantine: access to its source was lost. Release it once the access is back.",
+                source.name
+            );
+        }
         // A tracker that asked to wait is not asked again before it is over.
         if let Some(until) = source.paused_until.as_deref() {
             if chrono::DateTime::parse_from_rfc3339(until).is_ok_and(|until| until > chrono::Utc::now()) {
@@ -189,7 +197,7 @@ impl ConnectorRunner {
                     };
                     // One that failed is left for a person to look at, and
                     // one that was refused waits for a new token.
-                    if source.status == "error" || source.last_synced_at.is_none() {
+                    if source.status == "error" || source.last_synced_at.is_none() || source.quarantine.is_some() {
                         continue;
                     }
                     if source.status == "paused" && source.paused_until.is_none() {
@@ -356,6 +364,33 @@ pub(crate) async fn sync_connector(
         connector,
         job: Some(job),
     }))
+}
+
+/// Lets a quarantined connector's evidence be served again, after the source
+/// answers for the partition with the stored token (V0.8.2).
+pub(crate) async fn release_connector(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path(source_id): Path<String>,
+) -> Result<Json<ConnectorSource>, ApiError> {
+    let connector = load(&state, &source_id).await?;
+    require_workspace_admin(&state, &subject, &connector.workspace_id).await?;
+    let released = state
+        .core
+        .release_connector_quarantine(&source_id)
+        .await
+        .map_err(map_error)?;
+    record_workspace_activity(
+        &state,
+        &connector.workspace_id,
+        &subject.user_id,
+        "connector_released",
+        "connector",
+        Some(&source_id),
+        format!("Released the quarantine of {}.", connector.name),
+    )
+    .await;
+    Ok(Json(released))
 }
 
 /// Replaces the token. The new one is tried against the tracker first.

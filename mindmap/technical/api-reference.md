@@ -284,6 +284,7 @@
 | GET | `/v1/connectors/{source_id}` | auth | require_workspace_read | — | ConnectorSource |
 | DELETE | `/v1/connectors/{source_id}` | managing | require_workspace_admin | — | status |
 | POST | `/v1/connectors/{source_id}/sync` | auth | require_workspace_write | — | ConnectorSyncResponse |
+| POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |
 | PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |
 | GET | `/v1/artifacts/{artifact_id}/at/{commit}` | auth | require_workspace_read | — | RepoFileAtCommit |

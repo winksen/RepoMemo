@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.1` (2026-11-18)
+> **Current:** `V0.8.2` (2026-11-18)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -21,7 +21,7 @@
 |---|---|---|---|---|---|---|
 | **V0.8.0** | ✅ 2026-11-18 | AL. Connections and sharing | 📘 | Opening | Define a connector conformance contract: ownership, audience, cursor, freshness, deletion, rate limits and permission loss | Fixtures and a support matrix distinguish a deliberate shared-source import from unsupported per-user source ACL mirroring |
 | **V0.8.1** | ✅ 2026-11-18 | AL. Connections and sharing | 🔒 | Connection setup | Preview the selected source partition, copied data and destination audience before importing | An admin explicitly approves uniform sharing; sources requiring unsupported item-level restrictions are refused and secrets never appear in the preview |
-| **V0.8.2** | 🔜 | AL. Connections and sharing | 🔒 | Source access changes | Quarantine affected mirrored evidence when access is revoked or sharing can no longer be established | Denied sources disappear from retrieval, previews, exports and publication; transient failures and deletion differ, with a documented maximum stale-access window |
+| **V0.8.2** | ✅ 2026-11-18 | AL. Connections and sharing | 🔒 | Source access changes | Quarantine affected mirrored evidence when access is revoked or sharing can no longer be established | Denied sources disappear from retrieval, previews, exports and publication; transient failures and deletion differ, with a documented maximum stale-access window |
 | **V0.8.3** | 🔜 | AL. Connections and sharing | 🔧 | Connector health | Expose last successful sync, coverage, exclusions, backlog and recoverable errors | An operator distinguishes complete, partial, stale and paused sources, resumes a cursor and diagnoses a retry without duplicate evidence |
 | **V0.8.4** | 🔜 | AL. Connections and sharing | ✨ | Outbound events | Add opt-in signed outbound webhooks with event IDs, bounded retries and delivery inspection (existing webhooks are inbound only) | Only approved destinations receive selected events, duplicate delivery is identifiable and disabled endpoints stop receiving queued content |
 | **V0.8.5** | 🔜 | AL. Connections and sharing | ✨ | Jira intake | Read selected Jira Cloud project issues into existing connector evidence with stable remote IDs | A dry run reports scope and permissions; paged import resumes, preserves source links and changes nothing in Jira |

@@ -20,6 +20,7 @@ mod code_owners;
 mod compression;
 mod connectors;
 mod connectors_gitlab;
+mod connectors_quarantine;
 mod cross_search;
 mod edit_conflicts;
 mod evidence;

@@ -1191,6 +1191,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/connectors/{source_id}/sync", post(connectors::sync_connector))
         .route("/v1/connectors/{source_id}/token", put(connectors::set_connector_token))
+        .route(
+            "/v1/connectors/{source_id}/release",
+            post(connectors::release_connector),
+        )
         .route("/v1/repositories/{source_id}/sync", post(repositories::sync_repository))
         .route(
             "/v1/repositories/{source_id}/token",

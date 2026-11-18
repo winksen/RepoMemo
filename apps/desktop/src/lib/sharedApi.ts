@@ -1536,6 +1536,10 @@ export function connectSharedConnector(accessToken: string, workspaceId: string,
   return request(`/v1/workspaces/${workspaceId}/connectors`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 
+export function releaseSharedConnector(accessToken: string, connectorId: string): Promise<ConnectorSource> {
+  return request(`/v1/connectors/${connectorId}/release`, { method: "POST", body: JSON.stringify({}) }, accessToken);
+}
+
 export function syncSharedConnector(accessToken: string, connectorId: string): Promise<{ connector: ConnectorSource; job: IndexingJobStatus | null }> {
   return request(`/v1/connectors/${connectorId}/sync`, { method: "POST", body: JSON.stringify({}) }, accessToken);
 }

@@ -1432,7 +1432,28 @@ export interface ConnectorSource {
    */
   sharing_approved_by: string | null;
   sharing_approved_at: string | null;
+  /**
+   * Set while the connector's evidence is held back because access to the
+   * source was lost or cannot be established (V0.8.2).
+   */
+  quarantine: ConnectorQuarantine | null;
   created_at: string;
+}
+
+/**
+ * Why a connector's evidence is held back. The detail is the tracker's own
+ * words and never holds a secret.
+ */
+export interface ConnectorQuarantine {
+  /**
+   * `access_revoked` (the token is refused), `access_denied` (the tracker
+   * forbids the partition) or `not_found` (the tracker does not know it).
+   */
+  reason: string;
+  detail: string;
+  /** How many copied items are held back. */
+  items: number;
+  since: string;
 }
 
 /** What one connector sync did. */

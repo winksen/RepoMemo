@@ -15,6 +15,7 @@ import {
   deleteSharedConnector,
   deleteSharedConnectorWebhook,
   listSharedConnectors,
+  releaseSharedConnector,
   setSharedConnectorToken,
   syncSharedConnector,
 } from "../lib/sharedApi";
@@ -41,6 +42,7 @@ const STATUS_LABEL: Record<string, string> = {
   ready: "Up to date",
   error: "Sync failed",
   paused: "Paused",
+  quarantined: "Held back",
 };
 
 /** Workspace Settings › Issues: trackers whose issues are kept as evidence.
@@ -129,6 +131,17 @@ export function ConnectorSettings({
       showToast("error", apiMessage(error, "The tracker could not be connected."));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function release(connector: ConnectorSource) {
+    try {
+      await releaseSharedConnector(accessToken, connector.id);
+      showToast("success", `Released ${connector.name}. Its evidence is served again.`);
+      await load();
+      onChanged();
+    } catch (error) {
+      showToast("error", apiMessage(error, "The quarantine could not be released."));
     }
   }
 
@@ -221,10 +234,13 @@ export function ConnectorSettings({
             {!running && connector.status === "paused" ? <span className="rm-map-muted">
               Paused{connector.paused_until ? ` until ${formatTime(connector.paused_until)}` : " until the token is replaced"}: {connector.paused_reason}
             </span> : null}
+            {connector.quarantine ? <span className="rm-map-muted">
+              Held back since {formatTime(connector.quarantine.since)} ({connector.quarantine.items.toLocaleString()} items are out of search, files and exports): {connector.quarantine.detail}
+            </span> : null}
             {connector.has_webhook ? <span className="rm-map-muted">Webhook on{connector.webhook_last_received_at ? ` · last call ${formatTime(connector.webhook_last_received_at)}` : " · no call yet"}</span> : null}
           </div>
           <div className="rm-health-actions">
-            <Button disabled={running} onClick={() => void sync(connector)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button>
+            {connector.quarantine ? <Button onClick={() => void release(connector)} variant="secondary"><CircleCheck size={ICON_SIZE.sm} /> Release</Button> : <Button disabled={running} onClick={() => void sync(connector)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Sync now</Button>}
             <Button disabled={running} onClick={() => { setNewToken(""); setReplacing(connector); }} variant="secondary"><Key size={ICON_SIZE.sm} /> Token</Button>
             <Button disabled={running} onClick={() => { setHookSecret(null); setHooking(connector); }} variant="secondary"><Webhook size={ICON_SIZE.sm} /> Webhook</Button>
             <Button disabled={running} onClick={() => setRemoving(connector)} variant="secondary"><Trash size={ICON_SIZE.sm} /> Remove</Button>

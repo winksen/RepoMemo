@@ -340,7 +340,7 @@ impl StorageEngine {
               artifacts.indexed_at
             FROM artifacts
             JOIN sources ON sources.id = artifacts.source_id
-            WHERE artifacts.workspace_id = ?1
+            WHERE artifacts.workspace_id = ?1 AND NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = artifacts.source_id)
             ORDER BY artifacts.updated_at DESC, artifacts.path ASC, artifacts.id ASC
             "#,
         )
@@ -380,7 +380,7 @@ impl StorageEngine {
               artifacts.indexed_at
             FROM artifacts
             JOIN sources ON sources.id = artifacts.source_id
-            WHERE artifacts.workspace_id = ?1
+            WHERE artifacts.workspace_id = ?1 AND NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = artifacts.source_id)
             ORDER BY artifacts.updated_at DESC, artifacts.path ASC, artifacts.id ASC
             LIMIT ?2 OFFSET ?3
             "#,
@@ -390,7 +390,9 @@ impl StorageEngine {
         .bind(offset.max(0))
         .fetch_all(self.reader())
         .await?;
-        let total = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM artifacts WHERE workspace_id = ?1")
+        let total = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM artifacts WHERE workspace_id = ?1 AND NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = artifacts.source_id)",
+        )
             .bind(workspace_id)
             .fetch_one(self.reader())
             .await?;
@@ -413,7 +415,7 @@ impl StorageEngine {
                    artifacts.mime_type, artifacts.language, artifacts.size_bytes,
                    artifacts.created_at, artifacts.updated_at, artifacts.indexed_at
             FROM artifacts JOIN sources ON sources.id = artifacts.source_id
-            WHERE artifacts.workspace_id = ?1 AND EXISTS (
+            WHERE artifacts.workspace_id = ?1 AND NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = artifacts.source_id) AND EXISTS (
               SELECT 1 FROM artifacts cursor
               WHERE cursor.id = ?2 AND cursor.workspace_id = ?1
               AND (artifacts.updated_at < cursor.updated_at
@@ -512,6 +514,9 @@ impl StorageEngine {
         .bind(artifact_id)
         .fetch_one(self.reader())
         .await?;
+        if self.artifact_is_quarantined(artifact_id).await? {
+            repomemo_domain::bail_not_found!("This file is held back while its source's access is checked.");
+        }
 
         let summary = ArtifactSummary::from(row.summary_row());
         let metadata = serde_json::from_str(&row.metadata_json).unwrap_or_else(|_| Value::Object(Default::default()));
