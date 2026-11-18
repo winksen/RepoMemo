@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.12 (2026-11-18)
+
+Import a Confluence space exported as HTML with its page tree, links and attachments, say what did not translate, and make the missing page restrictions an explicit decision.
+
+### Added
+- **A Confluence importer** (`POST /v1/workspaces/{id}/imports/confluence`): send the files of a space exported **as HTML** (the pages, `index.html`, `attachments/` and the rest). Up to 500 files, the same limits as a directory import.
+- **Hierarchy kept.** `index.html` is read as the page tree: each page becomes `Parent/Page.md` in folders that follow it (a repeated title keeps its page id), with its title, a line saying which space and page it came from, and its content as Markdown: headings, paragraphs, lists, links, images, code, quotes and simple tables.
+- **Links and attachments kept.** Links between pages and to attachments are written as relative paths and then mapped to the files' addresses in the app by the directory import's link mapping; attachments (png, jpg, gif, webp, pdf) are stored as files.
+- **The same safety as a directory import:** a dry run is the default and explains every file, one problem refuses a commit unless `skip_invalid` is set, and the ledger means the same export sent again makes nothing twice and replaces a changed page in place.
+- **What did not translate is reported.** The report's `notes` list the **macros** that did not become plain content, by name and count, and the style, script, icon and index files that were not imported.
+- **Restrictions need an explicit mapping.** An HTML export carries **no page restrictions**, so every page would be readable by everyone who can read the workspace. A commit is refused (`409`) without `acknowledge_restrictions: true`, and the dry run says why. The XML export and the Confluence Cloud site export are not understood.
+- The directory import's core was split out (`run_import`) so both importers share it; its behaviour is unchanged.
+- Unit tests of the HTML converter (links, lists, code, images, macros, dropped styles) and the page tree, and a server test (`tests/directory_import.rs`): an export with no index refused, a dry run showing the tree, the macro and the restrictions note, a commit refused without the acknowledgement, a commit with it, the attribution line and the rewritten link, and a second send that makes nothing.
+- No migration (the ledger of V0.8.11 is used).
+- **Not in this release:** a web upload screen, ZIP upload, the XML export, page restrictions, comments and page history, and live synchronisation with Confluence.
+
+### Checks
+- Version, migration lock (83 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (server, all targets) pass. The new tests compile; **they were not executed** and no real Confluence export was read. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.11 (2026-11-18)
 
 Bring a wiki or a folder of notes in with a preview first, links that keep working, and nothing made twice when it is sent again.

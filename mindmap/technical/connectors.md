@@ -64,6 +64,10 @@ Migration 0082: `chat_destinations` (provider `slack`, name, host, **sealed** ad
 
 Not a connector (the source is a `manual` one named `Import: <source_key>`), but the same rules of identity and safety. Migration 0083 `directory_imports` (workspace, source key, path → artifact, hash of the file as sent). `directory_import.rs`: `normalize_path` (relative only; no `..`, backslash, control character, hidden segment, `:`), `classify` (md, txt, png, jpg, gif, webp, pdf), `scan_links` (`[t](target)` and `![a](target)` outside fenced code; `[[wiki]]` counted) and `resolve_link` (file of the import, missing, unsafe, other). Commit: folders by `ensure_folder`; pass 1 stores or replaces each file as sent (`store_artifact`, or `replace_artifact_content` for a changed file so its id, comments and versions stay) and records it in the ledger; pass 2 rewrites resolved links to `/workspaces/{ws}/artifacts/{id}` (with the fragment) and replaces the content when it differs; touched files are queued for indexing. The route takes up to 40 MB of JSON (500 files, 5 MiB each, 25 MiB in all).
 
+## Confluence migration (V0.8.12)
+
+No migration. `confluence_import.rs` reads a space exported as HTML (sent as its files, like a directory): `page_tree` reads `index.html` as nested lists to give each page its ancestors, `html_to_markdown` is a small tolerant converter (headings, paragraphs, lists, links, images, code, quotes, simple tables; script, style and head dropped; `ac:structured-macro` names and `conf-macro` classes collected as unsupported), pages become `Ancestors/Title.md` (a repeated title keeps its page id), links to pages and attachments are rewritten as relative paths, each page gets an attribution line, and the result is handed to `run_import` of the directory import (dry run, link mapping, ledger, in-place replacement). The report's `notes` carry the macros, the ignored files and the restrictions statement. A commit needs `acknowledge_restrictions` (409 otherwise) because the export holds no restrictions to map. The unit tests cover the converter and the tree.
+
 ## Rules for the outside connection (S6)
 
 | Rule | How |

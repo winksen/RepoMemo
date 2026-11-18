@@ -27,11 +27,11 @@ const BODY_LIMIT: usize = 40 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ImportFile {
-    path: String,
+    pub(crate) path: String,
     #[serde(default)]
-    text: Option<String>,
+    pub(crate) text: Option<String>,
     #[serde(default)]
-    base64: Option<String>,
+    pub(crate) base64: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -285,6 +285,8 @@ pub(crate) struct DirectoryImportReport {
     folders: usize,
     links_resolved: usize,
     links_broken: usize,
+    /// Things the caller should know that are not a file's own problem (V0.8.12): unsupported macros, restrictions.
+    pub(crate) notes: Vec<String>,
     entries: Vec<ImportEntry>,
 }
 
@@ -297,7 +299,7 @@ struct Planned {
     spans: Vec<LinkSpan>,
 }
 
-fn check_key(key: &str) -> Result<String, ApiError> {
+pub(crate) fn check_key(key: &str) -> Result<String, ApiError> {
     let key = key.trim();
     if key.is_empty() || key.len() > 60 || !key.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c)) {
         return Err(ApiError::bad_request(
@@ -463,8 +465,30 @@ pub(crate) async fn import_directory(
 ) -> Result<(StatusCode, Json<DirectoryImportReport>), ApiError> {
     require_workspace_write(&state, &subject, &workspace_id).await?;
     let source_key = check_key(&request.source_key)?;
-    let (dry_run, skip_invalid) = (request.dry_run, request.skip_invalid);
-    let mut planned = plan(request.files)?;
+    run_import(
+        &subject,
+        &state,
+        &workspace_id,
+        source_key,
+        request.dry_run,
+        request.skip_invalid,
+        request.files,
+    )
+    .await
+}
+
+/// Plans and, unless it is a dry run, writes an import. The caller has checked the right to write and the name of the import.
+pub(crate) async fn run_import(
+    subject: &AuthenticatedSubject,
+    state: &AppState,
+    workspace_id: &str,
+    source_key: String,
+    dry_run: bool,
+    skip_invalid: bool,
+    files: Vec<ImportFile>,
+) -> Result<(StatusCode, Json<DirectoryImportReport>), ApiError> {
+    let workspace_id = workspace_id.to_owned();
+    let mut planned = plan(files)?;
     let earlier = state
         .storage
         .directory_import_files(&workspace_id, &source_key)
@@ -500,6 +524,7 @@ pub(crate) async fn import_directory(
             .iter()
             .map(|f| f.entry.links.missing + f.entry.links.unsafe_links)
             .sum(),
+        notes: Vec::new(),
         entries: planned.iter().map(|f| f.entry.clone()).collect(),
     };
     let folders_needed: HashSet<String> = planned
@@ -534,7 +559,7 @@ pub(crate) async fn import_directory(
         .filter(|file| matches!(file.entry.action, "create" | "replace"))
         .map(|file| file.bytes.len() as u64)
         .sum();
-    quotas::check_incoming(&state, &subject, &workspace_id, writes, false).await?;
+    quotas::check_incoming(state, subject, &workspace_id, writes, false).await?;
     let source = state
         .storage
         .create_or_get_source(
@@ -679,7 +704,7 @@ pub(crate) async fn import_directory(
         }
     }
     record_workspace_activity(
-        &state,
+        state,
         &workspace_id,
         &subject.user_id,
         "directory_imported",

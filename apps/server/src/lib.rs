@@ -19,6 +19,7 @@ mod check_config;
 mod collaboration;
 mod compression;
 mod config;
+mod confluence_import;
 mod connectors;
 mod conversion;
 mod derived;
@@ -1237,6 +1238,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/chat-destinations/{id}/test", post(chat::test_destination))
         .route("/v1/chat-destinations/{id}/digest", post(chat::send_digest_now))
+        .route(
+            "/v1/workspaces/{workspace_id}/imports/confluence",
+            post(confluence_import::import_confluence).layer(DefaultBodyLimit::max(directory_import::body_limit())),
+        )
         .route(
             "/v1/workspaces/{workspace_id}/imports/directory",
             post(directory_import::import_directory).layer(DefaultBodyLimit::max(directory_import::body_limit())),

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.11` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.12 — Add a bounded importer for a documented Confluence export format.
+
+- Confluence migration (no migration): `confluence_import.rs` reads an HTML export as files, builds the page tree from `index.html`, converts pages to Markdown with a small tolerant converter, maps page and attachment links as relative paths, adds an attribution line, and hands the result to the directory import (dry run, link mapping, ledger). Unsupported macros and ignored files are reported in `notes`; a commit needs `acknowledge_restrictions`. Tests in the module and `tests/directory_import.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; no real Confluence export was read; nothing was built or run.
 
 ## V0.8.11 — Import a Markdown/asset directory with link mapping, preview and resumable progress.
 

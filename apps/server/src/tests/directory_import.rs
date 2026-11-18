@@ -194,3 +194,126 @@ async fn a_markdown_directory_is_previewed_mapped_and_imported_once() {
     assert_eq!(count().await, 3);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+fn export() -> Value {
+    json!([
+        {"path": "index.html", "text": "<ul><li><a href=\"Home_1.html\">Home</a><ul><li><a href=\"Guide_2.html\">Guide</a></li></ul></li></ul>"},
+        {"path": "Home_1.html", "text": "<html><head><title>Docs : Home</title></head><body><h1>Home</h1><p>Welcome to the manatee wiki.</p></body></html>"},
+        {"path": "Guide_2.html", "text": "<html><head><title>Docs : Guide</title></head><body><h1>Guide</h1><p>Back to <a href=\"Home_1.html\">home</a>.</p><img src=\"attachments/2/pic.png\" alt=\"pic\"/><ac:structured-macro ac:name=\"toc\"></ac:structured-macro></body></html>"},
+        {"path": "attachments/2/pic.png", "base64": PNG},
+        {"path": "styles/site.css", "text": "body{}"}
+    ])
+}
+
+#[tokio::test]
+async fn a_confluence_html_export_keeps_its_tree_and_links_and_needs_the_restrictions_acknowledged() {
+    let data_dir = temp_data_dir("confluence-import");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (owner, _) = register_account(&app, "confluence-owner@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let uri = format!("/v1/workspaces/{workspace_id}/imports/confluence");
+
+    // No index, no import.
+    let no_index = call(
+        "POST",
+        uri.clone(),
+        json!({"source_key": "space", "files": [{"path": "Home_1.html", "text": "<p>x</p>"}]}),
+    )
+    .await;
+    assert_eq!(no_index.status(), 400);
+
+    // The dry run shows the tree, what did not translate and the restrictions that were not carried.
+    let preview = response_json(
+        call(
+            "POST",
+            uri.clone(),
+            json!({"source_key": "space", "space_key": "DOCS", "files": export()}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(preview["committed"], false);
+    assert_eq!(preview["create"], 3, "{preview}");
+    assert_eq!(preview["links_resolved"], 2, "{preview}");
+    let paths = preview["entries"].to_string();
+    assert!(
+        paths.contains("Home/Guide.md") && paths.contains("\"Home.md\""),
+        "{paths}"
+    );
+    let notes = preview["notes"].to_string();
+    assert!(notes.contains("toc"), "{notes}");
+    assert!(notes.contains("no page restrictions"), "{notes}");
+
+    // Committing needs the caller to accept that everyone in the workspace reads every page.
+    let refused = call(
+        "POST",
+        uri.clone(),
+        json!({"source_key": "space", "dry_run": false, "files": export()}),
+    )
+    .await;
+    assert_eq!(refused.status(), 409);
+    let listed = response_json(call("GET", format!("/v1/workspaces/{workspace_id}/artifacts"), json!({})).await).await;
+    assert_eq!(listed.as_array().unwrap().len(), 0);
+
+    let done = response_json(
+        call(
+            "POST",
+            uri.clone(),
+            json!({"source_key": "space", "space_key": "DOCS", "dry_run": false, "acknowledge_restrictions": true, "files": export()}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(done["committed"], true, "{done}");
+    let id_of = |path: &str| {
+        done["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["path"] == path)
+            .unwrap()["artifact_id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let home = id_of("Home.md");
+    let guide = id_of("Home/Guide.md");
+
+    // The guide says where it came from, and its link to the home page now points at it.
+    let text = String::from_utf8(
+        axum::body::to_bytes(
+            call("GET", format!("/v1/artifacts/{guide}/file"), json!({}))
+                .await
+                .into_body(),
+            usize::MAX,
+        )
+        .await
+        .unwrap()
+        .to_vec(),
+    )
+    .unwrap();
+    assert!(text.contains("Imported from Confluence space DOCS, page 2"), "{text}");
+    assert!(
+        text.contains(&format!("/workspaces/{workspace_id}/artifacts/{home}")),
+        "{text}"
+    );
+
+    // Sent again, nothing is made twice.
+    let again = response_json(
+        call(
+            "POST",
+            uri,
+            json!({"source_key": "space", "space_key": "DOCS", "dry_run": false, "acknowledge_restrictions": true, "files": export()}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(again["create"], 0, "{again}");
+    assert_eq!(again["unchanged"], 3);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
