@@ -24,8 +24,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use repomemo_domain::{
-    ArtifactType, ConnectorAccessCheck, ConnectorSource, ConnectorSyncReport, IndexingJobStatus, Source,
-    CONNECTOR_SYNC_JOB_KIND,
+    ArtifactType, ConnectorAccessCheck, ConnectorPreview, ConnectorSource, ConnectorSyncReport, IndexingJobStatus,
+    Source, CONNECTOR_SYNC_JOB_KIND,
 };
 use repomemo_indexer::INDEXER_VERSION;
 use repomemo_storage::{ConnectorItemOutcome, ConnectorItemWrite, StorageEngine};
@@ -118,6 +118,11 @@ struct ConnectorMetadata {
     /// Set while the connector has stopped by itself.
     #[serde(default)]
     paused: Option<PausedInfo>,
+    /// Who approved sharing the copy with the whole workspace, and when.
+    #[serde(default)]
+    sharing_approved_by: Option<String>,
+    #[serde(default)]
+    sharing_approved_at: Option<String>,
 }
 
 /// A connector the tracker asked to stop (see [`Pause`]).
@@ -783,18 +788,87 @@ impl RepoMemoCore {
             .await?
             .iter()
             .any(|source| source.root_uri.as_deref() == Some(target.location.as_str()));
+        let name = text_of(&repository, "full_name");
+        let private = repository.get("private").and_then(Value::as_bool).unwrap_or(false);
+        // GitHub shows every issue of a repository to everyone who can read
+        // the repository, so there is no item-level restriction to refuse.
+        let preview = self
+            .connector_preview(workspace_id, "github", &name, private, false)
+            .await?;
         Ok(ConnectorAccessCheck {
             provider: "github".to_owned(),
-            name: text_of(&repository, "full_name"),
+            name,
             location: target.location,
             open_issues: repository.get("open_issues_count").and_then(Value::as_i64).unwrap_or(0),
-            private: repository.get("private").and_then(Value::as_bool).unwrap_or(false),
+            private,
             already_connected,
+            preview,
+        })
+    }
+
+    /// What an import would copy and to whom, built from facts the server
+    /// already holds: it never carries a token. A partition with item-level
+    /// restrictions is refused, because the copy would show every member what
+    /// the tracker hides from some of them (V0.8.1).
+    pub(crate) async fn connector_preview(
+        &self,
+        workspace_id: &str,
+        provider: &str,
+        partition: &str,
+        private: bool,
+        restricted_items: bool,
+    ) -> Result<ConnectorPreview> {
+        let members = self.storage.list_workspace_members(workspace_id).await?.len() as i64;
+        let workspace = self
+            .storage
+            .workspace_names()
+            .await?
+            .remove(workspace_id)
+            .unwrap_or_else(|| "this workspace".to_owned());
+        let (items, discussion) = if provider == "gitlab" {
+            (
+                "Issues and merge requests: title, state, author, labels, assignees, link and description",
+                "The discussion, commits, approvals and review comments of each merge request",
+            )
+        } else {
+            (
+                "Issues and pull requests: title, state, author, labels, assignees, link and description",
+                "The discussion, commits, reviews and review comments of each pull request",
+            )
+        };
+        let audience = format!(
+            "Everyone who can read {workspace} ({members} {}) can read the copy{}",
+            if members == 1 { "person" } else { "people" },
+            if private {
+                ", although the source itself is private"
+            } else {
+                ""
+            }
+        );
+        let refusal = restricted_items.then(|| {
+            "This project has confidential issues. Importing it would show them to every member of the workspace, \
+             including people the tracker hides them from, so it cannot be connected."
+                .to_owned()
+        });
+        Ok(ConnectorPreview {
+            partition: partition.to_owned(),
+            copies: vec![items.to_owned(), discussion.to_owned()],
+            not_copied: vec![
+                "The access token, which is stored sealed and never shown".to_owned(),
+                "Code, wikis, attachments and anything that is not an issue or a request".to_owned(),
+                "Anything in the tracker: nothing is ever written back".to_owned(),
+            ],
+            audience,
+            audience_members: members,
+            sharing: if refusal.is_some() { "refused" } else { "uniform" }.to_owned(),
+            refusal,
         })
     }
 
     /// Connects a repository's (or project's) issues and pull requests to a
-    /// workspace. Nothing is read until a sync runs.
+    /// workspace. Nothing is read until a sync runs. `approved_by` is the
+    /// administrator who approves sharing the copy with the whole workspace;
+    /// without one nothing is connected.
     pub async fn connect_tracker(
         &self,
         workspace_id: &str,
@@ -802,11 +876,22 @@ impl RepoMemoCore {
         provider: Option<&str>,
         name: Option<String>,
         token: Option<String>,
-        actor_user_id: Option<&str>,
+        approved_by: Option<&str>,
     ) -> Result<ConnectorSource> {
         let check = self
             .check_tracker_link(workspace_id, link, provider, token.as_deref())
             .await?;
+        // A partition that cannot share one audience is never imported, and
+        // sharing is never assumed: an administrator says it in the request.
+        if let Some(reason) = check.preview.refusal.as_deref() {
+            repomemo_domain::bail_conflict!("{reason}");
+        }
+        let Some(actor_user_id) = approved_by else {
+            repomemo_domain::bail_invalid!(
+                "Approve sharing first: {}. Check the address to see what is copied.",
+                check.preview.audience
+            );
+        };
         let target = parse_tracker_link(link, provider)?;
         let name = name
             .map(|value| value.trim().to_owned())
@@ -817,6 +902,8 @@ impl RepoMemoCore {
             api_base: target.api_base.clone(),
             owner: target.owner.clone(),
             repo: target.repo.clone(),
+            sharing_approved_by: Some(actor_user_id.to_owned()),
+            sharing_approved_at: Some(chrono::Utc::now().to_rfc3339()),
             ..Default::default()
         };
         let source = self
@@ -826,7 +913,7 @@ impl RepoMemoCore {
         if let Some(token) = token.as_deref().map(str::trim).filter(|token| !token.is_empty()) {
             if let Err(error) = self
                 .storage
-                .set_repo_credential(&source.id, "token", None, token, actor_user_id)
+                .set_repo_credential(&source.id, "token", None, token, Some(actor_user_id))
                 .await
             {
                 let _ = self.storage.delete_source(&source.id).await;
@@ -899,6 +986,8 @@ impl RepoMemoCore {
             webhook_last_received_at: webhook.and_then(|webhook| webhook.last_received_at),
             paused_reason: metadata.paused.as_ref().map(|paused| paused.reason.clone()),
             paused_until: metadata.paused.as_ref().and_then(|paused| paused.until.clone()),
+            sharing_approved_by: metadata.sharing_approved_by,
+            sharing_approved_at: metadata.sharing_approved_at,
             created_at: source.created_at,
         })
     }

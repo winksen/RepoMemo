@@ -288,6 +288,8 @@ flowchart LR
 
 Admins can connect **GitHub** and **GitLab** (including self-hosted) so that **issues and pull/merge requests**, with their comments, reviews and commits, become searchable evidence. Files, symbols and commits they mention link both ways, so a file shows the issues that name it. So do the other issues and pull requests an item refers to (`#12` for the same repository, `owner/repo#12` for another connected one, `!12` for a GitLab merge request, or the item's address): a pull request that says "Fixes #12" is listed on issue 12 and links to it. A pull request's page says who approved it and who asked for changes.
 
+Before anything is imported, **Check access** shows what the connection copies (issues and requests with their discussion), what it never copies (the token, code, wikis, attachments; nothing is written back to the tracker) and **who can read the copy**: everyone who can read the workspace. You must tick that you approve sharing it with them before **Connect and sync** is available. A source that hides some items from some people (a GitLab project with confidential issues) is refused, because the copy would show them to everyone.
+
 ### Versions and lifecycle
 
 - Upload a new version of a file and the **version history** keeps the old ones: see who uploaded each, read it, and compare any two line by line. If a newer version was a mistake, **Restore** an earlier one: it becomes a new version with that content, and nothing in the history is lost.

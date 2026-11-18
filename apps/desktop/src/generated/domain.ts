@@ -1426,6 +1426,12 @@ export interface ConnectorSource {
    */
   paused_reason: string | null;
   paused_until: string | null;
+  /**
+   * The administrator who approved sharing the copy with the whole
+   * workspace, and when (V0.8.1). Empty for a connector made earlier.
+   */
+  sharing_approved_by: string | null;
+  sharing_approved_at: string | null;
   created_at: string;
 }
 
@@ -1451,6 +1457,28 @@ export interface ConnectorAccessCheck {
   open_issues: number;
   private: boolean;
   already_connected: boolean;
+  /** What importing would copy and to whom, shown before anything is read. */
+  preview: ConnectorPreview;
+}
+
+/**
+ * What an import would do, so an administrator approves it knowingly
+ * (V0.8.1). It holds no token and no secret.
+ */
+export interface ConnectorPreview {
+  /** The part of the tracker that is copied: a repository or a project. */
+  partition: string;
+  /** What is copied into the workspace. */
+  copies: string[];
+  /** What is never copied. */
+  not_copied: string[];
+  /** Who will be able to read the copy. */
+  audience: string;
+  audience_members: number;
+  /** `uniform` (the partition has one audience) or `refused`. */
+  sharing: string;
+  /** Why the partition cannot be connected, when it is refused. */
+  refusal: string | null;
 }
 
 /**

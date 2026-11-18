@@ -279,7 +279,7 @@
 | GET | `/v1/connectors/{source_id}/webhook/deliveries` | auth | require_workspace_write | — | WebhookDelivery[] |
 | POST | `/v1/connectors/{source_id}/webhook/deliveries/{delivery_id}/resend` | auth | require_workspace_write | — | 202 `{queued, note, delivery}` |
 | GET | `/v1/workspaces/{workspace_id}/connectors` | auth | require_workspace_read | — | ConnectorsResponse |
-| POST | `/v1/workspaces/{workspace_id}/connectors` | managing | require_workspace_admin | ConnectorLinkRequest (`link`, `provider?`, `name?`, `token?`) | ConnectorSyncResponse (201) |
+| POST | `/v1/workspaces/{workspace_id}/connectors` | managing | require_workspace_admin | ConnectorLinkRequest (`link`, `provider?`, `name?`, `token?`, `approve_sharing` required true) | ConnectorSyncResponse (201); 400 without approval, 409 when refused |
 | POST | `/v1/workspaces/{workspace_id}/connectors/check` | managing | require_workspace_admin | ConnectorLinkRequest | ConnectorAccessCheck |
 | GET | `/v1/connectors/{source_id}` | auth | require_workspace_read | — | ConnectorSource |
 | DELETE | `/v1/connectors/{source_id}` | managing | require_workspace_admin | — | status |

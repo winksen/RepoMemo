@@ -1584,6 +1584,12 @@ pub struct ConnectorSource {
     pub paused_reason: Option<String>,
     #[serde(default)]
     pub paused_until: Option<String>,
+    /// The administrator who approved sharing the copy with the whole
+    /// workspace, and when (V0.8.1). Empty for a connector made earlier.
+    #[serde(default)]
+    pub sharing_approved_by: Option<String>,
+    #[serde(default)]
+    pub sharing_approved_at: Option<String>,
     pub created_at: String,
 }
 
@@ -1612,6 +1618,27 @@ pub struct ConnectorAccessCheck {
     pub open_issues: i64,
     pub private: bool,
     pub already_connected: bool,
+    /// What importing would copy and to whom, shown before anything is read.
+    pub preview: ConnectorPreview,
+}
+
+/// What an import would do, so an administrator approves it knowingly
+/// (V0.8.1). It holds no token and no secret.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectorPreview {
+    /// The part of the tracker that is copied: a repository or a project.
+    pub partition: String,
+    /// What is copied into the workspace.
+    pub copies: Vec<String>,
+    /// What is never copied.
+    pub not_copied: Vec<String>,
+    /// Who will be able to read the copy.
+    pub audience: String,
+    pub audience_members: i64,
+    /// `uniform` (the partition has one audience) or `refused`.
+    pub sharing: String,
+    /// Why the partition cannot be connected, when it is refused.
+    pub refusal: Option<String>,
 }
 
 /// A repository file's text as it was at a commit, for a citation that names

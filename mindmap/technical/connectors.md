@@ -28,6 +28,10 @@ Syncs run in the background through a runner of their own (one at a time, never 
 
 **Pauses.** The client treats `429`, and `403` with no requests remaining, as a rate limit and reads `Retry-After`, `X-RateLimit-Reset` or `RateLimit-Reset`. A wait of 30 s or less is slept inside the request (twice at most); a longer one ends the sync with `Pause::RateLimited { seconds }` as the error's context, and the connector records `paused { reason, until }` and status `paused` (until capped at 24 h). A `401` is `Pause::TokenRefused`: paused with no end until the token is replaced. Background polling skips paused connectors (a rate-limit pause ends by itself when `until` passes), manual and webhook starts answer `409` while a rate-limit pause is in the future, and a successful sync or a new token clears the pause.
 
+## Preview and approval (V0.8.1)
+
+`check_tracker_link` returns a `ConnectorPreview`: the partition, what is copied and what is not, the audience (the workspace's name and member count) and `sharing` (`uniform` or `refused` with the reason). It holds no token. A GitLab project with confidential issues (`issues?confidential=true` finds one) is refused; a GitHub repository has no item-level restriction. `connect_tracker` takes `approved_by`: the route passes the administrator only when the request says `approve_sharing: true`, otherwise it is `400`; a refusal is `409` whatever the request says. The approver and time are kept in the connector's metadata (`sharing_approved_by`, `sharing_approved_at`), shown on `ConnectorSource`. See [the 0.8 plan](../plans/2026-11-18-0.8-connections.md).
+
 ## Rules for the outside connection (S6)
 
 | Rule | How |
@@ -51,7 +55,7 @@ Syncs run in the background through a runner of their own (one at a time, never 
 | Method | Path | Guard | Notes |
 |---|---|---|---|
 | GET, POST | `/v1/workspaces/{id}/connectors` | R / A | list; connect (`{link, name?, token?}`) and start the first sync |
-| POST | `/v1/workspaces/{id}/connectors/check` | A | what the tracker answers for a link and token; nothing stored |
+| POST | `/v1/workspaces/{id}/connectors/check` | A | what the tracker answers for a link and token, with the import preview (V0.8.1); nothing stored |
 | GET, DELETE | `/v1/connectors/{id}` | R / A | detail; remove with its items |
 | POST | `/v1/connectors/{id}/sync` | W | queue a sync; 409 if one runs |
 | PUT | `/v1/connectors/{id}/token` | A | replace the token, tried against the tracker first; clears a pause |

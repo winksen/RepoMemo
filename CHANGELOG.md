@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.1 (2026-11-18)
+
+Show an administrator what a connection copies and to whom before anything is imported, and import nothing until they approve sharing it with the whole workspace.
+
+### Added
+- **A preview in the access check.** `POST /v1/workspaces/{id}/connectors/check` now returns a `preview`: the **partition** copied (the repository or project), **what is copied** (items, discussion), **what is never copied** (the token, code, wikis, attachments, any write back), **who can read the copy** (the workspace's name and how many people) and a **sharing** verdict, `uniform` or `refused`, with the reason. It is built from facts the server holds and carries **no token and no secret**.
+- **Explicit approval.** Connecting (`POST /v1/workspaces/{id}/connectors`) now needs `approve_sharing: true`; without it the request is `400` ("Approve sharing first...") and nothing is created or stored. The approving administrator and the time are kept on the connector (`sharing_approved_by`, `sharing_approved_at`) and in the workspace activity.
+- **A restricted partition is refused.** A GitLab project that has **confidential issues** is `409` and cannot be connected, whatever the request says, because the copy would show every member what the tracker hides from some of them. GitHub has no item-level restriction on a repository's issues. A failed look at confidentiality is not a refusal.
+- **The web client** shows the preview (copied, not copied, who can read it), the refusal when there is one, and a checkbox the administrator must tick; *Connect and sync* stays off until they do.
+- Two server tests follow the preview without a secret, the refused connection with nothing created, a non-administrator, the approval kept, and the GitLab confidential case; existing connection tests send the approval.
+- No migration: the approval lives in the connector's metadata. A connector made before this release has no recorded approval and keeps syncing.
+
+### Changed
+- **Breaking for scripts:** a client that connects a tracker must send `approve_sharing: true`.
+
+### Checks
+- Version, migration lock (79 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, API, server, all targets) pass. The new tests compile; **they were not executed**, and no tracker was contacted. Nothing was built or run.
+
+### Upgrading
+- Scripts that connect trackers send `approve_sharing: true` after reading the preview. Existing connectors are unchanged.
+
 ## V0.8.0 (2026-11-18)
 
 Open the 0.8 line by writing down what a connector may copy, to whom, and the eight facts every connector must state.

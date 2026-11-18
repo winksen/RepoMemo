@@ -1532,7 +1532,7 @@ export function checkSharedConnector(accessToken: string, workspaceId: string, i
   return request<ConnectorAccessCheck>(`/v1/workspaces/${workspaceId}/connectors/check`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 
-export function connectSharedConnector(accessToken: string, workspaceId: string, input: { link: string; provider?: string; name?: string; token?: string }): Promise<{ connector: ConnectorSource; job: IndexingJobStatus | null }> {
+export function connectSharedConnector(accessToken: string, workspaceId: string, input: { link: string; provider?: string; name?: string; token?: string; approve_sharing?: boolean }): Promise<{ connector: ConnectorSource; job: IndexingJobStatus | null }> {
   return request(`/v1/workspaces/${workspaceId}/connectors`, { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 

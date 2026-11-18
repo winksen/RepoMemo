@@ -319,7 +319,7 @@ async fn ten_thousand_issues_sync_and_stay_searchable() {
         call(
             "POST",
             format!("/v1/workspaces/{workspace_id}/connectors"),
-            json!({"link": format!("{base}/acme/big"), "token": "ghp_scale"}),
+            json!({"link": format!("{base}/acme/big"), "token": "ghp_scale", "approve_sharing": true}),
         )
         .await,
     )

@@ -24,6 +24,7 @@ import { CopyButton } from "./ui/copy-button";
 import { PanelHeading } from "./ui/panel-heading";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { WebhookDeliveries } from "./WebhookDeliveries";
+import { Checkbox } from "./ui/checkbox";
 import { Dropdown } from "./ui/dropdown";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
@@ -70,6 +71,8 @@ export function ConnectorSettings({
   const [token, setToken] = useState("");
   const [check, setCheck] = useState<ConnectorAccessCheck | null>(null);
   const [checkedFor, setCheckedFor] = useState("");
+  // The administrator's own approval to share the copy with the whole workspace.
+  const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState<ConnectorSource | null>(null);
   const [replacing, setReplacing] = useState<ConnectorSource | null>(null);
@@ -103,6 +106,7 @@ export function ConnectorSettings({
       const result = await checkSharedConnector(accessToken, workspaceId, { link: link.trim(), provider: provider || undefined, token: token.trim() || undefined });
       setCheck(result);
       setCheckedFor(formKey);
+      setApproved(false);
     } catch (error) {
       setCheck(null);
       showToast("error", apiMessage(error, "The tracker could not be checked."));
@@ -114,7 +118,8 @@ export function ConnectorSettings({
   async function connect() {
     setBusy(true);
     try {
-      const { connector } = await connectSharedConnector(accessToken, workspaceId, { link: link.trim(), provider: provider || undefined, token: token.trim() || undefined });
+      const { connector } = await connectSharedConnector(accessToken, workspaceId, { link: link.trim(), provider: provider || undefined, token: token.trim() || undefined, approve_sharing: approved });
+      setApproved(false);
       setLink("");
       setToken("");
       setCheck(null);
@@ -245,11 +250,18 @@ export function ConnectorSettings({
           <div><dt>Repository</dt><dd>{check.name} <span className="rm-map-muted">{check.private ? "private" : "public"}</span></dd></div>
           <div><dt>Open issues</dt><dd>{check.open_issues.toLocaleString()}</dd></div>
         </dl>
+        <dl className="rm-repo-facts">
+          <div><dt>Copied</dt><dd>{check.preview.copies.join(". ")}.</dd></div>
+          <div><dt>Not copied</dt><dd>{check.preview.not_copied.join(". ")}.</dd></div>
+          <div><dt>Who can read it</dt><dd>{check.preview.audience}.</dd></div>
+        </dl>
+        {check.preview.refusal ? <span className="rm-map-muted">{check.preview.refusal}</span> : null}
         {check.already_connected ? <span className="rm-map-muted">This repository's issues are already connected to the workspace.</span> : null}
+        {!check.preview.refusal && !check.already_connected ? <Checkbox checked={approved} label={`I approve sharing this copy with every member of the workspace (${check.preview.audience_members.toLocaleString()})`} onCheckedChange={setApproved} /> : null}
       </div> : null}
       <div className="rm-health-actions">
         <Button busy={busy && !checkIsCurrent} disabled={busy || !link.trim()} type="submit" variant={checkIsCurrent ? "secondary" : "main"}><Refresh size={ICON_SIZE.sm} /> {checkIsCurrent ? "Check again" : "Check access"}</Button>
-        <Button busy={busy && checkIsCurrent} disabled={!checkIsCurrent || check?.already_connected} onClick={() => void connect()} variant={checkIsCurrent ? "main" : "secondary"}><Plus size={ICON_SIZE.sm} /> Connect and sync</Button>
+        <Button busy={busy && checkIsCurrent} disabled={!checkIsCurrent || check?.already_connected || Boolean(check?.preview.refusal) || !approved} onClick={() => void connect()} variant={checkIsCurrent ? "main" : "secondary"}><Plus size={ICON_SIZE.sm} /> Connect and sync</Button>
       </div>
     </form>
 

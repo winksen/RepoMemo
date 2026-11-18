@@ -207,7 +207,7 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
             "POST",
             format!("/v1/workspaces/{workspace_id}/connectors/check"),
             owner.clone(),
-            json!({"link": link, "token": "ghp_trackertoken"}),
+            json!({"link": link, "token": "ghp_trackertoken", "approve_sharing": true}),
         )
         .await,
     )
@@ -221,7 +221,7 @@ async fn github_issues_become_evidence_that_follows_the_tracker() {
         "POST",
         format!("/v1/workspaces/{workspace_id}/connectors"),
         owner.clone(),
-        json!({"link": link, "token": "ghp_trackertoken"}),
+        json!({"link": link, "token": "ghp_trackertoken", "approve_sharing": true}),
     )
     .await;
     assert_eq!(connected.status(), 201);
@@ -500,7 +500,7 @@ async fn a_file_lists_the_issues_that_name_it() {
         call(
             "POST",
             format!("/v1/workspaces/{workspace_id}/connectors"),
-            json!({"link": format!("{base}/acme/app")}),
+            json!({"link": format!("{base}/acme/app"), "approve_sharing": true}),
         )
         .await,
     )
@@ -676,7 +676,7 @@ async fn a_tracker_that_asks_to_wait_or_refuses_the_token_pauses_the_connector()
         call(
             "POST",
             format!("/v1/workspaces/{workspace_id}/connectors"),
-            json!({"link": format!("{base}/acme/app"), "token": "ghp_first"}),
+            json!({"link": format!("{base}/acme/app"), "token": "ghp_first", "approve_sharing": true}),
         )
         .await,
     )
@@ -879,5 +879,100 @@ async fn a_tracker_that_asks_to_wait_or_refuses_the_token_pauses_the_connector()
         204
     );
     assert_eq!(send("issues", signature("{}")).await.0, 401);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn a_connection_shows_what_it_copies_and_waits_for_the_admins_approval() {
+    let fake = FakeGitHub::default();
+    *fake.version.lock().unwrap() = 1;
+    let base = start_fake_github(fake.clone()).await;
+    let link = format!("{base}/acme/app");
+
+    let data_dir = temp_data_dir("connectors-sharing");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.git_allowed_hosts = vec!["127.0.0.1".to_owned()];
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "sharing-owner@example.com").await;
+    let (member, _) = register_account(&app, "sharing-member@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |who: String, method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+
+    // The preview names the partition, what is copied, what is not and who reads it.
+    let checked = response_json(
+        call(
+            owner.clone(),
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/connectors/check"),
+            json!({"link": link, "token": "ghp_previewtoken"}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(checked["preview"]["partition"], "acme/app");
+    assert_eq!(checked["preview"]["sharing"], "uniform");
+    assert!(checked["preview"]["copies"].as_array().unwrap().len() >= 2);
+    assert!(checked["preview"]["not_copied"].as_array().unwrap().len() >= 2);
+    assert!(checked["preview"]["audience"]
+        .as_str()
+        .unwrap()
+        .contains("can read the copy"));
+    assert!(
+        !checked.to_string().contains("ghp_previewtoken"),
+        "a preview holds no secret"
+    );
+
+    // Connecting without the approval is refused and creates nothing.
+    let unapproved = call(
+        owner.clone(),
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/connectors"),
+        json!({"link": link, "token": "ghp_previewtoken"}),
+    )
+    .await;
+    assert_eq!(unapproved.status(), 400);
+    let body = response_json(unapproved).await.to_string();
+    assert!(body.contains("Approve sharing"));
+    assert!(!body.contains("ghp_previewtoken"));
+    let listed = response_json(
+        call(
+            owner.clone(),
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/connectors"),
+            json!({}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(listed["connectors"].as_array().unwrap().len(), 0);
+
+    // Someone who is not an administrator of the workspace cannot approve it.
+    let by_outsider = call(
+        member,
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/connectors"),
+        json!({"link": link, "approve_sharing": true}),
+    )
+    .await;
+    assert!(by_outsider.status() == 403 || by_outsider.status() == 404);
+
+    // The administrator's approval is kept with who gave it and when.
+    let connected = response_json(
+        call(
+            owner,
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/connectors"),
+            json!({"link": link, "token": "ghp_previewtoken", "approve_sharing": true}),
+        )
+        .await,
+    )
+    .await;
+    assert!(!connected.to_string().contains("ghp_previewtoken"));
+    assert!(connected["connector"]["sharing_approved_by"].is_string());
+    assert!(connected["connector"]["sharing_approved_at"].is_string());
     let _ = std::fs::remove_dir_all(data_dir);
 }

@@ -243,13 +243,31 @@ impl RepoMemoCore {
             .await?
             .iter()
             .any(|source| source.root_uri.as_deref() == Some(target.location.as_str()));
+        let name = text_of(&project, "path_with_namespace");
+        let private = project.get("visibility").and_then(Value::as_str) != Some("public");
+        // Confidential issues are visible to some members of a project only.
+        // A failed look is not a refusal: the sync reads what the token can.
+        let restricted = client
+            .get(&format!(
+                "{}/projects/{}/issues?confidential=true&scope=all&per_page=1",
+                client.api_base,
+                project_id(target)
+            ))
+            .await
+            .ok()
+            .and_then(|(issues, _)| issues.as_array().map(|issues| !issues.is_empty()))
+            .unwrap_or(false);
+        let preview = self
+            .connector_preview(workspace_id, "gitlab", &name, private, restricted)
+            .await?;
         Ok(ConnectorAccessCheck {
             provider: "gitlab".to_owned(),
-            name: text_of(&project, "path_with_namespace"),
+            name,
             location: target.location.clone(),
             open_issues: project.get("open_issues_count").and_then(Value::as_i64).unwrap_or(0),
-            private: project.get("visibility").and_then(Value::as_str) != Some("public"),
+            private,
             already_connected,
+            preview,
         })
     }
 

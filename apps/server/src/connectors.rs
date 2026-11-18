@@ -232,6 +232,10 @@ pub(crate) struct ConnectorLinkRequest {
     /// A read-only token, for a private repository or a higher rate limit.
     #[serde(default)]
     token: Option<SecretText>,
+    /// The administrator's explicit approval to share what is copied with
+    /// every member of the workspace (V0.8.1). Connecting is refused without it.
+    #[serde(default)]
+    approve_sharing: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -298,7 +302,7 @@ pub(crate) async fn connect_connector(
             request.provider.as_deref(),
             request.name,
             request.token.map(|token| token.0),
-            Some(&subject.user_id),
+            request.approve_sharing.then_some(subject.user_id.as_str()),
         )
         .await
         .map_err(map_error)?;
@@ -309,7 +313,10 @@ pub(crate) async fn connect_connector(
         "connector_connected",
         "connector",
         Some(&connector.id),
-        format!("Connected {}.", connector.name),
+        format!(
+            "Connected {} and approved sharing it with the workspace.",
+            connector.name
+        ),
     )
     .await;
     let job = state

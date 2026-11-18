@@ -6,6 +6,8 @@ use std::sync::{Arc, Mutex};
 struct FakeGitLab {
     tokens: Arc<Mutex<Vec<String>>>,
     queries: Arc<Mutex<Vec<String>>>,
+    /// The project holds a confidential issue.
+    confidential: Arc<Mutex<bool>>,
 }
 
 fn note_token(state: &FakeGitLab, headers: &axum::http::HeaderMap) {
@@ -36,7 +38,16 @@ async fn start_fake_gitlab(state: FakeGitLab) -> String {
             "/api/v4/projects/acme%2Fapp/issues",
             get(|State(state): State<FakeGitLab>, headers: HeaderMap, RawQuery(query): RawQuery| async move {
                 note_token(&state, &headers);
-                state.queries.lock().unwrap().push(query.unwrap_or_default());
+                let query = query.unwrap_or_default();
+                // The look for confidential issues finds one only when asked to.
+                if query.contains("confidential=true") {
+                    return axum::Json(if *state.confidential.lock().unwrap() {
+                        json!([{"iid": 7, "title": "Secret", "state": "opened", "confidential": true}])
+                    } else {
+                        json!([])
+                    });
+                }
+                state.queries.lock().unwrap().push(query);
                 axum::Json(json!([
                     {"iid": 5, "title": "Cache stampede", "state": "opened", "author": {"username": "ana"},
                      "created_at": "2026-03-01T00:00:00Z", "updated_at": "2026-03-02T00:00:00Z",
@@ -137,7 +148,7 @@ async fn gitlab_issues_and_merge_requests_follow_the_same_model() {
         call(
             "POST",
             format!("/v1/workspaces/{workspace_id}/connectors/check"),
-            json!({"link": link, "provider": "gitlab", "token": "glpat-secret"}),
+            json!({"link": link, "provider": "gitlab", "token": "glpat-secret", "approve_sharing": true}),
         )
         .await,
     )
@@ -150,7 +161,7 @@ async fn gitlab_issues_and_merge_requests_follow_the_same_model() {
         call(
             "POST",
             format!("/v1/workspaces/{workspace_id}/connectors"),
-            json!({"link": link, "provider": "gitlab", "token": "glpat-secret"}),
+            json!({"link": link, "provider": "gitlab", "token": "glpat-secret", "approve_sharing": true}),
         )
         .await,
     )
@@ -253,5 +264,74 @@ async fn gitlab_issues_and_merge_requests_follow_the_same_model() {
         "{:?}",
         fake.queries.lock().unwrap()
     );
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn a_project_with_confidential_issues_is_refused_and_sharing_needs_approval() {
+    let fake = FakeGitLab::default();
+    *fake.confidential.lock().unwrap() = true;
+    let base = start_fake_gitlab(fake.clone()).await;
+    let link = format!("{base}/acme/app");
+
+    let data_dir = temp_data_dir("connectors-gitlab-sharing");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.git_allowed_hosts = vec!["127.0.0.1".to_owned()];
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "gitlab-sharing@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+
+    // The preview says why, and it holds no token.
+    let checked = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/connectors/check"),
+            json!({"link": link, "provider": "gitlab", "token": "glpat-preview"}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(checked["preview"]["sharing"], "refused");
+    assert!(checked["preview"]["refusal"].as_str().unwrap().contains("confidential"));
+    assert!(!checked.to_string().contains("glpat-preview"));
+
+    // Approving does not override a refusal, and nothing is created.
+    let refused = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/connectors"),
+        json!({"link": link, "provider": "gitlab", "token": "glpat-preview", "approve_sharing": true}),
+    )
+    .await;
+    assert_eq!(refused.status(), 409);
+    let listed = response_json(call("GET", format!("/v1/workspaces/{workspace_id}/connectors"), json!({})).await).await;
+    assert_eq!(listed["connectors"].as_array().unwrap().len(), 0);
+
+    // Without the confidential issue the same project is uniform, and it still needs the approval.
+    *fake.confidential.lock().unwrap() = false;
+    let checked = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/connectors/check"),
+            json!({"link": link, "provider": "gitlab"}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(checked["preview"]["sharing"], "uniform");
+    assert_eq!(checked["preview"]["partition"], "acme/app");
+    assert_eq!(checked["preview"]["audience_members"], 1);
+    let unapproved = call(
+        "POST",
+        format!("/v1/workspaces/{workspace_id}/connectors"),
+        json!({"link": link, "provider": "gitlab"}),
+    )
+    .await;
+    assert_eq!(unapproved.status(), 400);
+    assert!(response_json(unapproved).await.to_string().contains("Approve sharing"));
     let _ = std::fs::remove_dir_all(data_dir);
 }

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.1 — Preview the selected source partition, copied data and destination audience before importing.
+
+- A connection is previewed and approved: the access check returns `ConnectorPreview` (partition, copies, not copied, audience, `uniform` or `refused`), and connecting needs `approve_sharing: true`, kept as `sharing_approved_by` and `sharing_approved_at` in the connector's metadata (no migration). GitLab confidential issues are refused. Tests added in `tests/connectors.rs` and `connectors_gitlab.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; nothing was built or run.
 
 ## V0.8.0 — Define a connector conformance contract: ownership, audience, cursor, freshness, deletion, rate limits and permission loss.
 
