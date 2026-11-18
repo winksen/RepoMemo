@@ -156,6 +156,32 @@ impl RemoteGitPolicy {
         Ok(())
     }
 
+    /// Checks the host of an outbound webhook destination (V0.8.4): the list must name it, and link-local and metadata
+    /// addresses are never allowed.
+    pub fn check_destination(&self, host: &str, port: Option<u16>) -> Result<()> {
+        if !self.is_enabled() {
+            repomemo_domain::bail_invalid!("Outbound webhooks are turned off on this server.");
+        }
+        if let Ok(address) = host.parse::<IpAddr>() {
+            if repomemo_ai::is_forbidden_address(&address) {
+                repomemo_domain::bail_invalid!("This address is never allowed as a destination.");
+            }
+        } else if repomemo_ai::is_metadata_host(host) {
+            repomemo_domain::bail_invalid!("This address is never allowed as a destination.");
+        }
+        let probe = RemoteRepository {
+            scheme: RemoteScheme::Https,
+            host: host.to_ascii_lowercase(),
+            port,
+            user: None,
+            path: "x".to_owned(),
+        };
+        if !self.allows(&probe) {
+            repomemo_domain::bail_invalid!("This server only sends events to: {}.", self.allowed.join(", "));
+        }
+        Ok(())
+    }
+
     fn allows(&self, repository: &RemoteRepository) -> bool {
         let port = repository.port.unwrap_or_else(|| repository.scheme.default_port());
         self.allowed.iter().any(|entry| {

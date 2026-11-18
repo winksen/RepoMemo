@@ -1546,6 +1546,37 @@ pub struct WebhookDelivery {
     pub resent_at: Option<String>,
 }
 
+/// A destination that receives signed events from a workspace (V0.8.4). The signing secret is never part of it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutboundEndpoint {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub url: String,
+    /// The events it receives, such as `connector.quarantined`.
+    pub events: Vec<String>,
+    pub enabled: bool,
+    pub created_at: String,
+    pub updated_at: String,
+    pub last_delivered_at: Option<String>,
+}
+
+/// One event for one endpoint. `event_id` is the same on every attempt and for every endpoint that gets the event.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutboundDelivery {
+    pub id: String,
+    pub event_id: String,
+    pub event_type: String,
+    /// `pending`, `delivered`, `failed` (attempts used up) or `cancelled` (the endpoint was turned off or is no longer approved).
+    pub status: String,
+    pub attempts: i64,
+    pub next_attempt_at: Option<String>,
+    pub last_status_code: Option<u16>,
+    pub last_error: Option<String>,
+    pub created_at: String,
+    pub delivered_at: Option<String>,
+}
+
 /// The job kind of a connector's sync.
 pub const CONNECTOR_SYNC_JOB_KIND: &str = "connector_sync";
 

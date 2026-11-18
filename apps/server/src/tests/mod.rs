@@ -38,6 +38,7 @@ mod my_work;
 mod onboarding;
 mod operations;
 mod organization_templates;
+mod outbound;
 mod performance;
 mod project_updates;
 mod projects;

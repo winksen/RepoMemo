@@ -284,6 +284,13 @@
 | GET | `/v1/connectors/{source_id}` | auth | require_workspace_read | — | ConnectorSource |
 | DELETE | `/v1/connectors/{source_id}` | managing | require_workspace_admin | — | status |
 | POST | `/v1/connectors/{source_id}/sync` | auth | require_workspace_write | — | ConnectorSyncResponse |
+| GET | `/v1/workspaces/{workspace_id}/outbound-endpoints` | managing | require_workspace_admin | — | EndpointsResponse (`endpoints`, `events`, `available`) |
+| POST | `/v1/workspaces/{workspace_id}/outbound-endpoints` | managing | require_workspace_admin | EndpointRequest (`name`, `url`, `events`) | EndpointCreated (201; the secret once) |
+| PUT | `/v1/outbound-endpoints/{endpoint_id}` | managing | require_workspace_admin | EndpointUpdate (`name?`, `events?`, `enabled?`) | OutboundEndpoint |
+| DELETE | `/v1/outbound-endpoints/{endpoint_id}` | managing | require_workspace_admin | — | status |
+| POST | `/v1/outbound-endpoints/{endpoint_id}/secret` | managing | require_workspace_admin | — | SecretResponse (the new secret once) |
+| GET | `/v1/outbound-endpoints/{endpoint_id}/deliveries` | managing | require_workspace_admin | `limit?` | OutboundDelivery[] |
+| POST | `/v1/outbound-endpoints/{endpoint_id}/test` | managing | require_workspace_admin | — | 202 `{event_id}`; 409 when off |
 | POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |
 | PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |

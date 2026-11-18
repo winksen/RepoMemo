@@ -151,6 +151,7 @@ impl ConnectorRunner {
                 ("connector_sync_failed", format!("Syncing {} failed.", source.name))
             }
         };
+        self.emit_outcome(source, action).await;
         if let Err(error) = self
             .core
             .storage()
@@ -165,6 +166,22 @@ impl ConnectorRunner {
             .await
         {
             tracing::error!(error = %error, "Failed to record connector activity");
+        }
+    }
+
+    /// Queues the outbound events of a sync's outcome: identifiers and counts, no titles or text.
+    async fn emit_outcome(&self, source: &ConnectorSource, action: &str) {
+        let data = serde_json::json!({ "connector_id": source.id });
+        if action == "connector_synced" {
+            crate::outbound::emit(&self.core, &source.workspace_id, "connector.sync_completed", data).await;
+            return;
+        }
+        crate::outbound::emit(&self.core, &source.workspace_id, "connector.sync_failed", data).await;
+        if let Ok(held) = self.core.connector_source(&source.id).await {
+            if let Some(held) = held.quarantine {
+                let data = serde_json::json!({ "connector_id": source.id, "reason": held.reason, "items": held.items });
+                crate::outbound::emit(&self.core, &source.workspace_id, "connector.quarantined", data).await;
+            }
         }
     }
 
@@ -388,6 +405,13 @@ pub(crate) async fn release_connector(
         "connector",
         Some(&source_id),
         format!("Released the quarantine of {}.", connector.name),
+    )
+    .await;
+    crate::outbound::emit(
+        &state.core,
+        &connector.workspace_id,
+        "connector.released",
+        serde_json::json!({ "connector_id": source_id }),
     )
     .await;
     Ok(Json(released))

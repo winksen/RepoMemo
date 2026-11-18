@@ -40,6 +40,7 @@ mod my_work;
 mod onboarding;
 mod organization_templates;
 mod organizations;
+mod outbound;
 mod profile;
 mod project_updates;
 mod projects;
@@ -217,6 +218,8 @@ struct AppState {
     converter: Converter,
     repo_sync: RepoSyncRunner,
     connector_sync: ConnectorRunner,
+    /// Signed outbound webhooks (V0.8.4).
+    outbound: outbound::OutboundService,
     /// Outgoing mail: the outbox and its sender.
     mail: mail::MailService,
     runtime: Arc<SettingsCell>,
@@ -472,6 +475,8 @@ async fn build_state(
     let connector_sync = ConnectorRunner::new(core.clone(), embedding_queue.clone(), runtime.clone());
     let connector_polling = runtime.clone();
     let connector_task = connector_sync.start_polling(move || connector_polling.current().repo_poll_interval);
+    let outbound = outbound::OutboundService::new(core.clone(), config.outbound_allowed_hosts.clone())?;
+    let outbound_task = outbound.start();
 
     // The previews live under the data folder unless the operator put them on a volume of their own.
     let preview_base = config.preview_root.clone().unwrap_or_else(|| data_dir.clone());
@@ -565,6 +570,7 @@ async fn build_state(
         converter,
         repo_sync,
         connector_sync,
+        outbound,
         mail,
         runtime,
         guards: Arc::new(Guards::default()),
@@ -579,7 +585,10 @@ async fn build_state(
         closing_signal: Arc::new(tokio::sync::Notify::new()),
     };
     let maintenance_task = maintenance::start(state.clone());
-    Ok((state, vec![polling_task, connector_task, maintenance_task, mail_task]))
+    Ok((
+        state,
+        vec![polling_task, connector_task, outbound_task, maintenance_task, mail_task],
+    ))
 }
 
 /// Cross-origin rules for the whole application, platform routes included.
@@ -1194,6 +1203,26 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/connectors/{source_id}/release",
             post(connectors::release_connector),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/outbound-endpoints",
+            get(outbound::list_endpoints).post(outbound::create_endpoint),
+        )
+        .route(
+            "/v1/outbound-endpoints/{endpoint_id}",
+            put(outbound::update_endpoint).delete(outbound::delete_endpoint),
+        )
+        .route(
+            "/v1/outbound-endpoints/{endpoint_id}/secret",
+            post(outbound::rotate_secret),
+        )
+        .route(
+            "/v1/outbound-endpoints/{endpoint_id}/deliveries",
+            get(outbound::list_deliveries),
+        )
+        .route(
+            "/v1/outbound-endpoints/{endpoint_id}/test",
+            post(outbound::test_endpoint),
         )
         .route("/v1/repositories/{source_id}/sync", post(repositories::sync_repository))
         .route(

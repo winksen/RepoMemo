@@ -1390,6 +1390,35 @@ export interface WebhookDelivery {
   resent_at: string | null;
 }
 
+/** A destination that receives signed events from a workspace (V0.8.4). The signing secret is never part of it. */
+export interface OutboundEndpoint {
+  id: string;
+  workspace_id: string;
+  name: string;
+  url: string;
+  /** The events it receives, such as `connector.quarantined`. */
+  events: string[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+  last_delivered_at: string | null;
+}
+
+/** One event for one endpoint. `event_id` is the same on every attempt and for every endpoint that gets the event. */
+export interface OutboundDelivery {
+  id: string;
+  event_id: string;
+  event_type: string;
+  /** `pending`, `delivered`, `failed` (attempts used up) or `cancelled` (the endpoint was turned off or is no longer approved). */
+  status: string;
+  attempts: number;
+  next_attempt_at: string | null;
+  last_status_code: number | null;
+  last_error: string | null;
+  created_at: string;
+  delivered_at: string | null;
+}
+
 /**
  * A tracker connected to a workspace: its issues (and later pull requests)
  * are kept as evidence (roadmap F17).

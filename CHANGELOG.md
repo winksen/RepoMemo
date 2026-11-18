@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.4 (2026-11-18)
+
+Let an administrator send signed events to a destination of their own, only to hosts the operator approved, with identifiable repeats, bounded retries and a list of every attempt.
+
+### Added
+- **Endpoints** (`/v1/workspaces/{id}/outbound-endpoints`, administrators): a name, an address, the events wanted and a signing secret (`whsec_…`) that is **shown once** and never listed; rotate it with `POST /v1/outbound-endpoints/{id}/secret`. Turn an endpoint on or off (`PUT`) and remove it (`DELETE`). Up to ten per workspace.
+- **Approved destinations only.** The setting `REPOMEMO_OUTBOUND_HOSTS` names the hosts; unset, outbound webhooks are **off**. An address must be `https` (`http` only to this machine), carry no name or password, and sit on the list; link-local and cloud-metadata addresses are never allowed. The check runs when the endpoint is made and **again at every send**, so a host the operator removes stops receiving.
+- **Signed events.** Each call carries `X-RepoMemo-Signature: v1=<HMAC-SHA256 of "{timestamp}.{body}">`, `X-RepoMemo-Timestamp`, `X-RepoMemo-Event`, `X-RepoMemo-Event-Id`, `X-RepoMemo-Delivery` and `X-RepoMemo-Attempt`. No redirect is followed and a call times out at 10 s.
+- **Events:** `ping` (a test, `POST /v1/outbound-endpoints/{id}/test`), `connector.sync_completed`, `connector.sync_failed`, `connector.quarantined` and `connector.released`. Payloads hold identifiers and counts, **never titles or text**.
+- **Repeats are identifiable.** An event has one id for every endpoint and every retry; the attempt number tells a retry from a first call.
+- **Bounded retries.** A failed delivery waits 30 s, 2 min, 10 min and 1 h and is then `failed`; a success is `delivered`. `GET /v1/outbound-endpoints/{id}/deliveries` lists each delivery with its status, attempts, last status code and next attempt.
+- **A disabled endpoint receives nothing queued.** Turning it off, or the host leaving the list, marks what was still queued `cancelled`.
+- Unit tests of the signature and the event check, and a server test (`tests/outbound.rs`) that follows the off-by-default setting, refused addresses and events, a stranger, the secret shown once, a signed and identified delivery, a failing destination left pending with the same event id, the cancel on disable, rotation and removal.
+- Migration **0081** adds `outbound_endpoints` and `outbound_deliveries`.
+- **Not in this release:** a web screen for endpoints; endpoints are not part of workspace archives (V0.8.19 decides what travels).
+
+### Checks
+- Version, migration lock (81 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new tests compile; **they were not executed**, and no destination was contacted. Nothing was built or run.
+
+### Upgrading
+- Nothing to do: with `REPOMEMO_OUTBOUND_HOSTS` unset nothing is sent. To use it, set the variable to the receiving hosts.
+
 ## V0.8.3 (2026-11-18)
 
 Say how current each connector's copy is, what it leaves out and what to do when it fails, and make an interrupted sync resume after the page it stored.

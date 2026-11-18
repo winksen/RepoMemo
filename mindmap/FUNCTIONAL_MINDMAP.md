@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.4` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.4 — Add opt-in signed outbound webhooks with event IDs, bounded retries and delivery inspection (existing webhooks are inbound only).
+
+- Outbound webhooks: migration 0081 (`outbound_endpoints`, `outbound_deliveries`); `apps/server/src/outbound.rs` checks the address against `REPOMEMO_OUTBOUND_HOSTS` at creation and at every send, signs `{timestamp}.{body}` (HMAC-SHA256), retries after 30 s, 2 min, 10 min and 1 h, cancels what is queued when an endpoint is off, and the connector runner queues four events with identifiers only. Test `tests/outbound.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; nothing was built or run.
 
 ## V0.8.3 — Expose last successful sync, coverage, exclusions, backlog and recoverable errors.
 
