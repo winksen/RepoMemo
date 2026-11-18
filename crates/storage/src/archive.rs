@@ -128,6 +128,7 @@ impl StorageEngine {
         let versions = self.export_versions(workspace_id).await?;
         let saved_searches = self.export_saved_searches(workspace_id).await?;
         let work = self.export_work(workspace_id).await?;
+        let integrations = self.export_integrations(workspace_id).await?;
 
         Ok(WorkspaceArchiveData {
             workspace,
@@ -141,6 +142,7 @@ impl StorageEngine {
             omitted_citations,
             trash_left_out,
             work,
+            integrations,
             versions,
             saved_searches,
         })

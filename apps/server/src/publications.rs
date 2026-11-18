@@ -168,6 +168,25 @@ async fn load_publishable(
             "An item mirrored from a tracker cannot be published: the tracker decides who may read it.",
         ));
     }
+    // A mirrored item that came back through an archive is a plain file now, but its origin still says a tracker decides who may read it.
+    let detail = state
+        .storage
+        .get_artifact(artifact_id)
+        .await
+        .map_err(map_storage_error)?;
+    let origin = detail
+        .metadata
+        .get("origin")
+        .and_then(|value| value.as_str())
+        .unwrap_or_default();
+    if matches!(
+        origin,
+        "github_issue" | "github_pull_request" | "gitlab_issue" | "gitlab_merge_request" | "jira_issue"
+    ) {
+        return Err(ApiError::bad_request(
+            "An item mirrored from a tracker cannot be published: the tracker decides who may read it.",
+        ));
+    }
     let publishable = artifact
         .mime_type
         .as_deref()

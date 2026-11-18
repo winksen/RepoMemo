@@ -15,9 +15,10 @@ pub const ARCHIVE_FORMAT: &str = "repomemo-workspace-archive";
 /// Bumped when an archive written by a newer server cannot be read by an older one. Version 2 (V0.3.19) adds the
 /// earlier versions of files and the saved searches; version 3 (V0.6.14) adds each memory card's revisions, the content
 /// its citations recorded, its approvals and its review assignment; version 4 (V0.7.19) adds the work of the 0.7 line
-/// (projects, milestones, task numbers and relations, labels, workflow states, schedules and project updates). A server reads
-/// versions 1 to 4.
-pub const ARCHIVE_FORMAT_VERSION: u32 = 4;
+/// (projects, milestones, task numbers and relations, labels, workflow states, schedules and project updates); version 5
+/// (V0.8.19) adds where connector items came from and the record of publications, neither of which is a live integration. A
+/// server reads versions 1 to 5.
+pub const ARCHIVE_FORMAT_VERSION: u32 = 5;
 pub const ARCHIVE_MANIFEST_ENTRY: &str = "manifest.json";
 pub const ARCHIVE_DATA_ENTRY: &str = "workspace.json";
 pub const ARCHIVE_BLOB_PREFIX: &str = "blobs/";
@@ -545,6 +546,51 @@ pub struct WorkspaceArchiveData {
     /// Projects, task numbers and relations, labels, workflow states, schedules and updates (format 4). Empty in an older archive.
     #[serde(default)]
     pub work: ArchiveWork,
+    /// Where connector items came from and what was published (format 5). Records only: nothing comes back connected, sending or public.
+    #[serde(default)]
+    pub integrations: ArchiveIntegrations,
+}
+
+/// Provenance and publication history (V0.8.19). It never holds a credential, a secret or an address that is not the tracker's own.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ArchiveIntegrations {
+    #[serde(default)]
+    pub connectors: Vec<ArchiveConnectorProvenance>,
+    #[serde(default)]
+    pub publications: Vec<ArchivePublication>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveConnectorProvenance {
+    /// The archive's own id of the source.
+    pub source_id: String,
+    pub name: String,
+    /// `github`, `gitlab` or `jira`.
+    pub provider: String,
+    /// The tracker's address of the project, such as https://github.com/acme/app.
+    pub location: String,
+    pub items: Vec<ArchiveConnectorItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveConnectorItem {
+    /// The archive's own id of the file.
+    pub artifact_id: String,
+    pub external_id: String,
+    pub kind: String,
+    pub state: String,
+    pub remote_updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchivePublication {
+    /// The archive's own id of the file it was made from, when that file is in the archive.
+    pub artifact_id: Option<String>,
+    pub title: String,
+    pub body_markdown: String,
+    pub status_at_export: String,
+    pub version: i64,
+    pub published_at: String,
 }
 
 impl WorkspaceArchiveData {

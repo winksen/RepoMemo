@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.19` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.19 — Carry connector provenance and publication metadata safely in archives.
+
+- Archive format 5: `integrations` records connector provenance (provider, address, items) and publication history; import writes `imported_from` on the source, no credential, webhook, sync or connector items, no endpoints or destinations, and publications return withdrawn under a new address. Imported mirrored items still cannot be published. Test in `tests/publications.rs`.
+
+Checks: static checks pass; the new test compiles but was not executed; no archive was written or read; nothing was built or run.
 
 ## V0.8.18 — Add a responsive public knowledge index and search limited to published snapshots.
 

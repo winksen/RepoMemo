@@ -72,6 +72,10 @@ No migration. `confluence_import.rs` reads a space exported as HTML (sent as its
 
 Not a connector, but the same rule that a source's text is data. `ASK_SOURCE_RULE` is appended to `ASK_SYSTEM` by `ask_system` (the V0.2.162 text stays first and byte for byte). Migration 0085 rebuilds `search_feedback` with the kind `wrong_answer`; the server requires its note and calls `flag_answer_source` (`set_system_lifecycle` from `verified` to `needs_review`). The evaluation set is `docs/evaluation/ask-eval-v1.json` and runs in `tests/answer_quality.rs` (no provider needed).
 
+## Archives (V0.8.19)
+
+Archive format 5 adds `integrations` (`archive_integrations.rs`): for each connector source its provider, the tracker's address and each item's remote id, kind, state and time (a source held back by a quarantine is left out like its evidence), and each publication's title, text, status and version. **Import writes records, not integrations:** a connector source still comes back as an upload with its name, now with `imported_from` in its metadata (provider, address, item count and a note), and no credential, webhook secret, sync or `connector_items` row; outbound endpoints and chat destinations are not in an archive at all, so no event or digest is sent after an import; a publication comes back `withdrawn` under a new address, with its text as history, so it is served only after an administrator previews and publishes it again. An imported item whose `origin` says it was mirrored still cannot be published. Formats 1 to 4 import as before.
+
 ## Rules for the outside connection (S6)
 
 | Rule | How |

@@ -616,6 +616,17 @@ impl StorageEngine {
                 .await?;
         }
 
+        // Where connector items came from, and publications as withdrawn history (V0.8.19): records, not integrations.
+        self.import_integrations(
+            &mut tx,
+            workspace_id,
+            &data.integrations,
+            &source_ids,
+            &imported.artifact_ids,
+            importer_user_id,
+        )
+        .await?;
+
         // The work of the 0.7 line: projects, relations between tasks, schedules (paused) and updates (V0.7.19).
         self.import_work(
             &mut tx,

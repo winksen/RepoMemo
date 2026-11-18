@@ -180,7 +180,7 @@ async fn projects_and_task_relations_survive_a_move_and_an_archive_that_points_o
             .into_iter()
             .collect();
     let manifest: Value = serde_json::from_slice(&entries["manifest.json"]).unwrap();
-    assert_eq!(manifest["format_version"], 4);
+    assert_eq!(manifest["format_version"], 5);
     for (counted, expected) in [
         ("projects", 1),
         ("milestones", 1),

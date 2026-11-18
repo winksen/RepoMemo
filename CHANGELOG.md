@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.19 (2026-11-18)
+
+Carry where tracker items came from and what was published through a workspace archive, as records only: nothing comes back connected, sending or public.
+
+### Added
+- **Archive format 5.** A new `integrations` section holds, for each tracker connection, its provider, the tracker's address and each item's remote id, kind, state and time, and, for each publication, its title, text, status and version. A source held back by a quarantine is left out like its evidence. A server reads formats 1 to 5; an older server refuses a format 5 archive and says to update.
+- **Attribution survives.** An imported tracker source keeps its name and now says what it was imported from (`imported_from`: provider, address, item count and a note that nothing is connected), and the files keep the origin and links in their own metadata.
+- **No credential comes back, nothing connects, nothing is sent.** No token, webhook secret or sync is carried, and no tracker item record is made, so the source is an upload. **Outbound endpoints and chat destinations are not in an archive**, so no event or digest is sent after an import.
+- **Nothing is published by an import.** A publication comes back **withdrawn**, under a **new address** (the old one is not reused), with its text kept as history; it is served only after an administrator previews and publishes it again. The original workspace's snapshot is not changed by the move.
+- **A closed gap.** A tracker item that came back through an archive is a plain file but its origin still says a tracker decides who may read it, so it cannot be published.
+- A server test (`tests/publications.rs`) publishes a snapshot, exports (format 5, the publication recorded, no secret in the data), imports it as a new workspace, and finds the publication withdrawn under another address and answering `404` publicly while the original is still served. Four existing tests now expect format 5.
+- No migration.
+- **Not in this release:** carrying credentials, endpoints or destinations (by design), and reconnecting an imported source (an administrator connects it again).
+
+### Checks
+- Version, migration lock (86 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**, and no archive was written or read. Nothing was built or run.
+
+### Upgrading
+- An archive written by this version is format 5 and cannot be read by an older server. Archives written before still import.
+
 ## V0.8.18 (2026-11-18)
 
 Let anyone read the published snapshots, and nothing else, under the rules of the V0.8.15 review.

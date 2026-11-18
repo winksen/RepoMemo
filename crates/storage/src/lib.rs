@@ -27,6 +27,7 @@ mod ai_usage;
 mod approvals;
 mod archive;
 mod archive_import;
+mod archive_integrations;
 mod archive_work;
 mod artifacts;
 mod chat;

@@ -340,3 +340,114 @@ async fn anonymous_readers_see_only_live_snapshots_and_everything_else_is_the_sa
     let _ = std::fs::remove_dir_all(off_dir);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[tokio::test]
+async fn an_archive_carries_publication_history_but_publishes_nothing_until_it_is_reviewed_again() {
+    let dir = temp_data_dir("publication-archive");
+    let mut config = ServerConfig::for_test(dir.clone());
+    config.public_publishing = true;
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "pub-archive@example.com").await;
+    let ws = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let made = response_json(
+        call(
+            "POST",
+            format!("/v1/workspaces/{ws}/artifacts/text"),
+            json!({"title": "Tides", "content": "The harbour opens at dawn.", "language": "Markdown"}),
+        )
+        .await,
+    )
+    .await;
+    let id = made["id"].as_str().unwrap().to_owned();
+    let preview = response_json(call("POST", format!("/v1/artifacts/{id}/publication-preview"), json!({})).await).await;
+    let published = response_json(
+        call(
+            "POST",
+            format!("/v1/artifacts/{id}/publication"),
+            json!({"review_token": preview["review_token"]}),
+        )
+        .await,
+    )
+    .await;
+    let slug = published["slug"].as_str().unwrap().to_owned();
+
+    // Out: format 5, with the publication recorded and no credential or secret anywhere.
+    let archive = axum::body::to_bytes(
+        call("GET", format!("/v1/workspaces/{ws}/export"), Value::Null)
+            .await
+            .into_body(),
+        usize::MAX,
+    )
+    .await
+    .unwrap()
+    .to_vec();
+    let entries: std::collections::HashMap<String, Vec<u8>> =
+        repomemo_api::read_archive_entries(archive.as_slice(), 1 << 26)
+            .unwrap()
+            .into_iter()
+            .collect();
+    let manifest: Value = serde_json::from_slice(&entries["manifest.json"]).unwrap();
+    assert_eq!(manifest["format_version"], 5);
+    let data: Value = serde_json::from_slice(&entries["workspace.json"]).unwrap();
+    assert_eq!(data["integrations"]["publications"].as_array().unwrap().len(), 1);
+    let text = String::from_utf8_lossy(&entries["workspace.json"]).to_string();
+    assert!(!text.contains("sealed") && !text.contains("whsec_") && !text.contains("hooks.slack.com"));
+
+    // In: the publication is history, withdrawn, with a new address; nothing is served.
+    let organization = response_json(call("GET", "/v1/organizations".to_owned(), Value::Null).await).await[0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let imported = app
+        .clone()
+        .oneshot(
+            axum::http::Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/v1/workspaces/import?organization_id={organization}&name=Moved"
+                ))
+                .header("authorization", owner.clone())
+                .header("content-type", "application/gzip")
+                .body(axum::body::Body::from(archive))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(imported.status(), 201);
+    let moved = response_json(imported).await["workspace"]["workspace"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let listed = response_json(call("GET", format!("/v1/workspaces/{moved}/publications"), json!({})).await).await;
+    assert_eq!(listed.as_array().unwrap().len(), 1);
+    assert_eq!(listed[0]["status"], "withdrawn", "{listed}");
+    assert_ne!(listed[0]["slug"], slug.as_str(), "the old address is not reused");
+    let reader = |uri: String| {
+        let app = app.clone();
+        async move {
+            app.oneshot(
+                axum::http::Request::builder()
+                    .uri(uri)
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+        }
+    };
+    assert_eq!(
+        reader(format!("/public/p/{}", listed[0]["slug"].as_str().unwrap()))
+            .await
+            .status(),
+        404,
+        "an imported publication is not served"
+    );
+    // The original workspace's snapshot is still live: the move changed nothing there.
+    assert_eq!(reader(format!("/public/p/{slug}")).await.status(), 200);
+    let _ = std::fs::remove_dir_all(dir);
+}
