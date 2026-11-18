@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.0 (2026-11-18)
+
+Open the 0.8 line by writing down what a connector may copy, to whom, and the eight facts every connector must state.
+
+### Added
+- **[The 0.8 plan](mindmap/plans/2026-11-18-0.8-connections.md):** the decision that a connector is a **deliberate shared-source import** (one workspace, one audience, approved by an admin) and that RepoMemo does **not** mirror a source's per-user permissions; a source that needs that is refused, never imported with the restriction dropped.
+- **The conformance contract:** ownership, audience, stable identity, cursor, freshness, deletion, rate limits and permission loss, each with a rule and a named fixture (`own-readonly`, `aud-uniform`, `aud-secret`, `id-repeat`, `cur-resume`, `fresh-stale`, `del-vs-fail`, `rate-pause`, `perm-lost`) that an adapter must pass. The outcome words of a sync are fixed: complete, partial, stale, paused, quarantined.
+- **A support matrix** for GitHub, GitLab, Jira Cloud and Linear: partition, items, the uniform-sharing check, the item-level restrictions that are refused, the deletion signal and that nothing is ever written to a source.
+- **Six rules for the line** (no credential travels with data, outside calls need an operator's allowance, outbound content is a link, publication is a copy, archives carry facts not authority, conditional adapters need an owner), the migration each release is expected to add, and the nine-step exit journey that V0.8.20 walks.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock, generated types, styles, documentation links and TypeScript pass. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.7.20 (2026-11-18)
 
 Close the 0.7 line with what it delivers, what was and was not checked, the exit journey written as a sheet for the maintainer, and how projects sit next to an external tracker.

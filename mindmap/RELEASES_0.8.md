@@ -1,5 +1,7 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
+> **Current:** `V0.8.0` (2026-11-18)
+
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
 **Status:** proposed on 2026-10-29; no row below is shipped or a release commitment. One intended commit per row, named `Update V0.N.P`, with a short body describing the change. Split oversized rows before implementation and renumber only unshipped rows. Update the changelog, user/API guides, mindmaps, archive compatibility and focused checks with the implementation, not in this planning change. No product version is bumped by this plan.
@@ -17,7 +19,7 @@
 
 | Release | Status | Track | Type | Area | What changes | Done when |
 |---|---|---|---|---|---|---|
-| **V0.8.0** | 🔜 | AL. Connections and sharing | 📘 | Opening | Define a connector conformance contract: ownership, audience, cursor, freshness, deletion, rate limits and permission loss | Fixtures and a support matrix distinguish a deliberate shared-source import from unsupported per-user source ACL mirroring |
+| **V0.8.0** | ✅ 2026-11-18 | AL. Connections and sharing | 📘 | Opening | Define a connector conformance contract: ownership, audience, cursor, freshness, deletion, rate limits and permission loss | Fixtures and a support matrix distinguish a deliberate shared-source import from unsupported per-user source ACL mirroring |
 | **V0.8.1** | 🔜 | AL. Connections and sharing | 🔒 | Connection setup | Preview the selected source partition, copied data and destination audience before importing | An admin explicitly approves uniform sharing; sources requiring unsupported item-level restrictions are refused and secrets never appear in the preview |
 | **V0.8.2** | 🔜 | AL. Connections and sharing | 🔒 | Source access changes | Quarantine affected mirrored evidence when access is revoked or sharing can no longer be established | Denied sources disappear from retrieval, previews, exports and publication; transient failures and deletion differ, with a documented maximum stale-access window |
 | **V0.8.3** | 🔜 | AL. Connections and sharing | 🔧 | Connector health | Expose last successful sync, coverage, exclusions, backlog and recoverable errors | An operator distinguishes complete, partial, stale and paused sources, resumes a cursor and diagnoses a retry without duplicate evidence |

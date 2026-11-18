@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.7.20` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.0 — Define a connector conformance contract: ownership, audience, cursor, freshness, deletion, rate limits and permission loss.
+
+- Documentation only: `plans/2026-11-18-0.8-connections.md` states the shared-source decision, the eight-fact connector contract with its fixtures, the support matrix (GitHub, GitLab, Jira, Linear), six line rules and the migration each release is expected to add. No code changes.
+
+Checks: static checks pass; nothing was built or run.
 
 ## V0.7.20 — Validate a complete small-team project and document coexistence with external trackers.
 
