@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.7 (2026-11-18)
+
+Record the deferral of the conditional Linear adapter, because no pilot owner needs it, and say plainly that Linear is not supported.
+
+### Changed
+- **Linear is deferred.** The row was conditional on a pilot owner and a representative fixture; neither exists. **No adapter was written**, no Linear host is accepted and no setting was added. The [0.8 plan](mindmap/plans/2026-11-18-0.8-connections.md) records the decision and keeps the connector contract as what a Linear adapter would have to pass; the row is reopened only when an owner and a fixture exist. **Jira is the supported second tracker.**
+- The release index gains a *deferred* status for a conditional row with no owner, and the user guide says that Linear is not supported.
+- No code, route, setting or migration changes.
+
+### Checks
+- Version, migration lock (81 files), generated types, styles, documentation links and TypeScript pass. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.6 (2026-11-18)
 
 Keep the Jira copy in step with Jira: edits replace it, what Jira deleted or restricted leaves the evidence, and the failure cases of the connector contract have fixtures.

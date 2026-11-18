@@ -84,10 +84,11 @@ for (const [line, file] of readdirSync(join(root, "mindmap"))
   const entries = new Set([...changelog.matchAll(new RegExp(`^## V(0\\.${line}\\.\\d+) \\(`, "gm"))].map((match) => match[1]));
   const index = read(file);
   const done = new Set();
-  for (const match of index.matchAll(new RegExp(`^\\| \\*\\*V(0\\.${line}\\.\\d+)\\*\\* \\| (✅|🧪|🔄|🔜)`, "gm"))) {
+  for (const match of index.matchAll(new RegExp(`^\\| \\*\\*V(0\\.${line}\\.\\d+)\\*\\* \\| (✅|🧪|🔄|🔜|⏸)`, "gm"))) {
     // 🧪 is built and committed with its own evidence still owed; like a ✅ row it has a changelog entry.
-    if (match[2] === "✅" || match[2] === "🧪") done.add(match[1]);
-    if ((match[2] === "✅" || match[2] === "🧪") && !entries.has(match[1]) && match[1] !== first) problems.push(`${file} marks V${match[1]} done and CHANGELOG.md has no entry for it`);
+    // ⏸ is a conditional row deferred with its reason written down; the changelog records the decision.
+    if (match[2] === "✅" || match[2] === "🧪" || match[2] === "⏸") done.add(match[1]);
+    if ((match[2] === "✅" || match[2] === "🧪" || match[2] === "⏸") && !entries.has(match[1]) && match[1] !== first) problems.push(`${file} marks V${match[1]} done and CHANGELOG.md has no entry for it`);
   }
   for (const entry of entries) {
     if (entry !== first && !done.has(entry)) problems.push(`CHANGELOG.md has an entry for V${entry} and ${file} does not mark it done`);

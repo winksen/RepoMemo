@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.6` (2026-11-18)
+> **Current:** `V0.8.7` (2026-11-18)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -13,7 +13,7 @@
 **Scope control:** local OCR (0.6.22), a second tracker (0.8.7) and a second chat adapter (0.8.10) require a pilot owner before implementation. Jira/Slack are the default first choices; pilot evidence may select Linear/Teams instead before work starts. Record a deferral and narrow the supported feature list when a conditional item is not justified. Access boundaries, trustworthy evidence, recovery and publication isolation are mandatory. Full details and pilot thresholds are in the [readiness report](analysis/2026-10-29-team-readiness.md).
 
 **Type:** ✨ Feature · 🔧 Enhancement · 🐞 Fix · 🔒 Security · 📘 Update (docs, process, evidence, release).
-**Status:** ✅ shipped (with date) · 🧪 built, not validated (committed with static checks only; the live evidence, walkthrough or run its row asks for is still owed) · 🔄 in progress · 🔜 planned. Every row starts planned; a written plan is not an acceptance-test pass.
+**Status:** ⏸ deferred (a conditional row with no pilot owner: nothing was built and nothing is claimed) · ✅ shipped (with date) · 🧪 built, not validated (committed with static checks only; the live evidence, walkthrough or run its row asks for is still owed) · 🔄 in progress · 🔜 planned. Every row starts planned; a written plan is not an acceptance-test pass.
 
 ## Every release
 
@@ -26,7 +26,7 @@
 | **V0.8.4** | ✅ 2026-11-18 | AL. Connections and sharing | ✨ | Outbound events | Add opt-in signed outbound webhooks with event IDs, bounded retries and delivery inspection (existing webhooks are inbound only) | Only approved destinations receive selected events, duplicate delivery is identifiable and disabled endpoints stop receiving queued content |
 | **V0.8.5** | ✅ 2026-11-18 | AL. Connections and sharing | ✨ | Jira intake | Read selected Jira Cloud project issues into existing connector evidence with stable remote IDs | A dry run reports scope and permissions; paged import resumes, preserves source links and changes nothing in Jira |
 | **V0.8.6** | ✅ 2026-11-18 | AL. Connections and sharing | 🔧 | Jira lifecycle | Reconcile Jira edits, removals and access changes through the connector contract | Rate limits, repeated pages, removed access and deleted issues pass conformance fixtures; remote/local status ownership is explicit |
-| **V0.8.7** | 🔜 | AL. Connections and sharing | ✨ | Linear (conditional) | Add a read-only Linear team/project adapter using the same conformance contract | A startup pilot imports and resyncs a representative fixture without duplicates or permission expansion; updates and deletion are covered |
+| **V0.8.7** | ⏸ deferred 2026-11-18 | AL. Connections and sharing | ✨ | Linear (conditional) | Add a read-only Linear team/project adapter using the same conformance contract | A startup pilot imports and resyncs a representative fixture without duplicates or permission expansion; updates and deletion are covered |
 | **V0.8.8** | 🔜 | AL. Connections and sharing | 🔧 | Tracker context | Link mirrored issues and pull requests to local projects and tasks without duplicating ownership | A user can distinguish remote state from local follow-up, navigate both directions through links and never mistakes a local edit for a remote update |
 | **V0.8.9** | 🔜 | AL. Connections and sharing | ✨ | Slack delivery | Send opted-in review/project digests to approved Slack destinations as authenticated links | A pilot receives deduplicated links without sensitive titles/excerpts, unauthorized readers cannot open them and disconnect stops delivery |
 | **V0.8.10** | 🔜 | AL. Connections and sharing | ✨ | Teams delivery (conditional) | Add equivalent link-only delivery for Microsoft Teams using the same destination and retry policy | A company pilot validates the destination, receives one digest per window and verifies revocation; unsupported delivery modes are named |
