@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.13 (2026-11-18)
+
+Make the AI calls a workspace spends visible and limited by stored counts, so a limit stops them predictably and a restart changes nothing, and say what still works when AI cannot.
+
+### Added
+- **Stored counts.** The calls the server makes on its own (embedding batches and image descriptions) are now counted **in the database**, by workspace, UTC day and kind, with the calls a limit **refused**. The old counts were in memory and started again at midnight and after a restart.
+- **A limit of the workspace's own.** `PUT /v1/workspaces/{id}/ai-limit` with `{"daily_calls": n}` sets it (administrators), `0` removes the limit and `null` returns the workspace to the server's default. It replaces the default for that workspace and is recorded in the activity.
+- **A usage view.** `GET /v1/workspaces/{id}/ai-usage?days=14` returns the limit and its **reason** (the workspace's own, the server's default or none), today's calls, the calls refused today, what remains, each recent day by kind, the **stored counts** (files, passages, vectors) and the providers that are on for text, embedding and vision.
+- **Predictable at the limit.** A call over the limit spends nothing, is counted as refused and ends the embedding job or the image description with the reason naming the limit; the work resumes the next UTC day. The same count applies after a restart.
+- **Keyword search needs no AI.** The usage view says what still works when AI is off, not configured, over its limit or failing: keyword search never calls a provider and finds a file whether or not it was embedded.
+- A storage test (`ai_usage.rs`) spends under the server's default, reopens the data and finds the day's calls remembered and refused, then follows the workspace's own limit, no limit and clearing, with refusals counted by kind. A server test (`tests/ai_admin.rs`) checks a stranger is refused, a fresh workspace's usage, setting, removing, refusing and clearing the limit, and that a file is found by keyword search with no provider and the answer says semantic search is not available.
+- Migration **0084** adds `ai_usage_daily` and `workspace_ai_limits`.
+- **Not in this release:** a web screen for usage or limits, money or token pricing (the unit is a call), per-person limits (they keep their own hourly quota), and a limit on the calls people ask for.
+
+### Checks
+- Version, migration lock (84 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (storage, API, server, all targets) pass. The new tests compile; **they were not executed**. Nothing was built or run.
+
+### Upgrading
+- Nothing to do. Counts start from the upgrade; a workspace with no limit of its own follows the server's default as before.
+
 ## V0.8.12 (2026-11-18)
 
 Import a Confluence space exported as HTML with its page tree, links and attachments, say what did not translate, and make the missing page restrictions an explicit decision.

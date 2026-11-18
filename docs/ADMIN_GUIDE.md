@@ -2,6 +2,10 @@
 
 The path an administrator follows, in order, with **who does each step**. Details live in the guides it links; this page says what to do next and which account can do it.
 
+## AI usage and limits (0.8)
+
+The calls the server makes on its own for a workspace (embedding batches and image descriptions) are counted **in the database**, so a limit stops them the same way before and after a restart. **API:** `GET /v1/workspaces/{id}/ai-usage` shows the limit and where it comes from (the workspace's own, the server's default or none), today's calls, the calls a limit refused, what is left, the last days by kind, how many files, passages and stored vectors the workspace holds, and which providers are on for text, embedding and vision. `PUT /v1/workspaces/{id}/ai-limit` with `{"daily_calls": 200}` sets the workspace's own daily limit, `0` removes the limit, and `null` returns to the server's default. At the limit, embedding and image description stop (and say why on the job) and resume the next UTC day. **Keyword search never calls an AI provider**, so it keeps working when AI is off, not configured, over its limit or failing; only semantic matching, Ask and summaries need a provider. No screen yet.
+
 ## 1. The accounts involved
 
 | Who | What they are | What they can do |

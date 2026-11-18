@@ -5,6 +5,7 @@ mod access_control;
 mod agent;
 mod ai;
 mod ai_access;
+mod ai_admin;
 mod approvals;
 mod artifacts;
 mod audit_export;
@@ -1246,6 +1247,8 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/imports/directory",
             post(directory_import::import_directory).layer(DefaultBodyLimit::max(directory_import::body_limit())),
         )
+        .route("/v1/workspaces/{workspace_id}/ai-usage", get(ai_admin::get_ai_usage))
+        .route("/v1/workspaces/{workspace_id}/ai-limit", put(ai_admin::set_ai_limit))
         .route(
             "/v1/artifacts/{artifact_id}/follow-ups",
             get(follow_ups::list_follow_ups),

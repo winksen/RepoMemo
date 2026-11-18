@@ -143,6 +143,14 @@ impl RepoMemoCore {
     }
 
     /// The daily allowance of AI calls made in the background.
+    /// Spends one call of today's allowance for a kind of work the server does on its own. The count is stored, and the
+    /// workspace's own limit applies before the server's default (V0.8.13).
+    pub(crate) async fn spend_ai_call(&self, workspace_id: &str, kind: &str) -> Result<repomemo_storage::AiSpend> {
+        self.storage
+            .spend_ai_calls(workspace_id, kind, 1, self.ai_budget.daily_limit())
+            .await
+    }
+
     pub fn background_ai_budget(&self) -> &BackgroundAiBudget {
         &self.ai_budget
     }
@@ -1493,10 +1501,11 @@ impl RepoMemoCore {
         let (output, stage) = if matches!(summary.artifact_type, ArtifactType::Image) {
             match self.vision_provider_for_workspace(&summary.workspace_id).await? {
                 Some(settings) => {
-                    if !self.ai_budget.try_spend(&summary.workspace_id, 1) {
+                    let spend = self.spend_ai_call(&summary.workspace_id, "vision").await?;
+                    if !spend.allowed {
                         bail!(
                             "This workspace reached its daily limit of {} background AI calls. Images are described again tomorrow.",
-                            self.ai_budget.daily_limit()
+                            spend.limit
                         );
                     }
                     let provider = provider_from_settings(settings)?;

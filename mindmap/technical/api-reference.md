@@ -299,6 +299,8 @@
 | DELETE | `/v1/chat-destinations/{id}` | managing | require_workspace_admin | — | status |
 | POST | `/v1/chat-destinations/{id}/test` | managing | require_workspace_admin | — | `{delivered, error?}` |
 | POST | `/v1/chat-destinations/{id}/digest` | managing | require_workspace_admin | — | `{sent}`; 409 when off |
+| GET | `/v1/workspaces/{workspace_id}/ai-usage` | managing | require_workspace_admin | `days?` | AiUsage (limit and its source, spent, refused and remaining today, the days by kind, stored files, passages and vectors, providers by purpose, what still works) |
+| PUT | `/v1/workspaces/{workspace_id}/ai-limit` | managing | require_workspace_admin | `{daily_calls}` (0 none, null the server's default) | `{daily_calls}` |
 | POST | `/v1/workspaces/{workspace_id}/imports/confluence` | auth | require_workspace_write | ConfluenceImportRequest (`source_key`, `space_key?`, `files`, `dry_run` default true, `skip_invalid`, `acknowledge_restrictions`) | DirectoryImportReport with `notes`; 409 without the acknowledgement |
 | POST | `/v1/workspaces/{workspace_id}/imports/directory` | auth | require_workspace_write | DirectoryImportRequest (`source_key`, `files[{path, text\|base64}]`, `dry_run` default true, `skip_invalid`) | DirectoryImportReport (200; 409 with the report when a file has a problem and `skip_invalid` is not set) |
 | POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |

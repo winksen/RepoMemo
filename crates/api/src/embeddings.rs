@@ -151,10 +151,11 @@ impl RepoMemoCore {
             if batch.is_empty() {
                 break;
             }
-            if !self.ai_budget.try_spend(workspace_id, 1) {
+            let spend = self.spend_ai_call(workspace_id, "embedding").await?;
+            if !spend.allowed {
                 let reason = format!(
-                    "The workspace reached its daily limit of {} background AI calls. Embedding continues tomorrow.",
-                    self.ai_budget.daily_limit()
+                    "The workspace reached its daily limit of {} background AI calls. Embedding continues tomorrow, and keyword search keeps working.",
+                    spend.limit
                 );
                 self.storage
                     .update_indexing_job(

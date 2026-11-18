@@ -8,6 +8,10 @@ RepoMemo is **one process and one folder**. The process is `repomemo-server` (th
 
 ---
 
+## AI usage (V0.8.13)
+
+Migration 0084: `ai_usage_daily` (workspace, UTC day, kind, calls, refused) and `workspace_ai_limits`. `spend_ai_calls` (storage) reads the day's total and writes the new count in one transaction, under the workspace's limit or the server's default (the run-time setting held by `BackgroundAiBudget`), and counts a refused call without spending it. `RepoMemoCore::spend_ai_call` replaces the in-memory `try_spend` at the two sites that make background calls (`embedding` batches and `vision` descriptions). The in-memory budget remains only as the holder of the server's default. `GET /v1/workspaces/{id}/ai-usage` and `PUT .../ai-limit` (`ai_admin.rs`).
+
 ## 1. What runs where
 
 ```mermaid

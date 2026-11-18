@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.13 — Extend existing AI limits with visible workspace budgets, usage, stored counts and provider-failure behavior.
+
+- AI administration: migration 0084 (`ai_usage_daily`, `workspace_ai_limits`); `spend_ai_calls` counts background calls in the database under the workspace's limit or the server's default and counts refusals; `GET .../ai-usage` and `PUT .../ai-limit` (`ai_admin.rs`) show and set it; keyword search is stated to need no provider. Tests in `ai_usage.rs` and `tests/ai_admin.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; nothing was built or run.
 
 ## V0.8.12 — Add a bounded importer for a documented Confluence export format.
 

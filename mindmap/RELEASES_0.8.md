@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.12` (2026-11-18)
+> **Current:** `V0.8.13` (2026-11-18)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -32,7 +32,7 @@
 | **V0.8.10** | ⏸ deferred 2026-11-18 | AL. Connections and sharing | ✨ | Teams delivery (conditional) | Add equivalent link-only delivery for Microsoft Teams using the same destination and retry policy | A company pilot validates the destination, receives one digest per window and verifies revocation; unsupported delivery modes are named |
 | **V0.8.11** | ✅ 2026-11-18 | AL. Connections and sharing | ✨ | Knowledge migration | Import a Markdown/asset directory with link mapping, preview and resumable progress | A representative wiki migrates with internal links and attachments intact; unsupported and unsafe paths are reported and retries do not duplicate records |
 | **V0.8.12** | ✅ 2026-11-18 | AL. Connections and sharing | ✨ | Confluence migration | Add a bounded importer for a documented Confluence export format | A representative space export preserves supported hierarchy, links and source attribution; restrictions require explicit mapping and unsupported macros are reported |
-| **V0.8.13** | 🔜 | AL. Connections and sharing | 🔧 | AI administration | Extend existing AI limits with visible workspace budgets, usage, stored counts and provider-failure behavior | Admins see consumption and limit reasons, spending limits stop calls predictably and survive a restart, and keyword search remains available when AI is disabled or unavailable |
+| **V0.8.13** | ✅ 2026-11-18 | AL. Connections and sharing | 🔧 | AI administration | Extend existing AI limits with visible workspace budgets, usage, stored counts and provider-failure behavior | Admins see consumption and limit reasons, spending limits stop calls predictably and survive a restart, and keyword search remains available when AI is disabled or unavailable |
 | **V0.8.14** | 🔜 | AL. Connections and sharing | 🔒 | Answer quality | Add a versioned retrieval/answer evaluation set and in-product correction feedback | Known/absent/conflicting evidence, stale sources and hostile source instructions are covered; answers cite accessible evidence and never treat source text as action authority |
 | **V0.8.15** | 🔜 | AL. Connections and sharing | 🔒 | Security review | Review the connector, outbound webhook and chat delivery surfaces and the threat model for public publishing, before any public route is added | No high/medium finding stays open and negative cases have regression coverage; the rules for anonymous reads, caching and private references are written before V0.8.16 starts |
 | **V0.8.16** | 🔜 | AL. Connections and sharing | ✨ | Public snapshots | Create an opt-in publication record containing only explicitly reviewed snapshot content | Publishing requires an authorized preview; private citations, comments, attachments, people and metadata are excluded unless independently approved as public |
