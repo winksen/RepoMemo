@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.18 (2026-11-18)
+
+Let anyone read the published snapshots, and nothing else, under the rules of the V0.8.15 review.
+
+### Added
+- **Public reading routes**, only when `REPOMEMO_PUBLIC_PUBLISHING` is on: `GET /public` (an index of live snapshots with a search box), `GET /public/p/{address}` (one page) and `GET /public/search?q=` (matches in title or text). They need no account, read no cookie or authorization header and set no cookie.
+- **A separate read path.** The routes read only the `publications` table: no file, comment, account or workspace is joined, so a fault here cannot reach private data. Pages are plain, responsive HTML (works on a phone and in dark mode) made of the snapshot text with every character **escaped**, never inserted as HTML.
+- **One answer for everything not served.** A withdrawn, stale, unknown or malformed address, and the whole surface when publishing is off, is the same plain `404` with `Cache-Control: no-store`. Search and the index list live snapshots only, so results, counts and errors reveal nothing private.
+- **Caches never outlive a withdrawal.** A page is `public, max-age=60, must-revalidate` with an `ETag` of its address and version (a repeat gets `304`); search results are not cached. A withdrawal is seen at the next request, and at a shared cache within a minute.
+- **Headers:** `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and a Content-Security-Policy with `default-src 'none'` (inline style only, no script). **Limits:** 120 requests a minute for each address (an IPv6 network counts as one), a search text cut at 100 characters.
+- A server test (`tests/publications.rs`) reads the index, a page and search anonymously: escaped title, no cookie, the security headers, the cache time and `304`, search that finds the snapshot and not a private file's words, a withdrawn, an unknown and a malformed address that give the same `404` and body, and the surface absent when publishing is off.
+- No migration.
+- **Not in this release:** per-site themes or custom domains, a sitemap, rendering Markdown (text is shown as written), and a counter of readers.
+
+### Checks
+- Version, migration lock (86 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (storage, server, all targets) pass. The new test compiles; **it was not executed** and no browser was used. Nothing was built or run.
+
+### Upgrading
+- Nothing to do. Put a reverse proxy in front of `/public` if you expose it to the internet, and keep the operator switch off if you do not publish.
+
 ## V0.8.17 (2026-11-18)
 
 Give publishers control over a snapshot: see what readers get, withdraw it, update it after a new review, and see when it is stale or its original is gone.

@@ -309,6 +309,9 @@
 | GET | `/v1/publications/{id}/public-preview` | managing | require_workspace_admin | — | PublicPreview (what readers are served now, its version and the cache time) |
 | POST | `/v1/publications/{id}/withdraw` | managing | require_workspace_admin | — | PublicationView (status `withdrawn`, version raised) |
 | POST | `/v1/publications/{id}/republish` | managing | require_workspace_admin | `{review_token}` | PublicationView (live again with the newly reviewed text) |
+| GET | `/public` | pub | publishing on | — | HTML index of live snapshots (404 when off) |
+| GET | `/public/p/{slug}` | pub | publishing on | — | HTML page of one live snapshot, `ETag`, 60 s cache; the same 404 for everything not served |
+| GET | `/public/search` | pub | publishing on | `q` | HTML list of live snapshots matching in title or text, not cached |
 | POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |
 | PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |

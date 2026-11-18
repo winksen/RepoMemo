@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.18 — Add a responsive public knowledge index and search limited to published snapshots.
+
+- Community reading: `/public`, `/public/p/{slug}`, `/public/search` read only the `publications` table, render escaped text as plain responsive HTML, answer one `404` (no-store) for everything not served or when off, cache pages 60 s with a version ETag, set nosniff, no-referrer and a no-script CSP, and limit 120 requests a minute per address. Test in `tests/publications.rs`.
+
+Checks: static checks pass; the new test compiles but was not executed; no browser was used; nothing was built or run.
 
 ## V0.8.17 — Add public preview, publish, unpublish and visible stale/source-revoked state.
 

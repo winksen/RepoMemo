@@ -160,4 +160,30 @@ impl StorageEngine {
         .await?;
         Ok(done.rows_affected())
     }
+
+    /// The index served to anonymous readers: slug and title of live snapshots, newest first, optionally matching words in the
+    /// title or text. It reads only this table.
+    pub async fn public_index(&self, query: Option<&str>, limit: i64) -> Result<Vec<(String, String)>> {
+        let pattern = query.map(|text| {
+            let escaped = text.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+            format!("%{escaped}%")
+        });
+        Ok(sqlx::query_as::<_, (String, String)>(
+            "SELECT slug, title FROM publications WHERE status = 'published' AND (?1 IS NULL OR title LIKE ?1 ESCAPE '\\' OR body_markdown LIKE ?1 ESCAPE '\\') ORDER BY published_at DESC LIMIT ?2",
+        )
+        .bind(pattern)
+        .bind(limit.clamp(1, 200))
+        .fetch_all(self.reader())
+        .await?)
+    }
+
+    /// A live snapshot by its public address: title, text and version. Anything else is none.
+    pub async fn public_page(&self, slug: &str) -> Result<Option<(String, String, i64)>> {
+        Ok(sqlx::query_as::<_, (String, String, i64)>(
+            "SELECT title, body_markdown, version FROM publications WHERE slug = ?1 AND status = 'published'",
+        )
+        .bind(slug)
+        .fetch_optional(self.reader())
+        .await?)
+    }
 }

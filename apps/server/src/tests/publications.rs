@@ -211,3 +211,132 @@ async fn a_publisher_sees_what_readers_get_and_can_withdraw_and_update_a_snapsho
     assert_eq!(seen["body_markdown"], "First text.", "the private original is separate");
     let _ = std::fs::remove_dir_all(dir);
 }
+
+async fn anonymous(app: &axum::Router, uri: &str, etag: Option<&str>) -> axum::response::Response {
+    let mut request = axum::http::Request::builder().method("GET").uri(uri);
+    if let Some(etag) = etag {
+        request = request.header("if-none-match", etag);
+    }
+    app.clone()
+        .oneshot(request.body(axum::body::Body::empty()).unwrap())
+        .await
+        .unwrap()
+}
+
+async fn text_of(response: axum::response::Response) -> String {
+    String::from_utf8(
+        axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn anonymous_readers_see_only_live_snapshots_and_everything_else_is_the_same_404() {
+    let dir = temp_data_dir("public-reading");
+    let mut config = ServerConfig::for_test(dir.clone());
+    config.public_publishing = true;
+    let app = router(config).await.unwrap();
+    let (owner, _) = register_account(&app, "public-reader-owner@example.com").await;
+    let ws = create_workspace(&app, &owner).await;
+    let call = |method: &'static str, uri: String, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, &owner, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let publish = |title: &'static str, content: &'static str| {
+        let call = &call;
+        let ws = ws.clone();
+        async move {
+            let made = response_json(
+                call(
+                    "POST",
+                    format!("/v1/workspaces/{ws}/artifacts/text"),
+                    json!({"title": title, "content": content, "language": "Markdown"}),
+                )
+                .await,
+            )
+            .await;
+            let id = made["id"].as_str().unwrap().to_owned();
+            let preview =
+                response_json(call("POST", format!("/v1/artifacts/{id}/publication-preview"), json!({})).await).await;
+            response_json(
+                call(
+                    "POST",
+                    format!("/v1/artifacts/{id}/publication"),
+                    json!({"review_token": preview["review_token"], "title": title}),
+                )
+                .await,
+            )
+            .await
+        }
+    };
+    let live = publish("Tide <i>tables</i>", "The harbour opens at dawn.").await;
+    let _private = call(
+        "POST",
+        format!("/v1/workspaces/{ws}/artifacts/text"),
+        json!({"title": "Private budget", "content": "The harbour budget is secret.", "language": "Markdown"}),
+    )
+    .await;
+    let slug = live["slug"].as_str().unwrap().to_owned();
+    let pid = live["id"].as_str().unwrap().to_owned();
+
+    // The index lists the snapshot, with the title escaped, and nothing private.
+    let index = anonymous(&app, "/public", None).await;
+    assert_eq!(index.status(), 200);
+    assert_eq!(index.headers()["x-content-type-options"], "nosniff");
+    assert_eq!(index.headers()["referrer-policy"], "no-referrer");
+    assert!(index.headers()["content-security-policy"]
+        .to_str()
+        .unwrap()
+        .contains("default-src 'none'"));
+    assert!(index.headers().get("set-cookie").is_none());
+    let html = text_of(index).await;
+    assert!(
+        html.contains("Tide &lt;i&gt;tables&lt;/i&gt;") && !html.contains("<i>"),
+        "{html}"
+    );
+    assert!(!html.contains("Private budget"));
+
+    // A page carries a short cache time and an ETag, and a repeat is not modified.
+    let read = anonymous(&app, &format!("/public/p/{slug}"), None).await;
+    assert_eq!(read.status(), 200);
+    assert_eq!(read.headers()["cache-control"], "public, max-age=60, must-revalidate");
+    let etag = read.headers()["etag"].to_str().unwrap().to_owned();
+    assert!(text_of(read).await.contains("The harbour opens at dawn."));
+    assert_eq!(
+        anonymous(&app, &format!("/public/p/{slug}"), Some(&etag))
+            .await
+            .status(),
+        304
+    );
+
+    // Search covers published snapshots only, and counts nothing private.
+    let found = text_of(anonymous(&app, "/public/search?q=harbour", None).await).await;
+    assert!(found.contains("Tide") && !found.contains("Private budget"), "{found}");
+    let none = text_of(anonymous(&app, "/public/search?q=budget", None).await).await;
+    assert!(none.contains("Nothing is published."), "{none}");
+
+    // Withdrawn, unknown and malformed addresses are the same answer, never cached.
+    call("POST", format!("/v1/publications/{pid}/withdraw"), json!({})).await;
+    let withdrawn = anonymous(&app, &format!("/public/p/{slug}"), None).await;
+    let unknown = anonymous(&app, &format!("/public/p/{}", "0".repeat(32)), None).await;
+    let malformed = anonymous(&app, "/public/p/not-a-slug", None).await;
+    for response in [&withdrawn, &unknown, &malformed] {
+        assert_eq!(response.status(), 404);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+    }
+    assert_eq!(text_of(withdrawn).await, text_of(unknown).await);
+    assert!(text_of(anonymous(&app, "/public", None).await)
+        .await
+        .contains("Nothing is published."));
+
+    // Off, the whole surface is not there.
+    let off_dir = temp_data_dir("public-reading-off");
+    let off = router(ServerConfig::for_test(off_dir.clone())).await.unwrap();
+    assert_eq!(anonymous(&off, "/public", None).await.status(), 404);
+    let _ = std::fs::remove_dir_all(off_dir);
+    let _ = std::fs::remove_dir_all(dir);
+}

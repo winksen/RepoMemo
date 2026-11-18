@@ -49,6 +49,7 @@ mod outbound;
 mod profile;
 mod project_updates;
 mod projects;
+mod public_site;
 mod publications;
 mod quotas;
 mod recurring;
@@ -228,6 +229,8 @@ struct AppState {
     outbound: outbound::OutboundService,
     /// Public publishing exists (V0.8.16).
     public_publishing: bool,
+    /// Counts anonymous requests per address (V0.8.18).
+    public_limiter: Arc<security::RateLimiter>,
     /// Outgoing mail: the outbox and its sender.
     mail: mail::MailService,
     runtime: Arc<SettingsCell>,
@@ -580,6 +583,7 @@ async fn build_state(
         connector_sync,
         outbound,
         public_publishing: config.public_publishing,
+        public_limiter: Arc::new(security::RateLimiter::default()),
         mail,
         runtime,
         guards: Arc::new(Guards::default()),
@@ -1264,6 +1268,9 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/publications/{id}/withdraw", post(publications::withdraw))
         .route("/v1/publications/{id}/republish", post(publications::republish))
+        .route("/public", get(public_site::index))
+        .route("/public/p/{slug}", get(public_site::read))
+        .route("/public/search", get(public_site::search))
         .route("/v1/workspaces/{workspace_id}/publications", get(publications::list))
         .route(
             "/v1/artifacts/{artifact_id}/follow-ups",
