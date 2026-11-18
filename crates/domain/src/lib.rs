@@ -1597,6 +1597,22 @@ pub struct WebhookDelivery {
     pub resent_at: Option<String>,
 }
 
+/// A public snapshot (V0.8.16): the record, never the text. `slug` is the opaque public address.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Publication {
+    pub id: String,
+    pub workspace_id: String,
+    pub slug: String,
+    pub title: String,
+    pub snapshot_hash: String,
+    /// `published`, `withdrawn` or `stale`.
+    pub status: String,
+    pub version: i64,
+    pub source_artifact_id: Option<String>,
+    pub published_at: String,
+    pub updated_at: String,
+}
+
 /// A chat channel an administrator approved to receive digests (V0.8.9). The address is a secret and is never part of this.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatDestination {

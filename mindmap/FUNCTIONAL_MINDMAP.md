@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.15` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.16` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.16 — Create an opt-in publication record containing only explicitly reviewed snapshot content.
+
+- Public snapshots: migration 0086 `publications` (a copy of reviewed text, opaque slug, no link to people or comments); `publications.rs` makes the snapshot (images, raw HTML, emails and non-https links removed) and publishes only with the preview's review token; off unless `REPOMEMO_PUBLIC_PUBLISHING`; mirrored tracker items cannot be published. No public route yet. Test `tests/publications.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; nothing was built or run.
 
 ## V0.8.15 — Review the connector, outbound webhook and chat delivery surfaces and the threat model for public publishing, before any public route is added.
 

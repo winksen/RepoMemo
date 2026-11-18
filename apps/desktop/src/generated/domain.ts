@@ -1440,6 +1440,21 @@ export interface WebhookDelivery {
   resent_at: string | null;
 }
 
+/** A public snapshot (V0.8.16): the record, never the text. `slug` is the opaque public address. */
+export interface Publication {
+  id: string;
+  workspace_id: string;
+  slug: string;
+  title: string;
+  snapshot_hash: string;
+  /** `published`, `withdrawn` or `stale`. */
+  status: string;
+  version: number;
+  source_artifact_id: string | null;
+  published_at: string;
+  updated_at: string;
+}
+
 /** A chat channel an administrator approved to receive digests (V0.8.9). The address is a secret and is never part of this. */
 export interface ChatDestination {
   id: string;

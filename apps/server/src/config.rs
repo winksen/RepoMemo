@@ -163,6 +163,8 @@ pub struct ServerConfig {
     /// Hosts remote repository links may use (`REPOMEMO_GIT_ALLOWED_HOSTS`:
     /// `host`, `host:port`, `*.suffix` or `*`). Empty turns remote links off.
     pub git_allowed_hosts: Vec<String>,
+    /// Whether public publishing exists at all (`REPOMEMO_PUBLIC_PUBLISHING`, off by default).
+    pub public_publishing: bool,
     /// Hosts outbound webhooks may be sent to (`REPOMEMO_OUTBOUND_HOSTS`, same entries). Empty turns them off.
     pub outbound_allowed_hosts: Vec<String>,
     /// Folders git may read although another account owns them
@@ -458,6 +460,7 @@ impl ServerConfig {
             smtp_extra_roots,
             repo_roots,
             git_allowed_hosts,
+            public_publishing: env_flag("REPOMEMO_PUBLIC_PUBLISHING", false)?,
             outbound_allowed_hosts,
             git_safe_directories: std::env::var_os("REPOMEMO_GIT_SAFE_DIRECTORIES")
                 .map(|folders| {
@@ -567,6 +570,7 @@ impl ServerConfig {
             smtp_extra_roots: Vec::new(),
             repo_roots: Vec::new(),
             git_allowed_hosts: Vec::new(),
+            public_publishing: false,
             outbound_allowed_hosts: Vec::new(),
             git_safe_directories: Vec::new(),
             repo_poll_interval: None,

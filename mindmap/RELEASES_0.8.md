@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.15` (2026-11-18)
+> **Current:** `V0.8.16` (2026-11-18)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -35,7 +35,7 @@
 | **V0.8.13** | ✅ 2026-11-18 | AL. Connections and sharing | 🔧 | AI administration | Extend existing AI limits with visible workspace budgets, usage, stored counts and provider-failure behavior | Admins see consumption and limit reasons, spending limits stop calls predictably and survive a restart, and keyword search remains available when AI is disabled or unavailable |
 | **V0.8.14** | ✅ 2026-11-18 | AL. Connections and sharing | 🔒 | Answer quality | Add a versioned retrieval/answer evaluation set and in-product correction feedback | Known/absent/conflicting evidence, stale sources and hostile source instructions are covered; answers cite accessible evidence and never treat source text as action authority |
 | **V0.8.15** | ✅ 2026-11-18 | AL. Connections and sharing | 🔒 | Security review | Review the connector, outbound webhook and chat delivery surfaces and the threat model for public publishing, before any public route is added | No high/medium finding stays open and negative cases have regression coverage; the rules for anonymous reads, caching and private references are written before V0.8.16 starts |
-| **V0.8.16** | 🔜 | AL. Connections and sharing | ✨ | Public snapshots | Create an opt-in publication record containing only explicitly reviewed snapshot content | Publishing requires an authorized preview; private citations, comments, attachments, people and metadata are excluded unless independently approved as public |
+| **V0.8.16** | ✅ 2026-11-18 | AL. Connections and sharing | ✨ | Public snapshots | Create an opt-in publication record containing only explicitly reviewed snapshot content | Publishing requires an authorized preview; private citations, comments, attachments, people and metadata are excluded unless independently approved as public |
 | **V0.8.17** | 🔜 | AL. Connections and sharing | ✨ | Publication controls | Add public preview, publish, unpublish and visible stale/source-revoked state | A publisher sees exactly what anonymous readers see; withdrawal and source-access revocation invalidate serving/caches without changing the private original |
 | **V0.8.18** | 🔜 | AL. Connections and sharing | ✨ | Community reading | Add a responsive public knowledge index and search limited to published snapshots | Anonymous readers can navigate approved content; query results, counts, URLs and errors reveal no private workspace content |
 | **V0.8.19** | 🔜 | AL. Connections and sharing | 🔧 | Integration portability | Carry connector provenance and publication metadata safely in archives | Import retains attribution but reconnects no credentials, sends no webhooks and publishes nothing until explicitly reauthorized |

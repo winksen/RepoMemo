@@ -49,6 +49,7 @@ mod outbound;
 mod profile;
 mod project_updates;
 mod projects;
+mod publications;
 mod quotas;
 mod recurring;
 mod repositories;
@@ -225,6 +226,8 @@ struct AppState {
     connector_sync: ConnectorRunner,
     /// Signed outbound webhooks (V0.8.4).
     outbound: outbound::OutboundService,
+    /// Public publishing exists (V0.8.16).
+    public_publishing: bool,
     /// Outgoing mail: the outbox and its sender.
     mail: mail::MailService,
     runtime: Arc<SettingsCell>,
@@ -576,6 +579,7 @@ async fn build_state(
         repo_sync,
         connector_sync,
         outbound,
+        public_publishing: config.public_publishing,
         mail,
         runtime,
         guards: Arc::new(Guards::default()),
@@ -1249,6 +1253,12 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route("/v1/workspaces/{workspace_id}/ai-usage", get(ai_admin::get_ai_usage))
         .route("/v1/workspaces/{workspace_id}/ai-limit", put(ai_admin::set_ai_limit))
+        .route(
+            "/v1/artifacts/{artifact_id}/publication-preview",
+            post(publications::preview),
+        )
+        .route("/v1/artifacts/{artifact_id}/publication", post(publications::publish))
+        .route("/v1/workspaces/{workspace_id}/publications", get(publications::list))
         .route(
             "/v1/artifacts/{artifact_id}/follow-ups",
             get(follow_ups::list_follow_ups),

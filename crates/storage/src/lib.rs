@@ -52,6 +52,7 @@ mod project_references;
 mod project_updates;
 mod projects;
 mod providers;
+mod publications;
 mod recurring;
 mod repo;
 mod review_assignments;

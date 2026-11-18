@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.16 (2026-11-18)
+
+Let an administrator publish a reviewed snapshot of a file as a record that holds only the previewed text, under the rules written in V0.8.15. Nothing is public yet.
+
+### Added
+- **An operator switch, off by default** (`REPOMEMO_PUBLIC_PUBLISHING`). Off, the routes answer `404`.
+- **A preview** (`POST /v1/artifacts/{id}/publication-preview`, administrators): the exact text that would be public and a list of what was taken out: **images, raw HTML, email addresses and every link that is not a plain `https` address** (a link to a file, task or app page is replaced by its text, so no private address survives). It returns a `review_token`, the hash of that text.
+- **A record that holds only what was reviewed** (`POST /v1/artifacts/{id}/publication` with the token): the text, a title and an **opaque public address** that says nothing about the workspace or file. The request is `409` if the file changed since the preview, or if the file already has a live snapshot. Comments, citations, attachments, people, paths and source names are not part of it; an item **mirrored from a tracker** and a non-text file cannot be published.
+- **The snapshot is a copy.** Changing or deleting the original leaves it unchanged. `GET /v1/workspaces/{id}/publications` lists them for administrators; publishing is recorded in the activity.
+- A unit test of the snapshot rules and a server test (`tests/publications.rs`): off by default, a stranger refused, the preview without the private link, image or email, a wrong token refused, the right token recorded, a public address that holds no id and one snapshot per file.
+- Migration **0086** adds `publications`.
+- **Not in this release:** any public route (V0.8.18), withdrawing and the stale state (V0.8.17), a screen, and publishing more than one file as a set.
+
+### Checks
+- Version, migration lock (86 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, server, all targets) pass. The new tests compile; **they were not executed**. Nothing was built or run.
+
+### Upgrading
+- Nothing to do: publishing is off unless `REPOMEMO_PUBLIC_PUBLISHING` is set.
+
 ## V0.8.15 (2026-11-18)
 
 Review the 0.8 connector, webhook and chat surfaces, fix what the review found, and write the rules for public publishing before any public route exists.

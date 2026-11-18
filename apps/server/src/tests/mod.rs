@@ -48,6 +48,7 @@ mod outbound;
 mod performance;
 mod project_updates;
 mod projects;
+mod publications;
 mod recurring;
 mod review_ownership;
 mod revision_attribution;

@@ -303,6 +303,9 @@
 | PUT | `/v1/workspaces/{workspace_id}/ai-limit` | managing | require_workspace_admin | `{daily_calls}` (0 none, null the server's default) | `{daily_calls}` |
 | POST | `/v1/workspaces/{workspace_id}/imports/confluence` | auth | require_workspace_write | ConfluenceImportRequest (`source_key`, `space_key?`, `files`, `dry_run` default true, `skip_invalid`, `acknowledge_restrictions`) | DirectoryImportReport with `notes`; 409 without the acknowledgement |
 | POST | `/v1/workspaces/{workspace_id}/imports/directory` | auth | require_workspace_write | DirectoryImportRequest (`source_key`, `files[{path, text\|base64}]`, `dry_run` default true, `skip_invalid`) | DirectoryImportReport (200; 409 with the report when a file has a problem and `skip_invalid` is not set) |
+| POST | `/v1/artifacts/{artifact_id}/publication-preview` | managing | require_workspace_admin | — | SnapshotPreview (`body_markdown`, `removed`, `review_token`); 404 when publishing is off |
+| POST | `/v1/artifacts/{artifact_id}/publication` | managing | require_workspace_admin | `{review_token, title?}` | Publication (201); 409 when the file changed since the preview or is already published |
+| GET | `/v1/workspaces/{workspace_id}/publications` | managing | require_workspace_admin | — | Publication[] |
 | POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |
 | PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |
