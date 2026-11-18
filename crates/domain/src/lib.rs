@@ -438,7 +438,58 @@ pub struct TaskReference {
     pub available: bool,
     pub note: String,
     pub added_by: Option<SharedUser>,
+    /// When the evidence is an issue or pull request mirrored from a tracker, what the tracker says about it (V0.8.8). It is the
+    /// tracker's state, never the task's.
+    #[serde(default)]
+    pub remote: Option<RemoteItemInfo>,
     pub created_at: String,
+}
+
+/// What a tracker reports about a mirrored issue or pull request. The tracker owns it: nothing here is edited in RepoMemo,
+/// and a task that follows the item has its own status.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteItemInfo {
+    pub provider: String,
+    pub source_id: String,
+    pub source_name: String,
+    /// `open`, `closed` or `merged`: the tracker's word at `synced_at`.
+    pub state: String,
+    pub url: Option<String>,
+    /// The tracker's own update time of the item.
+    pub synced_at: String,
+    /// Always `remote`: who owns `state`.
+    pub owner: String,
+}
+
+/// A local task that cites a mirrored item (V0.8.8).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FollowUpTask {
+    pub task_id: String,
+    pub key: String,
+    pub title: String,
+    /// The task's own status, which a person sets here; it never changes the tracker's state.
+    pub status: String,
+    pub assignee_name: Option<String>,
+    pub project_id: Option<String>,
+    pub project_name: Option<String>,
+    pub created_at: String,
+}
+
+/// A local project that cites a mirrored item in its brief.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FollowUpProject {
+    pub project_id: String,
+    pub name: String,
+    pub status: String,
+}
+
+/// Both directions of a mirrored item's links: the tracker's state, and the local work that follows it up.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ItemFollowUps {
+    pub artifact_id: String,
+    pub remote: RemoteItemInfo,
+    pub tasks: Vec<FollowUpTask>,
+    pub projects: Vec<FollowUpProject>,
 }
 
 /// A comment on a task (V0.7.4). It stays with its task and goes with it.

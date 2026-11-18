@@ -291,6 +291,8 @@
 | POST | `/v1/outbound-endpoints/{endpoint_id}/secret` | managing | require_workspace_admin | — | SecretResponse (the new secret once) |
 | GET | `/v1/outbound-endpoints/{endpoint_id}/deliveries` | managing | require_workspace_admin | `limit?` | OutboundDelivery[] |
 | POST | `/v1/outbound-endpoints/{endpoint_id}/test` | managing | require_workspace_admin | — | 202 `{event_id}`; 409 when off |
+| GET | `/v1/artifacts/{artifact_id}/follow-ups` | auth | require_workspace_read | — | ItemFollowUps (the tracker's state as `remote`, the local `tasks` and `projects` that cite the item); 400 for a file that is not mirrored, 404 when held back |
+| POST | `/v1/artifacts/{artifact_id}/follow-up` | auth | require_workspace_write | FollowUpRequest (all optional: `title`, `description`, `priority`, `assignee_user_id`, `project_id`, `due_at`, `allow_another`) | CollaborationTask (201); 409 while another follow-up is open |
 | POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |
 | PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |

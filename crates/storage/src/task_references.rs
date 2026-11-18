@@ -2,6 +2,7 @@
 //! target each time, so a deleted target shows as unavailable. The task's old single file link is kept as a reference too.
 
 use super::*;
+use repomemo_domain::{FollowUpTask, RemoteItemInfo};
 
 /// The most references one task can hold.
 pub const MAX_TASK_REFERENCES: i64 = 50;
@@ -11,14 +12,33 @@ const SELECT_REFERENCE: &str = r#"
            adder.id AS adder_id, adder.display_name AS adder_name, adder.email AS adder_email,
            CASE reference.kind
              WHEN 'memory_card' THEN (SELECT title FROM memory_cards WHERE memory_cards.id = reference.target_id AND memory_cards.workspace_id = reference.workspace_id)
-             ELSE (SELECT title FROM artifacts WHERE artifacts.id = reference.target_id AND artifacts.workspace_id = reference.workspace_id)
-           END AS title
+             ELSE (SELECT title FROM artifacts WHERE artifacts.id = reference.target_id AND artifacts.workspace_id = reference.workspace_id
+                   AND NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = artifacts.source_id))
+           END AS title,
+           item.source_id AS remote_source_id, item.state AS remote_state, item.remote_updated_at AS remote_updated_at,
+           (SELECT name FROM sources WHERE sources.id = item.source_id) AS remote_source_name,
+           (SELECT json_extract(artifacts.metadata_json, '$.url') FROM artifacts WHERE artifacts.id = reference.target_id) AS remote_url,
+           (SELECT json_extract(artifacts.metadata_json, '$.provider') FROM artifacts WHERE artifacts.id = reference.target_id) AS remote_provider
     FROM task_references AS reference
+    LEFT JOIN connector_items AS item ON item.artifact_id = reference.target_id AND reference.kind = 'evidence'
     LEFT JOIN users AS adder ON adder.id = reference.added_by_user_id"#;
 
 fn task_reference_from(row: &SqliteRow) -> TaskReference {
     let adder_id: Option<String> = row.get("adder_id");
     let title: Option<String> = row.get("title");
+    // A quarantined item has no title here, and no remote state either.
+    let remote = row
+        .get::<Option<String>, _>("remote_source_id")
+        .filter(|_| title.is_some())
+        .map(|source_id| RemoteItemInfo {
+            provider: row.get::<Option<String>, _>("remote_provider").unwrap_or_default(),
+            source_name: row.get::<Option<String>, _>("remote_source_name").unwrap_or_default(),
+            source_id,
+            state: row.get::<Option<String>, _>("remote_state").unwrap_or_default(),
+            url: row.get("remote_url"),
+            synced_at: row.get::<Option<String>, _>("remote_updated_at").unwrap_or_default(),
+            owner: "remote".to_owned(),
+        });
     TaskReference {
         id: row.get("id"),
         task_id: row.get("task_id"),
@@ -32,11 +52,69 @@ fn task_reference_from(row: &SqliteRow) -> TaskReference {
             display_name: row.get("adder_name"),
             email: row.get("adder_email"),
         }),
+        remote,
         created_at: row.get("created_at"),
     }
 }
 
 impl StorageEngine {
+    /// What the tracker says about a mirrored item, or none when the file is not one (or is held back by a quarantine).
+    pub async fn remote_item_info(&self, artifact_id: &str) -> Result<Option<RemoteItemInfo>> {
+        let row = sqlx::query(
+            r#"SELECT item.source_id, item.state, item.remote_updated_at, sources.name AS source_name,
+                      json_extract(artifacts.metadata_json, '$.url') AS url,
+                      json_extract(artifacts.metadata_json, '$.provider') AS provider
+               FROM connector_items AS item
+               JOIN artifacts ON artifacts.id = item.artifact_id
+               JOIN sources ON sources.id = item.source_id
+               WHERE item.artifact_id = ?1
+                 AND NOT EXISTS (SELECT 1 FROM connector_quarantine WHERE connector_quarantine.source_id = item.source_id)"#,
+        )
+        .bind(artifact_id)
+        .fetch_optional(self.reader())
+        .await?;
+        Ok(row.map(|row| RemoteItemInfo {
+            provider: row.get::<Option<String>, _>("provider").unwrap_or_default(),
+            source_id: row.get("source_id"),
+            source_name: row.get("source_name"),
+            state: row.get("state"),
+            url: row.get("url"),
+            synced_at: row.get("remote_updated_at"),
+            owner: "remote".to_owned(),
+        }))
+    }
+
+    /// The tasks of a workspace that cite an item, newest first.
+    pub async fn tasks_following(&self, workspace_id: &str, artifact_id: &str) -> Result<Vec<FollowUpTask>> {
+        let rows = sqlx::query(
+            r#"SELECT task.id, task.number, task.title, task.status, task.project_id, task.created_at,
+                      project.name AS project_name, assignee.display_name AS assignee_name
+               FROM task_references AS reference
+               JOIN workspace_tasks AS task ON task.id = reference.task_id
+               LEFT JOIN workspace_projects AS project ON project.id = task.project_id
+               LEFT JOIN users AS assignee ON assignee.id = task.assignee_user_id
+               WHERE reference.workspace_id = ?1 AND reference.kind = 'evidence' AND reference.target_id = ?2
+               ORDER BY task.created_at DESC"#,
+        )
+        .bind(workspace_id)
+        .bind(artifact_id)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .iter()
+            .map(|row| FollowUpTask {
+                task_id: row.get("id"),
+                key: format!("T-{}", row.get::<i64, _>("number")),
+                title: row.get("title"),
+                status: row.get("status"),
+                assignee_name: row.get("assignee_name"),
+                project_id: row.get("project_id"),
+                project_name: row.get("project_name"),
+                created_at: row.get("created_at"),
+            })
+            .collect())
+    }
+
     /// Fails with "not found" unless the memory card or evidence exists in this workspace.
     pub async fn check_reference_target(&self, workspace_id: &str, kind: &str, target_id: &str) -> Result<()> {
         let exists: i64 = if kind == "memory_card" {

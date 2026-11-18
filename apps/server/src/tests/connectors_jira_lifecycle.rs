@@ -301,3 +301,136 @@ async fn a_jira_rate_limit_pauses_and_lost_access_holds_the_evidence_back() {
     assert_eq!(scene.found("llamas").await, 0);
     let _ = std::fs::remove_dir_all(&scene.dir);
 }
+
+#[tokio::test]
+async fn a_mirrored_issue_and_its_local_follow_up_link_both_ways_and_keep_their_own_state() {
+    let scene = Scene::new("jira-follow-ups").await;
+    let artifacts = response_json(
+        scene
+            .call(
+                "GET",
+                format!("/v1/workspaces/{}/artifacts", scene.workspace_id),
+                json!({}),
+            )
+            .await,
+    )
+    .await;
+    let item_id = artifacts
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|artifact| artifact["title"].as_str().unwrap().contains("APP-1"))
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // A file that is not a mirrored item has no tracker state to follow up.
+    let missing = scene
+        .call("POST", "/v1/artifacts/does-not-exist/follow-up".to_owned(), json!({}))
+        .await;
+    assert!(missing.status() == 404 || missing.status() == 400);
+
+    // A follow-up is a local task that cites the item.
+    let made = scene
+        .call("POST", format!("/v1/artifacts/{item_id}/follow-up"), json!({}))
+        .await;
+    assert_eq!(made.status(), 201);
+    let task = response_json(made).await;
+    let task_id = task["id"].as_str().unwrap().to_owned();
+    assert!(task["title"].as_str().unwrap().starts_with("Follow up: APP-1"));
+    assert_eq!(task["status"], "open");
+
+    // One open follow-up per item, unless another is asked for.
+    let again = scene
+        .call("POST", format!("/v1/artifacts/{item_id}/follow-up"), json!({}))
+        .await;
+    assert_eq!(again.status(), 409);
+    assert!(response_json(again)
+        .await
+        .to_string()
+        .contains(task["key"].as_str().unwrap()));
+    assert_eq!(
+        scene
+            .call(
+                "POST",
+                format!("/v1/artifacts/{item_id}/follow-up"),
+                json!({"allow_another": true, "title": "Check the ledger"}),
+            )
+            .await
+            .status(),
+        201
+    );
+
+    // From the task, the citation carries the tracker's state as the tracker's.
+    let references = response_json(
+        scene
+            .call("GET", format!("/v1/tasks/{task_id}/references"), json!({}))
+            .await,
+    )
+    .await;
+    let remote = &references[0]["remote"];
+    assert_eq!(remote["provider"], "jira", "{references}");
+    assert_eq!(remote["state"], "open");
+    assert_eq!(remote["owner"], "remote");
+    assert!(remote["url"].as_str().unwrap().ends_with("/browse/APP-1"));
+
+    // From the item, the local work that follows it.
+    let links = response_json(
+        scene
+            .call("GET", format!("/v1/artifacts/{item_id}/follow-ups"), json!({}))
+            .await,
+    )
+    .await;
+    assert_eq!(links["remote"]["state"], "open");
+    assert_eq!(links["tasks"].as_array().unwrap().len(), 2, "{links}");
+
+    // Finishing the local task changes the task, never the tracker's state.
+    let updated = scene
+        .call(
+            "PUT",
+            format!("/v1/tasks/{task_id}"),
+            json!({"title": task["title"], "status": "done", "priority": "medium"}),
+        )
+        .await;
+    assert_eq!(updated.status(), 200);
+    let links = response_json(
+        scene
+            .call("GET", format!("/v1/artifacts/{item_id}/follow-ups"), json!({}))
+            .await,
+    )
+    .await;
+    assert_eq!(links["remote"]["state"], "open", "a local edit is not a remote update");
+    assert!(links["tasks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|linked| linked["task_id"] == task_id.as_str() && linked["status"] == "done"));
+    let connector = response_json(
+        scene
+            .call("GET", format!("/v1/connectors/{}", scene.source_id), json!({}))
+            .await,
+    )
+    .await;
+    assert_eq!(connector["open_items"], 3, "the tracker's items are untouched");
+
+    // Held back by a lost source, the item is not there: no links, no state, no title.
+    *scene.fake.deny.lock().unwrap() = 404;
+    scene.sync("quarantined").await;
+    assert_eq!(
+        scene
+            .call("GET", format!("/v1/artifacts/{item_id}/follow-ups"), json!({}))
+            .await
+            .status(),
+        404
+    );
+    let references = response_json(
+        scene
+            .call("GET", format!("/v1/tasks/{task_id}/references"), json!({}))
+            .await,
+    )
+    .await;
+    assert_eq!(references[0]["available"], false);
+    assert!(references[0]["remote"].is_null());
+    let _ = std::fs::remove_dir_all(&scene.dir);
+}

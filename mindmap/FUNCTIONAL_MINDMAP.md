@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.7` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.8 — Link mirrored issues and pull requests to local projects and tasks without duplicating ownership.
+
+- Tracker context: no migration. `TaskReference.remote` (tracker state, URL, time, `owner: remote`) for a cited mirrored item, `GET /v1/artifacts/{id}/follow-ups` (remote state, tasks, projects) and `POST /v1/artifacts/{id}/follow-up` (a normal task citing the item, one open per item unless `allow_another`). Remote state and local status never share a field; a quarantine hides the links. Test in `tests/connectors_jira_lifecycle.rs`.
+
+Checks: static checks pass; the new test compiles but was not executed; nothing was built or run.
 
 ## V0.8.7 — Add a read-only Linear team/project adapter using the same conformance contract.
 

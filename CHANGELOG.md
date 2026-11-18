@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.8 (2026-11-18)
+
+Let a person link a mirrored issue or pull request to local work and tell the tracker's state from their own, in both directions.
+
+### Added
+- **Make a follow-up** (`POST /v1/artifacts/{id}/follow-up`): a normal local task that cites the mirrored item, with its own assignee, status, priority, project and due date (all optional; the title defaults to "Follow up:" and the item's title). It is `400` for a file that is not mirrored, `404` when the item is held back, and `409` while another follow-up of the item is open, unless `allow_another` is sent.
+- **The tracker's state, as the tracker's.** A task's citation of a mirrored item now carries `remote`: the provider, the source, the item's state (`open`, `closed` or `merged`), its link, when the tracker last changed it and `owner: "remote"`. It is the tracker's word, separate from the task's own `status`.
+- **Both directions.** `GET /v1/artifacts/{id}/follow-ups` returns the tracker's state with every local **task** (key, title, status, assignee, project) and **project** that cites the item.
+- **A local edit is never a remote update.** Finishing the follow-up changes the task and nothing in the connector; a change in the tracker changes the item and never the task. A connector's items are not edited in RepoMemo.
+- **A held-back item shows nothing.** When a quarantine holds the source back, the item's links return not found, and a task's citation of it shows as unavailable with no remote state.
+- A server test (`tests/connectors_jira_lifecycle.rs`) makes a follow-up, refuses a second, cites both ways, finishes the task and checks the tracker's state and the connector's counts are untouched, then quarantines the source and checks the links disappear.
+- No migration: the link is the existing task citation.
+- **Not in this release:** a web screen for follow-ups, and writing anything back to a tracker.
+
+### Checks
+- Version, migration lock (81 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new test compiles; **it was not executed**. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.7 (2026-11-18)
 
 Record the deferral of the conditional Linear adapter, because no pilot owner needs it, and say plainly that Linear is not supported.

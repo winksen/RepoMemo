@@ -25,6 +25,7 @@ mod embedding;
 mod environment;
 mod errors;
 mod events;
+mod follow_ups;
 mod health;
 mod health_probe;
 mod identity;
@@ -1223,6 +1224,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/outbound-endpoints/{endpoint_id}/test",
             post(outbound::test_endpoint),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/follow-ups",
+            get(follow_ups::list_follow_ups),
+        )
+        .route(
+            "/v1/artifacts/{artifact_id}/follow-up",
+            post(follow_ups::create_follow_up),
         )
         .route("/v1/repositories/{source_id}/sync", post(repositories::sync_repository))
         .route(

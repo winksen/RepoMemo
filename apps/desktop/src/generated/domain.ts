@@ -371,7 +371,57 @@ export interface TaskReference {
   available: boolean;
   note: string;
   added_by: SharedUser | null;
+  /**
+   * When the evidence is an issue or pull request mirrored from a tracker, what the tracker says about it (V0.8.8). It is the
+   * tracker's state, never the task's.
+   */
+  remote: RemoteItemInfo | null;
   created_at: string;
+}
+
+/**
+ * What a tracker reports about a mirrored issue or pull request. The tracker owns it: nothing here is edited in RepoMemo,
+ * and a task that follows the item has its own status.
+ */
+export interface RemoteItemInfo {
+  provider: string;
+  source_id: string;
+  source_name: string;
+  /** `open`, `closed` or `merged`: the tracker's word at `synced_at`. */
+  state: string;
+  url: string | null;
+  /** The tracker's own update time of the item. */
+  synced_at: string;
+  /** Always `remote`: who owns `state`. */
+  owner: string;
+}
+
+/** A local task that cites a mirrored item (V0.8.8). */
+export interface FollowUpTask {
+  task_id: string;
+  key: string;
+  title: string;
+  /** The task's own status, which a person sets here; it never changes the tracker's state. */
+  status: string;
+  assignee_name: string | null;
+  project_id: string | null;
+  project_name: string | null;
+  created_at: string;
+}
+
+/** A local project that cites a mirrored item in its brief. */
+export interface FollowUpProject {
+  project_id: string;
+  name: string;
+  status: string;
+}
+
+/** Both directions of a mirrored item's links: the tracker's state, and the local work that follows it up. */
+export interface ItemFollowUps {
+  artifact_id: string;
+  remote: RemoteItemInfo;
+  tasks: FollowUpTask[];
+  projects: FollowUpProject[];
 }
 
 /** A comment on a task (V0.7.4). It stays with its task and goes with it. */
