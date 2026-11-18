@@ -56,6 +56,10 @@ Migration 0081: `outbound_endpoints` (address, sealed secret, events, enabled) a
 
 No migration: the link is the existing `task_references` citation (and `project_references` for a brief). `TaskReference.remote` (`RemoteItemInfo`: provider, source, the tracker's `state`, URL, the tracker's update time and `owner: "remote"`) is read from `connector_items` and the artifact's metadata for an evidence citation of a mirrored item, and is empty (with `available: false`) when the item is held back by a quarantine. `GET /v1/artifacts/{id}/follow-ups` returns the remote state with the tasks (`tasks_following`) and projects (`list_projects_citing`) that cite the item; `POST /v1/artifacts/{id}/follow-up` (`follow_ups.rs`) makes a task through the normal creation path with the item cited, refusing a second open one unless `allow_another`. Remote state and local status never share a field: a connector item is never edited locally, and a task's status never reaches the tracker.
 
+## Chat digests (V0.8.9)
+
+Migration 0082: `chat_destinations` (provider `slack`, name, host, **sealed** address, digests, enabled, last sent and error) and `chat_digest_log` (primary key destination, kind, window: the ledger). `chat.rs` accepts an address only when the host is on `REPOMEMO_OUTBOUND_HOSTS` (the same list and check as outbound webhooks) and is `hooks.slack.com/services/...` (a loopback `http` address is accepted for a test receiver). `deliver_digests` counts (`count_due_reviews`, `count_overdue_tasks`), skips a zero, **claims** the (destination, kind, UTC day) row before the call, posts `{"text": …}` (no redirect, 10 s), and releases the claim when the call fails, so the next pass retries and a success is never repeated in a window. `digest_text` makes only a count and `state.mail.link(...)` (the signed-in app). The pass runs in the maintenance loop (`send_due`) and on `POST /v1/chat-destinations/{id}/digest`; an off or deleted destination is not read.
+
 ## Rules for the outside connection (S6)
 
 | Rule | How |

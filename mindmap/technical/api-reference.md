@@ -293,6 +293,12 @@
 | POST | `/v1/outbound-endpoints/{endpoint_id}/test` | managing | require_workspace_admin | — | 202 `{event_id}`; 409 when off |
 | GET | `/v1/artifacts/{artifact_id}/follow-ups` | auth | require_workspace_read | — | ItemFollowUps (the tracker's state as `remote`, the local `tasks` and `projects` that cite the item); 400 for a file that is not mirrored, 404 when held back |
 | POST | `/v1/artifacts/{artifact_id}/follow-up` | auth | require_workspace_write | FollowUpRequest (all optional: `title`, `description`, `priority`, `assignee_user_id`, `project_id`, `due_at`, `allow_another`) | CollaborationTask (201); 409 while another follow-up is open |
+| GET | `/v1/workspaces/{workspace_id}/chat-destinations` | managing | require_workspace_admin | — | DestinationsResponse (`destinations`, `digests`, `available`; never the address) |
+| POST | `/v1/workspaces/{workspace_id}/chat-destinations` | managing | require_workspace_admin | DestinationRequest (`name`, `url` a Slack incoming webhook, `digests`) | ChatDestination (201) |
+| PUT | `/v1/chat-destinations/{id}` | managing | require_workspace_admin | DestinationUpdate (`name?`, `digests?`, `enabled?`) | ChatDestination |
+| DELETE | `/v1/chat-destinations/{id}` | managing | require_workspace_admin | — | status |
+| POST | `/v1/chat-destinations/{id}/test` | managing | require_workspace_admin | — | `{delivered, error?}` |
+| POST | `/v1/chat-destinations/{id}/digest` | managing | require_workspace_admin | — | `{sent}`; 409 when off |
 | POST | `/v1/connectors/{source_id}/release` | managing | require_workspace_admin | — | ConnectorSource; 409 when not held or still denied |
 | PUT | `/v1/connectors/{source_id}/token` | managing | require_workspace_admin | ConnectorTokenRequest | ConnectorSource |
 | GET | `/v1/artifacts/{artifact_id}/mentions` | auth | require_workspace_read | — | ArtifactMentions |

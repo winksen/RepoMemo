@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.9` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.9 — Send opted-in review/project digests to approved Slack destinations as authenticated links.
+
+- Slack digests: migration 0082 (`chat_destinations` with a sealed address, `chat_digest_log` ledger); `chat.rs` checks the host against `REPOMEMO_OUTBOUND_HOSTS` and `hooks.slack.com/services/`, sends a count and a link only, claims the (destination, kind, day) row before posting and releases it on failure, and runs in the maintenance loop. Off or deleted destinations stop at the next pass. Test `tests/chat.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; no Slack workspace was contacted; nothing was built or run.
 
 ## V0.8.8 — Link mirrored issues and pull requests to local projects and tasks without duplicating ownership.
 

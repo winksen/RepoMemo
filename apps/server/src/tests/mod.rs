@@ -15,6 +15,7 @@ mod archive_roundtrip;
 mod archive_work;
 mod auth;
 mod card_changes;
+mod chat;
 mod citation_durability;
 mod code_owners;
 mod compression;

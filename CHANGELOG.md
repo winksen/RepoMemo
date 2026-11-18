@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.9 (2026-11-18)
+
+Send an opted-in daily digest to a Slack channel as a count and a link, never as content, once a day, and stop when the channel is turned off.
+
+### Added
+- **Chat destinations** (`/v1/workspaces/{id}/chat-destinations`, administrators): a name, a Slack incoming-webhook address and the digests wanted. The address is a secret: it is **sealed, never returned** and never listed (only its host is). It must be a `hooks.slack.com/services/...` address and its host must be on the operator's `REPOMEMO_OUTBOUND_HOSTS` list, which is checked again at every send. Up to ten per workspace.
+- **Two digests**, *review* (items past their review date) and *projects* (open tasks past their due date). A digest is **a count and a link** ("3 items are due for review. Sign in to see them: ..."), with **no title, excerpt or name**; the link is the signed-in app (`REPOMEMO_PUBLIC_URL` is needed), so a person outside the workspace reaches a sign-in page, not content.
+- **Once a day, never twice.** A ledger takes the right to send a kind to a destination for the UTC day *before* the call and gives it back when the call fails, so a failure is retried at the next pass and a success is never repeated, across retries and restarts. A digest with nothing to report is not sent. The pass runs with the other maintenance, and `POST /v1/chat-destinations/{id}/digest` runs it now under the same ledger.
+- **Disconnecting stops delivery.** Turning a destination off (`PUT`) or removing it (`DELETE`) is read at the next pass; `POST .../test` sends a short message with no workspace content so an administrator can see it arrive. The last error and the last delivery are shown on the destination.
+- Unit tests of the digest words and the digest names, and a server test (`tests/chat.rs`) with a fake Slack: a refused address and digest, a stranger, the address never returned, a test message, nothing sent when nothing is owed, a digest with a count and a link and no task title, the second call deduplicated, a failing channel retried exactly once, and off and removed destinations.
+- Migration **0082** adds `chat_destinations` and `chat_digest_log`.
+- **Not in this release:** a web screen for destinations, Microsoft Teams (V0.8.10), per-person digests.
+
+### Checks
+- Version, migration lock (82 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, server, all targets) pass. The new tests compile; **they were not executed** and no Slack workspace was contacted. Nothing was built or run.
+
+### Upgrading
+- Nothing to do: with `REPOMEMO_OUTBOUND_HOSTS` unset nothing is sent. To use it, add `hooks.slack.com` to that list and set `REPOMEMO_PUBLIC_URL`.
+
 ## V0.8.8 (2026-11-18)
 
 Let a person link a mirrored issue or pull request to local work and tell the tracker's state from their own, in both directions.

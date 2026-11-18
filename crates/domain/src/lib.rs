@@ -1597,6 +1597,24 @@ pub struct WebhookDelivery {
     pub resent_at: Option<String>,
 }
 
+/// A chat channel an administrator approved to receive digests (V0.8.9). The address is a secret and is never part of this.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatDestination {
+    pub id: String,
+    pub workspace_id: String,
+    /// `slack`.
+    pub provider: String,
+    pub name: String,
+    /// Where it is (the host only).
+    pub host: String,
+    /// `review` and `projects`.
+    pub digests: Vec<String>,
+    pub enabled: bool,
+    pub created_at: String,
+    pub last_sent_at: Option<String>,
+    pub last_error: Option<String>,
+}
+
 /// A destination that receives signed events from a workspace (V0.8.4). The signing secret is never part of it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutboundEndpoint {

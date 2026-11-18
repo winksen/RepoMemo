@@ -14,6 +14,7 @@ mod backup;
 mod backup_copy;
 mod backup_crypto;
 mod build_info;
+mod chat;
 mod check_config;
 mod collaboration;
 mod compression;
@@ -1225,6 +1226,16 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/outbound-endpoints/{endpoint_id}/test",
             post(outbound::test_endpoint),
         )
+        .route(
+            "/v1/workspaces/{workspace_id}/chat-destinations",
+            get(chat::list_destinations).post(chat::create_destination),
+        )
+        .route(
+            "/v1/chat-destinations/{id}",
+            put(chat::update_destination).delete(chat::delete_destination),
+        )
+        .route("/v1/chat-destinations/{id}/test", post(chat::test_destination))
+        .route("/v1/chat-destinations/{id}/digest", post(chat::send_digest_now))
         .route(
             "/v1/artifacts/{artifact_id}/follow-ups",
             get(follow_ups::list_follow_ups),

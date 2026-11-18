@@ -1440,6 +1440,23 @@ export interface WebhookDelivery {
   resent_at: string | null;
 }
 
+/** A chat channel an administrator approved to receive digests (V0.8.9). The address is a secret and is never part of this. */
+export interface ChatDestination {
+  id: string;
+  workspace_id: string;
+  /** `slack`. */
+  provider: string;
+  name: string;
+  /** Where it is (the host only). */
+  host: string;
+  /** `review` and `projects`. */
+  digests: string[];
+  enabled: boolean;
+  created_at: string;
+  last_sent_at: string | null;
+  last_error: string | null;
+}
+
 /** A destination that receives signed events from a workspace (V0.8.4). The signing secret is never part of it. */
 export interface OutboundEndpoint {
   id: string;

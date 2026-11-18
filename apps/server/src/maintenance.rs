@@ -200,6 +200,13 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         Err(error) => failed(&mut report, "task reminders", error),
     }
 
+    // Chat digests: a count and a link, once a day per destination and kind.
+    match crate::chat::send_due(state).await {
+        Ok(0) => {}
+        Ok(count) => tracing::info!(count, "Chat digests were sent"),
+        Err(error) => failed(&mut report, "chat digests", error),
+    }
+
     // Access to a workspace ends at a guest's end date whether or not this has run; it writes the end to the trail.
     if let Err(error) = storage.record_expired_guests().await {
         failed(&mut report, "guest expiry", error);

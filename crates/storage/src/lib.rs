@@ -28,6 +28,7 @@ mod archive;
 mod archive_import;
 mod archive_work;
 mod artifacts;
+mod chat;
 mod collaboration;
 mod connector_quarantine;
 mod connectors;
@@ -75,6 +76,7 @@ pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_T
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
 pub use approvals::{StoredApproval, StoredImportedApproval};
 pub use archive_import::{ImportedWorkspace, PendingPassage};
+pub use chat::{NewChatDestination, CHAT_DIGESTS};
 pub use connector_quarantine::StoredQuarantine;
 pub(crate) use connector_quarantine::NOT_QUARANTINED;
 pub use connectors::{ConnectorItemOutcome, ConnectorItemWrite};

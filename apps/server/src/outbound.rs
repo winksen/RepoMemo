@@ -51,8 +51,13 @@ impl OutboundService {
         })
     }
 
+    /// Whether the operator has named any host.
+    pub(crate) fn is_available(&self) -> bool {
+        self.policy.is_enabled()
+    }
+
     /// Checks an address and returns it in a normal form: `https` (`http` only to this machine), no credentials, on the list.
-    fn check_destination(&self, raw: &str) -> Result<String, ApiError> {
+    pub(crate) fn check_destination(&self, raw: &str) -> Result<String, ApiError> {
         if !self.policy.is_enabled() {
             return Err(ApiError::bad_request(
                 "Outbound webhooks are off on this server. Its operator turns them on by setting REPOMEMO_OUTBOUND_HOSTS to the hosts they may use.",
