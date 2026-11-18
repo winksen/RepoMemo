@@ -45,6 +45,18 @@ const STATUS_LABEL: Record<string, string> = {
   quarantined: "Held back",
 };
 
+/** How complete the copy is, from the connector's health. */
+const HEALTH_LABEL: Record<string, string> = {
+  complete: "Complete",
+  partial: "Partial: the copy is behind",
+  stale: "Stale",
+  paused: "Paused",
+  quarantined: "Held back",
+  failed: "Sync failed",
+  syncing: "Syncing",
+  pending: "Not synced yet",
+};
+
 /** Workspace Settings › Issues: trackers whose issues are kept as evidence.
  *  A link is checked first, so an administrator sees whether the server can
  *  read it with the token given. */
@@ -224,13 +236,15 @@ export function ConnectorSettings({
             <strong>{connector.name}</strong>
             <code className="rm-repo-path">{connector.location}</code>
             <span className="rm-map-muted">
-              {STATUS_LABEL[running ? "syncing" : connector.status] ?? connector.status}
+              {HEALTH_LABEL[running ? "syncing" : connector.health.state] ?? STATUS_LABEL[connector.status] ?? connector.status}
               {" · "}{connector.open_items.toLocaleString()} open · {connector.closed_items.toLocaleString()} closed
               {connector.last_synced_at ? ` · last sync ${formatTime(connector.last_synced_at)}` : ""}
               {connector.has_credential ? " · with a token" : " · no token"}
               {connector.last_report?.more_to_fetch ? " · more to fetch on the next sync" : ""}
             </span>
-            {!running && connector.status === "error" && connector.last_error ? <span className="rm-map-muted">{connector.last_error}</span> : null}
+            {!running ? <span className="rm-map-muted">{connector.health.summary}{connector.health.resume_from ? ` The next sync resumes from ${formatTime(connector.health.resume_from)}.` : ""}</span> : null}
+            {!running && connector.health.problem ? <span className="rm-map-muted">{connector.health.problem.message} {connector.health.problem.action}</span> : null}
+            <details className="rm-map-muted"><summary>What is not copied</summary><ul>{connector.health.exclusions.map((line) => <li key={line}>{line}</li>)}</ul></details>
             {!running && connector.status === "paused" ? <span className="rm-map-muted">
               Paused{connector.paused_until ? ` until ${formatTime(connector.paused_until)}` : " until the token is replaced"}: {connector.paused_reason}
             </span> : null}

@@ -439,6 +439,8 @@ impl RepoMemoCore {
                     }
                 }
                 url = next;
+                // The page is stored: an interruption resumes after it.
+                self.checkpoint_connector(source, &metadata).await?;
             }
         }
         self.finish_connector_sync(source, metadata, report, job_id).await

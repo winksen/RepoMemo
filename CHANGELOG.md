@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.3 (2026-11-18)
+
+Say how current each connector's copy is, what it leaves out and what to do when it fails, and make an interrupted sync resume after the page it stored.
+
+### Added
+- **A health block on every connector** (`health` on `GET /v1/connectors/{id}` and the list): a state, a sentence about it, the **last successful sync**, the **last complete sync**, items kept and read, whether there is a **backlog**, items **not indexed**, the point the next sync **resumes from** and the **exclusions** (the comment, commit, page, request and text limits, attachments and code, GitLab system notes).
+- **Eight states an operator can tell apart:** `complete`, `partial` (the last sync stopped at its limit or could not index some items), `stale` (no sync finished for over a day), `paused`, `quarantined`, `failed`, `syncing` and `pending`. The most serious that applies wins.
+- **A recoverable problem** for a failed or paused connector: its kind (`token`, `rate_limit`, `unreachable`, `not_found`, `forbidden` or `other`), the tracker's message and the step that recovers (replace the token, wait, check the address, give read access, or Sync now).
+- **Checkpoints.** After each page of items is stored the cursor is saved (GitHub, and each GitLab endpoint), so a sync that fails or is interrupted **resumes after that page** instead of from the start. A page read again is found unchanged: **no item is stored twice**. A sync that read and indexed everything records `last_complete_at`.
+- **The web client** shows the state, the sentence, the resume point, the recovery step and a "What is not copied" list under each connector.
+- Unit tests of the state rules and of how a failure is explained, and a server test (`tests/connectors_health.rs`) in which the second page of issues fails, the first page is kept and shown as the resume point, and the retry adds the second item, finds the first unchanged and leaves two files.
+- No migration: health is computed when a connector is read.
+
+### Checks
+- Version, migration lock (80 files), generated types, styles, accessibility, documentation links, TypeScript, formatting and clippy (domain, storage, API, server, all targets) pass. The new tests compile; **they were not executed**. Nothing was built or run.
+
+### Upgrading
+- Nothing to do. A connector made before reads as `complete`, `partial` or `stale` from its last report.
+
 ## V0.8.2 (2026-11-18)
 
 Hold a connector's copied evidence back when its source stops answering for the partition, so a revoked token or a removed repository cannot leave a stale copy in search.

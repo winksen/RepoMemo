@@ -24,8 +24,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use repomemo_domain::{
-    ArtifactType, ConnectorAccessCheck, ConnectorPreview, ConnectorQuarantine, ConnectorSource, ConnectorSyncReport,
-    IndexingJobStatus, Source, CONNECTOR_SYNC_JOB_KIND,
+    ArtifactType, ConnectorAccessCheck, ConnectorHealth, ConnectorPreview, ConnectorProblem, ConnectorQuarantine,
+    ConnectorSource, ConnectorSyncReport, IndexingJobStatus, Source, CONNECTOR_SYNC_JOB_KIND,
 };
 use repomemo_indexer::INDEXER_VERSION;
 use repomemo_storage::{ConnectorItemOutcome, ConnectorItemWrite, StorageEngine};
@@ -140,6 +140,9 @@ struct ConnectorMetadata {
     pulls_cursor: Option<String>,
     #[serde(default)]
     last_synced_at: Option<String>,
+    /// The last sync that read everything and indexed everything.
+    #[serde(default)]
+    last_complete_at: Option<String>,
     #[serde(default)]
     last_error: Option<String>,
     #[serde(default)]
@@ -152,6 +155,126 @@ struct ConnectorMetadata {
     sharing_approved_by: Option<String>,
     #[serde(default)]
     sharing_approved_at: Option<String>,
+}
+
+/// With no successful sync for this long a connector reads `stale`.
+const STALE_AFTER_SECS: i64 = 24 * 60 * 60;
+
+/// Reads a connector's state in words an operator can act on (V0.8.3): the
+/// first line that applies wins, from the most serious.
+fn connector_health(
+    metadata: &ConnectorMetadata,
+    status: &str,
+    items_kept: i64,
+    quarantined: bool,
+    syncing: bool,
+    now: chrono::DateTime<chrono::Utc>,
+) -> ConnectorHealth {
+    let report = metadata.last_report.clone().unwrap_or_default();
+    let stale = metadata.last_synced_at.as_deref().is_some_and(|at| {
+        chrono::DateTime::parse_from_rfc3339(at)
+            .map(|at| (now - at.with_timezone(&chrono::Utc)).num_seconds() > STALE_AFTER_SECS)
+            .unwrap_or(false)
+    });
+    let problem = metadata.last_error.as_deref().map(classify_problem);
+    let (state, summary) = if quarantined {
+        (
+            "quarantined",
+            "Access to the source was lost: the copied items are held back until an administrator releases them.",
+        )
+    } else if status == "paused" || metadata.paused.is_some() {
+        (
+            "paused",
+            "The tracker asked the connector to wait, or refused the token: it resumes by itself or when the token is replaced.",
+        )
+    } else if syncing || status == "syncing" {
+        ("syncing", "A sync is running.")
+    } else if status == "error" {
+        (
+            "failed",
+            "The last sync failed. What it stored is kept and the next sync resumes after it.",
+        )
+    } else if metadata.last_synced_at.is_none() {
+        ("pending", "Nothing has been read yet.")
+    } else if report.more_to_fetch || report.index_failed > 0 {
+        (
+            "partial",
+            "The copy is behind: the last sync stopped at its limit or could not index some items. The next sync carries on.",
+        )
+    } else if stale {
+        (
+            "stale",
+            "No sync has finished for over a day, so the copy may be out of date.",
+        )
+    } else {
+        ("complete", "Everything the tracker reported has been read and indexed.")
+    };
+    let mut exclusions = vec![
+        format!(
+            "Comments: the first {} of each item are kept",
+            MAX_COMMENT_PAGES * PER_PAGE
+        ),
+        format!("Commits: the first {MAX_PULL_COMMITS} of each pull or merge request are listed"),
+        format!(
+            "A sync reads at most {MAX_PAGES_PER_SYNC} pages and {MAX_REQUESTS_PER_SYNC} requests; the rest follows on the next sync"
+        ),
+        format!("Text longer than {MAX_BODY_CHARS} characters is cut"),
+        "Attachments, images and code are not copied".to_owned(),
+    ];
+    if metadata.provider == "gitlab" {
+        exclusions.push("System notes (label and assignment changes) are not copied".to_owned());
+    }
+    ConnectorHealth {
+        state: state.to_owned(),
+        summary: summary.to_owned(),
+        last_success_at: metadata.last_synced_at.clone(),
+        last_complete_at: metadata.last_complete_at.clone(),
+        stale_after_seconds: STALE_AFTER_SECS,
+        items_kept,
+        items_seen_last_sync: report.items_seen,
+        backlog: report.more_to_fetch,
+        index_failed: report.index_failed,
+        resume_from: metadata.cursor.clone(),
+        exclusions,
+        problem: problem.filter(|_| matches!(state, "failed" | "paused" | "quarantined")),
+    }
+}
+
+/// Names the kind of an error from the words the tracker client uses, and the step that recovers from it.
+fn classify_problem(message: &str) -> ConnectorProblem {
+    let (kind, action) = if message.contains("refused the token") {
+        (
+            "token",
+            "Replace the token with the Token button; syncing resumes after it is tried against the tracker.",
+        )
+    } else if message.contains("rate limit") {
+        ("rate_limit", "Wait: syncing resumes by itself when the limit resets.")
+    } else if message.contains("could not be reached") {
+        (
+            "unreachable",
+            "Check the tracker's address and the server's network, then choose Sync now.",
+        )
+    } else if message.contains("does not know this repository") {
+        (
+            "not_found",
+            "Check that the repository still exists and that the token can see it.",
+        )
+    } else if message.contains("cannot read this repository") {
+        (
+            "forbidden",
+            "Give the token read access to issues, then choose Sync now.",
+        )
+    } else {
+        (
+            "other",
+            "Choose Sync now to retry. What was stored is kept, and a retry stores nothing twice.",
+        )
+    };
+    ConnectorProblem {
+        kind: kind.to_owned(),
+        message: message.chars().take(300).collect(),
+        action: action.to_owned(),
+    }
 }
 
 /// A connector the tracker asked to stop (see [`Pause`]).
@@ -998,7 +1121,24 @@ impl RepoMemoCore {
             .latest_source_job(&source.id, CONNECTOR_SYNC_JOB_KIND)
             .await?
             .filter(|job| job.status == "running");
-        let id = source.id.clone();
+        let quarantine = self
+            .storage
+            .connector_quarantine(&source.id)
+            .await?
+            .map(|held| ConnectorQuarantine {
+                reason: held.reason,
+                detail: held.detail,
+                items: held.items,
+                since: held.quarantined_at,
+            });
+        let health = connector_health(
+            &metadata,
+            &source.status,
+            open_items + closed_items,
+            quarantine.is_some(),
+            active_job.is_some(),
+            chrono::Utc::now(),
+        );
         let has_credential = self.storage.repo_credential_info(&source.id).await?.is_some();
         let webhook = self.storage.repo_webhook_info(&source.id).await.ok().flatten();
         Ok(ConnectorSource {
@@ -1021,16 +1161,8 @@ impl RepoMemoCore {
             paused_until: metadata.paused.as_ref().and_then(|paused| paused.until.clone()),
             sharing_approved_by: metadata.sharing_approved_by,
             sharing_approved_at: metadata.sharing_approved_at,
-            quarantine: self
-                .storage
-                .connector_quarantine(&id)
-                .await?
-                .map(|held| ConnectorQuarantine {
-                    reason: held.reason,
-                    detail: held.detail,
-                    items: held.items,
-                    since: held.quarantined_at,
-                }),
+            quarantine: quarantine.clone(),
+            health,
             created_at: source.created_at,
         })
     }
@@ -1343,9 +1475,21 @@ impl RepoMemoCore {
                 }
             }
             url = next;
+            // The page is stored: an interruption resumes after it.
+            self.checkpoint_connector(&source, &metadata).await?;
         }
 
         self.finish_connector_sync(&source, metadata, report, job_id).await
+    }
+
+    /// Saves the cursor once a page of items is stored, so a sync that is
+    /// interrupted (a failure, a restart) resumes after that page and not from
+    /// the start. Items already stored are found unchanged, never twice.
+    async fn checkpoint_connector(&self, source: &Source, metadata: &ConnectorMetadata) -> Result<()> {
+        self.storage
+            .update_source(&source.id, &source.name, "syncing", &metadata.to_value(), false)
+            .await?;
+        Ok(())
     }
 
     /// Indexes what a sync stored, in the same job like a repository's files,
@@ -1399,6 +1543,9 @@ impl RepoMemoCore {
         metadata.last_error = None;
         metadata.paused = None;
         metadata.last_synced_at = Some(chrono::Utc::now().to_rfc3339());
+        if !report.more_to_fetch && report.index_failed == 0 {
+            metadata.last_complete_at = metadata.last_synced_at.clone();
+        }
         self.storage
             .update_source(source_id, &source.name, "ready", &metadata.to_value(), true)
             .await?;
@@ -1615,5 +1762,108 @@ mod tests {
         assert_eq!(next_link(header).as_deref(), Some("https://api.github.com/x?page=2"));
         assert_eq!(next_link("<https://api.github.com/x?page=1>; rel=\"prev\""), None);
         assert_eq!(next_link(""), None);
+    }
+
+    fn at(text: &str) -> chrono::DateTime<chrono::Utc> {
+        chrono::DateTime::parse_from_rfc3339(text)
+            .unwrap()
+            .with_timezone(&chrono::Utc)
+    }
+
+    fn synced(when: &str, report: ConnectorSyncReport) -> ConnectorMetadata {
+        ConnectorMetadata {
+            provider: "github".to_owned(),
+            last_synced_at: Some(when.to_owned()),
+            last_report: Some(report),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn health_tells_complete_partial_stale_and_paused_apart() {
+        let now = at("2026-11-18T12:00:00Z");
+        let health = |metadata: &ConnectorMetadata, status: &str, quarantined: bool, syncing: bool| {
+            connector_health(metadata, status, 10, quarantined, syncing, now).state
+        };
+        let done = synced("2026-11-18T11:00:00Z", ConnectorSyncReport::default());
+        assert_eq!(health(&done, "ready", false, false), "complete");
+
+        // Stopped at its limit, or items that could not be indexed: the copy is behind.
+        let behind = synced(
+            "2026-11-18T11:00:00Z",
+            ConnectorSyncReport {
+                more_to_fetch: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(health(&behind, "ready", false, false), "partial");
+        let unindexed = synced(
+            "2026-11-18T11:00:00Z",
+            ConnectorSyncReport {
+                index_failed: 2,
+                ..Default::default()
+            },
+        );
+        assert_eq!(health(&unindexed, "ready", false, false), "partial");
+
+        // Silent for more than a day.
+        let old = synced("2026-11-16T11:00:00Z", ConnectorSyncReport::default());
+        assert_eq!(health(&old, "ready", false, false), "stale");
+
+        // A tracker that asked to wait, a refusal that stopped the sync, a running sync, a first sync not made yet.
+        let mut paused = done.clone();
+        paused.paused = Some(PausedInfo {
+            reason: "rate limit".to_owned(),
+            until: None,
+        });
+        assert_eq!(health(&paused, "paused", false, false), "paused");
+        assert_eq!(health(&done, "error", false, false), "failed");
+        assert_eq!(health(&done, "syncing", false, true), "syncing");
+        assert_eq!(
+            health(&ConnectorMetadata::default(), "pending", false, false),
+            "pending"
+        );
+
+        // A loss of access outranks everything else.
+        assert_eq!(health(&paused, "paused", true, false), "quarantined");
+    }
+
+    #[test]
+    fn health_explains_a_failure_and_the_way_out() {
+        let now = at("2026-11-18T12:00:00Z");
+        let mut metadata = synced("2026-11-18T11:00:00Z", ConnectorSyncReport::default());
+        metadata.cursor = Some("2026-11-18T10:00:00Z".to_owned());
+        metadata.last_error = Some("The tracker could not be reached: connection refused".to_owned());
+        let failed = connector_health(&metadata, "error", 3, false, false, now);
+        assert_eq!(failed.state, "failed");
+        let problem = failed.problem.expect("a failure is explained");
+        assert_eq!(problem.kind, "unreachable");
+        assert!(problem.action.contains("Sync now"));
+        assert_eq!(failed.resume_from.as_deref(), Some("2026-11-18T10:00:00Z"));
+        assert_eq!(failed.items_kept, 3);
+        assert!(failed.exclusions.iter().any(|line| line.contains("Attachments")));
+
+        // An old error is not shown once the connector is healthy again.
+        let healthy = connector_health(&metadata, "ready", 3, false, false, now);
+        assert!(healthy.problem.is_none());
+
+        for (message, kind) in [
+            ("The tracker refused the token. Check that it is valid", "token"),
+            (
+                "The tracker's rate limit is reached. Syncing resumes in 5 minutes.",
+                "rate_limit",
+            ),
+            (
+                "The tracker does not know this repository, or the token cannot see it.",
+                "not_found",
+            ),
+            (
+                "The tracker refused the request: the token cannot read this repository's issues.",
+                "forbidden",
+            ),
+            ("The tracker answered 500 Internal Server Error.", "other"),
+        ] {
+            assert_eq!(classify_problem(message).kind, kind, "{message}");
+        }
     }
 }

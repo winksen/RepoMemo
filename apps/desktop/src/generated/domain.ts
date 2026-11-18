@@ -1437,7 +1437,45 @@ export interface ConnectorSource {
    * source was lost or cannot be established (V0.8.2).
    */
   quarantine: ConnectorQuarantine | null;
+  /** What an operator needs to know about the sync (V0.8.3). */
+  health: ConnectorHealth;
   created_at: string;
+}
+
+/** How well a connector keeps its copy current, in words an operator can act on. */
+export interface ConnectorHealth {
+  /** `complete`, `partial`, `stale`, `paused`, `quarantined`, `failed`, `syncing` or `pending`. */
+  state: string;
+  /** One sentence saying what the state means now. */
+  summary: string;
+  /** The last sync that finished without an error. */
+  last_success_at: string | null;
+  /** The last sync that finished with nothing left to read and nothing that failed to index. */
+  last_complete_at: string | null;
+  /** A connector with no successful sync for this long reads `stale`. */
+  stale_after_seconds: number;
+  /** Items kept from the tracker. */
+  items_kept: number;
+  /** Items the last sync read. */
+  items_seen_last_sync: number;
+  /** The last sync stopped at its limit and the next one carries on. */
+  backlog: boolean;
+  /** Items stored but not indexed by the last sync. */
+  index_failed: number;
+  /** Where the next sync starts: the tracker's update time of the last item stored. */
+  resume_from: string | null;
+  /** What is not copied or is cut, so a gap is not mistaken for a failure. */
+  exclusions: string[];
+  /** What went wrong and what to do about it. */
+  problem: ConnectorProblem | null;
+}
+
+/** An error a person can recover from, with the step that does it. */
+export interface ConnectorProblem {
+  /** `token`, `rate_limit`, `unreachable`, `not_found`, `forbidden` or `other`. */
+  kind: string;
+  message: string;
+  action: string;
 }
 
 /**

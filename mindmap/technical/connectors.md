@@ -38,6 +38,10 @@ Syncs run in the background through a runner of their own (one at a time, never 
 
 **Stale-access window.** Access loss is found when a sync runs: at the repository polling interval (300 s by default, `REPOMEMO_REPO_POLL_SECONDS`), after a webhook, or on *Sync now*, plus the time of a sync in progress. With polling off, until the next webhook or manual sync. Loss of one item is not loss of access; deletion of one item is told by 0.8.6.
 
+## Health (V0.8.3)
+
+`ConnectorSource.health` is computed when the connector is read (no migration): `connector_health` takes the first state that applies, from the most serious: `quarantined`, `paused`, `syncing`, `failed` (status `error`), `pending` (never synced), `partial` (the last report has `more_to_fetch` or `index_failed`), `stale` (the last successful sync is older than 24 h, `STALE_AFTER_SECS`) and `complete`. It also carries `last_success_at` (`last_synced_at`), `last_complete_at` (new in the metadata: a sync that read and indexed everything), items kept and seen, the backlog flag, `resume_from` (the cursor), the exclusions (the comment, commit, page, request and text caps, attachments and code, GitLab system notes) and, for a failed or paused connector, a `problem` whose kind (`token`, `rate_limit`, `unreachable`, `not_found`, `forbidden`, `other`) is read from the client's own messages with the step that recovers. **Checkpoints:** after each page of items is stored, `checkpoint_connector` saves the cursor (GitHub, and GitLab per endpoint), so a sync interrupted by a failure or a restart resumes after that page; the items of the page that read again are found unchanged (`connector_items` is keyed by tracker id), never added twice.
+
 ## Rules for the outside connection (S6)
 
 | Rule | How |

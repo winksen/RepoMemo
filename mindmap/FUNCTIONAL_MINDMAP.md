@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.3 — Expose last successful sync, coverage, exclusions, backlog and recoverable errors.
+
+- Connector health computed on read (`connector_health`, no migration): eight states, last success and last complete sync, backlog, resume point, exclusions and a classified problem with its recovery step. The cursor is checkpointed after each stored page (GitHub and GitLab), so a failed sync resumes after it and a retry stores nothing twice. Tests: unit tests in `connectors.rs` and `tests/connectors_health.rs`.
+
+Checks: static checks pass; the new tests compile but were not executed; nothing was built or run.
 
 ## V0.8.2 — Quarantine affected mirrored evidence when access is revoked or sharing can no longer be established.
 

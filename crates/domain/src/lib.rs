@@ -1594,7 +1594,48 @@ pub struct ConnectorSource {
     /// source was lost or cannot be established (V0.8.2).
     #[serde(default)]
     pub quarantine: Option<ConnectorQuarantine>,
+    /// What an operator needs to know about the sync (V0.8.3).
+    #[serde(default)]
+    pub health: ConnectorHealth,
     pub created_at: String,
+}
+
+/// How well a connector keeps its copy current, in words an operator can act on.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ConnectorHealth {
+    /// `complete`, `partial`, `stale`, `paused`, `quarantined`, `failed`, `syncing` or `pending`.
+    pub state: String,
+    /// One sentence saying what the state means now.
+    pub summary: String,
+    /// The last sync that finished without an error.
+    pub last_success_at: Option<String>,
+    /// The last sync that finished with nothing left to read and nothing that failed to index.
+    pub last_complete_at: Option<String>,
+    /// A connector with no successful sync for this long reads `stale`.
+    pub stale_after_seconds: i64,
+    /// Items kept from the tracker.
+    pub items_kept: i64,
+    /// Items the last sync read.
+    pub items_seen_last_sync: usize,
+    /// The last sync stopped at its limit and the next one carries on.
+    pub backlog: bool,
+    /// Items stored but not indexed by the last sync.
+    pub index_failed: usize,
+    /// Where the next sync starts: the tracker's update time of the last item stored.
+    pub resume_from: Option<String>,
+    /// What is not copied or is cut, so a gap is not mistaken for a failure.
+    pub exclusions: Vec<String>,
+    /// What went wrong and what to do about it.
+    pub problem: Option<ConnectorProblem>,
+}
+
+/// An error a person can recover from, with the step that does it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectorProblem {
+    /// `token`, `rate_limit`, `unreachable`, `not_found`, `forbidden` or `other`.
+    pub kind: String,
+    pub message: String,
+    pub action: String,
 }
 
 /// Why a connector's evidence is held back. The detail is the tracker's own
