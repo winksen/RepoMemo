@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.21` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.22` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.22 — A more readable sidebar.
+
+- Rail text is 14 px with 18 px icons, and the **current** workspace, organization or System entry is filled with the accent colour and white text. The rail is 200 px wide.
+- The **Workspaces** and **Organizations** headings fold and unfold their lists; a list shows **five** rows before **Show more**.
+- The footer says **Session connected** and when this browser signed in (kept on this device; absent until the next sign-in). The *JWT active · API healthy* text and the rail's *Open in the app* link are removed.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.21 — A narrower sidebar and a plus menu to create.
 

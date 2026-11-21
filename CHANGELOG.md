@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.22 (2026-11-21)
+
+A more readable sidebar and a simpler foot.
+
+### Changed
+- **Bigger, clearer rail.** Text is 14 px and icons 18 px, and the rail is 200 px wide. The current workspace, organization or System entry is filled with the accent colour and white text.
+- **Lists fold.** Click the **Workspaces** or **Organizations** heading to fold or unfold its list. A list shows five rows before **Show more**.
+- **Session line.** The footer says *Session connected* with the time this browser signed in. The time is kept on this device, so it appears after the next sign-in.
+- **Removed.** The *JWT active · API healthy* text and the rail's *Open in the app* link.
+- No route, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the rail test now covers five rows and the fold and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.21 (2026-11-21)
 
 A narrower sidebar with workspaces listed like organizations, and a plus menu in the navbar to create.

@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconSearch as Search, IconSettings as Settings,  IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users, type TablerIcon } from "@tabler/icons-react";
+import { IconBook2 as Book, IconBuildingCommunity as Building, IconChevronDown as ChevronDown, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconSearch as Search, IconSettings as Settings,  IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users, type TablerIcon } from "@tabler/icons-react";
 import { SharedApiError, listSharedOrganizationMembers, removeSharedOrganizationMember, transferSharedOrganizationOwnership, updateSharedOrganization, upsertSharedOrganizationMember } from "../lib/sharedApi";
 import { type Organization, type OrganizationMember, type OrganizationRole, type SharedWorkspace } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
@@ -130,19 +130,26 @@ export function OrganizationRail({
   });
 
   return <div className="shared-rail-navigation">
-    {workspaces ? <section className="shared-rail-workspaces" aria-label="Workspaces">
-      <p className="shared-eyebrow">Workspaces</p>
-      {workspaceEntries.length ? <RailList activeId={workspaceId} items={workspaceEntries.map((entry) => ({ id: entry.id, name: entry.name, title: entry.title, icon: <WorkspaceIcon size={ICON_SIZE.md} workspace={entry.workspace} />, onSelect: () => navigate(workspaceHomePath(entry.id)) }))} kind="workspace" /> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
-    </section> : null}
-    {canManageOrganizations ? <section className="shared-rail-organizations" aria-label="Organization management">
-      <p className="shared-eyebrow">Organizations</p>
-      {organizations.length ? <RailList activeId={selectedOrganizationId} items={organizations.map((organization) => ({ id: organization.id, name: organization.name, title: organization.name, icon: <Building size={ICON_SIZE.md} />, onSelect: () => organizationNavigation.selectOrganization(organization.id) }))} kind="organization" /> : <p className="shared-rail-empty">Create an organization to begin.</p>}
-    </section> : null}
+    {workspaces ? <RailSection label="Workspaces" name="workspaces">
+      {workspaceEntries.length ? <RailList activeId={workspaceId} items={workspaceEntries.map((entry) => ({ id: entry.id, name: entry.name, title: entry.title, icon: <WorkspaceIcon size={ICON_SIZE.lg} workspace={entry.workspace} />, onSelect: () => navigate(workspaceHomePath(entry.id)) }))} kind="workspace" /> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
+    </RailSection> : null}
+    {canManageOrganizations ? <RailSection label="Organizations" name="organizations">
+      {organizations.length ? <RailList activeId={selectedOrganizationId} items={organizations.map((organization) => ({ id: organization.id, name: organization.name, title: organization.name, icon: <Building size={ICON_SIZE.lg} />, onSelect: () => organizationNavigation.selectOrganization(organization.id) }))} kind="organization" /> : <p className="shared-rail-empty">Create an organization to begin.</p>}
+    </RailSection> : null}
   </div>;
 }
 
+/** A titled part of the rail that its heading folds away and brings back. */
+function RailSection({ children, label, name }: { children: ReactNode; label: string; name: string }) {
+  const [open, setOpen] = useState(true);
+  return <section aria-label={label} className={`shared-rail-${name}`}>
+    <button aria-controls={`shared-rail-${name}-list`} aria-expanded={open} className="shared-rail-heading" onClick={() => setOpen((current) => !current)} type="button"><span>{label}</span><ChevronDown size={ICON_SIZE.md} /></button>
+    <div hidden={!open} id={`shared-rail-${name}-list`}>{children}</div>
+  </section>;
+}
+
 /** Lists longer than this fold behind a *Show more* button; the current item always stays visible. */
-const RAIL_LIST_LIMIT = 4;
+const RAIL_LIST_LIMIT = 5;
 
 function RailList({ activeId, items, kind }: { activeId?: string; items: { id: string; name: string; title: string; icon: ReactNode; onSelect: () => void }[]; kind: "workspace" | "organization" }) {
   const [expanded, setExpanded] = useState(false);

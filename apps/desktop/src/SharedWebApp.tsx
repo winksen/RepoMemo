@@ -6,6 +6,7 @@ FIRST VIEWPORT: A calm explanatory field balances a focused access form; after a
 FORM: The established RepoMemo operate composition, adapted into a protected browser session with direct API-state feedback.
 */
 
+import { forgetSignIn, rememberSignIn } from "./lib/signedIn";
 import { useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
@@ -162,6 +163,7 @@ function SharedWebAppContent() {
 
   function handleAuthenticated(token: string, destination = "/dashboard") {
     window.sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+    rememberSignIn();
     navigate(destination, true);
     hydrate(token).catch(() => undefined);
   }
@@ -170,6 +172,7 @@ function SharedWebAppContent() {
     // The recent places of the palette are the person's, not the computer's (V0.3.26).
     if (session) clearRecents(session.user.id);
     clearSharedSession();
+    forgetSignIn();
     setAccessToken(null);
     setSession(null);
     setOrganizations([]);
@@ -213,6 +216,7 @@ function SharedWebAppContent() {
     return <ServerSetup
       onAdminCreated={(token) => {
         window.sessionStorage.setItem(SESSION_STORAGE_KEY, token);
+        rememberSignIn();
         setSetup({ state: "finishing", onboarding: true });
         hydrate(token).catch(() => undefined);
       }}
