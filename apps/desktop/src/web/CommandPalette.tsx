@@ -1,3 +1,4 @@
+import { ASSISTANT_NAME } from "../lib/assistantName";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { querySharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
 import { onOpenCommandPalette, requestNewNote, sendToAssistant } from "../lib/assistantBridge";
@@ -136,7 +137,7 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
       clearOnEscape={false}
       onKeyDown={onKeyDown}
       onValueChange={(next) => { setQuery(next); setActive(0); }}
-      placeholder={assistantWorkspaceId ? "Go to, search, or ask the assistant…" : "Go to a workspace, file or page…"}
+      placeholder={assistantWorkspaceId ? `Go to, search, or ask ${ASSISTANT_NAME}…` : "Go to a workspace, file or page…"}
       role="combobox"
       value={query}
     />

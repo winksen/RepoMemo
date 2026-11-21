@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.47` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.48` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.48 — The assistant is called Cairn.
+
+- The assistant has a name: **Cairn**, a stack of stones that marks the way for whoever comes next. It is called that on its page and in its dock, on the top-bar button, in the command palette (the *Cairn* group, *Ask Cairn*, the search box's hint), in its messages and errors, in its greeting (*Hi, I'm Cairn*) and in the template and AI-provider texts that mention it.
+- Nothing else changes: the page is still `/assistant`, the capabilities and chats are the same, and the API still says *agent*.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.47 — A colored, full-width assistant page.
 

@@ -35,7 +35,7 @@ const COPY: Record<Purpose, { title: string; intro: string; modelLabel: string; 
   },
   embedding: {
     title: "AI for search",
-    intro: "Builds search vectors so search, the assistant and answers also find passages by meaning, not only by matching words. Every indexed passage is embedded in the background. Use an embedding model; multilingual models such as bge-m3 handle French and English.",
+    intro: "Builds search vectors so search, Cairn and answers also find passages by meaning, not only by matching words. Every indexed passage is embedded in the background. Use an embedding model; multilingual models such as bge-m3 handle French and English.",
     modelLabel: "Embedding model",
     ollamaModel: "bge-m3",
     cloudModel: "baai/bge-m3",

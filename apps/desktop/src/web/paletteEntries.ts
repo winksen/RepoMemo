@@ -1,3 +1,4 @@
+import { ASSISTANT_NAME } from "../lib/assistantName";
 import { type AgentCapability, type ArtifactSummary, type MemoryCardSummary, type SharedWorkspace, type WorkspaceTemplateView } from "../types";
 import { ADMIN_WORKSPACE_SECTIONS, SYSTEM_SECTIONS, WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { routePath, workspaceHomePath } from "./router";
@@ -5,7 +6,7 @@ import { arrangeSections } from "./templateSections";
 import { orderCapabilities } from "./templateAssistant";
 import { type RecentItem } from "../lib/paletteRecents";
 
-export type PaletteGroup = "Recent" | "Assistant" | "Files" | "Memory" | "This workspace" | "Workspaces" | "Pages" | "System";
+export type PaletteGroup = "Recent" | "Cairn" | "Files" | "Memory" | "This workspace" | "Workspaces" | "Pages" | "System";
 
 export type PaletteAction =
   | { kind: "navigate"; to: string }
@@ -38,7 +39,7 @@ export const SECTION_LABELS: Record<WorkspaceSection, string> = {
   settings: "Workspace settings",
 };
 
-const GROUP_ORDER: PaletteGroup[] = ["Recent", "Assistant", "Files", "Memory", "This workspace", "Workspaces", "Pages", "System"];
+const GROUP_ORDER: PaletteGroup[] = ["Recent", "Cairn", "Files", "Memory", "This workspace", "Workspaces", "Pages", "System"];
 const MAX_FILES = 8;
 const MAX_CARDS = 6;
 const MAX_ENTRIES = 40;
@@ -98,22 +99,22 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
     const name = input.assistantWorkspace.workspace.name;
     const assistant = (capability: AgentCapability, typedLabel: string, emptyLabel: string): PaletteEntry => ({
       id: `assistant:${capability}`,
-      group: "Assistant",
+      group: "Cairn",
       label: query ? `${typedLabel} “${query}”` : emptyLabel,
       hint: name,
       action: { kind: "assistant", capability, message: query },
     });
     // In the order the workspace's template prefers (V0.2.176); the usual order without one.
     const commands = [
-      assistant("ask_question", "Ask the assistant:", "Ask the assistant a question"),
-      assistant("find_files", "Find files named", "Find files with the assistant"),
-      assistant("search_content", "Search content for", "Search content with the assistant"),
-      assistant("find_symbol", "Find the symbol", "Find a code symbol with the assistant"),
+      assistant("ask_question", `Ask ${ASSISTANT_NAME}:`, `Ask ${ASSISTANT_NAME} a question`),
+      assistant("find_files", "Find files named", `Find files with ${ASSISTANT_NAME}`),
+      assistant("search_content", "Search content for", `Search content with ${ASSISTANT_NAME}`),
+      assistant("find_symbol", "Find the symbol", `Find a code symbol with ${ASSISTANT_NAME}`),
     ];
     orderCapabilities(commands.map((entry) => ({ id: entry.id.replace("assistant:", ""), entry })), input.assistantOrder ? { order: input.assistantOrder } : null)
       .forEach(({ entry }) => add(entry));
     if (matchesAll(words, "summarize workspace overview")) {
-      add({ id: "assistant:overview", group: "Assistant", label: "Give a workspace overview", hint: name, action: { kind: "assistant", capability: "workspace_overview", message: "" } });
+      add({ id: "assistant:overview", group: "Cairn", label: "Give a workspace overview", hint: name, action: { kind: "assistant", capability: "workspace_overview", message: "" } });
     }
   }
 
@@ -180,7 +181,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
 
   [
     { id: "dashboard", label: "Dashboard", hint: "Search all workspaces", to: routePath({ name: "dashboard" }) },
-    { id: "assistant", label: "Assistant", hint: "Chat with the assistant on a page of its own", to: routePath({ name: "assistant", workspaceId: null }) },
+    { id: "assistant", label: ASSISTANT_NAME, hint: "Chat on a page of its own", to: routePath({ name: "assistant", workspaceId: null }) },
     { id: "orgs", label: "Organizations", hint: "Manage every organization", to: routePath({ name: "orgs" }) },
     { id: "notifications", label: "Notifications", hint: "Mentions and assignments", to: routePath({ name: "notifications" }) },
     { id: "profile", label: "Profile and security", hint: "Your account, password and tokens", to: routePath({ name: "profile" }) },

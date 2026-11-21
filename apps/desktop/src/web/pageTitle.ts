@@ -1,3 +1,4 @@
+import { ASSISTANT_NAME } from "../lib/assistantName";
 import { type Route } from "./router";
 
 const SECTION_LABEL: Record<string, string> = {
@@ -15,7 +16,7 @@ export function pageTitle(route: Route, names: { workspace?: string; artifact?: 
   switch (route.name) {
     case "dashboard": return "Dashboard";
     case "orgs": return "Organizations";
-    case "assistant": return "Assistant";
+    case "assistant": return ASSISTANT_NAME;
     case "organization": return "Organization";
     case "new-organization": return "New organization";
     case "profile": return "Profile";

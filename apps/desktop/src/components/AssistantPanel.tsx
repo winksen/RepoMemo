@@ -37,6 +37,7 @@ import { workspaceKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";
 import { useErrorToast } from "../lib/useErrorToast";
 import { useAssistantCommands } from "../lib/useAssistantCommands";
+import { ASSISTANT_NAME } from "../lib/assistantName";
 import { submitShortcutLabel } from "../lib/submitShortcut";
 
 /** A turn as shown: stored turns plus the one waiting for, or failing to get, a reply. */
@@ -94,7 +95,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
     initial: [],
     staleTime: 0,
   });
-  useErrorToast(capabilitiesQuery.error ?? chatsQuery.error, "The assistant is unavailable.");
+  useErrorToast(capabilitiesQuery.error ?? chatsQuery.error, `${ASSISTANT_NAME} is unavailable.`);
   const [template] = useTemplate(accessToken, workspaceId);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [turns, setTurns] = useState<ThreadTurn[]>([]);
@@ -191,7 +192,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       }
       setTurns((current) => current.map((entry) => entry.key === turn.key ? storedTurn(saved) : entry));
     } catch (error) {
-      showToast("error", apiMessage(error, "The assistant could not reply."));
+      showToast("error", apiMessage(error, `${ASSISTANT_NAME} could not reply.`));
       if (token !== view.current) return;
       setTurns((current) => current.map((entry) => entry.key === turn.key ? { ...entry, status: "failed" } : entry));
     }
@@ -268,14 +269,14 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       ? <Dialog description={<>Delete <strong>{chatDialog.conversation.title}</strong> and its {chatDialog.conversation.turn_count} {chatDialog.conversation.turn_count === 1 ? "message" : "messages"}? This cannot be undone.</>} footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button busy={isSavingChat} onClick={() => void deleteChat(chatDialog.conversation)} variant="danger">Delete chat</Button></>} onClose={() => setChatDialog(null)} open title="Delete chat" />
       : null;
 
-  return <section className="shared-assistant" aria-label="Workspace assistant">
+  return <section className="shared-assistant" aria-label={`${ASSISTANT_NAME}, the workspace assistant`}>
     {dialog}
     <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
       <IconButton aria-expanded={showChats} label="Chat history" onClick={() => setShowChats((current) => !current)} size="sm"><History size={ICON_SIZE.md} /></IconButton>
       <IconButton disabled={isBusy} label="New chat" onClick={() => { startNewChat(); setShowChats(false); }} size="sm"><Plus size={ICON_SIZE.md} /></IconButton>
     </div>
-    {showChats ? <nav className="shared-assistant-chats" aria-label="Assistant chats">
+    {showChats ? <nav className="shared-assistant-chats" aria-label={`${ASSISTANT_NAME} chats`}>
       {conversations.length ? <ul className="rm-option-list">{conversations.map((conversation) => {
         const isActive = conversation.id === activeId;
         return <li className={isActive ? "rm-option-row active" : "rm-option-row"} key={conversation.id}>
@@ -299,13 +300,13 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
           {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} isBusy={isBusy} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} /> : null}
         </article>) : <div className="shared-assistant-intro">
           <Sparkles size={22} />
-          <strong>What do you need from this workspace?</strong>
+          <strong>Hi, I&apos;m {ASSISTANT_NAME}. What do you need from this workspace?</strong>
           <span>Pick an action below or just type. Requests are matched to one of these actions; anything else gets a short reply for now. Chats are saved so you can come back to them.</span>
         </div>}
         <div ref={threadEnd} />
       </div>
       <form className="shared-assistant-composer" onSubmit={submit}>
-        <div className="shared-assistant-actions" role="group" aria-label="Assistant actions">
+        <div className="shared-assistant-actions" role="group" aria-label={`${ASSISTANT_NAME} actions`}>
           {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
             const Icon = CAPABILITY_ICONS[capability.id];
             return <Button aria-pressed={selected === capability.id} className={selected === capability.id ? "active" : ""} disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onClick={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`} type="button" variant="secondary"><Icon size={ICON_SIZE.sm} />{capability.label}</Button>;
@@ -315,7 +316,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
           {suggestedQuestions(template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
         </div> : null}
         <div className="shared-assistant-input">
-          <Textarea aria-label="Message the assistant" onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={2} value={draft} />
+          <Textarea aria-label={`Message ${ASSISTANT_NAME}`} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={2} value={draft} />
           <Button aria-label="Send" busy={isBusy} disabled={isLoadingChat || !draft.trim()} type="submit" variant="main"><Send size={ICON_SIZE.md} /></Button>
         </div>
         <div className="shared-assistant-footnote">
@@ -366,7 +367,7 @@ function Reply({ accessToken, canSummarize, capabilities, isBusy, onOpenArtifact
   const offerSummary = canSummarize && !(reply.capability === "summarize_file" && reply.generated);
   return <div className="shared-assistant-reply">
     <div className="shared-assistant-reply-meta">
-      <span><Sparkles size={ICON_SIZE.sm} /> Assistant{note ? ` · ${note}` : ""}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
+      <span><Sparkles size={ICON_SIZE.sm} /> {ASSISTANT_NAME}{note ? ` · ${note}` : ""}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
       {reply.generated ? <span className="shared-assistant-generated">AI-generated · verify against the cited sources</span> : null}
     </div>
     <div className="shared-markdown"><SafeMarkdown>{reply.reply_markdown}</SafeMarkdown></div>

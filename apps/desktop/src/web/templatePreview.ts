@@ -88,7 +88,7 @@ export function previewLines(template: Previewable): Array<{ label: string; text
     { label: "Review lists", text: template.review.order.length ? template.review.order.map((source) => REVIEW_NAMES[source] ?? source).join(", then ") : "everything mixed, the oldest first" },
     { label: "Health checks", text: template.health.detectors.map((detector) => detector === "stale_evidence" && template.health.stale_after_days ? `${HEALTH_NAMES[detector]} (${template.health.stale_after_days} days)` : HEALTH_NAMES[detector] ?? detector).join(", ") },
     { label: "Search favours", text: favoured(template.ranking) },
-    { label: "The assistant suggests", text: assistantLine(template.assistant) },
+    { label: "Cairn suggests", text: assistantLine(template.assistant) },
     { label: "Repository links start with", text: repositoryRules(template.repositories) },
   ];
 }

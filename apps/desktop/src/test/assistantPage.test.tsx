@@ -25,7 +25,7 @@ it("chooses the workspace named by the address, else the last one used, else the
 
 it("shows the assistant for the workspace of the address, and remembers it", () => {
   render(<SharedAssistantPage accessToken="t" organizations={organizations} requestedWorkspaceId="w2" session={session} signOut={vi.fn()} workspaces={workspaces} />);
-  expect(screen.getByRole("heading", { name: "Assistant" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Cairn" })).toBeTruthy();
   expect(screen.getByTestId("panel").textContent).toBe("assistant for w2");
   expect(window.localStorage.getItem("repomemo.assistant.page-workspace")).toBe("w2");
   expect(navigate).not.toHaveBeenCalled();

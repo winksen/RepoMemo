@@ -229,7 +229,7 @@ A workspace is one body of knowledge: a project, a service, a team's runbooks. I
 | **People** | Members, invitations and the activity feed *(admins)* |
 | **Settings** | AI, repositories, template, export, rename, delete *(admins)* |
 
-The **assistant** is docked on the right of every section. It's always one click away.
+**Cairn**, the assistant, is docked on the right of every section. It's always one click away, and the sparkles button in the top bar opens it on a page of its own.
 
 ### Templates: a workspace shaped to its job
 
@@ -380,7 +380,7 @@ sequenceDiagram
 
 One click on **Save as memory** turns a good answer into a memory card.
 
-### The assistant
+### Cairn, the assistant
 
 The docked chat does one of five things per message: **find files**, **search content**, **summarize a file**, **ask a question**, or **give a workspace overview**. It remembers the conversation, so "and what about its timeout?" works as a follow-up, and a lookup that only points back works too: after "find the file about login", "search for it" searches for *login*. Finding and searching need no AI. Everything it writes with AI is labelled as such, and a template can teach it your team's vocabulary ("runbook for payments" finds files).
 

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { IconSparkles as Sparkles } from "@tabler/icons-react";
+import { ASSISTANT_NAME } from "../lib/assistantName";
 import { AssistantPanel } from "../components/AssistantPanel";
 import { SharedLayout } from "../components/SharedLayout";
 import { Button } from "../components/ui/button";
@@ -64,14 +65,14 @@ export function SharedAssistantPage({ accessToken, organizations, requestedWorks
   >
     <section className="shared-page-content shared-assistant-page">
       <PageHeader
-        actions={chosen ? <Dropdown aria-label="Workspace the assistant works on" className="shared-assistant-page-workspace" onValueChange={(value) => navigate(assistantPath(value))} options={options} value={chosenId ?? ""} /> : null}
-        description="Ask questions, search the evidence and get your workspace summarized in conversation."
+        actions={chosen ? <Dropdown aria-label={`Workspace ${ASSISTANT_NAME} works on`} className="shared-assistant-page-workspace" onValueChange={(value) => navigate(assistantPath(value))} options={options} value={chosenId ?? ""} /> : null}
+        description="Ask a question, search the evidence or get a workspace summarized, in conversation."
         icon={<Sparkles size={ICON_SIZE.lg} />}
-        title="Assistant"
+        title={ASSISTANT_NAME}
       />
       {chosen
         ? <div className="shared-assistant-page-body"><AssistantPanel accessToken={accessToken} key={chosenId} onOpenArtifact={(artifactId) => navigate(routePath({ name: "artifact", workspaceId: chosen.workspace.id, artifactId }))} workspaceId={chosen.workspace.id} /></div>
-        : <EmptyState action={<Button onClick={() => openNewWorkspace()} type="button" variant="main">New workspace</Button>} description="The assistant works on the evidence of a workspace. Create one, or ask an administrator to add you to one." title="No workspace to talk about yet" />}
+        : <EmptyState action={<Button onClick={() => openNewWorkspace()} type="button" variant="main">New workspace</Button>} description={`${ASSISTANT_NAME} works on the evidence of a workspace. Create one, or ask an administrator to add you to one.`} title="No workspace to talk about yet" />}
     </section>
   </SharedLayout>;
 }

@@ -1,6 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { applyWorkspaceColor } from "../web/workspaceColors";
+import { ASSISTANT_NAME } from "../lib/assistantName";
 import { assistantEntryPath } from "../web/router";
 import {
   IconBell as Bell,
@@ -97,7 +98,7 @@ function LayoutFrame({ session, sidebar, signOut, onNavigate, defaultOrganizatio
           <div className="shared-account-controls">
             <CreateMenu canCreateOrganization={session.can_create_organizations !== false} defaultOrganizationId={defaultOrganizationId} />
             <ThemeToggle />
-            <IconButton className="shared-assistant-link" label="Assistant" onClick={() => onNavigate(assistantEntryPath(window.location.pathname))} pressed={window.location.pathname === "/assistant" || window.location.pathname.startsWith("/assistant/")} size="sm"><Sparkles size={ICON_SIZE.md} /></IconButton>
+            <IconButton className="shared-assistant-link" label={ASSISTANT_NAME} onClick={() => onNavigate(assistantEntryPath(window.location.pathname))} pressed={window.location.pathname === "/assistant" || window.location.pathname.startsWith("/assistant/")} size="sm"><Sparkles size={ICON_SIZE.md} /></IconButton>
             <IconButton className="shared-palette-link" label="Open command palette" onClick={openCommandPalette} size="sm"><Search size={ICON_SIZE.md} /></IconButton>
             <IconButton className="shared-notifications-link" label="Notifications" onClick={() => onNavigate("/notifications")} size="sm"><Bell size={ICON_SIZE.md} /></IconButton>
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={ICON_SIZE.md} /> <span className="shared-button-label">Profile</span></Button>

@@ -60,7 +60,7 @@ describe("paletteEntries", () => {
   it("lists the account's pages and workspaces, and nothing of a workspace that is not open", () => {
     const entries = paletteEntries(base);
     expect(entries.filter((entry) => entry.group === "Workspaces").map((entry) => entry.label)).toEqual(["Atlas", "Borrowed"]);
-    expect(entries.some((entry) => entry.group === "This workspace" || entry.group === "Assistant" || entry.group === "System")).toBe(false);
+    expect(entries.some((entry) => entry.group === "This workspace" || entry.group === "Cairn" || entry.group === "System")).toBe(false);
     expect(entries.find((entry) => entry.label === "Dashboard")?.action).toEqual({ kind: "navigate", to: "/dashboard" });
   });
 
@@ -89,10 +89,10 @@ describe("paletteEntries", () => {
 
   it("starts assistant actions with what was typed, only where the assistant is docked", () => {
     const withoutDock = paletteEntries({ ...base, query: "how do retries work", currentWorkspace: ATLAS });
-    expect(withoutDock.some((entry) => entry.group === "Assistant")).toBe(false);
+    expect(withoutDock.some((entry) => entry.group === "Cairn")).toBe(false);
     const entries = paletteEntries({ ...base, query: "how do retries work", currentWorkspace: ATLAS, assistantWorkspace: ATLAS });
     const first = entries[0];
-    expect(first.group).toBe("Assistant");
+    expect(first.group).toBe("Cairn");
     expect(first.action).toEqual({ kind: "assistant", capability: "ask_question", message: "how do retries work" });
     expect(entries.map((entry) => entry.action).filter((action) => action.kind === "assistant").length).toBeGreaterThanOrEqual(4);
   });
@@ -183,7 +183,7 @@ describe("CommandPalette", () => {
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     const input = await screen.findByRole("combobox");
     fireEvent.change(input, { target: { value: "how do retries work" } });
-    await waitFor(() => expect(screen.getByRole("option", { name: /Ask the assistant/ })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("option", { name: /Ask Cairn/ })).toBeTruthy());
     fireEvent.keyDown(input, { key: "Enter" });
     expect(takeAssistantCommand()).toEqual({ capability: "ask_question", message: "how do retries work" });
     expect(navigate).not.toHaveBeenCalled();
