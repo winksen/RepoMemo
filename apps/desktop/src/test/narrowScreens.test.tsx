@@ -6,9 +6,6 @@ import { readFileSync } from "node:fs";
 // @ts-expect-error Node type declarations are outside the browser bundle.
 import { resolve } from "node:path";
 
-vi.mock("../components/AssistantPanel", () => ({ AssistantPanel: ({ workspaceId }: { workspaceId: string }) => <div data-testid="panel">assistant for {workspaceId}<button type="button">inside</button></div> }));
-
-import { AssistantDock } from "../components/AssistantDock";
 import { SharedLayout } from "../components/SharedLayout";
 import { NARROW_QUERY } from "../lib/useMediaQuery";
 const css = readFileSync(resolve("src/styles/13-narrow-screens.css"), "utf8");
@@ -26,80 +23,6 @@ function screenIs(width: "narrow" | "wide") {
 
 beforeEach(() => window.localStorage.clear());
 afterEach(() => { cleanup(); delete document.documentElement.dataset.theme; });
-
-const dock = () => render(<AssistantDock accessToken="t" onOpenArtifact={() => undefined} workspaceId="w1" />);
-
-describe("the assistant on a narrow screen", () => {
-  it("starts closed as a floating button, whatever the wide-screen state is", () => {
-    window.localStorage.setItem("repomemo.assistant.dock", JSON.stringify({ open: true, width: 500 }));
-    screenIs("narrow");
-    dock();
-    expect(screen.getByRole("button", { name: "Open CAIRN" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Close CAIRN" })).toBeNull();
-    expect(screen.getByLabelText("CAIRN, the workspace assistant").classList.contains("sheet")).toBe(true);
-  });
-
-  it("opens as a sheet with a backdrop and closes with Esc, the close button or the backdrop, giving focus back to its button", () => {
-    screenIs("narrow");
-    dock();
-    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
-    expect(screen.getByTestId("panel").textContent).toContain("assistant for w1");
-    const sheet = screen.getByLabelText("CAIRN, the workspace assistant");
-    expect(sheet.classList.contains("collapsed")).toBe(false);
-    expect(document.activeElement).toBe(sheet);
-    // Two buttons are named Close CAIRN: the backdrop (out of the tab order) and the sheet's own.
-    expect(screen.getAllByRole("button", { name: "Close CAIRN" })).toHaveLength(2);
-
-    fireEvent.keyDown(screen.getByText("inside"), { key: "Escape" });
-    expect(sheet.classList.contains("collapsed")).toBe(true);
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Open CAIRN" }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
-    fireEvent.click(document.querySelector(".shared-assistant-backdrop") as HTMLElement);
-    expect(sheet.classList.contains("collapsed")).toBe(true);
-
-    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
-    fireEvent.click(document.querySelector(".shared-assistant-dock-header button") as HTMLElement);
-    expect(sheet.classList.contains("collapsed")).toBe(true);
-  });
-
-  it.each(["light", "dark"])("keeps Tab inside the assistant sheet in the %s theme", (theme) => {
-    document.documentElement.dataset.theme = theme;
-    screenIs("narrow");
-    dock();
-    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
-    const sheet = screen.getByRole("dialog", { name: "CAIRN, the workspace assistant" });
-    expect(sheet.getAttribute("aria-modal")).toBe("true");
-    const first = sheet.querySelector(".shared-assistant-dock-header button") as HTMLButtonElement;
-    const last = screen.getByRole("button", { name: "inside" });
-    fireEvent.keyDown(sheet, { key: "Tab" });
-    expect(document.activeElement).toBe(first);
-    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
-    expect(document.activeElement).toBe(last);
-    fireEvent.keyDown(last, { key: "Tab" });
-    expect(document.activeElement).toBe(first);
-  });
-
-  it("keeps the conversation mounted while the sheet is closed", () => {
-    screenIs("narrow");
-    dock();
-    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
-    const panel = screen.getByTestId("panel");
-    fireEvent.keyDown(panel, { key: "Escape" });
-    expect(document.querySelector('[data-testid="panel"]')).toBe(panel);
-  });
-
-  it("does not change the wide-screen dock or its saved state", () => {
-    screenIs("wide");
-    dock();
-    expect(screen.queryByRole("button", { name: "Open CAIRN" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Shrink CAIRN" })).toBeTruthy();
-    expect(screen.getByLabelText("CAIRN, the workspace assistant").classList.contains("sheet")).toBe(false);
-    fireEvent.keyDown(screen.getByText("inside"), { key: "Escape" });
-    expect(screen.getByRole("button", { name: "Shrink CAIRN" })).toBeTruthy();
-    expect(JSON.parse(window.localStorage.getItem("repomemo.assistant.dock") ?? "{}").open).toBe(true);
-  });
-});
 
 describe("the rail on a narrow screen", () => {
   const session = { user: { id: "u1", email: "a@example.com", display_name: "Ada" }, authentication: "jwt", memberships: [] } as unknown as SharedSession;

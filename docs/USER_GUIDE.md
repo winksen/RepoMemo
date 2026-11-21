@@ -229,7 +229,7 @@ A workspace is one body of knowledge: a project, a service, a team's runbooks. I
 | **People** | Members, invitations and the activity feed *(admins)* |
 | **Settings** | AI, repositories, template, export, rename, delete *(admins)* |
 
-**CAIRN**, the assistant, is docked on the right of every section. It's always one click away, and the cairn button in the top bar opens it on a page of its own (`/cairn`), with your chats from every workspace in the sidebar.
+**CAIRN**, the assistant, is one click away in the top bar: the button opens its page (`/cairn`), with your chats from every workspace in the sidebar, and the menu beside it offers a **quick question** from anywhere.
 
 ### Templates: a workspace shaped to its job
 
@@ -382,7 +382,7 @@ One click on **Save as memory** turns a good answer into a memory card.
 
 ### Cairn, the assistant
 
-The docked chat does one of five things per message: **find files**, **search content**, **summarize a file**, **ask a question**, or **give a workspace overview**. It remembers the conversation, so "and what about its timeout?" works as a follow-up, and a lookup that only points back works too: after "find the file about login", "search for it" searches for *login*. Finding and searching need no AI. Everything it writes with AI is labelled as such, and a template can teach it your team's vocabulary ("runbook for payments" finds files).
+The chat does one of five things per message: **find files**, **search content**, **summarize a file**, **ask a question**, or **give a workspace overview**. It remembers the conversation, so "and what about its timeout?" works as a follow-up, and a lookup that only points back works too: after "find the file about login", "search for it" searches for *login*. Finding and searching need no AI. Everything it writes with AI is labelled as such, and a template can teach it your team's vocabulary ("runbook for payments" finds files).
 
 ---
 

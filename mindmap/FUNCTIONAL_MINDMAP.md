@@ -2,7 +2,16 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.60` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.61` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.61 — A CAIRN button, a notifications dropdown, no dock.
+
+- **CAIRN button.** The top bar has a larger **CAIRN** button with its icon and name, opening its page, and a menu beside it: **Quick question** (a dialog with the question and the workspace it is about; asking opens CAIRN on a new chat that sends it at once) and **New chat**. From a workspace page, CAIRN starts in that workspace.
+- **Notifications as a dropdown.** The bell opens a dropdown with the latest notifications (unread ones marked, the count on the bell, refreshed every minute), *Mark all read*, and *View all notifications*; a click opens what the notification points at and marks it read. The full page is still there from the dropdown.
+- **Smaller logo** in the top bar.
+- **The assistant dock is gone** from workspace pages: CAIRN is the page, the button and the quick question. The command palette's *Ask CAIRN* actions now work from any page and open CAIRN on a new chat.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.60 — A quiet current workspace, a calmer top bar.
 

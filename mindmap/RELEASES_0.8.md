@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.60` (2026-11-21)
+> **Current:** `V0.8.61` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -80,6 +80,7 @@
 | **V0.8.58** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Workspace cards and sidebar names | Show an organization's workspaces as cards in the workspace's color, keep workspace names in the sidebar at full contrast, draw a workspace's icon filled beside its name, put the organization's icon in its page title, and start the New organization dialog empty | The Workspaces tab shows colored cards, sidebar names never fade, icons beside names are filled, an organization's page title has its icon, and New organization starts empty |
 | **V0.8.59** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Quiet sidebar chips | Show a workspace's chip in the sidebar as a low-saturation grey tinted with its color and give it the full color only when the workspace is current, and draw the organization's icon beside the name at full contrast and a little larger | Non-current chips are quiet greys with a hint of their color, the current one is in full color, and the organization's icon is black or white |
 | **V0.8.60** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Quiet current workspace and a calmer top bar | Keep the current workspace's chip quiet instead of coloring it, give the workspace cards the same quiet mark, and stop the theme toggle and Cairn buttons from taking a grey fill | No chip changes to full color when current, the cards in an organization use the quiet mark, and the top bar buttons have no pressed fill |
+| **V0.8.61** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Top bar: CAIRN button, notifications dropdown | Make CAIRN a button with its name and a menu of quick ways in (a quick-question dialog), show notifications in a dropdown from the bell, shrink the logo, and remove the assistant dock from workspace pages | The top bar has a CAIRN button with a menu, the bell opens a dropdown of notifications, the logo is smaller, and workspace pages have no side dock |
 
 ## Verification and handoff
 

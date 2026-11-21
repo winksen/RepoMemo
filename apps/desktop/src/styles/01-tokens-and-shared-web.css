@@ -1009,3 +1009,28 @@ input[type="file"] {
    The organization's icon beside the name is at full contrast. */
 .rm-button.shared-rail-workspace .shared-rail-chip { color: var(--color-text); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 22%, var(--color-surface-3)), color-mix(in srgb, var(--color-accent) 30%, var(--color-surface-2))); transition: background 160ms var(--ease-control), color 160ms var(--ease-control); }
 .rm-button.shared-rail-workspace .shared-rail-sub svg { color: var(--color-text); }
+
+/* The top bar (V0.8.61): a smaller logo, CAIRN as a button with its name and a menu for the quick ways in, and the notifications as a dropdown. */
+.shared-home-header .shared-brand-full { height: 28px; }
+.shared-cairn-split { display: inline-flex; align-items: stretch; }
+.shared-account-controls .shared-cairn-main { min-height: 36px; padding: 0 14px 0 12px; border-right-width: 0; border-radius: 8px 0 0 8px; }
+.shared-account-controls .shared-cairn-caret { min-height: 36px; min-width: 30px; padding: 0 6px; border-radius: 0 8px 8px 0; }
+.shared-cairn-main[aria-current="page"] { background: var(--color-surface-2); }
+.shared-notifications-link { position: relative; }
+.shared-notifications-count { position: absolute; top: -5px; right: -5px; display: grid; min-width: 16px; height: 16px; padding: 0 4px; place-items: center; color: var(--color-on-accent); background: var(--color-accent); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1; }
+.shared-notifications-popover { z-index: var(--layer-popover); display: grid; gap: 8px; width: min(380px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 80px)); padding: 12px; overflow: auto; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 12px; box-shadow: var(--shadow-floating); }
+.shared-notifications-popover[data-state="open"] { animation: rm-dialog-in 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.shared-notifications-popover-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shared-notifications-popover-head .rm-button { min-height: 28px; padding: 0 10px; font-size: 12px; }
+.shared-notifications-popover-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.shared-notifications-popover-list button { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; color: var(--color-text-muted); background: transparent; border: 0; border-radius: 8px; cursor: pointer; font: inherit; text-align: left; }
+.shared-notifications-popover-list button:hover { background: var(--color-surface-2); }
+.shared-notifications-popover-list button:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: -2px; }
+.shared-notifications-popover-list button > span:last-child { display: grid; gap: 2px; min-width: 0; }
+.shared-notifications-popover-list strong { color: var(--color-text); font-size: 13px; }
+.shared-notifications-popover-list small { overflow: hidden; font-size: 12px; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.shared-notifications-popover-list time { color: var(--color-text-subtle); font-size: 11px; }
+.shared-notifications-popover-dot { flex: 0 0 auto; width: 8px; height: 8px; margin-top: 6px; background: transparent; border-radius: 50%; }
+.shared-notifications-popover-list .is-unread .shared-notifications-popover-dot { background: var(--color-accent); }
+.shared-notifications-popover-empty { margin: 4px 2px; color: var(--color-text-muted); font-size: 13px; }
+.shared-notifications-popover-all { justify-self: stretch; }

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.61 (2026-11-21)
+
+A CAIRN button, a notifications dropdown, and no assistant dock.
+
+### Changed
+- **CAIRN button.** The top bar has a larger **CAIRN** button with its icon and name that opens its page, and a small menu beside it with **Quick question** and **New chat**. *Quick question* opens a dialog with your question and the workspace it is about; asking opens CAIRN on a new chat that sends it at once, so the answer and its sources are there. From a workspace page, CAIRN starts in that workspace.
+- **Notifications are a dropdown.** The bell opens a dropdown with the latest notifications instead of going to a page: unread ones are marked and counted on the bell (refreshed every minute), a click opens what the notification points at and marks it read, and there are *Mark all read* and *View all notifications* (the full page).
+- **Smaller logo** in the top bar.
+- **No dock.** The assistant side panel is removed from workspace pages. CAIRN is reached from the top bar, its page and the quick question. The command palette's *Ask CAIRN* actions now work from any page and open a new chat on CAIRN's page.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the top bar was not seen. A new test covers the bell, the CAIRN button and the quick question, and the palette and narrow-screen tests were updated; none was executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.60 (2026-11-21)
 
 A quiet current workspace, and a calmer top bar.

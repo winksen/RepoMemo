@@ -4,7 +4,8 @@ import { applyWorkspaceColor } from "../web/workspaceColors";
 import { ASSISTANT_NAME } from "../lib/assistantName";
 import { parseRoute } from "../web/router";
 import { rememberCairnWorkspace } from "../web/cairn";
-import { CairnIcon } from "./CairnIcon";
+import { CairnButton } from "./CairnButton";
+import { NotificationsMenu } from "./NotificationsMenu";
 import { Bell, Buildings as Building, CaretDown as ChevronDown, MagnifyingGlass as Search, SignOut as Logout, Moon, HardDrives as Server, LockKey as Shield, Sun, UserCircle } from "@phosphor-icons/react";
 import type { SharedSession } from "../types";
 import { openCommandPalette } from "../lib/assistantBridge";
@@ -65,7 +66,9 @@ const ShellContext = createContext<ShellSlots | null>(null);
  * for all of them, so `SharedWebApp` keeps ONE copy mounted while the page inside it changes, and moving from page
  * to page redraws only the page, never the bar or the rail (V0.8.25).
  */
-function LayoutFrame({ chatsOnly = false, session, sidebar, signOut, onNavigate, defaultOrganizationId, navigation, aside, children, slots }: {
+function LayoutFrame({ accessToken, chatsOnly = false, session, sidebar, signOut, onNavigate, defaultOrganizationId, navigation, aside, children, slots }: {
+  /** Lets the bell list the notifications in a dropdown; without it (a bare frame) the bell opens their page. */
+  accessToken?: string;
   /** The rail holds only what `sidebar` gives it: no Organizations, System, session or server notes (Cairn's page). */
   chatsOnly?: boolean;
   session: SharedSession;
@@ -81,13 +84,6 @@ function LayoutFrame({ chatsOnly = false, session, sidebar, signOut, onNavigate,
 }) {
   // On a narrow screen the rail folds away behind a button so the page starts at the top; wide screens always show it.
   const [railOpen, setRailOpen] = useState(false);
-  const onCairn = window.location.pathname === "/cairn" || window.location.pathname.startsWith("/cairn/");
-  // From a workspace page Cairn starts its next chat in that workspace.
-  function openCairn() {
-    const route = parseRoute(window.location.pathname);
-    if (route.name === "workspace" || route.name === "artifact" || route.name === "memory-card") rememberCairnWorkspace(route.workspaceId);
-    onNavigate("/cairn");
-  }
   return <div className="shared-home">
     <a className="rm-skip-link" href={`#${MAIN_CONTENT_ID}`} onClick={(event) => { event.preventDefault(); document.getElementById(MAIN_CONTENT_ID)?.focus(); }}>Skip to the page</a>
     <header className="shared-home-header">
@@ -97,9 +93,9 @@ function LayoutFrame({ chatsOnly = false, session, sidebar, signOut, onNavigate,
           <div className="shared-account-controls">
             <CreateMenu canCreateOrganization={session.can_create_organizations !== false} defaultOrganizationId={defaultOrganizationId} />
             <ThemeToggle />
-            <IconButton aria-current={onCairn ? "page" : undefined} className="shared-assistant-link" label={ASSISTANT_NAME} onClick={openCairn} size="sm"><CairnIcon size={ICON_SIZE.md} weight={onCairn ? "fill" : "regular"} /></IconButton>
+            <CairnButton onNavigate={onNavigate} />
             <IconButton className="shared-palette-link" label="Open command palette" onClick={openCommandPalette} size="sm"><Search size={ICON_SIZE.md} /></IconButton>
-            <IconButton className="shared-notifications-link" label="Notifications" onClick={() => onNavigate("/notifications")} size="sm"><Bell size={ICON_SIZE.md} /></IconButton>
+            {accessToken ? <NotificationsMenu accessToken={accessToken} onNavigate={onNavigate} userId={session.user.id} /> : <IconButton className="shared-notifications-link" label="Notifications" onClick={() => onNavigate("/notifications")} size="sm"><Bell size={ICON_SIZE.md} /></IconButton>}
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={ICON_SIZE.md} /> <span className="shared-button-label">Profile</span></Button>
           </div>
           <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={ICON_SIZE.md} /> <span className="shared-button-label">Sign out</span></Button>
@@ -127,7 +123,8 @@ function LayoutFrame({ chatsOnly = false, session, sidebar, signOut, onNavigate,
  * into the frame's slots; the rail comes from here, so it does not blink while a page loads.
  * `scrollKey` changes with the page: the content starts at the top again.
  */
-export function SharedShell({ chatsOnly = false, children, defaultOrganizationId, scrollKey, session, sidebar, signOut, onNavigate }: {
+export function SharedShell({ accessToken, chatsOnly = false, children, defaultOrganizationId, scrollKey, session, sidebar, signOut, onNavigate }: {
+  accessToken?: string;
   chatsOnly?: boolean;
   children: ReactNode;
   defaultOrganizationId?: string;
@@ -143,7 +140,7 @@ export function SharedShell({ chatsOnly = false, children, defaultOrganizationId
   const slots = useMemo(() => ({ navigation, content, aside }), [navigation, content, aside]);
   useEffect(() => { content?.scrollTo?.({ top: 0 }); }, [content, scrollKey]);
   return <ShellContext.Provider value={slots}>
-    <LayoutFrame chatsOnly={chatsOnly} defaultOrganizationId={defaultOrganizationId} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut} slots={{ setNavigation, setContent, setAside }} />
+    <LayoutFrame accessToken={accessToken} chatsOnly={chatsOnly} defaultOrganizationId={defaultOrganizationId} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut} slots={{ setNavigation, setContent, setAside }} />
     {children}
   </ShellContext.Provider>;
 }

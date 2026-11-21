@@ -1,3 +1,4 @@
+import { rememberCairnWorkspace } from "./cairn";
 import { ASSISTANT_NAME } from "../lib/assistantName";
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { querySharedArtifacts, searchSharedMemoryCards } from "../lib/sharedApi";
@@ -7,7 +8,7 @@ import { type ArtifactSummary, type MemoryCardSummary, type SharedWorkspace } fr
 import { Dialog, DialogCancel } from "../components/ui/dialog";
 import { EmptyState } from "../components/ui/empty-state";
 import { SearchField } from "../components/ui/search-field";
-import { navigate } from "./router";
+import { cairnPath, navigate } from "./router";
 import { paletteEntries, type PaletteEntry } from "./paletteEntries";
 import { useTemplate } from "./workspace/data";
 
@@ -22,7 +23,7 @@ const FILE_SEARCH_LIMIT = 50;
  */
 export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministerSystem, currentWorkspaceId, userId = "", workspaces }: {
   accessToken: string;
-  /** The workspace whose page has the assistant docked, if the open page is one. */
+  /** The workspace CAIRN would work on from here: the open workspace, else the one it worked on last. */
   assistantWorkspaceId: string | null;
   canAdministerSystem: boolean;
   /** The workspace the open page belongs to, if any. */
@@ -112,7 +113,12 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
     else if (entry.action.kind === "new-note") {
       requestNewNote(entry.action.workspaceId);
       navigate(entry.action.to);
-    } else sendToAssistant({ capability: entry.action.capability, message: entry.action.message });
+    } else {
+      // CAIRN is a page of its own: go there, on a new chat in the workspace the question is about, and hand it the question.
+      if (assistantWorkspaceId) rememberCairnWorkspace(assistantWorkspaceId);
+      navigate(cairnPath(null));
+      sendToAssistant({ capability: entry.action.capability, message: entry.action.message });
+    }
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {

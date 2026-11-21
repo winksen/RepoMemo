@@ -178,7 +178,7 @@ describe("CommandPalette", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
-  it("hands an assistant action to the assistant of the page", async () => {
+  it("hands an assistant action to CAIRN's page", async () => {
     palette("w1");
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     const input = await screen.findByRole("combobox");
@@ -186,7 +186,9 @@ describe("CommandPalette", () => {
     await waitFor(() => expect(screen.getByRole("option", { name: /Ask CAIRN/ })).toBeTruthy());
     fireEvent.keyDown(input, { key: "Enter" });
     expect(takeAssistantCommand()).toEqual({ capability: "ask_question", message: "how do retries work" });
-    expect(navigate).not.toHaveBeenCalled();
+    // CAIRN is a page: the question goes there, on a new chat in the workspace the palette was opened on.
+    expect(navigate).toHaveBeenCalledWith("/cairn");
+    expect(window.localStorage.getItem("repomemo.cairn.workspace")).toBe("w1");
   });
 
   it("uses the shared search field for the query and the shared empty state when nothing matches", async () => {

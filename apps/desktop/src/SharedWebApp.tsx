@@ -6,6 +6,9 @@ FIRST VIEWPORT: A calm explanatory field balances a focused access form; after a
 FORM: The established RepoMemo operate composition, adapted into a protected browser session with direct API-state feedback.
 */
 
+import { QuickAskDialog } from "./components/QuickAskDialog";
+import { onQuickAskRequest } from "./lib/cairnBridge";
+import { cairnContextWorkspace, rememberedCairnWorkspace } from "./web/cairn";
 import { CairnRail, SharedCairnPage } from "./web/CairnPage";
 import { ServerUnreachable } from "./components/ServerUnreachable";
 import { NewWorkspaceDialog } from "./components/NewWorkspaceDialog";
@@ -69,6 +72,7 @@ function SharedWebAppContent() {
   // The New workspace dialog, opened from the + menu and from an organization page (`lib/newWorkspaceBridge.ts`).
   const [newWorkspace, setNewWorkspace] = useState<{ organizationId?: string } | null>(null);
   const [newOrganization, setNewOrganization] = useState(false);
+  const [quickAsk, setQuickAsk] = useState(false);
   const [pathname, setPathname] = useState(currentPathname);
   // Invitation and reset links carry their secret in the fragment (`/invite#<secret>`), never sent to a server.
   const [linkSecret, setLinkSecret] = useState(currentLinkSecret);
@@ -82,6 +86,7 @@ function SharedWebAppContent() {
 
   useEffect(() => onNewWorkspaceRequest((organizationId) => setNewWorkspace({ organizationId })), []);
   useEffect(() => onNewOrganizationRequest(() => setNewOrganization(true)), []);
+  useEffect(() => onQuickAskRequest(() => setQuickAsk(true)), []);
 
   useEffect(() => {
     // An older server has no platform routes and is always attached.
@@ -410,6 +415,7 @@ function SharedWebAppContent() {
     <PageAnnouncer accessToken={accessToken} route={route} workspaceName={workspace?.workspace.name} />
     {clientPlatform.nativeNotices ? <NoticeWatcher accessToken={accessToken} userId={session.user.id} workspaceIds={workspaces.map((entry) => entry.workspace.id)} /> : null}
     <SharedShell
+      accessToken={accessToken}
       chatsOnly={route.name === "cairn"}
       defaultOrganizationId={workspaceOrganization?.id ?? organizations[0]?.id}
       onNavigate={navigate}
@@ -420,6 +426,7 @@ function SharedWebAppContent() {
     >
       {renderPage()}
     </SharedShell>
+    <QuickAskDialog onClose={() => setQuickAsk(false)} open={quickAsk} organizations={organizations} workspaces={workspaces} />
     <NewOrganizationDialog
       accessToken={accessToken}
       onClose={() => setNewOrganization(false)}
@@ -441,6 +448,6 @@ function SharedWebAppContent() {
       open={newWorkspace !== null}
       organizations={organizations}
     />
-    <CommandPalette accessToken={accessToken} userId={session.user.id} assistantWorkspaceId={route.name === "workspace" ? route.workspaceId : null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
+    <CommandPalette accessToken={accessToken} userId={session.user.id} assistantWorkspaceId={(route.name === "workspace" ? route.workspaceId : null) ?? cairnContextWorkspace(workspaces, rememberedCairnWorkspace())?.workspace.id ?? null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
   </>;
 }
