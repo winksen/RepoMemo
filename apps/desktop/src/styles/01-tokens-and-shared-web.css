@@ -864,3 +864,11 @@ input[type="file"] {
 .shared-organization-overview-table { display: grid; gap: 12px; }
 .rm-button.shared-link-button { min-height: 0; padding: 0; color: var(--color-text); background: transparent; border: 0; font: inherit; font-weight: 650; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
 .rm-button.shared-link-button:hover:not(:disabled) { background: transparent; border-color: transparent; }
+
+.shared-unreachable { display: grid; min-height: 100dvh; padding: 24px; place-items: center; background: var(--color-surface); }
+.shared-unreachable-card { display: grid; justify-items: center; gap: 14px; max-width: 440px; text-align: center; }
+.shared-unreachable-logo { height: 32px; margin-bottom: 18px; }
+.shared-unreachable-art { width: min(280px, 80vw); height: auto; margin-bottom: 6px; }
+.shared-unreachable-card h1 { margin: 0; color: var(--color-text); font-size: 24px; letter-spacing: -0.02em; line-height: 1.25; }
+.shared-unreachable-card p { margin: 0; color: var(--color-text-muted); font-size: 15px; line-height: 1.6; }
+.shared-unreachable-card .rm-button { margin-top: 10px; min-width: 140px; }

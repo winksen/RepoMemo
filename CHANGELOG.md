@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.38 (2026-11-21)
+
+A calmer page for an unreachable server.
+
+### Changed
+- **One centred section.** The page shows the logo, a drawing of a server and a plug that has come away, the heading *We can't connect to the server right now*, one sentence of advice and **Try again**, centred on a plain background instead of the two-column sign-in layout.
+- **Less repetition.** The *No connection* label, which repeated the heading, is removed, and the advice is one sentence: check the connection, and contact the administrator if it keeps happening.
+- The drawing uses the theme's greys, so it follows light and dark mode. Markup and CSS only.
+
+### Checks
+- Typecheck passes. Nothing was built or run, and the page was not shown against a stopped server.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.37 (2026-11-21)
 
 A page of its own when the server cannot be reached.
