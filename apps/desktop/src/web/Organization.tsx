@@ -199,7 +199,6 @@ export function WorkspaceTopbar({
   };
 
   return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
-    <span className="shared-workspace-location" title={workspace.workspace.name}>{workspace.workspace.name}<span aria-hidden="true"> / </span>{nameOf(activeSection)}</span>
     <div className="shared-workspace-tabs">
       {tabs.map(workspaceTab)}
       {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: section === "review" && waiting > 0 ? `${nameOf(section)} (${waiting})` : nameOf(section), onSelect: () => onNavigate(section), section }))} /> : null}

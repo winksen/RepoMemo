@@ -1,4 +1,4 @@
-import { IconActivity as Activity, IconBuildingCommunity as Building, IconLayoutDashboard as Dashboard, IconSettings as Settings, IconStack2 as Layers, type TablerIcon } from "@tabler/icons-react";
+import { IconActivity as Activity, IconLayoutDashboard as Dashboard, IconSettings as Settings, IconStack2 as Layers, type TablerIcon } from "@tabler/icons-react";
 import { Button } from "../components/ui/button";
 import { PanelHeading } from "../components/ui/panel-heading";
 import { Skeleton } from "../components/ui/skeleton";
@@ -26,7 +26,6 @@ export function organizationSections(organization: Organization): OrganizationSe
 /** The row of tabs of an organization's page, in the form of a workspace's. */
 export function OrganizationTopbar({ activeSection, onNavigate, organization }: { activeSection: OrganizationSection; onNavigate: (section: OrganizationSection) => void; organization: Organization }) {
   return <nav aria-label="Organization sections" className="shared-workspace-topbar">
-    <span className="shared-workspace-location" title={organization.name}><Building size={ICON_SIZE.sm} /> {organization.name}<span aria-hidden="true"> / </span>{TABS[activeSection].label}</span>
     <div className="shared-workspace-tabs">
       {organizationSections(organization).map((section) => {
         const Icon = TABS[section].icon;
@@ -79,7 +78,7 @@ export function OrganizationOverviewTab({ accessToken, onOpenWorkspace, organiza
             <td className="rm-table-number">{workspace.artifact_count.toLocaleString()}</td>
             <td className="rm-table-number">{workspace.memory_card_count.toLocaleString()}</td>
             <td className="rm-table-number">{workspace.active_task_count.toLocaleString()}</td>
-            {hasActivity ? <td className="rm-table-number">{workspace.activity_count === null ? "—" : workspace.activity_count.toLocaleString()}</td> : null}
+            {hasActivity ? <td className="rm-table-number">{workspace.activity_count === null ? "â€”" : workspace.activity_count.toLocaleString()}</td> : null}
           </tr>)}</tbody>
         </Table> : <p className="shared-muted-copy">No workspaces yet. Use New workspace to create the first one.</p>}
       </section>

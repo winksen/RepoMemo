@@ -232,7 +232,6 @@ input[type="file"] {
 .shared-home-content { --shared-content-inset: clamp(24px, 2vw, 36px); display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0; overflow: hidden; }
 .shared-layout-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .shared-workspace-topbar { display: flex; align-items: stretch; min-height: 48px; padding: 0 var(--shared-content-inset); overflow: hidden; border-bottom: 1px solid var(--color-border); }
-.shared-workspace-location { display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0; max-width: 180px; margin-right: 16px; overflow: hidden; color: var(--color-text-muted); font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .shared-workspace-tabs { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .shared-workspace-tabs::-webkit-scrollbar { display: none; }
 .shared-workspace-tabs .rm-button { position: relative; flex: 0 0 auto; min-height: 48px; padding: 0 11px; color: var(--color-text-muted); background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-size: 12px; }
@@ -850,7 +849,7 @@ input[type="file"] {
 /* ===== App shell ===== */
 
 .shared-org-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 18px; }
-.rm-button.shared-org-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; align-content: start; justify-items: start; gap: 8px; min-height: 200px; padding: 20px 20px 24px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 14px; text-align: left; transition: border-color 140ms var(--ease-control), transform 140ms var(--ease-control), box-shadow 140ms var(--ease-control); }
+.rm-button.shared-org-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); justify-content: stretch; align-content: start; justify-items: start; gap: 8px; min-height: 200px; padding: 20px 20px 24px; color: var(--color-text); background: var(--color-surface); border: var(--control-border) solid var(--color-border); border-radius: 14px; text-align: left; transition: border-color 140ms var(--ease-control), transform 140ms var(--ease-control), box-shadow 140ms var(--ease-control); }
 .rm-button.shared-org-card:hover:not(:disabled) { background: var(--color-surface); border-color: var(--color-border-strong); box-shadow: var(--shadow-block); transform: translateY(-2px); }
 .shared-org-card-head { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .shared-org-card-mark { display: grid; width: 52px; height: 52px; place-items: center; color: var(--color-text); background: var(--color-surface-2); border-radius: 14px; }

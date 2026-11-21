@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.35` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.36` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.36 — Cleaner tab bars, matching card borders.
+
+- The label in front of the tabs of a workspace (*Workspace / Section*) and of an organization is gone: it was not a tab and repeated what the page and the highlighted tab already say. The tabs start at the left edge.
+- The border of an organization card is as thick as a button's.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.35 — Organization tabs and an Overview.
 

@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.36 (2026-11-21)
+
+Cleaner tab bars and matching card borders.
+
+### Changed
+- **Tab bars.** The label in front of the tabs (*Workspace / Section* on a workspace, the organization name and tab on an organization) is removed: it was not a tab and repeated what the page and the highlighted tab say. The tabs start at the left edge.
+- **Organization cards.** The border is as thick as a button's.
+
+### Fixed
+- A source file added in V0.8.35 (`OrganizationPage.tsx`) had one character saved in the wrong encoding; it is valid UTF-8 again. Nothing the person sees changes.
+- CSS and layout only: no data, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.35 (2026-11-21)
 
 A tab bar on an organization's page, starting with an Overview.
