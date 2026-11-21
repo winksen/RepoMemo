@@ -360,6 +360,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           </div>
           <IconButton appearance="plain" busy={isBusy} className="shared-assistant-send" disabled={isLoadingChat || !draft.trim()} label="Send" size="sm" type="submit"><ArrowElbowDownLeft size={ICON_SIZE.lg} /></IconButton>
         </div>
+        <p className="shared-assistant-model">{capabilities ? (capabilities.provider_name ? `Model: ${capabilities.model ?? "provider default"} · ${capabilities.provider_name}` : "No AI provider: file lookup and search only") : ""}</p>
       </form> : <form className="shared-assistant-composer" onSubmit={submit}>
         <div className="shared-assistant-actions" role="group" aria-label={`${ASSISTANT_NAME} actions`}>
           {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {

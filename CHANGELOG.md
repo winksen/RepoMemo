@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.67 (2026-11-21)
+
+The model under the message box, a bare top bar, and dropdown motion.
+
+### Changed
+- **Model.** The model in use (*Model: <model> · <provider>*, or *No AI provider: file lookup and search only*) is a small line under the message box on Cairn's page, no longer under the heading. The chat options still have a *Model* row.
+- **Top bar.** It no longer has a light fill or a shadow: the logo, the search bar and the controls sit directly on the page's background.
+- **Dropdown motion.** Every dropdown now eases in (a short fade and slide) and eases out when it closes: the create, CAIRN, account and row-action menus, selects, search-and-pick lists, and the notifications and chat-options dropdowns. Before, only some of them eased in and none eased out. With reduced motion they appear and disappear at once.
+- CSS and markup only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look and motion were not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.66 (2026-11-21)
 
 The chat's title as the heading, and the model in use.

@@ -1017,7 +1017,6 @@ input[type="file"] {
 .shared-notifications-link { position: relative; }
 .shared-notifications-count { position: absolute; top: -5px; right: -5px; display: grid; min-width: 16px; height: 16px; padding: 0 4px; place-items: center; color: var(--color-on-accent); background: var(--color-accent); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1; }
 .shared-notifications-popover { z-index: var(--layer-popover); display: grid; gap: 8px; width: min(380px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 80px)); padding: 12px; overflow: auto; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 12px; box-shadow: var(--shadow-floating); }
-.shared-notifications-popover[data-state="open"] { animation: rm-dialog-in 160ms cubic-bezier(0.22, 1, 0.36, 1); }
 .shared-notifications-popover-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .shared-notifications-popover-head .rm-button { min-height: 28px; padding: 0 10px; font-size: 12px; }
 .shared-notifications-popover-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
@@ -1097,7 +1096,6 @@ input[type="file"] {
 .shared-home-header .shared-cairn-main[aria-current="page"] { background: transparent; }
 /* The chat options, a dropdown at the top right of the chat. */
 .shared-chat-options { z-index: var(--layer-popover); display: grid; gap: 12px; width: min(340px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 80px)); padding: 14px; overflow: auto; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 12px; box-shadow: var(--shadow-floating); }
-.shared-chat-options[data-state="open"] { animation: rm-dialog-in 160ms cubic-bezier(0.22, 1, 0.36, 1); }
 .shared-chat-options-facts { display: grid; gap: 8px; margin: 0; }
 .shared-chat-options-facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .shared-chat-options dt { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); font-size: 13px; }
@@ -1117,3 +1115,13 @@ input[type="file"] {
 .shared-assistant-page .rm-page-header h1 { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shared-assistant-page .rm-page-header > div:first-child { min-width: 0; }
 .shared-chat-options-host { display: inline-flex; }
+
+/* The model sits under the message box. The bar has no fill of its own: its content is on the page's background (V0.8.67). */
+.shared-assistant-model { min-height: 16px; margin: -2px 0 0; color: var(--color-text-subtle); font-size: 12px; text-align: center; }
+.shared-home-header { background: transparent; box-shadow: none; }
+/* Every dropdown eases in and eases out (V0.8.67). `translate` and `scale` are the individual properties, so they leave the
+   positioning `transform` alone; Radix keeps a closing dropdown mounted until its animation ends. Reduced motion removes them. */
+@keyframes rm-pop-in { from { opacity: 0; translate: 0 -4px; scale: 0.98; } to { opacity: 1; translate: 0 0; scale: 1; } }
+@keyframes rm-pop-out { from { opacity: 1; translate: 0 0; scale: 1; } to { opacity: 0; translate: 0 -4px; scale: 0.98; } }
+.rm-action-menu[data-state="open"], .rm-dropdown-content[data-state="open"], .rm-combobox-content[data-state="open"], .shared-notifications-popover[data-state="open"], .shared-chat-options[data-state="open"] { animation: rm-pop-in 150ms cubic-bezier(0.22, 1, 0.36, 1); }
+.rm-action-menu[data-state="closed"], .rm-dropdown-content[data-state="closed"], .rm-combobox-content[data-state="closed"], .shared-notifications-popover[data-state="closed"], .shared-chat-options[data-state="closed"] { animation: rm-pop-out 110ms ease-in forwards; }

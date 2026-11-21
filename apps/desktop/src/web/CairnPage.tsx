@@ -100,13 +100,12 @@ export function SharedCairnPage({ accessToken, chatId, organizations, session, s
   const chosen = open?.workspace ?? cairnContextWorkspace(workspaces, startIn);
   const isNewChat = chatId === null;
   const chosenId = chosen?.workspace.id ?? null;
-  // The heading is the chat's title (in the page-title face); a new chat has none yet. The model in use is under it.
+  // The heading is the chat's title (in the page-title face); a new chat has none yet. The capabilities are the panel's too (the same cache).
   const [optionsHost, setOptionsHost] = useState<HTMLElement | null>(null);
   const [capabilities] = useServerState<AgentCapabilities | null>({
     key: workspaceKeys.assistantCapabilities(chosenId ?? ""), fetch: () => getSharedAgentCapabilities(accessToken, chosenId ?? ""), initial: null, enabled: Boolean(chosenId),
   });
   const chatTitle = open ? open.conversation.title : chatId ? "Chat" : "New chat";
-  const modelLine = !capabilities ? "" : capabilities.provider_name ? `Model: ${capabilities.model ?? "provider default"} \u00b7 ${capabilities.provider_name}` : "No AI provider: file lookup and search only";
 
   // A chat that no longer exists (deleted, or not the person's) opens a new one.
   useEffect(() => {
@@ -123,7 +122,6 @@ export function SharedCairnPage({ accessToken, chatId, organizations, session, s
   >
     <section className="shared-page-content shared-assistant-page">
       <PageHeader
-        description={modelLine}
         actions={<span className="shared-chat-options-host" ref={setOptionsHost} />}
         icon={<CairnIcon size={32} weight="fill" />}
         title={chatTitle}

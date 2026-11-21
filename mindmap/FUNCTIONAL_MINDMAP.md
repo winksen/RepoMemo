@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.66` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.67` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.67 — The model under the message box, a bare top bar, dropdown motion.
+
+- **Model.** The model in use (*Model: <model> · <provider>*, or *No AI provider: file lookup and search only*) is a small line **under the message box** on Cairn's page; it is no longer under the heading.
+- **Top bar.** It has no light fill and no shadow of its own: its logo, search and controls sit on the page's background.
+- **Dropdown motion.** Menus (create, CAIRN, account, row actions), selects, search-and-pick lists and the notifications and chat options dropdowns all **ease in** (a short fade and slide) and **ease out** when they close, instead of only some easing in and none easing out. With reduced motion they appear and disappear at once.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.66 — The chat's title as the heading, and the model in use.
 
