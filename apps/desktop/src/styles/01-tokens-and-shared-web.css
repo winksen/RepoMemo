@@ -1005,3 +1005,9 @@ input[type="file"] {
 .rm-button.shared-workspace-card { min-height: 180px; }
 .shared-workspace-card .shared-org-card-description { -webkit-line-clamp: 1; }
 .shared-workspace-card .shared-org-card-arrow { color: var(--color-accent-text); }
+
+/* In the sidebar a workspace's chip is a quiet grey tinted with its color, and takes the full color when the workspace is the current one (V0.8.59).
+   The organization's icon beside the name is at full contrast. */
+.rm-button.shared-rail-workspace .shared-rail-chip { color: var(--color-text); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 22%, var(--color-surface-3)), color-mix(in srgb, var(--color-accent) 30%, var(--color-surface-2))); transition: background 160ms var(--ease-control), color 160ms var(--ease-control); }
+.rm-button.shared-rail-workspace.active .shared-rail-chip { color: var(--color-on-accent); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 80%, white), color-mix(in srgb, var(--color-accent) 80%, black)); }
+.rm-button.shared-rail-workspace .shared-rail-sub svg { color: var(--color-text); }

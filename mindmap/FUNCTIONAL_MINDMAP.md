@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.58` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.59` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.59 — Quiet sidebar chips.
+
+- In the sidebar a workspace's icon chip is a **low-saturation grey tinted with the workspace's color**, with the icon in the normal text color. The **current** workspace's chip turns to the **full color** with a light icon, and eases between the two.
+- The **organization's icon** under each workspace name is at full contrast (black on light, white on dark, no longer greyed) and a little larger (15 px instead of 12).
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.58 — Workspace cards, steadier sidebar names.
 

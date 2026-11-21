@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.59 (2026-11-21)
+
+Quiet sidebar chips.
+
+### Changed
+- **Quiet chips.** In the sidebar a workspace's icon chip is a low-saturation grey tinted with the workspace's color, with the icon in the normal text color. The **current** workspace's chip turns to the full color with a light icon, and the change eases in. The chips in the New workspace and New organization dialogs keep their full color.
+- **Organization icon.** The organization's icon under each workspace name is at full contrast (black on light, white on dark) instead of grey, and a little larger (15 px instead of 12).
+- CSS and one size only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.58 (2026-11-21)
 
 Workspace cards, steadier sidebar names, and a few details.
