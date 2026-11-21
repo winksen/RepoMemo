@@ -9,6 +9,7 @@ import { useServerState } from "../lib/useServerState";
 import { type Organization, type OrganizationOverview, type WorkspaceMetricBreakdown } from "../types";
 import { ICON_SIZE } from "../components/ui/icon";
 import { MetricBars, MetricTimeline } from "./common";
+import { useTabIndicator } from "./tabIndicator";
 import { ORGANIZATION_SECTIONS, type OrganizationSection } from "./constants";
 
 const TABS: Record<OrganizationSection, { label: string; icon: TablerIcon }> = {
@@ -25,13 +26,15 @@ export function organizationSections(organization: Organization): OrganizationSe
 
 /** The row of tabs of an organization's page, in the form of a workspace's. */
 export function OrganizationTopbar({ activeSection, onNavigate, organization }: { activeSection: OrganizationSection; onNavigate: (section: OrganizationSection) => void; organization: Organization }) {
+  const { ref: tabsRef, indicator } = useTabIndicator();
   return <nav aria-label="Organization sections" className="shared-workspace-topbar">
-    <div className="shared-workspace-tabs">
+    <div className="shared-workspace-tabs" ref={tabsRef}>
       {organizationSections(organization).map((section) => {
         const Icon = TABS[section].icon;
         const isActive = section === activeSection;
         return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} key={section} onClick={() => onNavigate(section)} type="button" variant="secondary"><span className="shared-workspace-tab-label"><Icon size={ICON_SIZE.md} />{TABS[section].label}</span></Button>;
       })}
+      {indicator}
     </div>
   </nav>;
 }

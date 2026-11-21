@@ -16,6 +16,7 @@ import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
 import { InviteMembers } from "../components/InviteMembers";
 import { OrganizationTemplatesPanel } from "../components/OrganizationTemplatesPanel";
+import { useTabIndicator } from "./tabIndicator";
 import { WorkspaceMoreMenu } from "../components/WorkspaceMoreMenu";
 import { arrangeSections } from "./templateSections";
 import { useReviewQueue, useTemplate } from "./workspace/data";
@@ -180,6 +181,7 @@ export function WorkspaceTopbar({
   workspace: SharedWorkspace;
 }) {
   const isWorkspaceAdmin = workspace.role === "owner" || workspace.role === "admin";
+  const { ref: tabsRef, indicator } = useTabIndicator();
   const [template] = useTemplate(accessToken ?? "", workspace.workspace.id, Boolean(accessToken));
   // How many items wait in the person's review list: shown on the Review tab when there are any (V0.3.10).
   const [reviewQueue] = useReviewQueue(accessToken ?? "", workspace.workspace.id, Boolean(accessToken));
@@ -200,9 +202,10 @@ export function WorkspaceTopbar({
   };
 
   return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
-    <div className="shared-workspace-tabs">
+    <div className="shared-workspace-tabs" ref={tabsRef}>
       {tabs.map(workspaceTab)}
       {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: section === "review" && waiting > 0 ? `${nameOf(section)} (${waiting})` : nameOf(section), onSelect: () => onNavigate(section), section }))} /> : null}
+      {indicator}
     </div>
   </nav>;
 }

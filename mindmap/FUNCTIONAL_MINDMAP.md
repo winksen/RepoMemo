@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.42` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.43` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.43 — A sliding tab line and steadier sidebar icons.
+
+- The line under the active tab has rounded ends and **slides** to the new tab (about 0.3 s, ease in and out) when the tab changes, on workspaces and on organizations. It does not slide in the first time it appears, and with reduced motion it jumps.
+- The icons on the sidebar chips stay light at all times; they used to flash dark for a moment when a workspace became the current one.
+- The **current workspace** is a contrasting grey (dark in the light theme, light in the dark one) again, while its chip keeps the workspace's color. This replaces the color fill of V0.8.41.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.42 — Chips, tab line and focus.
 

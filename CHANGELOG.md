@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.43 (2026-11-21)
+
+A sliding tab line and steadier sidebar icons.
+
+### Changed
+- **Tab line.** The line under the active tab has rounded ends and slides to the new tab (about 0.3 s, ease in and out) when you change tabs, on workspaces and on organizations. It does not slide in the first time it appears, and with reduced motion it jumps.
+- **Sidebar icons stay light.** The icon on a workspace chip no longer goes dark and back when the workspace becomes the current one: it followed the row's text color while that changed.
+- **Current workspace in grey.** The current workspace row is a contrasting grey (dark in the light theme, light in the dark one) again, with its chip keeping the workspace's color. This replaces the color fill introduced in V0.8.41; the color is carried by the chip and by the tabs.
+- CSS and markup only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the animation was not seen. A new test covers the indicator and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.42 (2026-11-21)
 
 Chips, tab line and focus.
