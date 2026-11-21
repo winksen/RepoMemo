@@ -1,6 +1,6 @@
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { Buildings as Building, Plus, Stack as Layers } from "@phosphor-icons/react";
-import { openNewWorkspace } from "../lib/newWorkspaceBridge";
+import { openNewOrganization, openNewWorkspace } from "../lib/newWorkspaceBridge";
 import { navigate, parseRoute } from "../web/router";
 import { IconButton } from "./ui/icon-button";
 import { ICON_SIZE } from "./ui/icon";
@@ -20,7 +20,7 @@ export function CreateMenu({ canCreateOrganization, defaultOrganizationId }: { c
       <MenuPrimitive.Portal>
         <MenuPrimitive.Content align="end" aria-label="Create new" className="rm-action-menu" sideOffset={6}>
           <MenuPrimitive.Item className="rm-action-item" onSelect={newWorkspace}><Layers size={ICON_SIZE.md} /><span>New workspace</span></MenuPrimitive.Item>
-          {canCreateOrganization ? <MenuPrimitive.Item className="rm-action-item" onSelect={() => navigate("/orgs/new")}><Building size={ICON_SIZE.md} /><span>New organization</span></MenuPrimitive.Item> : null}
+          {canCreateOrganization ? <MenuPrimitive.Item className="rm-action-item" onSelect={openNewOrganization}><Building size={ICON_SIZE.md} /><span>New organization</span></MenuPrimitive.Item> : null}
         </MenuPrimitive.Content>
       </MenuPrimitive.Portal>
     </MenuPrimitive.Root>

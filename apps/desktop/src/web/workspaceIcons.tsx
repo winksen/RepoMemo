@@ -1,4 +1,5 @@
 import { Plugs as Api, Lightning as Bolt, Book, Brain, Briefcase, Bank, Storefront as Store, Lightbulb as Bulb, ChartBar as Chart, Cloud, Code, Compass, Cpu, CreditCard, Database, DeviceMobile as Mobile, Flask, Heartbeat, Leaf, Lock, Chats as Messages, Palette, PuzzlePiece as Puzzle, RocketLaunch as Rocket, GraduationCap as School, HardDrives as Server, ShoppingCart as Cart, Stack as Layers, Toolbox as Tools, Truck, Users, Globe as World, type Icon as IconComponent, type IconWeight } from "@phosphor-icons/react";
+import { Flag as FlagIcon, ShieldCheck as ShieldIcon, Target as TargetIcon, MapTrifold as MapIcon, CalendarBlank as CalendarIcon, Scales as ScalesIcon, Handshake as HandshakeIcon, Gear as GearIcon } from "@phosphor-icons/react";
 import type { Workspace } from "../types";
 
 /** The icons a workspace can take, by the key the server stores. */
@@ -35,6 +36,14 @@ export const WORKSPACE_ICONS: { key: string; label: string; icon: IconComponent 
   { key: "leaf", label: "Sustainability", icon: Leaf },
   { key: "palette", label: "Design", icon: Palette },
   { key: "compass", label: "Strategy", icon: Compass },
+  { key: "flag", label: "Milestones", icon: FlagIcon },
+  { key: "shield", label: "Compliance", icon: ShieldIcon },
+  { key: "target", label: "Goals", icon: TargetIcon },
+  { key: "map", label: "Planning", icon: MapIcon },
+  { key: "calendar", label: "Schedule", icon: CalendarIcon },
+  { key: "scales", label: "Legal", icon: ScalesIcon },
+  { key: "handshake", label: "Partners", icon: HandshakeIcon },
+  { key: "gear", label: "Operations", icon: GearIcon },
 ];
 
 export const DEFAULT_WORKSPACE_ICON = WORKSPACE_ICONS[0].key;

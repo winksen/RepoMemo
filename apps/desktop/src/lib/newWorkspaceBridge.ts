@@ -11,3 +11,16 @@ export function onNewWorkspaceRequest(listener: (organizationId?: string) => voi
   window.addEventListener(EVENT, handler);
   return () => window.removeEventListener(EVENT, handler);
 }
+
+const ORGANIZATION_EVENT = "repomemo:new-organization";
+
+/** Asks the app to open the *New organization* dialog. */
+export function openNewOrganization() {
+  window.dispatchEvent(new Event(ORGANIZATION_EVENT));
+}
+
+/** Listens for `openNewOrganization`; returns the function that stops listening. */
+export function onNewOrganizationRequest(listener: () => void): () => void {
+  window.addEventListener(ORGANIZATION_EVENT, listener);
+  return () => window.removeEventListener(ORGANIZATION_EVENT, listener);
+}

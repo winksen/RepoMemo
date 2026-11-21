@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Buildings as Building, CaretRight as ChevronRight, SquaresFour as Dashboard, CircleNotch as Loader, Plus, LockKey as Shield, Stack as Layers } from "@phosphor-icons/react";
 import { createSharedOrganization, type DashboardWorkspaceFigures } from "../lib/sharedApi";
 import { WorkspaceImport } from "../components/WorkspaceImport";
-import { openNewWorkspace } from "../lib/newWorkspaceBridge";
+import { openNewOrganization, openNewWorkspace } from "../lib/newWorkspaceBridge";
 import { OrganizationOverviewTab, OrganizationTopbar } from "./OrganizationPage";
 import { type OrganizationSection } from "./constants";
 import { type Organization, type SharedSession, type SharedWorkspace } from "../types";
@@ -110,14 +110,11 @@ export function SharedWorkspaceHome({
   onOpenWorkspace: (workspace: SharedWorkspace) => void;
   workspaces: SharedWorkspace[];
 }) {
-  const [organizationName, setOrganizationName] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
   const organizationNavigation = useOrganizationNavigation();
   const organizationId = organizations.some((organization) => organization.id === organizationNavigation.activeOrganizationId)
     ? organizationNavigation.activeOrganizationId!
     : organizations[0]?.id ?? "";
-  const showOrganizationForm = organizationNavigation.isCreatingOrganization || organizations.length === 0;
+  const showOrganizationForm = organizations.length === 0;
 
   const currentOrganization = useMemo(
     () => organizations.find((organization) => organization.id === organizationId),
@@ -128,18 +125,6 @@ export function SharedWorkspaceHome({
   const activeSection: OrganizationSection = section === "administration" && !canManageOrganization ? "overview" : section;
   // The same request as the dashboard's, so the list below can say which template each workspace uses.
   const [figures] = useDashboardFigures(accessToken, workspaces);
-
-  async function createOrganization(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsSubmitting(true); setFormError(null); setError(null);
-    try {
-      const organization = await createSharedOrganization(accessToken, organizationName);
-      setOrganizations((current) => [...current, organization]);
-      organizationNavigation.selectOrganization(organization.id);
-      setOrganizationName("");
-      showToast("success", `${organization.name} was created.`);
-    } catch (requestError) { setFormError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
-  }
 
   return (
     <SharedLayout
@@ -152,7 +137,7 @@ export function SharedWorkspaceHome({
     >
         <div className="shared-page-content">
           <PageHeader actions={!showOrganizationForm && canManageOrganization ? <Button onClick={() => openNewWorkspace(organizationId)} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New workspace</Button> : null} description={showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : activeSection === "overview" ? "How the organization and its workspaces are doing." : activeSection === "workspaces" ? "Workspaces are server-authoritative and available only to their members." : "Members, templates and invitations."} title={showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"} />
-          {showOrganizationForm ? <form className="shared-setup-form" onSubmit={createOrganization}><label>Organization name<Input autoFocus onChange={(event) => setOrganizationName(event.target.value)} placeholder="Engineering" required value={organizationName} /></label><div className="shared-setup-actions"><Button disabled={isSubmitting} type="submit" variant="main">{isSubmitting ? <Loader className="spin" size={ICON_SIZE.md} /> : <Plus size={ICON_SIZE.md} />} Create organization</Button>{organizations.length ? <Button disabled={isSubmitting} onClick={organizationNavigation.cancelOrganizationCreation} type="button" variant="secondary">Cancel</Button> : null}</div></form> : <>
+          {showOrganizationForm ? <div className="shared-empty-state"><Building size={26} /><strong>No organizations yet</strong>{session.can_create_organizations === false ? <span>Ask a system administrator to create one or to invite you to one.</span> : <><span>Create an organization to start a shared workspace boundary.</span><Button onClick={openNewOrganization} type="button" variant="main"><Plus size={ICON_SIZE.md} /> Create organization</Button></>}</div> : <>
             {activeSection === "overview" && currentOrganization ? <OrganizationOverviewTab accessToken={accessToken} onOpenWorkspace={(workspaceId) => navigate(workspaceHomePath(workspaceId))} organization={currentOrganization} /> : null}
             {activeSection === "workspaces" ? <>
             {canManageOrganization ? <WorkspaceImport accessToken={accessToken} key={`import-${organizationId}`} onImported={(workspace) => setWorkspaces((current) => [workspace, ...current])} organizationId={organizationId} /> : null}
@@ -162,8 +147,7 @@ export function SharedWorkspaceHome({
             {currentOrganization && canManageOrganization ? <OrganizationAdministration accessToken={accessToken} onOrganizationUpdated={(updated) => setOrganizations((current) => current.map((organization) => organization.id === updated.id ? updated : organization))} organization={currentOrganization} /> : null}
             </> : null}
           </>}
-          <Toast kind="error" message={formError} />
-          {activeSection === "workspaces" ? <p className="shared-boundary-note"><Shield size={ICON_SIZE.sm} /> Every workspace view is loaded through the JWT-protected API. This browser never falls back to local preview data.</p> : null}
+                    {activeSection === "workspaces" ? <p className="shared-boundary-note"><Shield size={ICON_SIZE.sm} /> Every workspace view is loaded through the JWT-protected API. This browser never falls back to local preview data.</p> : null}
         </div>
     </SharedLayout>
   );

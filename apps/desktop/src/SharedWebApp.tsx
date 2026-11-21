@@ -9,7 +9,8 @@ FORM: The established RepoMemo operate composition, adapted into a protected bro
 import { CairnRail, SharedCairnPage } from "./web/CairnPage";
 import { ServerUnreachable } from "./components/ServerUnreachable";
 import { NewWorkspaceDialog } from "./components/NewWorkspaceDialog";
-import { onNewWorkspaceRequest } from "./lib/newWorkspaceBridge";
+import { onNewOrganizationRequest, onNewWorkspaceRequest } from "./lib/newWorkspaceBridge";
+import { NewOrganizationDialog } from "./components/NewOrganizationDialog";
 import { AppSkeleton } from "./components/ui/skeleton";
 import { SharedOrganizations } from "./web/Organizations";
 import { forgetSignIn, rememberSignIn } from "./lib/signedIn";
@@ -67,6 +68,7 @@ function SharedWebAppContent() {
   const [error, setError] = useState<string | null>(null);
   // The New workspace dialog, opened from the + menu and from an organization page (`lib/newWorkspaceBridge.ts`).
   const [newWorkspace, setNewWorkspace] = useState<{ organizationId?: string } | null>(null);
+  const [newOrganization, setNewOrganization] = useState(false);
   const [pathname, setPathname] = useState(currentPathname);
   // Invitation and reset links carry their secret in the fragment (`/invite#<secret>`), never sent to a server.
   const [linkSecret, setLinkSecret] = useState(currentLinkSecret);
@@ -79,6 +81,7 @@ function SharedWebAppContent() {
   const [platform, setPlatform] = useState<{ attached: boolean; folder: string; pinned_environment?: string | null } | null>(null);
 
   useEffect(() => onNewWorkspaceRequest((organizationId) => setNewWorkspace({ organizationId })), []);
+  useEffect(() => onNewOrganizationRequest(() => setNewOrganization(true)), []);
 
   useEffect(() => {
     // An older server has no platform routes and is always attached.
@@ -204,6 +207,8 @@ function SharedWebAppContent() {
     if (pageState === "ready" && (pathname === "/" || pathname === "/login" || pathname === "/register")) {
       navigate("/dashboard", true);
     }
+    // `/orgs/new` opens the New organization dialog over the list of organizations.
+    if (pageState === "ready" && pathname === "/orgs/new") { setNewOrganization(true); navigate("/orgs", true); }
     // An address of the old shape (`/workspaces/...`, `/workspaces?organization=...`) moves to its current one.
     const moved = legacyRedirect(pathname, window.location.search);
     if (pageState === "ready" && moved) navigate(moved, true);
@@ -378,14 +383,16 @@ function SharedWebAppContent() {
       return notFound("/dashboard");
 
     case "new-organization":
+      return <SharedOrganizations apiAvailable={apiAvailable} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
+
     case "organization":
-      if (route.name === "organization" && !organizations.some((organization) => organization.id === route.organizationId)) return notFound("/orgs");
+      if (!organizations.some((organization) => organization.id === route.organizationId)) return notFound("/orgs");
       return (
         <SharedWorkspaceHome
           accessToken={accessToken}
           apiAvailable={apiAvailable}
           organizations={organizations}
-          section={route.name === "organization" ? route.section : "overview"}
+          section={route.section}
           session={session}
           setError={setError}
           setOrganizations={setOrganizations}
@@ -413,6 +420,16 @@ function SharedWebAppContent() {
     >
       {renderPage()}
     </SharedShell>
+    <NewOrganizationDialog
+      accessToken={accessToken}
+      onClose={() => setNewOrganization(false)}
+      onCreated={(created, first) => {
+        setOrganizations((current) => [...current, created]);
+        if (first) setWorkspaces((current) => [first, ...current]);
+        navigate(organizationPath(created.id));
+      }}
+      open={newOrganization}
+    />
     <NewWorkspaceDialog
       accessToken={accessToken}
       defaultOrganizationId={newWorkspace?.organizationId}

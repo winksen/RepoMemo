@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.56 (2026-11-21)
+
+Compact pickers, aligned halves, and a New organization dialog.
+
+### Changed
+- **Compact pickers.** The icon (32 px) and color (28 px) choices are smaller, with the text unchanged, in the New workspace dialog and in a workspace's Settings.
+- **Forty icons.** Eight were added (Milestones, Compliance, Goals, Planning, Schedule, Legal, Partners, Operations), so the grid is four full rows of ten.
+- **Eleven colors.** Cyan, amber and lime join the eight. Each has a darker shade for the light theme and a lighter shade for the dark theme, with their contrast checked by the same test.
+- **New workspace dialog.** It is wider and in two equal halves, so the organization sits over the icons and the name over the color. The five templates fit on one line (three or two on a narrower window).
+
+### Added
+- **New organization dialog**, laid out like New workspace: the organization's name beside the name of a **first workspace**, the line *Organization will be created as … with the workspace …*, and a switch for *Start with a first workspace* or *Start empty*. When on, the first workspace's icon, color, template and access are chosen below. If the first workspace cannot be created the organization still exists and a warning says so.
+- It opens from the **+** menu, from the Organizations page and from the old `/orgs/new` address, and the organization's page opens after creating it. A person with no organization sees *Create organization* in its place. The inline form on the organization page is gone.
+- No server, API, setting or migration changes: an organization is still created with its name; the person who creates it is its owner. Other settings for an organization (a description, a logo, defaults for its workspaces) would need new fields on the server and are not part of this release.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the dialogs were not seen. A new test covers the organization dialog; none was executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.55 (2026-11-21)
 
 A fuller New workspace dialog, and template cards.

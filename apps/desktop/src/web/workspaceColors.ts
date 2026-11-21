@@ -20,6 +20,9 @@ export const WORKSPACE_COLORS: { key: string; label: string; light: ColorTones; 
   { key: "pink", label: "Pink", light: { accent: "#af1863", hover: "#8b134f", soft: "#fff0f7", text: "#8b134f", on: "#ffffff" }, dark: { accent: "#da1678", hover: "#c8146e", soft: "#3d1429", text: "#e882b5", on: "#ffffff" } },
   { key: "purple", label: "Purple", light: { accent: "#7f26d9", hover: "#6b20b6", soft: "#f7f0ff", text: "#6b20b6", on: "#ffffff" }, dark: { accent: "#9647e6", hover: "#8c35e3", soft: "#29143d", text: "#d4b8ef", on: "#ffffff" } },
   { key: "slate", label: "Slate", light: { accent: "#535f6e", hover: "#424b57", soft: "#f6f7f9", text: "#424b57", on: "#ffffff" }, dark: { accent: "#5e718d", hover: "#566881", soft: "#24282e", text: "#a5b0c0", on: "#ffffff" } },
+  { key: "cyan", label: "Cyan", light: { accent: "#07667e", hover: "#054757", soft: "#f0fcff", text: "#054757", on: "#ffffff" }, dark: { accent: "#037996", hover: "#036882", soft: "#14353d", text: "#2bc3e9", on: "#ffffff" } },
+  { key: "amber", label: "Amber", light: { accent: "#865203", hover: "#5e3a02", soft: "#fff9f0", text: "#5e3a02", on: "#ffffff" }, dark: { accent: "#a36200", hover: "#8f5600", soft: "#3d2d14", text: "#eea22f", on: "#ffffff" } },
+  { key: "lime", label: "Lime", light: { accent: "#406812", hover: "#2b450c", soft: "#f8fff0", text: "#2b450c", on: "#ffffff" }, dark: { accent: "#4b7e11", hover: "#406c0f", soft: "#2a3d14", text: "#8ad336", on: "#ffffff" } },
 ];
 
 /** The key of the colour a workspace uses, or `null` for the app's default when none was chosen or the key is unknown. */

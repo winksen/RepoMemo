@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.55` (2026-11-21)
+> **Current:** `V0.8.56` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -75,6 +75,7 @@
 | **V0.8.53** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Cairn message box | Make Cairn's icon a filled Phosphor icon as large as the page title, replace the row of action buttons with a + menu, put Send at the left and the + at the right of one message box, remove the text under it, and show the workspace with its icon above it | The title icon matches the title, the message box is one box with Send, an actions menu and nothing under it, and the workspace is chosen above it with its icon |
 | **V0.8.54** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Cairn welcome and message box | Use the rocket launch icon, drop the separator lines on Cairn's page, make the new-chat welcome centred and minimal, and rework the message box so it grows with its text, with the + at the left, Enter at the right and no button borders | The icon is a rocket, a new chat shows a large centred icon and one line, and the message box is one grey box that grows and keeps its text centred between the buttons |
 | **V0.8.55** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | New workspace dialog and template cards | Add icon and color choices to the New workspace dialog, show templates as cards with a drawing of each, explain access in words, widen the dialog with the organization and the name side by side, and say how the workspace will be named | The dialog is wide, shows Workspace will be created as Org / Space, offers an icon, a color, template cards and a readable access choice, and the building mark in the workspace list is always filled |
+| **V0.8.56** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Compact pickers and a New organization dialog | Make the icon and color pickers compact, complete the icon grid with eight icons and add three colors, lay the New workspace dialog out in aligned halves with the five templates on one line, and give New organization a dialog of the same form that can also create a first workspace | The icon grid is four full rows, the dialog's halves line up, five templates fit on one line, and New organization is a dialog with an optional first workspace |
 
 ## Verification and handoff
 

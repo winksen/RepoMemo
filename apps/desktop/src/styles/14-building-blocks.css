@@ -285,3 +285,15 @@ th > .rm-badge,
 .shared-access-choice strong { font-size: 13px; }
 .shared-access-choice span { color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
 @media (max-width: 720px) { .shared-new-workspace-row, .shared-new-workspace-look { grid-template-columns: 1fr; } }
+
+/* Compact pickers and a dialog in two halves (V0.8.56). Ten icons to a row, four full rows; the colours in one row. */
+.shared-icon-picker { display: grid; grid-template-columns: repeat(10, 32px); gap: 6px; max-width: none; }
+.shared-color-picker { display: flex; flex-wrap: wrap; gap: 8px; max-width: none; }
+.shared-color-swatch { width: 28px; height: 28px; }
+.rm-dialog.shared-new-workspace-dialog { width: min(1180px, calc(100vw - 32px)); }
+.shared-new-workspace-look { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.shared-new-workspace-dialog .rm-template-options { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.shared-new-workspace-dialog .rm-template-art { max-width: 140px; }
+.shared-new-workspace-dialog .rm-template-art-box { padding: 6px; }
+@media (max-width: 1000px) { .shared-new-workspace-dialog .rm-template-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .shared-new-workspace-dialog .rm-template-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } .shared-icon-picker { grid-template-columns: repeat(auto-fill, 32px); } }

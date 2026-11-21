@@ -2,7 +2,17 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.55` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.56` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.56 — Compact pickers, aligned halves, a New organization dialog.
+
+- **Compact pickers.** The icon and color choices are smaller (32 px icons, 28 px colors) with the text unchanged, in the dialog and in a workspace's Settings.
+- **Forty icons.** Eight were added (Milestones, Compliance, Goals, Planning, Schedule, Legal, Partners, Operations), so the grid is four full rows of ten.
+- **Eleven colors.** Cyan, amber and lime join the eight; each has a darker shade for the light theme and a lighter one for the dark theme, checked for contrast.
+- **New workspace dialog.** Wider, in two halves: the organization over the icon, the name over the color, so the sections line up. The five templates are on one line.
+- **New organization is a dialog**, laid out the same way: the organization's name beside the name of a **first workspace**, the line *Organization will be created as … with the workspace …*, a switch to start with a first workspace or empty, and, when on, the workspace's icon, color, template and access. The **+** menu, the Organizations page and the old `/orgs/new` address open it; after creating, the organization's page opens. A person with no organization sees *Create organization* in its place.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.55 — A fuller New workspace dialog.
 

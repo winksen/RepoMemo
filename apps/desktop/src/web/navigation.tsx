@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
+import { openNewOrganization } from "../lib/newWorkspaceBridge";
 import { type Organization } from "../types";
 import { type OrganizationNavigation } from "./constants";
 import { currentLocation, navigate, organizationPath, parseRoute } from "./router";
@@ -24,7 +25,7 @@ export function OrganizationNavigationProvider({ children }: { children: ReactNo
     activeOrganizationId,
     isCreatingOrganization,
     selectOrganization: (organizationId) => navigate(organizationPath(organizationId)),
-    startCreatingOrganization: () => navigate("/orgs/new"),
+    startCreatingOrganization: openNewOrganization,
     cancelOrganizationCreation: () => navigate(activeOrganizationId ? organizationPath(activeOrganizationId) : "/orgs"),
   };
 

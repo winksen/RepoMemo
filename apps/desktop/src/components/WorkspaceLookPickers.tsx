@@ -10,8 +10,8 @@ export function WorkspaceIconPicker({ disabled = false, onChange, value }: { dis
   return (
     <div aria-label="Workspace icon" className="shared-icon-picker" role="group">
       {WORKSPACE_ICONS.map(({ icon: Icon, key, label }) => (
-        <IconButton appearance="outline" disabled={disabled} key={key} label={label} onClick={() => onChange(key)} pressed={key === value} type="button">
-          <Icon size={ICON_SIZE.lg} weight={key === value ? "fill" : "regular"} />
+        <IconButton appearance="outline" disabled={disabled} key={key} label={label} onClick={() => onChange(key)} pressed={key === value} size="sm" type="button">
+          <Icon size={ICON_SIZE.md} weight={key === value ? "fill" : "regular"} />
         </IconButton>
       ))}
     </div>
@@ -26,7 +26,7 @@ export function WorkspaceColorPicker({ disabled = false, onChange, value }: { di
         const selected = color.key === value;
         return <Tooltip content={color.label} key={color.key ?? "default"}>
           <button aria-label={color.label} aria-pressed={selected} className="shared-color-swatch" data-default={color.key === null ? "true" : undefined} disabled={disabled} onClick={() => onChange(color.key)} style={color.light && color.dark ? { "--swatch-light": color.light.accent, "--swatch-dark": color.dark.accent, "--swatch-on-light": color.light.on, "--swatch-on-dark": color.dark.on } as React.CSSProperties : undefined} type="button">
-            {selected ? <Check size={ICON_SIZE.md} /> : null}
+            {selected ? <Check size={ICON_SIZE.sm} /> : null}
           </button>
         </Tooltip>;
       })}

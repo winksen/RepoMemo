@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { createSharedWorkspace, saveSharedWorkspaceColor, saveSharedWorkspaceIcon } from "../lib/sharedApi";
+import { createSharedWorkspace } from "../lib/sharedApi";
 import type { Organization, SharedWorkspace } from "../types";
 import { apiMessage } from "../web/format";
 import { useTemplateCatalogue } from "../web/workspace/data";
-import { TemplatePicker } from "./TemplatePicker";
-import { WorkspaceColorPicker, WorkspaceIconPicker } from "./WorkspaceLookPickers";
-import { DEFAULT_WORKSPACE_ICON, WorkspaceIcon } from "../web/workspaceIcons";
+import { WorkspaceIcon } from "../web/workspaceIcons";
+import { DEFAULT_WORKSPACE_SETUP, type WorkspaceSetup, WorkspaceSetupFields, applyWorkspaceLook, lookWarning } from "./workspaceSetup";
 import { workspaceColorProps } from "../web/workspaceColors";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -33,10 +32,7 @@ export function NewWorkspaceDialog({ accessToken, defaultOrganizationId, onClose
   const choices = creatableOrganizations(organizations);
   const [organizationId, setOrganizationId] = useState("");
   const [name, setName] = useState("");
-  const [templateId, setTemplateId] = useState("general");
-  const [restricted, setRestricted] = useState(false);
-  const [icon, setIcon] = useState(DEFAULT_WORKSPACE_ICON);
-  const [color, setColor] = useState<string | null>(null);
+  const [setup, setSetup] = useState<WorkspaceSetup>(DEFAULT_WORKSPACE_SETUP);
   const [busy, setBusy] = useState(false);
   const [templates] = useTemplateCatalogue(accessToken, open);
 
@@ -44,26 +40,18 @@ export function NewWorkspaceDialog({ accessToken, defaultOrganizationId, onClose
   useEffect(() => {
     if (!open) return;
     setOrganizationId(choices.some((organization) => organization.id === defaultOrganizationId) ? defaultOrganizationId! : choices[0]?.id ?? "");
-    setName(""); setTemplateId("general"); setRestricted(false); setIcon(DEFAULT_WORKSPACE_ICON); setColor(null);
+    setName(""); setSetup(DEFAULT_WORKSPACE_SETUP);
   }, [open]);
 
   async function create() {
     if (!organizationId || !name.trim()) return;
     setBusy(true);
     try {
-      const workspace = await createSharedWorkspace(accessToken, organizationId, name.trim(), templates.length > 1 ? templateId : undefined, restricted);
-      // The icon and the color are settings of the new workspace, saved once it exists; a failure leaves it created with the defaults.
-      const settings: Record<string, unknown> = { ...workspace.workspace.settings };
-      const failed: string[] = [];
-      if (icon !== DEFAULT_WORKSPACE_ICON) {
-        try { settings.icon = (await saveSharedWorkspaceIcon(accessToken, workspace.workspace.id, icon)).icon; } catch { failed.push("icon"); }
-      }
-      if (color) {
-        try { settings.color = (await saveSharedWorkspaceColor(accessToken, workspace.workspace.id, color)).color; } catch { failed.push("color"); }
-      }
-      workspace.workspace = { ...workspace.workspace, settings };
+      const created = await createSharedWorkspace(accessToken, organizationId, name.trim(), templates.length > 1 ? setup.templateId : undefined, setup.restricted);
+      // The icon and the color are settings of the new workspace, saved once it exists.
+      const { workspace, failed } = await applyWorkspaceLook(accessToken, created, setup);
       showToast("success", `${workspace.workspace.name} was created.`);
-      if (failed.length) showToast("warning", `The ${failed.join(" and ")} could not be saved. Choose ${failed.length > 1 ? "them" : "it"} again in the workspace's Settings.`);
+      if (failed.length) showToast("warning", lookWarning(failed));
       onCreated(workspace);
       onClose();
     } catch (requestError) { showToast("error", apiMessage(requestError)); } finally { setBusy(false); }
@@ -89,20 +77,9 @@ export function NewWorkspaceDialog({ accessToken, defaultOrganizationId, onClose
       <Field label="Workspace name" required><Input autoFocus disabled={busy} onChange={(event) => setName(event.target.value)} placeholder="Payments platform" required value={name} /></Field>
     </div>
     <p className="shared-new-workspace-as" aria-live="polite">
-      <span className="shared-rail-chip" {...workspaceColorProps(color)}><WorkspaceIcon size={20} weight="fill" workspace={{ settings: { icon } }} /></span>
+      <span className="shared-rail-chip" {...workspaceColorProps(setup.color)}><WorkspaceIcon size={20} weight="fill" workspace={{ settings: { icon: setup.icon } }} /></span>
       <span>Workspace will be created as <strong>{asName}</strong></span>
     </p>
-    <div className="shared-new-workspace-look">
-      <div><strong>Icon</strong><WorkspaceIconPicker disabled={busy} onChange={setIcon} value={icon} /></div>
-      <div><strong>Main color</strong><WorkspaceColorPicker disabled={busy} onChange={setColor} value={color} /></div>
-    </div>
-    <TemplatePicker disabled={busy} name="new-workspace-template" onChange={setTemplateId} templates={templates} value={templateId} />
-    <div className="shared-access-choice">
-      <Switch aria-label="Restrict access to the people you add" checked={restricted} disabled={busy} onCheckedChange={setRestricted} />
-      <div>
-        <strong>{restricted ? "Restricted access" : "Access inherited from the organization"}</strong>
-        <span>{restricted ? "Only the people you add one by one can open this workspace." : `Everyone in ${organization?.name ?? "the organization"} can open it, with the role they have there.`}</span>
-      </div>
-    </div>
+    <WorkspaceSetupFields busy={busy} onChange={setSetup} organizationName={organization?.name ?? ""} setup={setup} templates={templates} />
   </Dialog>;
 }
