@@ -38,11 +38,23 @@ pub(crate) struct ChangePasswordRequest {
 #[derive(Debug, Deserialize)]
 pub(crate) struct CreateOrganizationRequest {
     pub(crate) name: String,
+    /// A short description, optional.
+    #[serde(default)]
+    pub(crate) description: Option<String>,
+    /// The key of the icon that stands for the organization, optional.
+    #[serde(default)]
+    pub(crate) icon: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct UpdateOrganizationRequest {
     pub(crate) name: String,
+    /// Sets the description (an empty one clears it); left out, it is unchanged.
+    #[serde(default)]
+    pub(crate) description: Option<String>,
+    /// Sets the icon key (an empty one clears it); left out, it is unchanged.
+    #[serde(default)]
+    pub(crate) icon: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

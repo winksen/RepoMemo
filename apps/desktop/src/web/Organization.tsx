@@ -13,9 +13,12 @@ import { Dropdown } from "../components/ui/dropdown";
 import { Tooltip } from "../components/ui/tooltip";
 import { IconButton } from "../components/ui/icon-button";
 import { Input } from "../components/ui/input";
+import { Textarea } from "../components/ui/textarea";
+import { OrganizationIconPicker } from "../components/WorkspaceLookPickers";
 import { Toast, showToast } from "../components/ui/toast";
 import { InviteMembers } from "../components/InviteMembers";
 import { OrganizationTemplatesPanel } from "../components/OrganizationTemplatesPanel";
+import { OrganizationIcon, organizationIconKey } from "./organizationIcons";
 import { useTabIndicator } from "./tabIndicator";
 import { WorkspaceMoreMenu } from "../components/WorkspaceMoreMenu";
 import { arrangeSections } from "./templateSections";
@@ -39,6 +42,8 @@ export function OrganizationAdministration({
   const confirm = useConfirm();
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [organizationName, setOrganizationName] = useState(organization.name);
+  const [description, setDescription] = useState(organization.description ?? "");
+  const [icon, setIcon] = useState(organizationIconKey(organization));
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<OrganizationRole>("member");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -53,12 +58,12 @@ export function OrganizationAdministration({
     try { setMembers(await listSharedOrganizationMembers(accessToken, organization.id)); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsLoading(false); }
   }
 
-  useEffect(() => { setOrganizationName(organization.name); void load(); }, [accessToken, organization.id, organization.name]);
+  useEffect(() => { setOrganizationName(organization.name); setDescription(organization.description ?? ""); setIcon(organizationIconKey(organization)); void load(); }, [accessToken, organization.id, organization.name, organization.description, organization.icon]);
 
   async function saveOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSaving(true); setError(null);
-    try { onOrganizationUpdated(await updateSharedOrganization(accessToken, organization.id, organizationName)); showToast("success", "Organization renamed."); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
+    try { onOrganizationUpdated(await updateSharedOrganization(accessToken, organization.id, organizationName, { description: description.trim(), icon })); showToast("success", "Organization updated."); } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSaving(false); }
   }
 
   async function saveMember(email: string, role: OrganizationRole) {
@@ -94,7 +99,12 @@ export function OrganizationAdministration({
   return <section className="shared-organization-admin" aria-labelledby="organization-admin-title">
     <PanelHeading description={organization.role} icon={Building} id="organization-admin-title" title="Organization administration" />
     <p className="shared-muted-copy">Organization members inherit access to every workspace. Their organization role controls the level of that access.</p>
-    {canRename ? <form className="shared-organization-rename" onSubmit={saveOrganization}><Field label="Organization name" required><Input onChange={(event) => setOrganizationName(event.target.value)} value={organizationName} /></Field><Button busy={isSaving} disabled={organizationName.trim() === organization.name} type="submit" variant="secondary">Save name</Button></form> : null}
+    {canRename ? <form className="shared-organization-profile" onSubmit={saveOrganization}>
+      <Field label="Organization name" required><Input onChange={(event) => setOrganizationName(event.target.value)} value={organizationName} /></Field>
+      <Field label="Description"><Textarea maxLength={500} onChange={(event) => setDescription(event.target.value)} placeholder="What this organization is for" rows={3} value={description} /></Field>
+      <div className="shared-organization-profile-icon"><strong>Icon</strong><OrganizationIconPicker onChange={setIcon} value={icon} /></div>
+      <Button busy={isSaving} disabled={organizationName.trim() === organization.name && description.trim() === (organization.description ?? "") && icon === organizationIconKey(organization)} type="submit" variant="secondary">Save profile</Button>
+    </form> : null}
     <form className="shared-organization-member-form" onSubmit={(event) => { event.preventDefault(); void saveMember(memberEmail, memberRole); }}><Field label="Member email" required><Input onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" type="email" value={memberEmail} /></Field><Field label="Organization role">{(control) => <Dropdown id={control.id} onValueChange={(value) => setMemberRole(value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} />}</Field><Button busy={isSaving} type="submit" variant="secondary"><Users size={ICON_SIZE.md} /> Add member</Button></form>
     <Toast kind="error" message={error} />
     <div className="shared-organization-member-list" aria-busy={isLoading}>{isLoading ? <SkeletonList label="Loading organization members" /> : members.map((member) => {
@@ -120,7 +130,7 @@ export function OrganizationRail({
   if (!workspaces) return <div className="shared-rail-navigation" />;
   const entries = workspaces.map((workspace) => {
     const organization = organizations.find((entry) => entry.id === workspace.organization_id);
-    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, subtitle: organization ? <><Building size={12} weight="fill" /><span>{organization.name}</span></> : undefined, colorProps: workspaceColorProps(workspaceColorKey(workspace.workspace)), icon: (active: boolean) => <span className="shared-rail-chip"><WorkspaceIcon size={22} weight={active ? "fill" : "regular"} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
+    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, subtitle: organization ? <><OrganizationIcon organization={organization} size={12} weight="fill" /><span>{organization.name}</span></> : undefined, colorProps: workspaceColorProps(workspaceColorKey(workspace.workspace)), icon: (active: boolean) => <span className="shared-rail-chip"><WorkspaceIcon size={22} weight={active ? "fill" : "regular"} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
   });
   return <div className="shared-rail-navigation">
     <RailSection label="Workspaces" name="workspaces">

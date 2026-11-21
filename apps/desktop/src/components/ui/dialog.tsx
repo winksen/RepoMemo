@@ -1,7 +1,10 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useId, useRef, type FormEvent, type MouseEvent, type ReactNode } from "react";
 import { currentOpener, restoreFocus, type FocusAnchor } from "../../lib/focusReturn";
+import { X } from "@phosphor-icons/react";
 import { Button } from "./button";
+import { ICON_SIZE } from "./icon";
+import { IconButton } from "./icon-button";
 
 /** `sm` 400 px (a question), `md` 520 px (a small form), `lg` 720 px (long content). */
 export type DialogSize = "sm" | "md" | "lg";
@@ -79,6 +82,9 @@ export function Dialog({
           }}
           ref={content}
         >
+          <DialogPrimitive.Close asChild>
+            <IconButton appearance="plain" className="rm-dialog-close" label="Close dialog" size="sm" type="button"><X size={ICON_SIZE.md} /></IconButton>
+          </DialogPrimitive.Close>
           <DialogPrimitive.Title className="rm-dialog-title">{title}</DialogPrimitive.Title>
           {description ? <DialogPrimitive.Description className="rm-dialog-description">{description}</DialogPrimitive.Description> : null}
           {children ? <a className="rm-skip-link rm-dialog-skip" href={`#${footerId}`} onClick={skipToButtons}>Skip to the buttons</a> : null}

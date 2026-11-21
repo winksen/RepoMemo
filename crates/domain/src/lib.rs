@@ -782,6 +782,12 @@ pub struct Organization {
     pub role: OrganizationRole,
     pub created_at: String,
     pub updated_at: String,
+    /// A short description (up to 500 characters), shown on the organization's card and page.
+    #[serde(default)]
+    pub description: Option<String>,
+    /// The key of the icon that stands for the organization; the client owns the set of icons.
+    #[serde(default)]
+    pub icon: Option<String>,
     /// Listed only because the user belongs to some of its workspaces: they
     /// are not a member of the organization, `role` is then `member` for
     /// display, and nothing flows to its other workspaces.

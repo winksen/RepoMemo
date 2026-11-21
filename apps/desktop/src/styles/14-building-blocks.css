@@ -297,3 +297,17 @@ th > .rm-badge,
 .shared-new-workspace-dialog .rm-template-art-box { padding: 6px; }
 @media (max-width: 1000px) { .shared-new-workspace-dialog .rm-template-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .shared-new-workspace-dialog .rm-template-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } .shared-icon-picker { grid-template-columns: repeat(auto-fill, 32px); } }
+
+/* The organization dialog's sections and the organization's profile (V0.8.57). */
+.shared-dialog-stack { display: grid; align-content: start; gap: 12px; min-width: 0; }
+.shared-dialog-divider { width: 100%; height: 0; margin: 6px 0; border: 0; border-top: 1px solid var(--color-border); }
+.shared-dialog-section { display: grid; gap: 14px; min-width: 0; }
+.shared-dialog-section-title { margin: 0; font-size: 14px; font-weight: 700; }
+.shared-new-workspace-look-block { display: grid; gap: 8px; }
+.shared-new-workspace-look-block > strong { font-size: 13px; }
+.shared-icon-picker-organization { grid-template-columns: repeat(7, 32px); }
+.shared-organization-profile { display: grid; gap: 12px; max-width: 560px; margin-bottom: 14px; }
+.shared-organization-profile .rm-button { justify-self: start; }
+.shared-organization-profile-icon { display: grid; gap: 8px; }
+.shared-organization-profile-icon > strong { font-size: 13px; }
+.shared-org-card-description { display: -webkit-box; max-width: 100%; margin-top: -2px; overflow: hidden; color: var(--color-text-muted); font-size: 13px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }

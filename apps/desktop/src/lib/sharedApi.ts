@@ -535,17 +535,20 @@ export function listSharedOrganizations(accessToken: string): Promise<Organizati
   return request<Organization[]>("/v1/organizations", {}, accessToken);
 }
 
-export function createSharedOrganization(accessToken: string, name: string): Promise<Organization> {
+/** What an organization has besides its name: both optional. An empty string clears one on an update. */
+export interface OrganizationProfile { description?: string; icon?: string }
+
+export function createSharedOrganization(accessToken: string, name: string, profile: OrganizationProfile = {}): Promise<Organization> {
   return request<Organization>("/v1/organizations", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, ...profile }),
   }, accessToken);
 }
 
-export function updateSharedOrganization(accessToken: string, organizationId: string, name: string): Promise<Organization> {
+export function updateSharedOrganization(accessToken: string, organizationId: string, name: string, profile: OrganizationProfile = {}): Promise<Organization> {
   return request<Organization>(`/v1/organizations/${organizationId}`, {
     method: "PUT",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, ...profile }),
   }, accessToken);
 }
 

@@ -1,4 +1,5 @@
 import { Check } from "@phosphor-icons/react";
+import { ORGANIZATION_ICONS } from "../web/organizationIcons";
 import { WORKSPACE_ICONS } from "../web/workspaceIcons";
 import { WORKSPACE_COLORS } from "../web/workspaceColors";
 import { ICON_SIZE } from "./ui/icon";
@@ -30,6 +31,19 @@ export function WorkspaceColorPicker({ disabled = false, onChange, value }: { di
           </button>
         </Tooltip>;
       })}
+    </div>
+  );
+}
+
+/** The icons an organization can take, as a short grid of toggle buttons. */
+export function OrganizationIconPicker({ disabled = false, onChange, value }: { disabled?: boolean; onChange: (key: string) => void; value: string }) {
+  return (
+    <div aria-label="Organization icon" className="shared-icon-picker shared-icon-picker-organization" role="group">
+      {ORGANIZATION_ICONS.map(({ icon: Icon, key, label }) => (
+        <IconButton appearance="outline" disabled={disabled} key={key} label={label} onClick={() => onChange(key)} pressed={key === value} size="sm" type="button">
+          <Icon size={ICON_SIZE.md} weight={key === value ? "fill" : "regular"} />
+        </IconButton>
+      ))}
     </div>
   );
 }

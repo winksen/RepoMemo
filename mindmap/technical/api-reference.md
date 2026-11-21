@@ -140,8 +140,8 @@
 | Method | Path | Authentication | Guards | Request body | Response |
 |---|---|---|---|---|---|
 | GET | `/v1/organizations` | auth | — | — | Vec<Organization |
-| POST | `/v1/organizations` | auth | — | CreateOrganizationRequest | Organization |
-| PUT | `/v1/organizations/{organization_id}` | managing | require_organization_owner | UpdateOrganizationRequest | Organization |
+| POST | `/v1/organizations` | auth | — | CreateOrganizationRequest (name, description, icon) | Organization |
+| PUT | `/v1/organizations/{organization_id}` | managing | require_organization_owner | UpdateOrganizationRequest (name, description, icon) | Organization |
 | GET | `/v1/organizations/{organization_id}/overview` | auth | require_organization_read | — | OrganizationOverviewResponse |
 | GET | `/v1/organizations/{organization_id}/members` | auth | require_organization_read | — | Vec<OrganizationMember |
 | PUT | `/v1/organizations/{organization_id}/members` | managing | require_organization_admin | UpsertOrganizationMemberRequest | OrganizationMember |

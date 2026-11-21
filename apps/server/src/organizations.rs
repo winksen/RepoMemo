@@ -13,7 +13,12 @@ pub(crate) async fn create_organization(
     }
     let organization = state
         .storage
-        .create_organization(&subject.user_id, &request.name)
+        .create_organization_with(
+            &subject.user_id,
+            &request.name,
+            request.description.as_deref(),
+            request.icon.as_deref(),
+        )
         .await
         .map_err(map_storage_error)?;
     Ok((StatusCode::CREATED, Json(organization)))
@@ -141,7 +146,13 @@ pub(crate) async fn update_organization(
     require_organization_owner(&state, &subject, &organization_id).await?;
     state
         .storage
-        .update_organization(&organization_id, &subject.user_id, &request.name)
+        .update_organization_profile(
+            &organization_id,
+            &subject.user_id,
+            &request.name,
+            request.description.as_deref(),
+            request.icon.as_deref(),
+        )
         .await
         .map(Json)
         .map_err(map_storage_error)

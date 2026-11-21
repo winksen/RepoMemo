@@ -284,6 +284,10 @@ struct OrganizationRow {
     created_at: String,
     updated_at: String,
     #[sqlx(default)]
+    description: Option<String>,
+    #[sqlx(default)]
+    icon: Option<String>,
+    #[sqlx(default)]
     guest: bool,
 }
 
@@ -1094,6 +1098,8 @@ impl From<OrganizationRow> for Organization {
             role: organization_role_from_db(&row.role).unwrap_or(OrganizationRole::Member),
             created_at: row.created_at,
             updated_at: row.updated_at,
+            description: row.description,
+            icon: row.icon,
             guest: row.guest,
         }
     }
@@ -1628,6 +1634,35 @@ fn require_name(value: &str, field: &str) -> Result<String> {
         repomemo_domain::bail_invalid!("{field} must not contain control or text-direction characters.");
     }
     Ok(value.to_owned())
+}
+
+/// An organization's description: empty is none, and it is kept short and free of control or text-direction characters.
+fn optional_description(value: Option<&str>) -> Result<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    if value.chars().count() > 500 {
+        repomemo_domain::bail_invalid!("The description must be 500 characters or fewer.");
+    }
+    if value.chars().any(|c| is_hidden_character(c) && c != '\n') {
+        repomemo_domain::bail_invalid!("The description must not contain control or text-direction characters.");
+    }
+    Ok(Some(value.to_owned()))
+}
+
+/// The key of an icon: empty is none, otherwise a short slug (the client owns the set of icons).
+fn optional_icon_key(value: Option<&str>) -> Result<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    if value.len() > 40
+        || !value
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        repomemo_domain::bail_invalid!("That icon is not valid.");
+    }
+    Ok(Some(value.to_owned()))
 }
 
 /// A title taken from a file name or a pasted text: only the length is checked, as before, because a

@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.57 (2026-11-21)
+
+An organization profile, and dialogs with a close button and transitions.
+
+### Added
+- **Organization description and icon.** An organization can have a **description** (up to 500 characters) and an **icon**, chosen from thirteen places a team works from (company, office, apartment, house, studio, factory, bank, shop, school, clinic, lab, warehouse, community). Both are optional. They are set in the *New organization* dialog and changed by the owner in the organization's **Administration** (*Save profile*, which replaces *Save name*). The icon shows on the organization's card (filled), before the organization's name under each workspace in the sidebar and wherever an organization is listed; the description shows on the card and on the organization's Overview.
+- **API.** `POST /v1/organizations` accepts `description` and `icon`; `PUT /v1/organizations/{id}` accepts them with the name (a field left out is unchanged; an empty string clears it). `Organization` in the API and in the generated types has `description` and `icon` (`null` when not set). Invalid values are refused with `400`.
+- **Migration `0087_organization_profile`** adds the two nullable columns. It is applied on start; nothing else changes for existing organizations (no description, the company icon).
+
+### Changed
+- **Every dialog has a close button** (an X at the top right, named *Close dialog*), in addition to Cancel and Escape.
+- **Dialogs ease in and out.** The dialog fades and rises into place and the backdrop fades, and both ease out when closed. With reduced motion they appear and disappear at once.
+- **New organization dialog, in sections.** First the organization (name, description, icon and *Organization will be created as …*); then the choice *Start with a first workspace* or *Start empty*; then, below a line, the **First workspace** (name and *Workspace will be created as Organization / Workspace*, icon, color, template and access). Starting empty leaves the lower section out, so the workspace's choices are never next to the organization's.
+
+### Checks
+- Typecheck, formatting and clippy (domain, storage, server, all targets) pass, and the generated types and the migration lock were refreshed with their scripts. **The new server test and the client tests were compiled but not executed**; nothing was started or opened in a browser.
+
+### Upgrading
+- The server applies migration 0087 on start. A client of this release needs this server; an older server ignores the description and icon.
+
 ## V0.8.56 (2026-11-21)
 
 Compact pickers, aligned halves, and a New organization dialog.

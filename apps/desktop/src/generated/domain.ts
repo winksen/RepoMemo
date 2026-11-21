@@ -706,6 +706,10 @@ export interface Organization {
   role: OrganizationRole;
   created_at: string;
   updated_at: string;
+  /** A short description (up to 500 characters), shown on the organization's card and page. */
+  description: string | null;
+  /** The key of the icon that stands for the organization; the client owns the set of icons. */
+  icon: string | null;
   /**
    * Listed only because the user belongs to some of its workspaces: they
    * are not a member of the organization, `role` is then `member` for

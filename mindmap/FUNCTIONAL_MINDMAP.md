@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.56` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.57` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.57 — An organization profile, and dialogs with a close button.
+
+- **Organization profile.** An organization has a **description** (up to 500 characters) and an **icon** chosen from thirteen places a team works from (company, office, apartment, house, studio, factory, bank, shop, school, clinic, lab, warehouse, community). Both are optional and are set when it is created and changed in the organization's **Administration** (*Save profile*, for its owner). The icon is on the organization's card, the description under its name on the card and on its Overview, and the icon before the organization's name under each workspace in the sidebar.
+- **Every dialog has an X** (top right, *Close dialog*), and **dialogs ease in and out** (a short fade and rise, with the backdrop fading), unless reduced motion is on.
+- **New organization**, in sections so the workspace's choices are not mistaken for the organization's: first the organization (name, description, icon, and how it will be named), then the choice of *Start with a first workspace* or *Start empty*, and, below a line, the **First workspace** (its name and how it will be named, icon, color, template and access). Starting empty leaves the lower section out.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.56 — Compact pickers, aligned halves, a New organization dialog.
 

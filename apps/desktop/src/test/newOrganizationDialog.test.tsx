@@ -15,25 +15,36 @@ const workspace = { organization_id: "o9", workspace: { id: "w9", name: "General
 beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
-it("says how the organization and its first workspace will be named", () => {
+it("says how the organization, and then its first workspace, will be named, each in its own section", () => {
   render(<NewOrganizationDialog accessToken="t" onClose={vi.fn()} onCreated={vi.fn()} open />);
-  expect(screen.getByText(/Organization will be created as/).textContent).toContain("with the workspace Organization name / General");
+  expect(screen.getByText(/Organization will be created as/).textContent).toContain("Organization name");
+  expect(screen.getByText(/Workspace will be created as/).textContent).toContain("Organization name / General");
   fireEvent.change(screen.getByLabelText(/Organization name/), { target: { value: "Engineering" } });
-  fireEvent.change(screen.getByLabelText(/First workspace name/), { target: { value: "Platform" } });
-  expect(screen.getByText(/Organization will be created as/).textContent).toContain("Engineering / Platform");
+  fireEvent.change(screen.getByLabelText(/Workspace name/), { target: { value: "Platform" } });
+  expect(screen.getByText(/Organization will be created as/).textContent).toBe("Organization will be created as Engineering");
+  expect(screen.getByText(/Workspace will be created as/).textContent).toContain("Engineering / Platform");
+  // The workspace is below the organization's section and the choice of starting with one, and nothing about it is above them.
+  const organizationSection = screen.getByRole("region", { name: "Organization" });
+  const workspaceSection = screen.getByRole("region", { name: "First workspace" });
+  expect(organizationSection.compareDocumentPosition(workspaceSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(organizationSection.contains(screen.getByLabelText(/Workspace name/))).toBe(false);
+  expect(workspaceSection.contains(screen.getByRole("group", { name: "Workspace icon" }))).toBe(true);
+  expect(organizationSection.contains(screen.getByRole("group", { name: "Organization icon" }))).toBe(true);
 });
 
-it("creates the organization and its first workspace, with the color that was chosen, and hands both on", async () => {
+it("creates the organization with its description and icon, then its first workspace with the color that was chosen, and hands both on", async () => {
   vi.mocked(createSharedOrganization).mockResolvedValue(organization);
   vi.mocked(createSharedWorkspace).mockResolvedValue(workspace);
   vi.mocked(saveSharedWorkspaceColor).mockResolvedValue({ color: "teal" });
   const onCreated = vi.fn();
   render(<NewOrganizationDialog accessToken="t" onClose={vi.fn()} onCreated={onCreated} open />);
   fireEvent.change(screen.getByLabelText(/Organization name/), { target: { value: "Engineering" } });
+  fireEvent.change(screen.getByLabelText("Description"), { target: { value: "  The platform team  " } });
+  fireEvent.click(screen.getByRole("button", { name: "House" }));
   fireEvent.click(screen.getByRole("button", { name: "Teal" }));
   fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
   await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
-  expect(createSharedOrganization).toHaveBeenCalledWith("t", "Engineering");
+  expect(createSharedOrganization).toHaveBeenCalledWith("t", "Engineering", { description: "The platform team", icon: "house" });
   expect(createSharedWorkspace).toHaveBeenCalledWith("t", "o9", "General", undefined, false);
   expect(onCreated.mock.calls[0][0]).toBe(organization);
   expect(onCreated.mock.calls[0][1].workspace.settings.color).toBe("teal");
@@ -46,6 +57,7 @@ it("can start empty: no workspace is made, and its fields are not asked for", as
   fireEvent.click(screen.getByRole("switch", { name: "Create a first workspace" }));
   expect(screen.getByText("Start empty")).toBeTruthy();
   expect(screen.queryByRole("group", { name: "Workspace icon" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "First workspace" })).toBeNull();
   fireEvent.change(screen.getByLabelText(/Organization name/), { target: { value: "Engineering" } });
   fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith(organization, null));

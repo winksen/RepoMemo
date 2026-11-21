@@ -138,7 +138,7 @@ impl StorageEngine {
             r#"
             SELECT o.id, o.name,
                    CASE m.role WHEN 'owner' THEN 'owner' ELSE 'admin' END AS role,
-                   o.created_at, o.updated_at
+                   o.created_at, o.updated_at, o.description, o.icon
             FROM organizations o
             LEFT JOIN organization_memberships m ON m.organization_id = o.id AND m.user_id = ?1
             ORDER BY o.name ASC

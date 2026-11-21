@@ -8,6 +8,7 @@ import { type Organization, type SharedSession, type SharedWorkspace } from "../
 import { useOrganizationNavigation } from "./navigation";
 import { navigate } from "./router";
 import { OrganizationRail } from "./Organization";
+import { OrganizationIcon } from "./organizationIcons";
 import { WorkspaceIcon } from "./workspaceIcons";
 
 /** `/orgs`: every organization the account belongs to, with its role and workspace count; each opens its administration. */
@@ -33,8 +34,9 @@ export function SharedOrganizations({
       {organizations.length ? <div className="shared-org-cards">{organizations.map((organization) => {
         const own = workspaces.filter((workspace) => workspace.organization_id === organization.id);
         return <Button className="shared-org-card" key={organization.id} onClick={() => organizationNavigation.selectOrganization(organization.id)} type="button" variant="secondary">
-          <span className="shared-org-card-head"><span className="shared-org-card-mark"><Building size={26} /></span><Badge>{organization.role}</Badge></span>
+          <span className="shared-org-card-head"><span className="shared-org-card-mark"><OrganizationIcon organization={organization} size={28} weight="fill" /></span><Badge>{organization.role}</Badge></span>
           <strong>{organization.name}</strong>
+          {organization.description ? <span className="shared-org-card-description">{organization.description}</span> : null}
           <span className="shared-org-card-count">{own.length} {own.length === 1 ? "workspace" : "workspaces"}</span>
           <span className="shared-org-card-spaces">{own.slice(0, 4).map((workspace) => <span key={workspace.workspace.id}><WorkspaceIcon size={ICON_SIZE.sm} workspace={workspace.workspace} />{workspace.workspace.name}</span>)}{own.length > 4 ? <span>+{own.length - 4} more</span> : null}{own.length === 0 ? <span>No workspaces yet</span> : null}</span>
           <ChevronRight className="shared-org-card-arrow" size={ICON_SIZE.lg} />

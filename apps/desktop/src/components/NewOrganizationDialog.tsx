@@ -3,19 +3,23 @@ import { createSharedOrganization, createSharedWorkspace } from "../lib/sharedAp
 import type { Organization, SharedWorkspace } from "../types";
 import { apiMessage } from "../web/format";
 import { useTemplateCatalogue } from "../web/workspace/data";
+import { DEFAULT_ORGANIZATION_ICON, OrganizationIcon } from "../web/organizationIcons";
 import { workspaceColorProps } from "../web/workspaceColors";
 import { WorkspaceIcon } from "../web/workspaceIcons";
+import { OrganizationIconPicker } from "./WorkspaceLookPickers";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
 import { Switch } from "./ui/switch";
+import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
 import { DEFAULT_WORKSPACE_SETUP, type WorkspaceSetup, WorkspaceSetupFields, applyWorkspaceLook, lookWarning } from "./workspaceSetup";
 
 /**
- * *New organization*, laid out like *New workspace*: the name, and optionally a first workspace with its name, icon, color,
- * template and access, so a new organization does not start empty. The person who creates it is its owner.
+ * *New organization*, in two sections so that nothing about the workspace is mistaken for the organization: first the
+ * organization (name, description, icon), then the choice of starting empty or with a first workspace, and below a line the
+ * workspace's own choices (name, icon, color, template, access). The person who creates the organization is its owner.
  */
 export function NewOrganizationDialog({ accessToken, onClose, onCreated, open }: {
   accessToken: string;
@@ -25,6 +29,8 @@ export function NewOrganizationDialog({ accessToken, onClose, onCreated, open }:
   open: boolean;
 }) {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [icon, setIcon] = useState(DEFAULT_ORGANIZATION_ICON);
   const [withWorkspace, setWithWorkspace] = useState(true);
   const [workspaceName, setWorkspaceName] = useState("General");
   const [setup, setSetup] = useState<WorkspaceSetup>(DEFAULT_WORKSPACE_SETUP);
@@ -33,17 +39,22 @@ export function NewOrganizationDialog({ accessToken, onClose, onCreated, open }:
 
   useEffect(() => {
     if (!open) return;
-    setName(""); setWithWorkspace(true); setWorkspaceName("General"); setSetup(DEFAULT_WORKSPACE_SETUP);
+    setName(""); setDescription(""); setIcon(DEFAULT_ORGANIZATION_ICON);
+    setWithWorkspace(true); setWorkspaceName("General"); setSetup(DEFAULT_WORKSPACE_SETUP);
   }, [open]);
 
   const canCreate = Boolean(name.trim()) && (!withWorkspace || Boolean(workspaceName.trim()));
+  const organizationLabel = name.trim() || "Organization name";
 
   async function create() {
     if (!canCreate) return;
     setBusy(true);
     let organization: Organization;
     try {
-      organization = await createSharedOrganization(accessToken, name.trim());
+      organization = await createSharedOrganization(accessToken, name.trim(), {
+        description: description.trim() || undefined,
+        icon: icon === DEFAULT_ORGANIZATION_ICON ? undefined : icon,
+      });
     } catch (requestError) { showToast("error", apiMessage(requestError)); setBusy(false); return; }
     let workspace: SharedWorkspace | null = null;
     if (withWorkspace) {
@@ -73,21 +84,41 @@ export function NewOrganizationDialog({ accessToken, onClose, onCreated, open }:
     size="lg"
     title="New organization"
   >
-    <div className="shared-new-workspace-row">
-      <Field label="Organization name" required><Input autoFocus disabled={busy} onChange={(event) => setName(event.target.value)} placeholder="Engineering" required value={name} /></Field>
-      <Field label="First workspace name" required={withWorkspace}><Input disabled={busy || !withWorkspace} onChange={(event) => setWorkspaceName(event.target.value)} placeholder="General" value={withWorkspace ? workspaceName : ""} /></Field>
-    </div>
-    <p className="shared-new-workspace-as" aria-live="polite">
-      {withWorkspace ? <span className="shared-rail-chip" {...workspaceColorProps(setup.color)}><WorkspaceIcon size={20} weight="fill" workspace={{ settings: { icon: setup.icon } }} /></span> : null}
-      <span>Organization will be created as <strong>{name.trim() || "Organization name"}</strong>{withWorkspace ? <>, with the workspace <strong>{name.trim() || "Organization name"} / {workspaceName.trim() || "Workspace name"}</strong></> : null}</span>
-    </p>
+    <section aria-label="Organization" className="shared-dialog-section">
+      <div className="shared-new-workspace-row">
+        <div className="shared-dialog-stack">
+          <Field label="Organization name" required><Input autoFocus disabled={busy} onChange={(event) => setName(event.target.value)} placeholder="Engineering" required value={name} /></Field>
+          <Field label="Description"><Textarea disabled={busy} maxLength={500} onChange={(event) => setDescription(event.target.value)} placeholder="What this organization is for" rows={3} value={description} /></Field>
+        </div>
+        <div className="shared-dialog-stack">
+          <div className="shared-new-workspace-look-block"><strong>Icon</strong><OrganizationIconPicker disabled={busy} onChange={setIcon} value={icon} /></div>
+          <p aria-live="polite" className="shared-new-workspace-as">
+            <span className="shared-rail-chip"><OrganizationIcon organization={{ icon }} size={20} weight="fill" /></span>
+            <span>Organization will be created as <strong>{organizationLabel}</strong></span>
+          </p>
+        </div>
+      </div>
+    </section>
     <div className="shared-access-choice">
       <Switch aria-label="Create a first workspace" checked={withWorkspace} disabled={busy} onCheckedChange={setWithWorkspace} />
       <div>
         <strong>{withWorkspace ? "Start with a first workspace" : "Start empty"}</strong>
-        <span>{withWorkspace ? "Choose how it looks and what it starts with below. You can add more workspaces later." : "The organization is created with no workspace; add one from its page."}</span>
+        <span>{withWorkspace ? "Set it up below, under the line. You can add more workspaces later." : "The organization is created with no workspace; add one from its page."}</span>
       </div>
     </div>
-    {withWorkspace ? <WorkspaceSetupFields busy={busy} onChange={setSetup} organizationName={name.trim()} setup={setup} templates={templates} /> : null}
+    {withWorkspace ? <>
+      <hr className="shared-dialog-divider" />
+      <section aria-label="First workspace" className="shared-dialog-section">
+        <h3 className="shared-dialog-section-title">First workspace</h3>
+        <div className="shared-new-workspace-row">
+          <Field label="Workspace name" required><Input disabled={busy} onChange={(event) => setWorkspaceName(event.target.value)} placeholder="General" value={workspaceName} /></Field>
+          <p aria-live="polite" className="shared-new-workspace-as">
+            <span className="shared-rail-chip" {...workspaceColorProps(setup.color)}><WorkspaceIcon size={20} weight="fill" workspace={{ settings: { icon: setup.icon } }} /></span>
+            <span>Workspace will be created as <strong>{organizationLabel} / {workspaceName.trim() || "Workspace name"}</strong></span>
+          </p>
+        </div>
+        <WorkspaceSetupFields busy={busy} onChange={setSetup} organizationName={name.trim()} setup={setup} templates={templates} />
+      </section>
+    </> : null}
   </Dialog>;
 }

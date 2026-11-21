@@ -206,14 +206,29 @@ impl StorageEngine {
     }
 
     pub async fn create_organization(&self, owner_id: &str, name: &str) -> Result<Organization> {
+        self.create_organization_with(owner_id, name, None, None).await
+    }
+
+    /// Creates an organization with its optional description and icon key; the creator is its owner.
+    pub async fn create_organization_with(
+        &self,
+        owner_id: &str,
+        name: &str,
+        description: Option<&str>,
+        icon: Option<&str>,
+    ) -> Result<Organization> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let name = require_name(name, "Organization name")?;
+        let description = optional_description(description)?;
+        let icon = optional_icon_key(icon)?;
         let mut tx = self.pool.begin().await?;
 
-        sqlx::query("INSERT INTO organizations (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)")
+        sqlx::query("INSERT INTO organizations (id, name, description, icon, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)")
             .bind(&id)
             .bind(&name)
+            .bind(&description)
+            .bind(&icon)
             .bind(&now)
             .bind(&now)
             .execute(&mut *tx)
@@ -234,6 +249,8 @@ impl StorageEngine {
             role: OrganizationRole::Owner,
             created_at: now.clone(),
             updated_at: now,
+            description,
+            icon,
             guest: false,
         })
     }
@@ -242,9 +259,9 @@ impl StorageEngine {
     /// they only belong to some workspaces, so those workspaces can be found.
     pub async fn list_organizations_for_user(&self, user_id: &str) -> Result<Vec<Organization>> {
         let rows = sqlx::query_as::<_, OrganizationRow>(
-            "SELECT o.id, o.name, m.role, o.created_at, o.updated_at, 0 AS guest FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE m.user_id = ?1 \
+            "SELECT o.id, o.name, m.role, o.created_at, o.updated_at, o.description, o.icon, 0 AS guest FROM organizations o INNER JOIN organization_memberships m ON m.organization_id = o.id WHERE m.user_id = ?1 \
              UNION ALL \
-             SELECT o.id, o.name, 'member' AS role, o.created_at, o.updated_at, 1 AS guest FROM organizations o \
+             SELECT o.id, o.name, 'member' AS role, o.created_at, o.updated_at, o.description, o.icon, 1 AS guest FROM organizations o \
              WHERE EXISTS (SELECT 1 FROM workspace_organizations wo INNER JOIN workspace_memberships wm ON wm.workspace_id = wo.workspace_id WHERE wo.organization_id = o.id AND wm.user_id = ?1 AND (wm.expires_at IS NULL OR wm.expires_at > ?2)) \
              AND NOT EXISTS (SELECT 1 FROM organization_memberships m WHERE m.organization_id = o.id AND m.user_id = ?1) \
              ORDER BY 2 ASC",
@@ -273,21 +290,42 @@ impl StorageEngine {
     }
 
     pub async fn update_organization(&self, organization_id: &str, user_id: &str, name: &str) -> Result<Organization> {
+        self.update_organization_profile(organization_id, user_id, name, None, None)
+            .await
+    }
+
+    /// Renames an organization and, when given, sets its description and icon key (an empty one clears it; `None` leaves it as it is).
+    pub async fn update_organization_profile(
+        &self,
+        organization_id: &str,
+        user_id: &str,
+        name: &str,
+        description: Option<&str>,
+        icon: Option<&str>,
+    ) -> Result<Organization> {
         let name = require_name(name, "Organization name")?;
+        let new_description = optional_description(description)?;
+        let new_icon = optional_icon_key(icon)?;
         let now = Utc::now().to_rfc3339();
-        let updated = sqlx::query("UPDATE organizations SET name = ?1, updated_at = ?2 WHERE id = ?3")
-            .bind(&name)
-            .bind(&now)
-            .bind(organization_id)
-            .execute(&self.pool)
-            .await?;
+        let updated = sqlx::query(
+            "UPDATE organizations SET name = ?1, description = CASE WHEN ?2 THEN ?3 ELSE description END, icon = CASE WHEN ?4 THEN ?5 ELSE icon END, updated_at = ?6 WHERE id = ?7",
+        )
+        .bind(&name)
+        .bind(description.is_some())
+        .bind(&new_description)
+        .bind(icon.is_some())
+        .bind(&new_icon)
+        .bind(&now)
+        .bind(organization_id)
+        .execute(&self.pool)
+        .await?;
         if updated.rows_affected() == 0 {
             repomemo_domain::bail_not_found!("Organization was not found.");
         }
         // A system administrator may rename an organization they are not a
         // member of; they act as its administrator.
         let row = sqlx::query_as::<_, OrganizationRow>(
-            "SELECT o.id, o.name, COALESCE(m.role, 'admin') AS role, o.created_at, o.updated_at FROM organizations o LEFT JOIN organization_memberships m ON m.organization_id = o.id AND m.user_id = ?2 WHERE o.id = ?1",
+            "SELECT o.id, o.name, COALESCE(m.role, 'admin') AS role, o.created_at, o.updated_at, o.description, o.icon FROM organizations o LEFT JOIN organization_memberships m ON m.organization_id = o.id AND m.user_id = ?2 WHERE o.id = ?1",
         )
         .bind(organization_id)
         .bind(user_id)

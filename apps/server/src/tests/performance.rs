@@ -544,3 +544,102 @@ async fn a_workspace_colour_is_saved_for_administrators_and_only_as_a_slug() {
     assert_eq!(reset.status(), 200);
     assert!(settings(app, owner).await.is_null());
 }
+
+#[tokio::test]
+async fn an_organization_keeps_a_description_and_an_icon_that_its_owner_can_change() {
+    let data_dir = temp_data_dir("organization-profile");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "profile-first@example.com").await;
+    let (owner, _) = register_account(&app, "profile-owner@example.com").await;
+    let (stranger, _) = register_account(&app, "profile-stranger@example.com").await;
+
+    let created = app
+        .clone()
+        .oneshot(json_request(
+            "POST",
+            "/v1/organizations",
+            &owner,
+            json!({"name": "Studio", "description": "  Design and brand work.  ", "icon": "house"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(created.status(), 201);
+    let created = response_json(created).await;
+    assert_eq!(created["description"], "Design and brand work.");
+    assert_eq!(created["icon"], "house");
+    let organization = created["id"].as_str().unwrap().to_owned();
+
+    // The list carries them too, and an organization made with a name only has none.
+    let plain = response_json(
+        app.clone()
+            .oneshot(json_request(
+                "POST",
+                "/v1/organizations",
+                &owner,
+                json!({"name": "Plain"}),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(plain["description"].is_null() && plain["icon"].is_null());
+    let listed = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/organizations", &owner))
+            .await
+            .unwrap(),
+    )
+    .await;
+    let studio = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["id"] == organization.as_str())
+        .unwrap();
+    assert_eq!(studio["icon"], "house");
+
+    // Renaming alone leaves them; setting them changes them; an empty one clears it.
+    let uri = format!("/v1/organizations/{organization}");
+    let renamed = response_json(
+        app.clone()
+            .oneshot(json_request("PUT", &uri, &owner, json!({"name": "Studio North"})))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(renamed["name"], "Studio North");
+    assert_eq!(renamed["description"], "Design and brand work.");
+    let changed = response_json(
+        app.clone()
+            .oneshot(json_request(
+                "PUT",
+                &uri,
+                &owner,
+                json!({"name": "Studio North", "description": "", "icon": "factory"}),
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(changed["description"].is_null());
+    assert_eq!(changed["icon"], "factory");
+
+    // Nothing invalid is stored, and only an owner may change it.
+    for body in [
+        json!({"name": "Studio", "icon": "Not A Slug!"}),
+        json!({"name": "Studio", "description": "x".repeat(501)}),
+    ] {
+        let refused = app
+            .clone()
+            .oneshot(json_request("PUT", &uri, &owner, body))
+            .await
+            .unwrap();
+        assert_eq!(refused.status(), 400);
+    }
+    let outsider = app
+        .clone()
+        .oneshot(json_request("PUT", &uri, &stranger, json!({"name": "Mine now"})))
+        .await
+        .unwrap();
+    assert_eq!(outsider.status(), 403);
+}
