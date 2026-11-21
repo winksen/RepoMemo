@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.41 (2026-11-21)
+
+Larger workspace rows in the sidebar.
+
+### Changed
+- **Bigger rows.** Each workspace shows a large icon on a chip of its color, its name, and the organization it belongs to under the name, in the manner of a media library list. The sidebar is a little wider (236 px) to fit them.
+- **Current workspace in its color.** The current workspace is filled with its own color (the app's blue when none is chosen), in the shade of the current theme, with its icon on a lighter tile. **Organizations** and **System** keep the grey current-item fill.
+- CSS and markup only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.40 (2026-11-21)
 
 Workspace colors in the sidebar.

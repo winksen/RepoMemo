@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.40` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.41` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.41 — Larger workspace rows.
+
+- Each workspace in the sidebar is a larger row: a big icon on a chip of the workspace's color, its name, and the **organization it belongs to** under the name. The sidebar is a little wider (236 px) to fit them.
+- The **current workspace** is filled with its own color (the app's blue when it has none) with light or dark text as the theme needs, and its icon chip becomes a lighter tile on that fill. **Organizations** and **System** keep their grey current-item fill.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.40 — Workspace colors in the sidebar.
 

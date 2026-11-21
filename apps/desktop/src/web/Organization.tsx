@@ -119,7 +119,7 @@ export function OrganizationRail({
   if (!workspaces) return <div className="shared-rail-navigation" />;
   const entries = workspaces.map((workspace) => {
     const organization = organizations.find((entry) => entry.id === workspace.organization_id);
-    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, icon: <span className="shared-rail-chip" {...workspaceColorProps(workspaceColorKey(workspace.workspace))}><WorkspaceIcon size={ICON_SIZE.md} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
+    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, subtitle: organization?.name, colorProps: workspaceColorProps(workspaceColorKey(workspace.workspace)), icon: <span className="shared-rail-chip"><WorkspaceIcon size={22} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
   });
   return <div className="shared-rail-navigation">
     <RailSection label="Workspaces" name="workspaces">
@@ -139,14 +139,14 @@ function RailSection({ children, label, name }: { children: ReactNode; label: st
 /** Lists longer than this fold behind a *Show more* button; the current item always stays visible. */
 const RAIL_LIST_LIMIT = 10;
 
-function RailList({ activeId, items }: { activeId?: string; items: { id: string; name: string; title: string; icon: ReactNode; onSelect: () => void }[] }) {
+function RailList({ activeId, items }: { activeId?: string; items: { id: string; name: string; title: string; subtitle?: string; colorProps?: ReturnType<typeof workspaceColorProps>; icon: ReactNode; onSelect: () => void }[] }) {
   const [expanded, setExpanded] = useState(false);
   const folded = items.length > RAIL_LIST_LIMIT && !expanded;
   let visible = folded ? items.slice(0, RAIL_LIST_LIMIT) : items;
   const active = items.find((item) => item.id === activeId);
   if (folded && active && !visible.includes(active)) visible = [...visible.slice(0, RAIL_LIST_LIMIT - 1), active];
   return <div className="shared-rail-list">
-    {visible.map((item) => <Tooltip content={item.title} key={item.id} side="right"><Button aria-current={item.id === activeId ? "page" : undefined} className={`shared-rail-workspace${item.id === activeId ? " active" : ""}`} onClick={item.onSelect} type="button" variant="secondary">{item.icon}<span>{item.name}</span></Button></Tooltip>)}
+    {visible.map((item) => <Tooltip content={item.title} key={item.id} side="right"><Button aria-current={item.id === activeId ? "page" : undefined} className={`shared-rail-workspace${item.id === activeId ? " active" : ""}`} onClick={item.onSelect} type="button" variant="secondary" {...item.colorProps}>{item.icon}<span className="shared-rail-text"><span className="shared-rail-name">{item.name}</span>{item.subtitle ? <span className="shared-rail-sub">{item.subtitle}</span> : null}</span></Button></Tooltip>)}
     {items.length > RAIL_LIST_LIMIT ? <Button aria-expanded={expanded} className="shared-rail-more" onClick={() => setExpanded((open) => !open)} type="button" variant="secondary">{expanded ? "Show less" : `Show more (${items.length - visible.length})`}</Button> : null}
   </div>;
 }
