@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
-import { IconBrain as Brain, IconPhoto as Photo, IconRefresh as Refresh, IconSearch as Search } from "@tabler/icons-react";
+import { Brain, Image as Photo, ArrowsClockwise as Refresh, MagnifyingGlass as Search } from "@phosphor-icons/react";
 import { saveSharedWorkspaceAiProvider, testSharedWorkspaceAiProvider } from "../lib/sharedApi";
 import type { ProviderTestResult, SharedAiProviderSettings } from "../types";
 import { Button } from "./ui/button";

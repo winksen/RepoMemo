@@ -1,5 +1,5 @@
 import { SafeMarkdown } from "../../components/SafeMarkdown";
-import { IconBrain as Brain, IconChartBar as Chart, IconCode as Code, IconLoader2 as Loader, IconRefresh as Refresh, IconShieldLock as Shield } from "@tabler/icons-react";
+import { Brain, ChartBar as Chart, Code, CircleNotch as Loader, ArrowsClockwise as Refresh, LockKey as Shield } from "@phosphor-icons/react";
 import { generateSharedWorkspaceAiOverview } from "../../lib/sharedApi";
 import { type WorkspaceAiOverview } from "../../types";
 import { Button } from "../../components/ui/button";

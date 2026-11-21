@@ -1,4 +1,4 @@
-import { IconCheck, IconCopy } from "@tabler/icons-react";
+import { Check as IconCheck, Copy as IconCopy } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./button";
 import { ICON_SIZE } from "./icon";

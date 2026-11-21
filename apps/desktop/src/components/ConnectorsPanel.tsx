@@ -1,13 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import {
-  IconBrandGithub as GitHub,
-  IconCircleCheck as CircleCheck,
-  IconKey as Key,
-  IconPlus as Plus,
-  IconRefresh as Refresh,
-  IconTrash as Trash,
-  IconWebhook as Webhook,
-} from "@tabler/icons-react";
+import { GithubLogo as GitHub, CheckCircle as CircleCheck, Key, Plus, ArrowsClockwise as Refresh, Trash, WebhooksLogo as Webhook } from "@phosphor-icons/react";
 import {
   checkSharedConnector,
   connectSharedConnector,

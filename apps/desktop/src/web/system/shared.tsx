@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 import type { Dispatch, SetStateAction, ReactNode } from "react";
-import { IconRefresh as Refresh } from "@tabler/icons-react";
+import { ArrowsClockwise as Refresh } from "@phosphor-icons/react";
 import type { CountByLabel } from "../../types";
 import { Table } from "../../components/ui/table";
 import { IconButton } from "../../components/ui/icon-button";

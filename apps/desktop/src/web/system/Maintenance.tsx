@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconLoader2 as Loader, IconRotate as Rotate, IconTool as Tool } from "@tabler/icons-react";
+import { CircleNotch as Loader, ArrowClockwise as Rotate, Wrench as Tool } from "@phosphor-icons/react";
 import { runSystemMaintenance } from "../../lib/sharedApi";
 import type { MaintenanceStatus } from "../../types";
 import { Button } from "../../components/ui/button";

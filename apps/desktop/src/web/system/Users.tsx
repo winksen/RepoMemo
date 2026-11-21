@@ -1,20 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  IconBuildingCommunity as Building,
-  IconCrown as Crown,
-  IconEye as Eye,
-  IconKey as Key,
-  IconLockOpen as LockOpen,
-  IconLogout as Logout,
-  IconServerCog as ServerCog,
-  IconShieldCheck as ShieldCheck,
-  IconShieldOff as ShieldOff,
-  IconUser as UserIcon,
-  IconUserCheck as UserCheck,
-  IconUserCog as UserCog,
-  IconUserOff as UserOff,
-  IconUsers as Users,
-} from "@tabler/icons-react";
+import { Buildings as Building, Crown, Eye, Key, LockOpen, SignOut as Logout, HardDrives as ServerCog, ShieldCheck, ShieldSlash as ShieldOff, User as UserIcon, UserCheck, UserGear as UserCog, UserMinus as UserOff, Users } from "@phosphor-icons/react";
 import { UserAvatar } from "../../components/UserAvatar";
 import {
   anonymizeSystemUser,

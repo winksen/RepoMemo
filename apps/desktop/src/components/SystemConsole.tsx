@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { IconChevronRight as Prompt, IconEraser as Eraser, IconLoader2 as Loader } from "@tabler/icons-react";
+import { CaretRight as Prompt, Eraser, CircleNotch as Loader } from "@phosphor-icons/react";
 import { getConsoleWelcome, runConsoleCommand, SharedApiError } from "../lib/sharedApi";
 import type { ConsoleResponse, ConsoleWelcome } from "../types";
 import { Badge } from "./ui/badge";

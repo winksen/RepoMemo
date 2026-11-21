@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
-import { IconAlertCircle, IconAlertTriangle, IconCircleCheck, IconInfoCircle, IconX } from "@tabler/icons-react";
+import { WarningCircle as IconAlertCircle, Warning as IconAlertTriangle, CheckCircle as IconCircleCheck, Info as IconInfoCircle, X as IconX } from "@phosphor-icons/react";
 import { ICON_SIZE } from "./icon";
 
 export type ToastKind = "error" | "success" | "warning" | "info";

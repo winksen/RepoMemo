@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { IconApi as ApiIcon, IconPlus as Plus, IconTrash as Trash } from "@tabler/icons-react";
+import { Plugs as ApiIcon, Plus, Trash } from "@phosphor-icons/react";
 import { createPersonalToken, limitPersonalTokenWorkspaces, listPersonalTokens, listSharedWorkspaces, revokePersonalToken } from "../lib/sharedApi";
 import type { PersonalAccessToken, SharedWorkspace } from "../types";
 import { Switch } from "./ui/switch";

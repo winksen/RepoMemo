@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { IconLink as LinkIcon, IconMailForward as MailForward, IconTrash as Trash } from "@tabler/icons-react";
+import { Link as LinkIcon, EnvelopeSimple as MailForward, Trash } from "@phosphor-icons/react";
 import { createSharedInvitation, listSharedInvitations, revokeSharedInvitation } from "../lib/sharedApi";
 import type { InvitationTarget } from "../lib/sharedApi";
 import type { Invitation } from "../types";

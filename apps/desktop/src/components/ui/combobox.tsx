@@ -1,5 +1,5 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { IconCheck, IconChevronDown } from "@tabler/icons-react";
+import { Check as IconCheck, CaretDown as IconChevronDown } from "@phosphor-icons/react";
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 import { cn } from "../../lib/utils";
 import { ICON_SIZE } from "./icon";

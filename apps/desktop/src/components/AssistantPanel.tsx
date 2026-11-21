@@ -1,21 +1,7 @@
 import type { FormEvent, KeyboardEvent } from "react";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { useEffect, useRef, useState } from "react";
-import {
-  IconBrain as Brain,
-  IconFileSearch as FileSearch,
-  IconFileText as FileText,
-  IconHistory as History,
-  IconLayoutDashboard as Dashboard,
-  IconMessage as Message,
-  IconMessageQuestion as Question,
-  IconPencil as Pencil,
-  IconPlus as Plus,
-  IconRefresh as Refresh,
-  IconSearch as Search,
-  IconSend as Send,
-  IconTrash as Trash,
-} from "@tabler/icons-react";
+import { Brain, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash } from "@phosphor-icons/react";
 import { deleteSharedAgentConversation, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowRight as ArrowRight, IconKey as Key, IconShieldLock as Shield } from "@tabler/icons-react";
+import { ArrowRight, Key, LockKey as Shield } from "@phosphor-icons/react";
 import { getSharedHealth } from "../lib/sharedApi";
 import { pointAtServer } from "../lib/desktopConnection";
 import { checkServerVersion, versionAdvice } from "../lib/versionCheck";

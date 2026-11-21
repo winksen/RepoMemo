@@ -1,42 +1,8 @@
-import {
-  IconApi as Api,
-  IconBolt as Bolt,
-  IconBook2 as Book,
-  IconBrain as Brain,
-  IconBriefcase as Briefcase,
-  IconBuildingBank as Bank,
-  IconBuildingStore as Store,
-  IconBulb as Bulb,
-  IconChartBar as Chart,
-  IconCloud as Cloud,
-  IconCode as Code,
-  IconCompass as Compass,
-  IconCpu as Cpu,
-  IconCreditCard as CreditCard,
-  IconDatabase as Database,
-  IconDeviceMobile as Mobile,
-  IconFlask as Flask,
-  IconHeartbeat as Heartbeat,
-  IconLeaf as Leaf,
-  IconLock as Lock,
-  IconMessages as Messages,
-  IconPalette as Palette,
-  IconPuzzle as Puzzle,
-  IconRocket as Rocket,
-  IconSchool as School,
-  IconServer as Server,
-  IconShoppingCart as Cart,
-  IconStack2 as Layers,
-  IconTools as Tools,
-  IconTruck as Truck,
-  IconUsers as Users,
-  IconWorld as World,
-  type TablerIcon,
-} from "@tabler/icons-react";
+import { Plugs as Api, Lightning as Bolt, Book, Brain, Briefcase, Bank, Storefront as Store, Lightbulb as Bulb, ChartBar as Chart, Cloud, Code, Compass, Cpu, CreditCard, Database, DeviceMobile as Mobile, Flask, Heartbeat, Leaf, Lock, Chats as Messages, Palette, PuzzlePiece as Puzzle, RocketLaunch as Rocket, GraduationCap as School, HardDrives as Server, ShoppingCart as Cart, Stack as Layers, Toolbox as Tools, Truck, Users, Globe as World, type Icon as IconComponent, type IconWeight } from "@phosphor-icons/react";
 import type { Workspace } from "../types";
 
 /** The icons a workspace can take, by the key the server stores. */
-export const WORKSPACE_ICONS: { key: string; label: string; icon: TablerIcon }[] = [
+export const WORKSPACE_ICONS: { key: string; label: string; icon: IconComponent }[] = [
   { key: "stack", label: "Layers", icon: Layers },
   { key: "rocket", label: "Rocket", icon: Rocket },
   { key: "code", label: "Code", icon: Code },
@@ -80,8 +46,8 @@ export function workspaceIconKey(workspace: Pick<Workspace, "settings">): string
 }
 
 /** The icon of a workspace, as chosen by its administrators. */
-export function WorkspaceIcon({ size, workspace }: { size: number | string; workspace: Pick<Workspace, "settings"> }) {
+export function WorkspaceIcon({ size, weight = "regular", workspace }: { size: number | string; /** `fill` for the current item of a menu. */ weight?: IconWeight; workspace: Pick<Workspace, "settings"> }) {
   const key = workspaceIconKey(workspace);
   const Icon = (WORKSPACE_ICONS.find((entry) => entry.key === key) ?? WORKSPACE_ICONS[0]).icon;
-  return <Icon size={size} />;
+  return <Icon size={size} weight={weight} />;
 }

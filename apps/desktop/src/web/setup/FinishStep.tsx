@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconArrowLeft as ArrowLeft, IconFlag as Flag } from "@tabler/icons-react";
+import { ArrowLeft, Flag } from "@phosphor-icons/react";
 import { completeServerSetup } from "../../lib/sharedApi";
 import type { SharedSession, SystemSetting } from "../../types";
 import { Button } from "../../components/ui/button";

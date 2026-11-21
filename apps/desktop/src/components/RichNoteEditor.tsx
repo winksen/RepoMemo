@@ -5,18 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { Placeholder } from "@tiptap/extensions";
-import {
-  IconBold as Bold,
-  IconBraces as CodeBlock,
-  IconCode as Code,
-  IconHeading as Heading,
-  IconItalic as Italic,
-  IconLink as LinkIcon,
-  IconList as List,
-  IconListCheck as Checklist,
-  IconListNumbers as ListNumbers,
-  IconQuote as Quote,
-} from "@tabler/icons-react";
+import { TextB as Bold, BracketsCurly as CodeBlock, Code, TextH as Heading, TextItalic as Italic, Link as LinkIcon, List, ListChecks as Checklist, ListNumbers, Quotes as Quote } from "@phosphor-icons/react";
 import { ICON_SIZE } from "./ui/icon";
 import { isSubmitShortcut } from "../lib/submitShortcut";
 import { useToolbarKeys } from "../lib/useToolbarKeys";

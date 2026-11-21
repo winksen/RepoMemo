@@ -1,4 +1,4 @@
-import { IconCode as Code, IconMarkdown as Markdown, IconNote as Note } from "@tabler/icons-react";
+import { Code, MarkdownLogo as Markdown, Note } from "@phosphor-icons/react";
 import { type ArtifactSummary, type Citation, type CollaborationTaskStatus, type Folder } from "../types";
 
 export const SYSTEM_SECTIONS = ["overview", "usage", "users", "settings", "logs", "jobs", "audit", "console"] as const;

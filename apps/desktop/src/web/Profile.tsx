@@ -1,5 +1,5 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
-import { IconCamera as Camera, IconChecklist as Checklist, IconChevronRight as ChevronRight, IconKey as Key, IconLogout as Logout, IconPencil as Pencil, IconTrash as Trash, IconUpload as Upload, IconUserCircle as UserCircle } from "@tabler/icons-react";
+import { Camera, ListChecks as Checklist, CaretRight as ChevronRight, Key, SignOut as Logout, PencilSimple as Pencil, Trash, UploadSimple as Upload, UserCircle } from "@phosphor-icons/react";
 import { type NotificationPreference, changeEmailAddress, getNotificationPreferences, resendEmailVerification, setNotificationPreference, changeSharedPassword, deleteSharedAvatar, fetchSharedAvatar, getSharedProfile, listSharedProfileTasks, signOutEverywhere, updateSharedProfile, uploadSharedAvatar } from "../lib/sharedApi";
 import { type CollaborationTask, type Organization, type SharedSession, type SharedUser, type SharedWorkspace, type UserProfile } from "../types";
 import { UserAvatar } from "../components/UserAvatar";

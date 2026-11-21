@@ -1,6 +1,6 @@
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import type { ReactNode } from "react";
-import { IconDots } from "@tabler/icons-react";
+import { DotsThree as IconDots } from "@phosphor-icons/react";
 import { ICON_SIZE } from "./icon";
 import { IconButton } from "./icon-button";
 

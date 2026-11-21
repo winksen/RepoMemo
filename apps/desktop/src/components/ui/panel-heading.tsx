@@ -1,4 +1,4 @@
-import type { TablerIcon } from "@tabler/icons-react";
+import type { Icon as IconComponent } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
 import { ICON_SIZE } from "./icon";
@@ -9,8 +9,8 @@ export interface PanelHeadingProps {
   className?: string;
   /** A muted note at the end of the heading: a count, a state or a short qualifier. */
   description?: ReactNode;
-  /** A Tabler icon component; it is drawn at the heading's size. */
-  icon?: TablerIcon;
+  /** An icon component; it is drawn at the heading's size. */
+  icon?: IconComponent;
   /** The id of the heading element, for `aria-labelledby`. */
   id?: string;
   /** 2 for a panel, 3 for a part of a panel. The page itself has the h1. */

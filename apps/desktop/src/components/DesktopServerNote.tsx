@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconServer as Server } from "@tabler/icons-react";
+import { HardDrives as Server } from "@phosphor-icons/react";
 import { sharedApiUrl } from "../lib/sharedApi";
 import { appUpdates, desktopServer, desktopSettings } from "../lib/desktop";
 import { readUpdateChoice, writeUpdateChoice } from "../lib/updateChoice";

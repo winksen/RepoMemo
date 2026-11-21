@@ -1,4 +1,4 @@
-import { IconBook2 as Book, IconExternalLink as ExternalLink } from "@tabler/icons-react";
+import { Book, ArrowSquareOut as ExternalLink } from "@phosphor-icons/react";
 import type { KnowledgeEdge, KnowledgeNode } from "../../types";
 import { Button } from "../../components/ui/button";
 import { ICON_SIZE } from "../../components/ui/icon";

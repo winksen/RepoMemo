@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { IconLayoutDashboard as Layout } from "@tabler/icons-react";
+import { SquaresFour as Layout } from "@phosphor-icons/react";
 import { getSharedOrganizationTemplateVersions, listSharedOrganizationTemplates, saveSharedOrganizationTemplate, type OrganizationTemplate } from "../lib/sharedApi";
 import { Button } from "./ui/button";
 import { Field } from "./ui/field";

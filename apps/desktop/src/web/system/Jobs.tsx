@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconActivity as Activity } from "@tabler/icons-react";
+import { Pulse as Activity } from "@phosphor-icons/react";
 import { cancelSharedJob, getSystemOverview, listSystemJobsPage } from "../../lib/sharedApi";
 import type { MaintenanceStatus, SystemJob, SystemOverview } from "../../types";
 import { Button } from "../../components/ui/button";

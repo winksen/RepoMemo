@@ -1,5 +1,5 @@
 import { formatDateTimeValue, formatDateValue, formatDayMonth } from "../lib/locale";
-import { IconCode as Code, IconMarkdown as Markdown, IconNote as Note } from "@tabler/icons-react";
+import { Code, MarkdownLogo as Markdown, Note } from "@phosphor-icons/react";
 import { SharedApiError } from "../lib/sharedApi";
 import { type ArtifactSummary, type ArtifactType, type Citation, type CollaborationTask, type WorkspaceActivityEvent } from "../types";
 import { DOCUMENT_KIND_LABEL, documentKindOf } from "../lib/documents";

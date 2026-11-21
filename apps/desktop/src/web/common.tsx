@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react";
-import { IconCode as Code, IconFileSpreadsheet as ExcelFile, IconFileText as FileText, IconFileTypePdf as PdfFile, IconFileWord as WordFile, IconGitBranch as RepositoryIcon, IconLoader2 as Loader, IconMail as MailIcon, IconMarkdown as Markdown, IconNote as Note, IconNotebook as OneNoteIcon, IconPhoto as Photo, IconPresentation as Presentation, IconSearch as Search } from "@tabler/icons-react";
+import { Code, FileXls as ExcelFile, FileText, FilePdf as PdfFile, FileDoc as WordFile, GitBranch as RepositoryIcon, CircleNotch as Loader, Envelope as MailIcon, MarkdownLogo as Markdown, Note, Notebook as OneNoteIcon, Image as Photo, PresentationChart as Presentation, MagnifyingGlass as Search } from "@phosphor-icons/react";
 import { type ArtifactType, type Citation, type RepoFileAtCommit, type WorkspaceMetricBreakdown } from "../types";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogCancel } from "../components/ui/dialog";

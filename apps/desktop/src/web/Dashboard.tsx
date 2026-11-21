@@ -1,6 +1,6 @@
 import { Skeleton } from "../components/ui/skeleton";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { IconBuildingCommunity as Building, IconChevronRight as ChevronRight, IconLayoutDashboard as Dashboard, IconLoader2 as Loader, IconPlus as Plus, IconShieldLock as Shield, IconStack2 as Layers } from "@tabler/icons-react";
+import { Buildings as Building, CaretRight as ChevronRight, SquaresFour as Dashboard, CircleNotch as Loader, Plus, LockKey as Shield, Stack as Layers } from "@phosphor-icons/react";
 import { createSharedOrganization, type DashboardWorkspaceFigures } from "../lib/sharedApi";
 import { WorkspaceImport } from "../components/WorkspaceImport";
 import { openNewWorkspace } from "../lib/newWorkspaceBridge";

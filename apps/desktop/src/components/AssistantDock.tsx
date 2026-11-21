@@ -1,10 +1,6 @@
 import type { KeyboardEvent, PointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
-import {
-  IconLayoutSidebarRightCollapse as Collapse,
-  IconLayoutSidebarRightExpand as Expand,
-  IconX as Close,
-} from "@tabler/icons-react";
+import { SidebarSimple as Collapse, SidebarSimple as Expand, X as Close } from "@phosphor-icons/react";
 import { onAssistantCommand } from "../lib/assistantBridge";
 import { NARROW_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { ASSISTANT_NAME } from "../lib/assistantName";

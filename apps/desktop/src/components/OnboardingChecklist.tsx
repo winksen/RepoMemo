@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconCircle as Circle, IconCircleCheck as CircleCheck, IconListCheck as ListCheck } from "@tabler/icons-react";
+import { Circle, CheckCircle as CircleCheck, ListChecks as ListCheck } from "@phosphor-icons/react";
 import { getSharedOnboarding, setSharedOnboardingDismissed } from "../lib/sharedApi";
 import type { WorkspaceOnboarding } from "../types";
 import { useLiveRefresh } from "../lib/liveEvents";

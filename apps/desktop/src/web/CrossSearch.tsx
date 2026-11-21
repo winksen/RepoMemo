@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from "react";
-import { IconLoader2 as Loader, IconNotebook as Notebook, IconSearch as Search } from "@tabler/icons-react";
+import { CircleNotch as Loader, Notebook, MagnifyingGlass as Search } from "@phosphor-icons/react";
 import { searchAllWorkspaces } from "../lib/sharedApi";
 import { type ArtifactType, type CrossSearchResponse } from "../types";
 import { Button } from "../components/ui/button";

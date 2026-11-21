@@ -1,6 +1,6 @@
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconChartDots3 as Graph, IconList as List, IconMinus as Minus, IconPlus as Plus, IconFocusCentered as Recenter } from "@tabler/icons-react";
+import { Graph, List, Minus, Plus, Crosshair as Recenter } from "@phosphor-icons/react";
 import { layoutGraph } from "../../lib/forceLayout";
 import type { KnowledgeEdge, KnowledgeMap, KnowledgeNode } from "../../types";
 import { Button } from "../../components/ui/button";

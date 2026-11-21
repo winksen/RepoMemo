@@ -1,6 +1,6 @@
 import { PanelHeading } from "./ui/panel-heading";
 import { useEffect, useState } from "react";
-import { IconShieldLock as ShieldLock } from "@tabler/icons-react";
+import { LockKey as ShieldLock } from "@phosphor-icons/react";
 import { getSharedAiPolicy, saveSharedAiPolicy } from "../lib/sharedApi";
 import type { AiMinRole, AiPolicy } from "../types";
 import { Dropdown } from "./ui/dropdown";

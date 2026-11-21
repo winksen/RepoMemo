@@ -1,4 +1,4 @@
-import { IconAlertTriangle as Alert, IconFileCheck as File } from "@tabler/icons-react";
+import { Warning as Alert, FileText as File } from "@phosphor-icons/react";
 import { AuthFrame } from "./AuthFrame";
 import { ICON_SIZE } from "./ui/icon";
 

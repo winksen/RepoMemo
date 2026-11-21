@@ -1,4 +1,4 @@
-import { IconActivity as Activity, IconDatabase as Database, IconServer as Server, IconShieldCheck as ShieldCheck, IconTemplate as Template, IconUsers as Users, IconWorld as World } from "@tabler/icons-react";
+import { Pulse as Activity, Database, HardDrives as Server, ShieldCheck, Layout as Template, Users, Globe as World } from "@phosphor-icons/react";
 import { getSystemOverview } from "../../lib/sharedApi";
 import type { MaintenanceStatus, SystemOverview, SystemTemplateFiles } from "../../types";
 import { Badge } from "../../components/ui/badge";

@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect } from "react";
-import { IconPencil as Pencil, IconSettings as Settings, IconTrash as Trash } from "@tabler/icons-react";
+import { PencilSimple as Pencil, Gear as Settings, Trash } from "@phosphor-icons/react";
 import { deleteSharedWorkspace, getSharedWorkspaceMetrics, updateSharedWorkspace } from "../../lib/sharedApi";
 import { type SharedAiProviderSettings } from "../../types";
 import { Button } from "../../components/ui/button";

@@ -1,7 +1,7 @@
 import { SkeletonList } from "../../components/ui/skeleton";
 import { useRef, useState } from "react";
 import { useLiveRefresh } from "../../lib/liveEvents";
-import { IconRefresh as Refresh } from "@tabler/icons-react";
+import { ArrowsClockwise as Refresh } from "@phosphor-icons/react";
 import { getSharedKnowledgeMap } from "../../lib/sharedApi";
 import type { KnowledgeMap } from "../../types";
 import { Button } from "../../components/ui/button";

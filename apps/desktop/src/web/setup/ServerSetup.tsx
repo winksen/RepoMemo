@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconLogout as Logout } from "@tabler/icons-react";
+import { SignOut as Logout } from "@phosphor-icons/react";
 import { getSystemSettings } from "../../lib/sharedApi";
 import type { SharedSession, SystemSetting } from "../../types";
 import { Button } from "../../components/ui/button";

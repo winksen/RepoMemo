@@ -1,4 +1,4 @@
-import { IconSearch, IconX } from "@tabler/icons-react";
+import { MagnifyingGlass as IconSearch, X as IconX } from "@phosphor-icons/react";
 import { forwardRef, useRef, type InputHTMLAttributes, type KeyboardEvent } from "react";
 import { cn } from "../../lib/utils";
 import { ICON_SIZE } from "./icon";

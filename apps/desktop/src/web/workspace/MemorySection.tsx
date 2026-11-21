@@ -1,5 +1,5 @@
 import { type FormEvent } from "react";
-import { IconSearch as Search, IconShieldLock as Shield } from "@tabler/icons-react";
+import { MagnifyingGlass as Search, LockKey as Shield } from "@phosphor-icons/react";
 import { createSharedMemoryCard, searchSharedMemoryCards } from "../../lib/sharedApi";
 import { type MemoryCardSummary } from "../../types";
 import { Badge } from "../../components/ui/badge";

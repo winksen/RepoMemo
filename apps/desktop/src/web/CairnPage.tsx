@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconChevronDown as ChevronDown, IconPlus as Plus, IconStack2 as Layers } from "@tabler/icons-react";
+import { CaretDown as ChevronDown, Plus, Stack as Layers } from "@phosphor-icons/react";
 import { AssistantPanel } from "../components/AssistantPanel";
 import { CairnIcon } from "../components/CairnIcon";
 import { SharedLayout } from "../components/SharedLayout";
@@ -17,15 +17,13 @@ import { formatRecentTime } from "./format";
 import { RailSection } from "./Organization";
 import { type CairnChat, cairnContextWorkspace, groupCairnChats, onCairnWorkspaceChange, rememberCairnWorkspace, rememberedCairnWorkspace, useCairnChats } from "./cairn";
 import { cairnPath, navigate, routePath } from "./router";
-import { workspaceColorKey, workspaceColorProps } from "./workspaceColors";
 
 /** One workspace's chats in the sidebar: its name folds them away, and its + starts a chat in it. */
 function CairnGroup({ activeId, chats, workspace }: { activeId: string | null; chats: CairnChat[]; workspace: SharedWorkspace }) {
   const [open, setOpen] = useState(true);
   const [all, setAll] = useState(false);
   const visible = all || chats.length <= GROUP_LIMIT ? chats : chats.slice(0, GROUP_LIMIT);
-  const color = workspaceColorProps(workspaceColorKey(workspace.workspace));
-  return <section aria-label={workspace.workspace.name} className="shared-cairn-group" {...color}>
+  return <section aria-label={workspace.workspace.name} className="shared-cairn-group">
     <div className="shared-cairn-group-head">
       <button aria-expanded={open} className="shared-cairn-group-toggle" onClick={() => setOpen((current) => !current)} type="button"><span>{workspace.workspace.name}</span><ChevronDown size={ICON_SIZE.sm} /></button>
       <IconButton appearance="plain" className="shared-cairn-group-new" label={`New chat in ${workspace.workspace.name}`} onClick={() => { rememberCairnWorkspace(workspace.workspace.id); navigate(cairnPath(null)); }} size="sm"><Plus size={ICON_SIZE.sm} /></IconButton>
@@ -89,7 +87,6 @@ export function SharedCairnPage({ accessToken, chatId, organizations, session, s
   useEffect(() => { if (open) rememberCairnWorkspace(open.workspace.workspace.id); }, [open?.workspace.workspace.id]);
 
   return <SharedLayout
-    accent={chosen ? workspaceColorKey(chosen.workspace) : null}
     onNavigate={navigate}
     session={session}
     sidebar={null}

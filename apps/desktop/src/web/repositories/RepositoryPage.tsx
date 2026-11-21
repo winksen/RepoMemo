@@ -1,14 +1,6 @@
 import { SafeMarkdown } from "../../components/SafeMarkdown";
 import { useEffect, useRef, useState } from "react";
-import {
-  IconFolderCode as FolderCode,
-  IconGitBranch as GitBranch,
-  IconGitCommit as GitCommit,
-  IconRefresh as Refresh,
-  IconSettings as Settings,
-  IconSparkles as Sparkles,
-  IconStack2 as Layers,
-} from "@tabler/icons-react";
+import { FolderSimple as FolderCode, GitBranch, GitCommit, ArrowsClockwise as Refresh, Gear as Settings, Sparkle as Sparkles, Stack as Layers } from "@phosphor-icons/react";
 import { cancelSharedJob, getSharedRepositoryDetail, summarizeSharedRepository, syncSharedRepository } from "../../lib/sharedApi";
 import type { RepositoryDetailResponse } from "../../types";
 import { apiMessage, formatBytes, formatTime } from "../format";

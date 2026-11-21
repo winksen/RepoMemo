@@ -1,16 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import {
-  IconAlertCircle as AlertCircle,
-  IconArrowRight as ArrowRight,
-  IconCircleCheck as CircleCheck,
-  IconFolder as Folder,
-  IconFolderPlus as FolderPlus,
-  IconKey as Key,
-  IconLock as Lock,
-  IconRefresh as Refresh,
-  IconShieldLock as ShieldLock,
-} from "@tabler/icons-react";
+import { WarningCircle as AlertCircle, ArrowRight, CheckCircle as CircleCheck, Folder, FolderSimplePlus as FolderPlus, Key, Lock, ArrowsClockwise as Refresh, LockKey as ShieldLock } from "@phosphor-icons/react";
 import { attachEnvironment, createEnvironment, listEnvironments, SharedApiError } from "../lib/sharedApi";
 import type { EnvironmentEntry, PlatformStatus } from "../lib/sharedApi";
 import { ThemeToggle } from "./SharedLayout";

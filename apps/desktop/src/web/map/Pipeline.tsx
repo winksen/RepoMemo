@@ -1,4 +1,4 @@
-import { IconAlertTriangle as AlertTriangle, IconArrowRight as ArrowRight, IconHourglass as Hourglass, IconSearch as Search, IconStack2 as Layers } from "@tabler/icons-react";
+import { Warning as AlertTriangle, ArrowRight, Hourglass, MagnifyingGlass as Search, Stack as Layers } from "@phosphor-icons/react";
 import type { KnowledgeMap } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";

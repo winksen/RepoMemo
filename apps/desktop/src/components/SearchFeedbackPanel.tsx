@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { IconMessageQuestion as Question } from "@tabler/icons-react";
+import { Question } from "@phosphor-icons/react";
 import { listSharedArtifactsPage, listSharedMemoryCards, listSharedSearchFeedback, resolveSharedSearchFeedback } from "../lib/sharedApi";
 import type { SearchFeedback } from "../types";
 import { Button } from "./ui/button";

@@ -1,7 +1,7 @@
 // Profile › Two-step sign-in: set up an authenticator app with a first code, keep the recovery codes (shown once),
 // replace them or turn it off. Changing it always asks for the password and a code.
 import { useCallback, useEffect, useState } from "react";
-import { IconShieldLock as Shield } from "@tabler/icons-react";
+import { LockKey as Shield } from "@phosphor-icons/react";
 import { request } from "../lib/sharedApi";
 import { apiMessage } from "../web/format";
 import { Badge } from "./ui/badge";

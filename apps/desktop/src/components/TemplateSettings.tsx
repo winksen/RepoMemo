@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconLayoutList as LayoutList } from "@tabler/icons-react";
+import { Rows as LayoutList } from "@phosphor-icons/react";
 import { downloadSharedWorkspaceTemplateFile, saveSharedWorkspaceTemplate } from "../lib/sharedApi";
 import { saveBlob } from "../lib/saveBlob";
 import type { WorkspaceTemplateView } from "../types";

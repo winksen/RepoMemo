@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconActivity as Activity, IconChartBar as ChartBar, IconDatabase as Database, IconUsers as Users } from "@tabler/icons-react";
+import { Pulse as Activity, ChartBar, Database, Users } from "@phosphor-icons/react";
 import { getSystemUsage } from "../../lib/sharedApi";
 import type { SystemUsage } from "../../types";
 import { Table } from "../../components/ui/table";

@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { IconArrowRight as ArrowRight, IconKey as Key, IconShieldLock as Shield, IconUsers as Users } from "@tabler/icons-react";
+import { ArrowRight, Key, LockKey as Shield, Users } from "@phosphor-icons/react";
 import { DesktopServerNote } from "../components/DesktopServerNote";
 import { SharedApiError, fetchSignInProvider, loginSharedUser, requestPasswordResetMail, sharedApiUrl, signUpSharedUser, startProviderFlow } from "../lib/sharedApi";
 import { Button } from "../components/ui/button";

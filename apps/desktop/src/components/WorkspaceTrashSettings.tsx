@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { IconLoader2 as Loader, IconTrash as Trash } from "@tabler/icons-react";
+import { CircleNotch as Loader, Trash } from "@phosphor-icons/react";
 import { listSharedTrash, purgeSharedTrashItem, restoreSharedTrashItem } from "../lib/sharedApi";
 import type { TrashItem } from "../types";
 import { Button } from "./ui/button";

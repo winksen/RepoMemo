@@ -1,6 +1,6 @@
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useRef, useState } from "react";
-import { IconAlertTriangle as AlertTriangle, IconFileText as FileText } from "@tabler/icons-react";
+import { Warning as AlertTriangle, FileText } from "@phosphor-icons/react";
 import type { KnowledgeMap } from "../../types";
 import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";

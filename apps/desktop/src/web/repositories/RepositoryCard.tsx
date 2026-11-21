@@ -1,4 +1,4 @@
-import { IconFolderCode as FolderCode, IconGitBranch as GitBranch, IconGitCommit as GitCommit, IconRefresh as Refresh } from "@tabler/icons-react";
+import { FolderSimple as FolderCode, GitBranch, GitCommit, ArrowsClockwise as Refresh } from "@phosphor-icons/react";
 import type { RepoSource } from "../../types";
 import { formatTime } from "../format";
 import { Badge } from "../../components/ui/badge";

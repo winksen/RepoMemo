@@ -1,4 +1,4 @@
-import { IconLoader2 } from "@tabler/icons-react";
+import { CircleNotch as IconLoader2 } from "@phosphor-icons/react";
 import { cn } from "../../lib/utils";
 import { ICON_SIZE } from "./icon";
 

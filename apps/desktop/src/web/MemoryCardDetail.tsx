@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../components/SafeMarkdown";
-import { IconArrowLeft as ArrowLeft, IconFileText as FileText, IconMarkdown as Markdown, IconPencil as Pencil, IconTrash as Trash } from "@tabler/icons-react";
+import { ArrowLeft, FileText, MarkdownLogo as Markdown, PencilSimple as Pencil, Trash } from "@phosphor-icons/react";
 import { deleteSharedMemoryCard, exportSharedMemoryCard, getSharedMemoryCard, SharedApiError, updateSharedMemoryCard } from "../lib/sharedApi";
 import { type ArtifactSummary, type MemoryCardDetail, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";

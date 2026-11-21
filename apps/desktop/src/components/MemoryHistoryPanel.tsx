@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconHistory as History, IconLoader2 as Loader } from "@tabler/icons-react";
+import { ClockCounterClockwise as History, CircleNotch as Loader } from "@phosphor-icons/react";
 import { compareSharedMemoryRevisions, getSharedCitedSource, listSharedMemoryRevisions, restoreSharedMemoryRevision, SharedApiError } from "../lib/sharedApi";
 import type { CitedSource, MemoryRevision, MemoryRevisionComparison } from "../types";
 import { apiMessage } from "../web/format";

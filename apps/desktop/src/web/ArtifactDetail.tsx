@@ -4,7 +4,7 @@ import { ArtifactVersionsPanel } from "../components/ArtifactVersionsPanel";
 import { ReviewOwnershipPanel } from "../components/ReviewOwnershipPanel";
 import { CodeOwnersHint } from "../components/CodeOwnersHint";
 import { MentionTextarea } from "../components/MentionTextarea";
-import { IconMessageCircle as MessageCircle, IconPencil as Pencil, IconShieldLock as Shield, IconStack2 as Layers, IconTrash as Trash, IconUpload as Upload } from "@tabler/icons-react";
+import { ChatCircle as MessageCircle, PencilSimple as Pencil, LockKey as Shield, Stack as Layers, Trash, UploadSimple as Upload } from "@phosphor-icons/react";
 import { uploadSharedArtifactVersion, createSharedArtifactComment, deleteSharedArtifact, deleteSharedArtifactComment, getSharedArtifact, getSharedArtifactLifecycle, indexSharedArtifact, listSharedArtifactChunks, waitForSharedJob, listSharedArtifactComments, listSharedArtifactLifecycleEvents, updateSharedArtifact, updateSharedArtifactComment, updateSharedArtifactLifecycle } from "../lib/sharedApi";
 import { type ArtifactComment, type ArtifactDetail, type ArtifactLifecycle, type ArtifactLifecycleEvent, type ArtifactLifecycleStatus, type ArtifactSummary, type Chunk, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Badge, type BadgeTone } from "../components/ui/badge";

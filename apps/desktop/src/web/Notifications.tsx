@@ -1,6 +1,6 @@
 import { SkeletonList } from "../components/ui/skeleton";
 import { useEffect, useState } from "react";
-import { IconBell as Bell, IconChevronRight as ChevronRight } from "@tabler/icons-react";
+import { Bell, CaretRight as ChevronRight } from "@phosphor-icons/react";
 import { listSharedNotifications, markAllSharedNotificationsRead, markSharedNotificationRead } from "../lib/sharedApi";
 import { type Organization, type SharedNotification, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";

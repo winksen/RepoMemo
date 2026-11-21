@@ -1,13 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  IconBuilding as Building,
-  IconFileText as FileText,
-  IconFlag as Flag,
-  IconKey as Key,
-  IconServer as Server,
-  IconShieldLock as ShieldLock,
-  IconUserShield as UserShield,
-} from "@tabler/icons-react";
+import { Building, FileText, Flag, Key, HardDrives as Server, LockKey as ShieldLock, IdentificationBadge as UserShield } from "@phosphor-icons/react";
 
 export type StepKey = "welcome" | "admin" | "checks" | "access" | "logging" | "organization" | "finish";
 

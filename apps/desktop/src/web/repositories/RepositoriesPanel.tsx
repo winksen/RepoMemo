@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconFolderCode as FolderCode, IconPlus as Plus, IconSettings as Settings } from "@tabler/icons-react";
+import { FolderSimple as FolderCode, Plus, Gear as Settings } from "@phosphor-icons/react";
 import { cancelSharedJob, syncSharedRepository } from "../../lib/sharedApi";
 import type { RepoSource } from "../../types";
 import { apiMessage } from "../format";

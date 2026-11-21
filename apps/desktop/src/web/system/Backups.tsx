@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { IconDatabase as Database, IconKey as Key } from "@tabler/icons-react";
+import { Database, Key } from "@phosphor-icons/react";
 import { copySystemBackups, createSystemBackup, deleteSystemBackup, getSystemBackups, resealSystemBackup, restoreSystemBackup } from "../../lib/sharedApi";
 import type { BackupsOverview } from "../../types";
 import { ActionMenu } from "../../components/ui/action-menu";

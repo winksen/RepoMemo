@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowLeft as ArrowLeft, IconUserShield as UserShield } from "@tabler/icons-react";
+import { ArrowLeft, IdentificationBadge as UserShield } from "@phosphor-icons/react";
 import { createSetupAdmin, SharedApiError } from "../../lib/sharedApi";
 import { Button } from "../../components/ui/button";
 import { Field } from "../../components/ui/field";

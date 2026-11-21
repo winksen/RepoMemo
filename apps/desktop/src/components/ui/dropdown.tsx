@@ -1,5 +1,5 @@
 import * as SelectPrimitive from "@radix-ui/react-select";
-import { IconCheck, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { Check as IconCheck, CaretDown as IconChevronDown, CaretUp as IconChevronUp } from "@phosphor-icons/react";
 import { cn } from "../../lib/utils";
 import { ICON_SIZE } from "./icon";
 

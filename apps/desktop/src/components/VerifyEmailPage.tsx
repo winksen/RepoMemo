@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconCircleCheck as CircleCheck } from "@tabler/icons-react";
+import { CheckCircle as CircleCheck } from "@phosphor-icons/react";
 import { verifyEmailLink } from "../lib/sharedApi";
 import { ThemeToggle } from "./SharedLayout";
 import { Button } from "./ui/button";

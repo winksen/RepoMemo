@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  IconAlertCircle as AlertCircle,
-  IconAlertTriangle as AlertTriangle,
-  IconArrowRight as ArrowRight,
-  IconCircleCheck as CircleCheck,
-  IconInfoCircle as InfoCircle,
-  IconRefresh as Refresh,
-} from "@tabler/icons-react";
+import { WarningCircle as AlertCircle, Warning as AlertTriangle, ArrowRight, CheckCircle as CircleCheck, Info as InfoCircle, ArrowsClockwise as Refresh } from "@phosphor-icons/react";
 import { getSetupChecks } from "../../lib/sharedApi";
 import type { SetupCheck } from "../../types";
 import { Button } from "../../components/ui/button";

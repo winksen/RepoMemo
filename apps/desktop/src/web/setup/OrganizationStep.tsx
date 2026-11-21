@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowLeft as ArrowLeft, IconArrowRight as ArrowRight, IconBuilding as Building, IconCircleCheck as CircleCheck } from "@tabler/icons-react";
+import { ArrowLeft, ArrowRight, Building, CheckCircle as CircleCheck } from "@phosphor-icons/react";
 import { createSharedOrganization, createSharedWorkspace } from "../../lib/sharedApi";
 import { TemplatePicker } from "../../components/TemplatePicker";
 import { useTemplateCatalogue } from "../workspace/data";

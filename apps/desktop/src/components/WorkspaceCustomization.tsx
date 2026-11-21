@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconCheck as Check, IconPalette as PaletteIcon } from "@tabler/icons-react";
+import { Check, Palette as PaletteIcon } from "@phosphor-icons/react";
 import { saveSharedWorkspaceColor, saveSharedWorkspaceIcon } from "../lib/sharedApi";
 import { WORKSPACE_ICONS, workspaceIconKey } from "../web/workspaceIcons";
 import { WORKSPACE_COLORS, workspaceColorKey } from "../web/workspaceColors";

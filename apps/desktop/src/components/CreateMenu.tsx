@@ -1,5 +1,5 @@
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { IconBuildingCommunity as Building, IconPlus as Plus, IconStack2 as Layers } from "@tabler/icons-react";
+import { Buildings as Building, Plus, Stack as Layers } from "@phosphor-icons/react";
 import { openNewWorkspace } from "../lib/newWorkspaceBridge";
 import { navigate, parseRoute } from "../web/router";
 import { IconButton } from "./ui/icon-button";

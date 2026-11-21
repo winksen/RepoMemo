@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconRosetteDiscountCheck as Approved } from "@tabler/icons-react";
+import { SealCheck as Approved } from "@phosphor-icons/react";
 import { approveSharedMemoryCard, getSharedApprovalPolicy, getSharedMemoryApproval, setSharedApprovalPolicy, withdrawSharedMemoryApproval } from "../lib/sharedApi";
 import type { MemoryApprovalStatus } from "../types";
 import { Button } from "./ui/button";

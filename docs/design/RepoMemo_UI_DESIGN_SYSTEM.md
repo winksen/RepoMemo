@@ -400,7 +400,7 @@ Durable knowledge objects, not decorative cards. Each shows: title, short body e
 Preserve trust: retrieved context appears before/beside the generated answer; citation chips sit inline or immediately below claims; "insufficient context" is a valid final state; provider + mode (local / cloud / no AI) are visible; save-to-memory requires explicit user action. Never present AI output as the source of truth.
 
 ## Iconography
-Use `@tabler/icons-react` for all icons. `16px` dense/table, `18px` nav/buttons, `20px` panel headers, `24px` brand/empty-state. Stroke `1.75`–`2`. No mixed icon families. Icon-only buttons need tooltips + labels. Icons clarify object type and action, not decoration.
+Use `@phosphor-icons/react` for all icons (since V0.8.51; it was Tabler). `16px` dense/table, `18px` nav/buttons, `20px` panel headers, `24px` brand/empty-state. Weight `regular`; `fill` marks the current item of a menu. No mixed icon families. Icon-only buttons need tooltips + labels. Icons clarify object type and action, not decoration.
 
 ## Motion & Interaction
 Durations: hover/focus `100ms`, small state `140ms`, panel open/close `180ms`, modal/palette `220ms`.
@@ -436,7 +436,7 @@ Before merging UI work:
 - [ ] paths/hashes/line-ranges/code render in `--font-mono`
 - [ ] no decorative gradients, orbs, bokeh, glass panels
 - [ ] empty/loading/error states exist and are compact (no full-panel placeholders)
-- [ ] icons from `@tabler/icons-react`; keyboard path considered
+- [ ] icons from `@phosphor-icons/react`; keyboard path considered
 
 ## Future UI Package
 When ≥3 screens reuse the same patterns, extract shared components:
@@ -457,4 +457,4 @@ These informed the guide; RepoMemo copies none directly.
 - Carbon role-based tokens and light/dark layering: https://carbondesignsystem.com/elements/color/overview/
 - Atlassian color roles, tokens, dark mode, contrast: https://atlassian.design/foundations/color/
 - Outfit (UI face): https://fonts.google.com/specimen/Outfit · JetBrains Mono (technical face): https://www.jetbrains.com/lp/mono/
-- Tabler Icons: https://tabler.io/icons
+- Phosphor Icons: https://phosphoricons.com

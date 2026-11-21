@@ -1,14 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  IconAdjustments as Adjustments,
-  IconChartBar as ChartBar,
-  IconClipboardList as ClipboardList,
-  IconFileText as FileText,
-  IconServer as Server,
-  IconTerminal2 as Terminal,
-  IconTool as Tool,
-  IconUsers as Users,
-} from "@tabler/icons-react";
+import { SlidersHorizontal as Adjustments, ChartBar, ClipboardText as ClipboardList, FileText, HardDrives as Server, Terminal, Wrench as Tool, Users } from "@phosphor-icons/react";
 import { SystemConsole } from "../../components/SystemConsole";
 import type { SharedSession, SharedWorkspace } from "../../types";
 import { Button } from "../../components/ui/button";

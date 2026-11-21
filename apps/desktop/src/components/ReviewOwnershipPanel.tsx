@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconUserCheck as UserCheck } from "@tabler/icons-react";
+import { UserCheck } from "@phosphor-icons/react";
 import { completeSharedReview, getSharedReviewAssignment, listSharedWorkspaceMembers, setSharedReviewAssignment } from "../lib/sharedApi";
 import type { ReviewAssignmentView, WorkspaceMember } from "../types";
 import { Button } from "./ui/button";

@@ -1,5 +1,5 @@
 import { type FormEvent } from "react";
-import { IconChecklist as Checklist, IconFileText as FileText, IconFilter as Filter, IconPlus as Plus, IconSearch as Search, IconTrash as Trash } from "@tabler/icons-react";
+import { ListChecks as Checklist, FileText, Funnel as Filter, Plus, MagnifyingGlass as Search, Trash } from "@phosphor-icons/react";
 import { createSharedCollaborationTask, createSharedTaskChecklistItem, deleteSharedCollaborationTask, getSharedWorkspaceMetrics, listSharedCollaborationTasks, listSharedTaskChecklist, toggleSharedTaskChecklistItem, updateSharedCollaborationTask } from "../../lib/sharedApi";
 import { type CollaborationTask, type CollaborationTaskPriority, type CollaborationTaskStatus, type TaskChecklistItem } from "../../types";
 import { Button } from "../../components/ui/button";

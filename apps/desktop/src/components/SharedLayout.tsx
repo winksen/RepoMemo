@@ -5,18 +5,7 @@ import { ASSISTANT_NAME } from "../lib/assistantName";
 import { parseRoute } from "../web/router";
 import { rememberCairnWorkspace } from "../web/cairn";
 import { CairnIcon } from "./CairnIcon";
-import {
-  IconBell as Bell,
-  IconBuildingCommunity as Building,
-  IconChevronDown as ChevronDown,
-  IconSearch as Search,
-  IconLogout as Logout,
-  IconMoon as Moon,
-  IconServer as Server,
-  IconShieldLock as Shield,
-  IconSun as Sun,
-  IconUserCircle as UserCircle,
-} from "@tabler/icons-react";
+import { Bell, Buildings as Building, CaretDown as ChevronDown, MagnifyingGlass as Search, SignOut as Logout, Moon, HardDrives as Server, LockKey as Shield, Sun, UserCircle } from "@phosphor-icons/react";
 import type { SharedSession } from "../types";
 import { openCommandPalette } from "../lib/assistantBridge";
 import { MAIN_CONTENT_ID } from "../web/RouteAnnouncer";
@@ -116,7 +105,7 @@ function LayoutFrame({ chatsOnly = false, session, sidebar, signOut, onNavigate,
         </div>
       </div>
     </header>
-    <div className="shared-home-frame">
+    <div className="shared-home-frame" data-wide={chatsOnly ? "true" : undefined}>
       <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
         <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={ICON_SIZE.md} /></Button>
         <div className="shared-rail-body" id="shared-rail-body">{sidebar}{chatsOnly ? null : <><AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><SessionNote /><DesktopServerNote signedIn /></>}</div>
@@ -210,8 +199,8 @@ function AdministrationRail({ onNavigate, showSystem }: { onNavigate: (to: strin
   const inOrganizations = path === "/orgs" || path.startsWith("/orgs/");
   const inSystem = path === "/system" || path.startsWith("/system/");
   return <section aria-label="Administration" className="shared-rail-system">
-    <Tooltip content="Manage your organizations" side="right"><Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} type="button" variant="secondary"><Building size={ICON_SIZE.lg} /><span>Organizations</span></Button></Tooltip>
-    {showSystem ? <Tooltip content="Administer this server" side="right"><Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} type="button" variant="secondary"><Server size={ICON_SIZE.lg} /><span>System</span></Button></Tooltip> : null}
+    <Tooltip content="Manage your organizations" side="right"><Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} type="button" variant="secondary"><Building size={ICON_SIZE.lg} weight={inOrganizations ? "fill" : "regular"} /><span>Organizations</span></Button></Tooltip>
+    {showSystem ? <Tooltip content="Administer this server" side="right"><Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} type="button" variant="secondary"><Server size={ICON_SIZE.lg} weight={inSystem ? "fill" : "regular"} /><span>System</span></Button></Tooltip> : null}
   </section>;
 }
 

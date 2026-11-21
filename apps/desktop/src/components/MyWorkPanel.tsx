@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { IconChevronRight as ChevronRight, IconChecklist as Checklist } from "@tabler/icons-react";
+import { CaretRight as ChevronRight, ListChecks as Checklist } from "@phosphor-icons/react";
 import { getSharedMyWork } from "../lib/sharedApi";
 import { accountKeys } from "../lib/queryClient";
 import { useServerState } from "../lib/useServerState";

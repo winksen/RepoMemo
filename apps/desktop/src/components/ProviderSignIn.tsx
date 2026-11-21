@@ -1,7 +1,7 @@
 // One provider sign-in or link attempt: the provider page opens in the browser (the system browser on desktop), this
 // window polls for the single-use result and always offers a way to reopen the page, cancel, or start again.
 import { useEffect, useRef, useState } from "react";
-import { IconExternalLink as ExternalLink, IconLogin2 as Login } from "@tabler/icons-react";
+import { ArrowSquareOut as ExternalLink, SignIn as Login } from "@phosphor-icons/react";
 import { openExternal, isDesktopRuntime } from "../lib/desktop";
 import { pollProviderFlow, SharedApiError, type ProviderFlow, type TokenResponse } from "../lib/sharedApi";
 import { apiMessage } from "../web/format";

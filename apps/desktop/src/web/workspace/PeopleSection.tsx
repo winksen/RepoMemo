@@ -1,5 +1,5 @@
 import { type FormEvent, useMemo } from "react";
-import { IconSparkles as Sparkles, IconTimeline as Timeline, IconUsers as Users } from "@tabler/icons-react";
+import { Sparkle as Sparkles, ChartLineUp as Timeline, Users } from "@phosphor-icons/react";
 import { SharedApiError, transferSharedWorkspaceOwnership, removeSharedWorkspaceMember, upsertSharedWorkspaceMember } from "../../lib/sharedApi";
 import { type WorkspaceMember, type WorkspaceRole } from "../../types";
 import { UserAvatar } from "../../components/UserAvatar";

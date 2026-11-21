@@ -1,6 +1,6 @@
 // Guests (people in a workspace who are not in its organization) and when their access ends.
 import { useCallback, useEffect, useState } from "react";
-import { IconClockHour4 as Clock } from "@tabler/icons-react";
+import { Clock } from "@phosphor-icons/react";
 import { request } from "../lib/sharedApi";
 import { apiMessage, formatTime } from "../web/format";
 import { Button } from "./ui/button";

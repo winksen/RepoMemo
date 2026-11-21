@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { IconAdjustments as Adjustments, IconDownload as Download, IconServer as Server } from "@tabler/icons-react";
+import { SlidersHorizontal as Adjustments, DownloadSimple as Download, HardDrives as Server } from "@phosphor-icons/react";
 import { downloadSystemLogFile, getSystemLogFiles, getSystemLogs } from "../../lib/sharedApi";
 import type { SharedWorkspace, SystemLogFiles, SystemLogs } from "../../types";
 import { Button } from "../../components/ui/button";

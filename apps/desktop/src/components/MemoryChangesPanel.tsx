@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconGitCompare as Compare } from "@tabler/icons-react";
+import { GitDiff as Compare } from "@phosphor-icons/react";
 import { getSharedMemoryChanges } from "../lib/sharedApi";
 import type { MemoryChange, MemoryChanges } from "../types";
 import { Button } from "./ui/button";

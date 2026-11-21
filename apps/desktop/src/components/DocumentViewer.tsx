@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { IconDownload as Download, IconExternalLink as ExternalLink, IconLoader2 as Loader, IconPaperclip as Paperclip } from "@tabler/icons-react";
+import { DownloadSimple as Download, ArrowSquareOut as ExternalLink, CircleNotch as Loader, Paperclip } from "@phosphor-icons/react";
 import { createSharedFileLink, downloadSharedArtifactFile, downloadSharedRenderedPreview, getSharedDocumentPreview, getSharedRenderStatus, sharedApiUrl } from "../lib/sharedApi";
 import { canOpenInApp, columnLetters, documentKindOf, OPEN_IN_APP } from "../lib/documents";
 import { platform } from "../lib/platform";

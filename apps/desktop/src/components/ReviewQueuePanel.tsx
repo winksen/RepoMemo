@@ -1,11 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  IconEyeCheck as EyeCheck,
-  IconFileAlert as FileAlert,
-  IconNotebook as Notebook,
-  IconRefresh as Refresh,
-  IconStethoscope as Stethoscope,
-} from "@tabler/icons-react";
+import { Eye as EyeCheck, FileX as FileAlert, Notebook, ArrowsClockwise as Refresh, Stethoscope } from "@phosphor-icons/react";
 import { bringBackSharedReviewItem, getSharedReviewQueue, snoozeSharedReviewItem } from "../lib/sharedApi";
 import type { ReviewItem, ReviewItemKind, ReviewQueue } from "../types";
 import { useLiveRefresh } from "../lib/liveEvents";

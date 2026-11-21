@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconDownload as Download } from "@tabler/icons-react";
+import { DownloadSimple as Download } from "@phosphor-icons/react";
 import { downloadSystemAuditExport, listSystemAuditEvents } from "../../lib/sharedApi";
 import type { SystemAuditEvent } from "../../types";
 import { Button } from "../../components/ui/button";

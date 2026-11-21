@@ -1,7 +1,7 @@
 // Extends the System settings form: provider identity, callback, credentials, then
 // check/save. Uses the existing neutral fields, loading state and toast feedback.
 import { useEffect, useRef, useState } from "react";
-import { IconKey } from "@tabler/icons-react";
+import { Key as IconKey } from "@phosphor-icons/react";
 import { request } from "../lib/sharedApi";
 import { apiMessage } from "../web/format";
 import { Button } from "./ui/button";

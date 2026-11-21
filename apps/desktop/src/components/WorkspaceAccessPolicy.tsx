@@ -1,6 +1,6 @@
 // Who joins a workspace without being asked (shared or restricted), and who can open it now and why.
 import { useCallback, useEffect, useState } from "react";
-import { IconLock as Lock } from "@tabler/icons-react";
+import { Lock } from "@phosphor-icons/react";
 import { request } from "../lib/sharedApi";
 import { apiMessage } from "../web/format";
 import { useConfirm } from "./ui/confirm-dialog";

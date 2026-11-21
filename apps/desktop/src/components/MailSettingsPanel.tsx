@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { IconMail as Mail, IconSend as Send } from "@tabler/icons-react";
+import { Envelope as Mail, PaperPlaneTilt as Send } from "@phosphor-icons/react";
 import { getSystemMail, saveSystemMail, sendSystemTestMail } from "../lib/sharedApi";
 import type { MailOverview } from "../types";
 import { Button } from "./ui/button";

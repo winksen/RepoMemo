@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.51 (2026-11-21)
+
+Phosphor icons, and a tidier Cairn sidebar.
+
+### Changed
+- **Icon pack.** Every icon now comes from the [Phosphor](https://phosphoricons.com) pack, in place of Tabler. Where no exact twin exists the closest one is used: for example the knowledge map is a graph, the webhook and Markdown icons are Phosphor's own logos, and the review tab is an eye. The assistant's cairn is still its own drawing.
+- **Filled when current.** In the sidebar, the icon of the current workspace, **Organizations** or **System** is drawn filled; the others are outlined.
+- **No sideways scrolling in the sidebar.** A chat title or workspace name that does not fit is cut with an ellipsis instead of adding a horizontal scrollbar. Cairn's sidebar is a little wider (288 px) to fit chat titles.
+- **Cairn keeps the app's colors.** Cairn's page and its chat list no longer take the main color of the workspace a chat belongs to; the workspace color still applies to the workspace's own pages and to its chip in the workspace list.
+
+### Dependencies
+- Added `@phosphor-icons/react`; removed `@tabler/icons-react`.
+
+### Checks
+- Typecheck passes. Nothing was built or run: icons were not looked at, and the mapping of 150 icons to their Phosphor twins is by name and meaning, so a few may need a nicer choice. No test was executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.50 (2026-11-21)
 
 Chats by workspace, and a choice of workspace for a new chat.

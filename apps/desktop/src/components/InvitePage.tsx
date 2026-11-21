@@ -1,7 +1,7 @@
 import { organizationPath } from "../web/router";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowRight as ArrowRight, IconMailForward as MailForward } from "@tabler/icons-react";
+import { ArrowRight, EnvelopeSimple as MailForward } from "@phosphor-icons/react";
 import { acceptSharedInvitation, fetchSignInProvider, loginSharedUser, previewSharedInvitation, registerSharedUser, startProviderFlow } from "../lib/sharedApi";
 import type { AcceptedInvitation, InvitationPreview, SharedSession } from "../types";
 import { ProviderSignIn } from "./ProviderSignIn";

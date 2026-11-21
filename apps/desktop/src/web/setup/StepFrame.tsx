@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { IconCircleCheck as CircleCheck, IconLock as Lock, IconLogout as Logout } from "@tabler/icons-react";
+import { CheckCircle as CircleCheck, Lock, SignOut as Logout } from "@phosphor-icons/react";
 import type { SharedSession } from "../../types";
 import { ThemeToggle } from "../../components/SharedLayout";
 import { Button } from "../../components/ui/button";

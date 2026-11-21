@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { IconAlertCircle as AlertCircle, IconBook2 as Book, IconChevronDown as ChevronDown, IconChevronRight as ChevronRight, IconFileText as FileText, IconFilter as Filter, IconFolder as FolderIcon, IconFolderPlus as FolderPlus, IconFolderSymlink as FolderMove, IconLayoutGrid as Grid, IconList as List, IconMarkdown as Markdown, IconNote as Note, IconPencil as Pencil, IconPlus as Plus, IconSearch as Search, IconShieldLock as Shield, IconTrash as Trash, IconUpload as Upload } from "@tabler/icons-react";
+import { WarningCircle as AlertCircle, Book, CaretDown as ChevronDown, CaretRight as ChevronRight, FileText, Funnel as Filter, Folder as FolderIcon, FolderSimplePlus as FolderPlus, FolderSimple as FolderMove, GridFour as Grid, List, MarkdownLogo as Markdown, Note, PencilSimple as Pencil, Plus, MagnifyingGlass as Search, LockKey as Shield, Trash, UploadSimple as Upload } from "@phosphor-icons/react";
 import { bulkSharedArtifacts, type BulkArtifactsResult, moveSharedFolder, createSharedFolder, createSharedTextArtifact, deleteSharedArtifact, deleteSharedFolder, moveSharedArtifact, renameSharedFolder, uploadSharedArtifact } from "../../lib/sharedApi";
 import { type ArtifactSummary, type Folder } from "../../types";
 import { Button } from "../../components/ui/button";

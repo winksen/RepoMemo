@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { IconArrowRight as ArrowRight, IconLock as Lock, IconShieldLock as ShieldLock, IconUserShield as UserShield } from "@tabler/icons-react";
+import { ArrowRight, Lock, LockKey as ShieldLock, IdentificationBadge as UserShield } from "@phosphor-icons/react";
 import { verifySetupCode } from "../../lib/sharedApi";
 import { Button } from "../../components/ui/button";
 import { Field } from "../../components/ui/field";

@@ -1,5 +1,5 @@
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { IconChevronDown as ChevronDown } from "@tabler/icons-react";
+import { CaretDown as ChevronDown } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { Button } from "./ui/button";
 import { ICON_SIZE } from "./ui/icon";

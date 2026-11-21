@@ -964,3 +964,11 @@ input[type="file"] {
 .rm-button.shared-cairn-chat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rm-button.shared-cairn-chat:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
 .rm-button.shared-cairn-chat.active, .rm-button.shared-cairn-chat.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); }
+
+/* Cairn's sidebar is a little wider, and nothing in any sidebar scrolls sideways: a title that does not fit is cut with an ellipsis (V0.8.51). */
+.shared-home-frame[data-wide="true"] { grid-template-columns: 288px minmax(0, 1fr); }
+.shared-rail-navigation { overflow-x: hidden; }
+.shared-rail-navigation section, .shared-rail-navigation section > div { min-width: 0; }
+.shared-cairn-group { grid-template-columns: minmax(0, 1fr); }
+.shared-cairn-group > div { min-width: 0; }
+.rm-button.shared-cairn-chat { max-width: 100%; }

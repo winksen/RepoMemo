@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { IconArrowLeft as ArrowLeft, IconArrowRight as ArrowRight } from "@tabler/icons-react";
+import { ArrowLeft, ArrowRight } from "@phosphor-icons/react";
 import { saveSystemSettings } from "../../lib/sharedApi";
 import type { SystemSetting } from "../../types";
 import { Button } from "../../components/ui/button";

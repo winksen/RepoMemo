@@ -1,5 +1,5 @@
 import { type ChangeEvent, useRef, useState } from "react";
-import { IconPackageImport as PackageImport } from "@tabler/icons-react";
+import { ArrowSquareIn as PackageImport } from "@phosphor-icons/react";
 import { importSharedWorkspaceArchive } from "../lib/sharedApi";
 import type { ArchiveImportProgress, ArchiveImportReport, SharedWorkspace } from "../types";
 import { Button } from "./ui/button";

@@ -1,6 +1,6 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconGitBranch as GitBranch, IconPencil as Pencil, IconPlus as Plus, IconRefresh as Refresh, IconSettings as Settings, IconTrash as Trash } from "@tabler/icons-react";
+import { GitBranch, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, Gear as Settings, Trash } from "@phosphor-icons/react";
 import {
   checkSharedRepository,
   clearSharedRepositoryToken,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconAlertCircle as AlertCircle, IconLoader2 as Loader, IconSearch as Search, IconSettings as Settings, IconShieldLock as Shield, IconUpload as Upload } from "@tabler/icons-react";
+import { WarningCircle as AlertCircle, CircleNotch as Loader, MagnifyingGlass as Search, Gear as Settings, LockKey as Shield, UploadSimple as Upload } from "@phosphor-icons/react";
 import { cancelSharedJob, createSharedMemoryCard, getSharedRetrievalFacets, getSharedWorkspaceMetrics, getSharedWorkspaceOverview, listSharedArtifactWindow, listSharedIndexFailures, listSharedMemoryCards } from "../lib/sharedApi";
 import { type Citation, type IndexingJobStatus, type LiveEvent, type Organization, type SharedSession, type SharedWorkspace, type WorkspaceActivityEvent } from "../types";
 import { Button } from "../components/ui/button";

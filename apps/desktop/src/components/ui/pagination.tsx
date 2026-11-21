@@ -1,4 +1,4 @@
-import { IconChevronLeft as ChevronLeft, IconChevronRight as ChevronRight } from "@tabler/icons-react";
+import { CaretLeft as ChevronLeft, CaretRight as ChevronRight } from "@phosphor-icons/react";
 import { useEffect } from "react";
 import { Button } from "./button";
 import { ICON_SIZE } from "./icon";

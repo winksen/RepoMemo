@@ -1,4 +1,4 @@
-import { IconCircleCheck as CircleCheck, IconGitBranch as GitBranch, IconGitCommit as GitCommit } from "@tabler/icons-react";
+import { CheckCircle as CircleCheck, GitBranch, GitCommit } from "@phosphor-icons/react";
 import type { RepoAccessCheck } from "../../types";
 import { formatTime } from "../format";
 import { Field, FieldRow } from "../../components/ui/field";

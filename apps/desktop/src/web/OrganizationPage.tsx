@@ -1,4 +1,4 @@
-import { IconActivity as Activity, IconLayoutDashboard as Dashboard, IconSettings as Settings, IconStack2 as Layers, type TablerIcon } from "@tabler/icons-react";
+import { Pulse as Activity, SquaresFour as Dashboard, Gear as Settings, Stack as Layers, type Icon as IconComponent } from "@phosphor-icons/react";
 import { Button } from "../components/ui/button";
 import { PanelHeading } from "../components/ui/panel-heading";
 import { Skeleton } from "../components/ui/skeleton";
@@ -12,7 +12,7 @@ import { MetricBars, MetricTimeline } from "./common";
 import { useTabIndicator } from "./tabIndicator";
 import { ORGANIZATION_SECTIONS, type OrganizationSection } from "./constants";
 
-const TABS: Record<OrganizationSection, { label: string; icon: TablerIcon }> = {
+const TABS: Record<OrganizationSection, { label: string; icon: IconComponent }> = {
   overview: { label: "Overview", icon: Dashboard },
   workspaces: { label: "Workspaces", icon: Layers },
   administration: { label: "Administration", icon: Settings },

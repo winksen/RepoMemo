@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { IconKey as Key } from "@tabler/icons-react";
+import { Key } from "@phosphor-icons/react";
 import { SharedApiError, completeSharedPasswordReset, previewSharedPasswordReset } from "../lib/sharedApi";
 import type { PasswordResetPreview } from "../types";
 import { ThemeToggle } from "./SharedLayout";

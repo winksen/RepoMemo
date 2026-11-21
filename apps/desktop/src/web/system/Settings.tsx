@@ -1,14 +1,7 @@
 import { useMemo, useState } from "react";
 import { MailSettingsPanel } from "../../components/MailSettingsPanel";
 import { IdentitySettings } from "../../components/IdentitySettings";
-import {
-  IconAdjustments as Adjustments,
-  IconAlertCircle as AlertCircle,
-  IconCircleCheck as CircleCheck,
-  IconRotate as Rotate,
-  IconServer as Server,
-  IconPlugConnectedX as Unplug,
-} from "@tabler/icons-react";
+import { SlidersHorizontal as Adjustments, WarningCircle as AlertCircle, CheckCircle as CircleCheck, ArrowClockwise as Rotate, HardDrives as Server, Plugs as Unplug } from "@phosphor-icons/react";
 import {
   detachEnvironment,
   getPlatformStatus,

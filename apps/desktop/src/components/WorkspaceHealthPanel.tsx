@@ -1,15 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import {
-  IconCircleDashed as Unconnected,
-  IconCode as Code,
-  IconCopy as Copy,
-  IconFileAlert as FileAlert,
-  IconLinkOff as LinkOff,
-  IconRefresh as Refresh,
-  IconStethoscope as Stethoscope,
-  IconVersions as Versions,
-} from "@tabler/icons-react";
+import { CircleDashed as Unconnected, Code, Copy, FileX as FileAlert, LinkBreak as LinkOff, ArrowsClockwise as Refresh, Stethoscope, StackSimple as Versions } from "@phosphor-icons/react";
 import { applySharedHealthAction, getSharedWorkspaceHealth, SharedApiError } from "../lib/sharedApi";
 import type { HealthAction, HealthDetector, HealthEvidence, HealthFinding, WorkspaceHealth } from "../types";
 import { Button } from "./ui/button";

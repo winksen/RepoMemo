@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconDownload as Download, IconPackageExport as PackageExport } from "@tabler/icons-react";
+import { DownloadSimple as Download, Export as PackageExport } from "@phosphor-icons/react";
 import { downloadSharedWorkspaceArchive } from "../lib/sharedApi";
 import { saveBlob } from "../lib/saveBlob";
 import { Button } from "./ui/button";

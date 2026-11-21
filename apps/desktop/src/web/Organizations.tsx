@@ -1,4 +1,4 @@
-import { IconBuildingCommunity as Building, IconChevronRight as ChevronRight, IconPlus as Plus } from "@tabler/icons-react";
+import { Buildings as Building, CaretRight as ChevronRight, Plus } from "@phosphor-icons/react";
 import { SharedLayout } from "../components/SharedLayout";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";

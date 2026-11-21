@@ -2,7 +2,16 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.50` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.51` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.51 — Phosphor icons, a tidier Cairn sidebar.
+
+- **Icons.** The interface uses the [Phosphor](https://phosphoricons.com) icon pack instead of Tabler. Icons that have no exact twin take the closest one (the knowledge map is a graph, the review tab an eye, a webhook its own logo).
+- **Filled when current.** In the sidebar, the icon of the current workspace, **Organizations** or **System** is drawn **filled**; the others are outlined.
+- **No sideways scrolling.** No sidebar scrolls horizontally any more: a chat title or name that does not fit is cut with an ellipsis. Cairn's sidebar is wider (288 px) to fit its chat titles.
+- **Cairn uses the app's colors.** Cairn's page and its chat list no longer take the color of the workspace a chat belongs to.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.50 — Chats by workspace.
 

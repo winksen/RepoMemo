@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { SafeMarkdown } from "../../components/SafeMarkdown";
-import { IconBook2 as Book, IconBrain as Brain, IconCode as Code, IconSearch as Search, IconShieldLock as Shield, IconTrash as Trash } from "@tabler/icons-react";
+import { Book, Brain, Code, MagnifyingGlass as Search, LockKey as Shield, Trash } from "@phosphor-icons/react";
 import { askSharedWorkspace, createSharedSavedSearch, deleteSharedSavedSearch, getSharedArtifact, getSharedArtifactLifecycle, searchSharedSymbols, searchSharedWorkspace, setSharedSavedSearchSharing } from "../../lib/sharedApi";
 import { answerExportMarkdown } from "../../lib/answerExport";
 import { saveBlob } from "../../lib/saveBlob";
