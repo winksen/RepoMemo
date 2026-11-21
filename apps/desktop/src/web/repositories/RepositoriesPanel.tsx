@@ -4,7 +4,7 @@ import { cancelSharedJob, syncSharedRepository } from "../../lib/sharedApi";
 import type { RepoSource } from "../../types";
 import { apiMessage } from "../format";
 import { Button } from "../../components/ui/button";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { useRepositories } from "./useRepositories";
@@ -54,7 +54,7 @@ export function RepositoriesPanel({
   }
 
   if (!repositories) {
-    return <section className="rm-repos" aria-busy="true"><LoadingState label="Loading repositories" /></section>;
+    return <section className="rm-repos" aria-busy="true"><SkeletonList label="Loading repositories" /></section>;
   }
 
   const count = repositories.length;

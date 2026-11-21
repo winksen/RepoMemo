@@ -6,7 +6,7 @@ import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dropdown } from "../../components/ui/dropdown";
 import { Field } from "../../components/ui/field";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { formatBytes, formatTime } from "../format";
 import { useSystemData, count, RefreshButton, BarStrip, CountTable } from "./shared";
 import { systemKeys } from "../../lib/queryClient";
@@ -40,6 +40,6 @@ export function UsageSection({ accessToken, onOpenWorkspace }: { accessToken: st
           </tr>)}</tbody>
         </Table>
       </section>
-    </> : isLoading ? <LoadingState label="Loading usage" /> : <p className="shared-muted-copy">Usage is not available.</p>}
+    </> : isLoading ? <SkeletonList label="Loading usage" /> : <p className="shared-muted-copy">Usage is not available.</p>}
   </>;
 }

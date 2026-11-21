@@ -6,6 +6,7 @@ FIRST VIEWPORT: A calm explanatory field balances a focused access form; after a
 FORM: The established RepoMemo operate composition, adapted into a protected browser session with direct API-state feedback.
 */
 
+import { AppSkeleton } from "./components/ui/skeleton";
 import { SharedOrganizations } from "./web/Organizations";
 import { forgetSignIn, rememberSignIn } from "./lib/signedIn";
 import { useEffect, useState } from "react";
@@ -247,7 +248,7 @@ function SharedWebAppContent() {
   }
 
   if (pageState === "restoring") {
-    return <LoadingCanvas label="Restoring your shared session" />;
+    return <AppSkeleton label="Restoring your shared session" />;
   }
 
   // Links people receive: they work signed in or not.
@@ -282,7 +283,7 @@ function SharedWebAppContent() {
   }
 
   if (!accessToken || !session) {
-    return <LoadingCanvas label="Preparing shared workspace" />;
+    return <AppSkeleton label="Preparing shared workspace" />;
   }
 
   const route = parseRoute(pathname);

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.26 (2026-11-21)
+
+Pages load with placeholders instead of spinners and blank areas.
+
+### Changed
+- **Skeletons.** While a page or a list loads, the main area shows grey placeholders with a slow shimmer in the shape of what is coming: rows, cards and a heading. Pages fade in when they replace them (160 ms).
+- **Where.** Opening a workspace, the evidence, documents and action-item lists, the dashboard figures, notifications, the knowledge map, repository pages, the evidence and memory card pages, organization members, and the System pages. The lazy-loaded System area now draws its placeholder inside the page frame.
+- **The whole frame at start.** While your session is restored the top bar, sidebar and page are drawn as placeholders instead of a spinner on a blank screen.
+- **Unchanged.** Spinners inside buttons, dialogs, the sign-in and setup pages, the assistant, connectors and mail settings. Placeholders are read out once ("Loading …") by screen readers, and with reduced motion they do not shimmer.
+- No data is fetched differently, and there are no route, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; a new test covers the placeholder components and the loading notice and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.25 (2026-11-21)
 
 Moving between pages no longer blinks.

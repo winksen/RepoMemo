@@ -11,7 +11,7 @@ import { Dialog, DialogCancel } from "../../components/ui/dialog";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatBytes, formatTime } from "../format";
@@ -95,7 +95,7 @@ export function BackupsPanel({ accessToken, canChange }: { accessToken: string; 
           { label: "Delete", onSelect: () => setDeleting(backup.name), destructive: true },
         ]} label={`Actions for ${backup.name}`} /></td> : null}
       </tr>)}</tbody>
-    </Table> : overview ? <EmptyState title="No backups yet" /> : <LoadingState label="Loading backups" />}
+    </Table> : overview ? <EmptyState title="No backups yet" /> : <SkeletonList label="Loading backups" />}
     <Dialog description="The backup is copied into a new environment folder under workspace-data and checked: it must open. The running environment is not changed. Attach the new one from the environment menu when you want to use it." footer={<><DialogCancel onClick={() => setRestoring(null)} /><Button busy={isBusy} disabled={!environment.trim()} type="submit" variant="main">Restore</Button></>} onClose={() => setRestoring(null)} onSubmit={() => { if (environment.trim()) void restore(); }} open={Boolean(restoring)} title={`Restore ${restoring ?? "the backup"}`}>
       <Field label="New environment name"><Input onChange={(event) => setEnvironment(event.target.value)} placeholder="restored-2026-10" value={environment} /></Field>
     </Dialog>

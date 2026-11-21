@@ -6,7 +6,7 @@ import { UserAvatar } from "../components/UserAvatar";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Field } from "../components/ui/field";
-import { LoadingState } from "../components/ui/loading-state";
+import { SkeletonList } from "../components/ui/skeleton";
 import { PanelHeading } from "../components/ui/panel-heading";
 import { useConfirm } from "../components/ui/confirm-dialog";
 import { Dropdown } from "../components/ui/dropdown";
@@ -94,7 +94,7 @@ export function OrganizationAdministration({
     {canRename ? <form className="shared-organization-rename" onSubmit={saveOrganization}><Field label="Organization name" required><Input onChange={(event) => setOrganizationName(event.target.value)} value={organizationName} /></Field><Button busy={isSaving} disabled={organizationName.trim() === organization.name} type="submit" variant="secondary">Save name</Button></form> : null}
     <form className="shared-organization-member-form" onSubmit={(event) => { event.preventDefault(); void saveMember(memberEmail, memberRole); }}><Field label="Member email" required><Input onChange={(event) => setMemberEmail(event.target.value)} placeholder="person@example.com" type="email" value={memberEmail} /></Field><Field label="Organization role">{(control) => <Dropdown id={control.id} onValueChange={(value) => setMemberRole(value as OrganizationRole)} options={[{ label: "Member", value: "member" }, ...(canAssignAdmin ? [{ label: "Admin", value: "admin" }] : [])]} value={memberRole} />}</Field><Button busy={isSaving} type="submit" variant="secondary"><Users size={ICON_SIZE.md} /> Add member</Button></form>
     <Toast kind="error" message={error} />
-    <div className="shared-organization-member-list" aria-busy={isLoading}>{isLoading ? <LoadingState label="Loading organization members" /> : members.map((member) => {
+    <div className="shared-organization-member-list" aria-busy={isLoading}>{isLoading ? <SkeletonList label="Loading organization members" /> : members.map((member) => {
       const isOwner = member.role === "owner";
       const protectedMember = isOwner || (organization.role === "admin" && member.role === "admin");
       const email = member.user.email ?? "";

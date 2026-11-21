@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.25` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.26` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.26 — Skeleton loading.
+
+- While a page or a list loads, the main area shows grey placeholders with a slow shimmer in the shape of the content (rows, cards, a heading) instead of a spinner or a blank area. Starting the app shows the whole frame (bar, sidebar and page) as placeholders until the session is restored. Pages fade in when they replace their placeholders.
+- Covered: opening a workspace, workspace sections that load lists (evidence, documents, action items), the dashboard figures, notifications, the knowledge map, repository pages, the memory card and evidence pages, organization members and the System pages. Small inline spinners (a button, the assistant) are unchanged. With reduced motion the placeholders do not shimmer.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.25 — No blink between pages.
 

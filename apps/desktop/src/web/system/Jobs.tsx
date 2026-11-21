@@ -10,7 +10,7 @@ import { Dropdown } from "../../components/ui/dropdown";
 import { EmptyState } from "../../components/ui/empty-state";
 import { FeedbackNotice } from "../../components/ui/feedback-notice";
 import { Field } from "../../components/ui/field";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { showToast } from "../../components/ui/toast";
 import { useLiveEventHub, useLiveEvents } from "../../lib/liveEvents";
 import { apiMessage, formatTime } from "../format";
@@ -72,7 +72,7 @@ export function JobsSection({ accessToken, canChange }: { accessToken: string; c
         </tr>)}</tbody>
       </Table>
       <Pagination onPageChange={changePage} page={page} pageSize={24} total={result?.total ?? jobs.length} />
-      </> : jobs ? <EmptyState action={status === "all" ? <Button onClick={() => void reload()} variant="secondary">Refresh jobs</Button> : <Button onClick={() => { setStatus("all"); setPage(0); setCursors([null]); }} variant="secondary">Show all jobs</Button>} description={status === "all" ? "New jobs appear here when workspace work is queued." : "Try another status or show all jobs to see the queue."} title={status === "all" ? "No jobs yet" : "No jobs match"} /> : isLoading ? <LoadingState label="Loading jobs" /> : loadError ? null : <EmptyState action={<Button onClick={() => void reload()} variant="secondary">Try again</Button>} description="The job list is not available yet." title="Jobs unavailable" />}
+      </> : jobs ? <EmptyState action={status === "all" ? <Button onClick={() => void reload()} variant="secondary">Refresh jobs</Button> : <Button onClick={() => { setStatus("all"); setPage(0); setCursors([null]); }} variant="secondary">Show all jobs</Button>} description={status === "all" ? "New jobs appear here when workspace work is queued." : "Try another status or show all jobs to see the queue."} title={status === "all" ? "No jobs yet" : "No jobs match"} /> : isLoading ? <SkeletonList label="Loading jobs" /> : loadError ? null : <EmptyState action={<Button onClick={() => void reload()} variant="secondary">Try again</Button>} description="The job list is not available yet." title="Jobs unavailable" />}
     </section>
   </>;
 }

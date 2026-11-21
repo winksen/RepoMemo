@@ -1,17 +1,17 @@
 import { lazy, Suspense, type ComponentProps, type ComponentType } from "react";
-import { IconLoader2 as Loader } from "@tabler/icons-react";
-import { ICON_SIZE } from "../components/ui/icon";
+import { ShellContent } from "../components/SharedLayout";
+import { PageSkeleton, SkeletonList } from "../components/ui/skeleton";
 
 /**
  * Heavy panels are fetched when they are first shown (route-level code
  * splitting, P6): the rich note editor, the knowledge map, the document
  * viewer, the repository pages and the System area stay out of the first load.
  */
-function lazily<Props extends object>(load: () => Promise<{ default: ComponentType<Props> }>) {
+function lazily<Props extends object>(load: () => Promise<{ default: ComponentType<Props> }>, asPage = false) {
   const Component = lazy(load) as unknown as ComponentType<Props>;
   return function Lazy(props: Props) {
     return (
-      <Suspense fallback={<div className="shared-loading" role="status"><Loader className="spin" size={ICON_SIZE.lg} /> Loading</div>}>
+      <Suspense fallback={asPage ? <ShellContent><PageSkeleton label="Loading the page" /></ShellContent> : <SkeletonList label="Loading" rows={3} />}>
         <Component {...props} />
       </Suspense>
     );
@@ -44,4 +44,4 @@ export const RepositorySettings = lazily<Module<"RepositorySettings", typeof imp
 export const RepositoryDetailView = lazily<Module<"RepositoryDetailView", typeof import("./repositories/RepositoryPage")>>(
   () => import("./repositories/RepositoryPage").then((module) => ({ default: module.RepositoryDetailView })),
 );
-export const SystemArea = lazily<ComponentProps<typeof import("./SystemArea").default>>(() => import("./SystemArea"));
+export const SystemArea = lazily<ComponentProps<typeof import("./SystemArea").default>>(() => import("./SystemArea"), true);

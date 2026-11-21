@@ -22,7 +22,7 @@ import type { SharedSession, SystemSetting, SystemSettings } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { Dialog, DialogCancel } from "../../components/ui/dialog";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatTime } from "../format";
@@ -107,7 +107,7 @@ export function SettingsSection({ accessToken, session }: { accessToken: string;
     finally { setIsBusy(false); }
   }
 
-  if (!settings) return <LoadingState label="Loading settings" />;
+  if (!settings) return <SkeletonList label="Loading settings" />;
   // App administrators read the settings; system administrators change them.
   const readOnly = !session.is_system_admin;
   return <>

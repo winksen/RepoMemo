@@ -1,3 +1,4 @@
+import { Skeleton } from "../components/ui/skeleton";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { IconBuildingCommunity as Building, IconChevronRight as ChevronRight, IconLayoutDashboard as Dashboard, IconLoader2 as Loader, IconPlus as Plus, IconShieldLock as Shield, IconStack2 as Layers } from "@tabler/icons-react";
 import { createSharedOrganization, createSharedWorkspace, type DashboardWorkspaceFigures } from "../lib/sharedApi";
@@ -58,9 +59,9 @@ export function SharedDashboard({
       <dl className="shared-dashboard-summary">
         <div><dt>Organizations</dt><dd>{organizations.length}</dd><span>available to your account</span></div>
         <div><dt>Workspaces</dt><dd>{workspaces.length}</dd><span>within your access boundary</span></div>
-        <div><dt>Active tasks</dt><dd>{isLoading ? "—" : summary.tasks}</dd><span>open or in progress</span></div>
-        <div><dt>Evidence</dt><dd>{isLoading ? "—" : summary.artifacts}</dd><span>stored artifacts</span></div>
-        <div><dt>Memory</dt><dd>{isLoading ? "—" : summary.memory}</dd><span>durable team records</span></div>
+        <div><dt>Active tasks</dt><dd>{isLoading ? <Skeleton height={22} width={48} /> : summary.tasks}</dd><span>open or in progress</span></div>
+        <div><dt>Evidence</dt><dd>{isLoading ? <Skeleton height={22} width={48} /> : summary.artifacts}</dd><span>stored artifacts</span></div>
+        <div><dt>Memory</dt><dd>{isLoading ? <Skeleton height={22} width={48} /> : summary.memory}</dd><span>durable team records</span></div>
       </dl>
       <MyWorkPanel accessToken={accessToken} userId={session.user.id} />
       {workspaces.length ? <CrossWorkspaceSearch accessToken={accessToken} /> : null}
@@ -74,7 +75,7 @@ export function SharedDashboard({
             <div className="shared-dashboard-organization-heading"><div><span className="shared-dashboard-organization-mark"><Building size={ICON_SIZE.md} /></span><div><h2>{organization.name}</h2><p>{organizationWorkspaces.length} workspace{organizationWorkspaces.length === 1 ? "" : "s"}{organizationMetrics.length ? ` · ${artifacts} artifacts · ${activeTasks} active tasks` : ""}{organization.guest ? " · Guest: only the workspaces you were added to" : ""}</p></div></div><Button onClick={() => navigate(`/spaces?organization=${encodeURIComponent(organization.id)}`)} type="button" variant="secondary">View workspaces <ChevronRight size={ICON_SIZE.md} /></Button></div>
             {organizationWorkspaces.length ? <div className="shared-dashboard-workspace-list">{organizationWorkspaces.map((entry) => {
               const metrics = metricsByWorkspace[entry.workspace.id];
-              return <Button className="shared-dashboard-workspace" key={entry.workspace.id} onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><span className="shared-workspace-icon"><WorkspaceIcon size={ICON_SIZE.md} workspace={entry.workspace} /></span><span><strong>{entry.workspace.name}</strong><small>{entry.role} access{templateName(metrics) ? ` · ${templateName(metrics)}` : ""} · updated {new Date(entry.workspace.updated_at).toLocaleDateString()}</small></span><span className="shared-dashboard-workspace-metrics">{metrics ? cardFigures(metrics).map((figure) => figure.headline ? <b key={figure.key}>{figure.text}</b> : <span key={figure.key}>{figure.text}</span>) : <span>Loading workspace data</span>}</span><ChevronRight size={ICON_SIZE.md} /></Button>;
+              return <Button className="shared-dashboard-workspace" key={entry.workspace.id} onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><span className="shared-workspace-icon"><WorkspaceIcon size={ICON_SIZE.md} workspace={entry.workspace} /></span><span><strong>{entry.workspace.name}</strong><small>{entry.role} access{templateName(metrics) ? ` · ${templateName(metrics)}` : ""} · updated {new Date(entry.workspace.updated_at).toLocaleDateString()}</small></span><span className="shared-dashboard-workspace-metrics">{metrics ? cardFigures(metrics).map((figure) => figure.headline ? <b key={figure.key}>{figure.text}</b> : <span key={figure.key}>{figure.text}</span>) : <Skeleton height={13} width={120} />}</span><ChevronRight size={ICON_SIZE.md} /></Button>;
             })}</div> : <p className="shared-muted-copy">No accessible workspaces in this organization yet.</p>}
           </section>;
         }) : <div className="shared-empty-state"><Building size={26} /><strong>No organizations yet</strong>{session.can_create_organizations === false ? <span>Ask a system administrator to create one or to invite you to one.</span> : <><span>Create an organization to start a shared workspace boundary.</span><Button onClick={() => navigate("/orgs/new")} type="button" variant="main"><Plus size={ICON_SIZE.md} /> Create organization</Button></>}</div>}

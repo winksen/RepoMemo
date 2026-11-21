@@ -4,7 +4,7 @@ import type { MaintenanceStatus, SystemOverview, SystemTemplateFiles } from "../
 import { Badge } from "../../components/ui/badge";
 import { Table } from "../../components/ui/table";
 import { PanelHeading } from "../../components/ui/panel-heading";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { formatBytes, formatDuration, formatTime } from "../format";
 import { useSystemData, count, RefreshButton, Facts, BarStrip } from "./shared";
 import { MaintenancePanel } from "./Maintenance";
@@ -57,7 +57,7 @@ export function TemplatesPanel({ files }: { files: SystemTemplateFiles }) {
 export function OverviewSection({ accessToken }: { accessToken: string }) {
   const [overview, isLoading, reload, setOverview] = useSystemData<SystemOverview>(systemKeys.overview(), () => getSystemOverview(accessToken), { refreshMs: 30_000 });
   const setMaintenance = (next: MaintenanceStatus) => setOverview((current) => current ? { ...current, background: { ...current.background, maintenance: next } } : current);
-  if (!overview) return isLoading ? <LoadingState label="Loading the system overview" /> : <p className="shared-muted-copy">The overview is not available.</p>;
+  if (!overview) return isLoading ? <SkeletonList label="Loading the system overview" /> : <p className="shared-muted-copy">The overview is not available.</p>;
   const { instance, statistics, storage, background, traffic, protection } = overview;
   const minuteBars = traffic.requests_per_minute_last_hour.map((value, index, all) => ({ label: `${all.length - 1 - index} min ago`, value }));
   return <>

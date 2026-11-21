@@ -9,7 +9,7 @@ import { Dropdown } from "../../components/ui/dropdown";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Field } from "../../components/ui/field";
 import { SearchField } from "../../components/ui/search-field";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { Switch } from "../../components/ui/switch";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
@@ -84,6 +84,6 @@ export function LogsSection({ accessToken, canDownload, onOpenSettings, workspac
       <span className="rm-system-log-level">{record.level}</span>
       <span className="rm-system-log-target">{record.target}</span>
       <span className="rm-system-log-message">{record.message}{record.fields ? <small>{record.fields}</small> : null}</span>
-    </li>)}</ol> : logs ? <EmptyState title="No log events match" /> : <LoadingState label="Loading logs" />}
+    </li>)}</ol> : logs ? <EmptyState title="No log events match" /> : <SkeletonList label="Loading logs" />}
   </>;
 }

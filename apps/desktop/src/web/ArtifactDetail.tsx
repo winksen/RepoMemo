@@ -17,7 +17,7 @@ import { Dropdown } from "../components/ui/dropdown";
 import { EmptyState } from "../components/ui/empty-state";
 import { Field } from "../components/ui/field";
 import { Input } from "../components/ui/input";
-import { LoadingState } from "../components/ui/loading-state";
+import { SkeletonList } from "../components/ui/skeleton";
 import { Textarea } from "../components/ui/textarea";
 import { ImagePreview, imageSearchability } from "../components/ImagePreview";
 import { isDocumentArtifact } from "../lib/documents";
@@ -342,7 +342,7 @@ export function IndexedChunksDialog({
       </header>
       <div className="shared-dialog-body">
         <Toast kind="error" message={error} />
-        {chunks === null && !error ? <LoadingState label="Loading chunks" /> : null}
+        {chunks === null && !error ? <SkeletonList label="Loading chunks" /> : null}
         {chunks && chunks.length === 0 ? <EmptyState description="It may still be indexing, or it has no extractable text." title="No chunks are stored for this artifact" /> : null}
         {chunks && chunks.length ? <div className="shared-chunk-list">{chunks.map((chunk) => <article key={chunk.id}><span>{`#${chunk.chunk_index + 1}`}{chunk.start_line ? ` · Lines ${chunk.start_line}${chunk.end_line && chunk.end_line !== chunk.start_line ? `–${chunk.end_line}` : ""}` : ""}{chunk.heading_path ? ` · ${chunk.heading_path}` : ""}{chunk.token_count ? ` · ${chunk.token_count} tokens` : ""}</span><p>{chunk.text}</p></article>)}</div> : null}
       </div>

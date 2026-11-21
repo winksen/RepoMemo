@@ -1,7 +1,6 @@
 import { useEffect } from "react";
-import { IconLoader2 as Loader } from "@tabler/icons-react";
 import { ShellContent } from "../components/SharedLayout";
-import { ICON_SIZE } from "../components/ui/icon";
+import { PageSkeleton } from "../components/ui/skeleton";
 import { navigate, routePath } from "./router";
 import { landingSection } from "./templateSections";
 import { useTemplate } from "./workspace/data";
@@ -19,5 +18,5 @@ export function WorkspaceLanding({ accessToken, workspaceId }: { accessToken: st
     if (settled) navigate(routePath({ name: "workspace", workspaceId, section }), true);
   }, [section, settled, workspaceId]);
   // Drawn inside the frame that is already on screen, so opening a workspace does not replace the whole page.
-  return <ShellContent><div className="shared-loading" role="status"><Loader className="spin" size={ICON_SIZE.lg} /> Opening the workspace</div></ShellContent>;
+  return <ShellContent><PageSkeleton label="Opening the workspace" /></ShellContent>;
 }

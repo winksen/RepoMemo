@@ -233,3 +233,22 @@ th > .rm-badge,
 .rm-my-work-list small { display: block; color: var(--color-text-muted); }
 .rm-approval-policy { display: flex; gap: 8px; align-items: center; }
 .rm-change-list { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+
+/* Skeletons: grey placeholders with a slow shimmer where content will be (V0.8.26). Reduced motion stops the shimmer. */
+.rm-skeleton { display: block; max-width: 100%; background: linear-gradient(90deg, var(--color-surface-2) 0%, color-mix(in srgb, var(--color-border) 70%, var(--color-surface-2)) 50%, var(--color-surface-2) 100%); background-size: 300% 100%; border-radius: 6px; animation: rm-skeleton-shimmer 1.5s ease-in-out infinite; }
+.rm-skeleton-round { border-radius: 50%; }
+@keyframes rm-skeleton-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.rm-skeleton-text { display: grid; gap: 8px; }
+.rm-skeleton-list { display: grid; gap: 4px; }
+.rm-skeleton-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 0; border-bottom: 1px solid var(--color-border); }
+.rm-skeleton-row > span { display: grid; flex: 1; gap: 8px; min-width: 0; }
+.rm-skeleton-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.rm-skeleton-card { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--color-border); border-radius: 10px; }
+.rm-skeleton-page { display: grid; align-content: start; gap: 22px; }
+.rm-skeleton-heading { display: grid; gap: 10px; }
+.rm-skeleton-body { display: grid; gap: 22px; }
+.rm-skeleton-bar-actions { display: inline-flex; gap: 8px; margin-left: auto; }
+.rm-skeleton-rail { display: grid; gap: 10px; margin-top: 18px; }
+/* A page's content fades in rather than snapping in when it replaces its skeleton. */
+@keyframes rm-content-in { from { opacity: 0; } to { opacity: 1; } }
+.shared-layout-content > * { animation: rm-content-in 160ms var(--ease-standard, ease-out); }

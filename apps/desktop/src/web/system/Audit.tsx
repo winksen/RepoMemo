@@ -11,7 +11,7 @@ import { Dropdown } from "../../components/ui/dropdown";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { showToast } from "../../components/ui/toast";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { apiMessage, formatTime } from "../format";
@@ -58,6 +58,6 @@ export function AuditSection({ accessToken, canExport }: { accessToken: string; 
       <tbody>{paging.rows.map((event) => <tr key={event.id}><td>{formatTime(event.created_at)}</td><td>{event.actor ? event.actor.display_name : "System"}</td><th scope="row">{event.action.replace(/_/g, " ")}</th><td>{event.detail}</td></tr>)}</tbody>
     </Table>
     <Pagination {...paging.props} />
-    </> : events ? <EmptyState title="Nothing recorded yet" /> : <LoadingState label="Loading the audit trail" />}
+    </> : events ? <EmptyState title="Nothing recorded yet" /> : <SkeletonList label="Loading the audit trail" />}
   </>;
 }

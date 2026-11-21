@@ -1,3 +1,4 @@
+import { SkeletonList } from "../../components/ui/skeleton";
 import { useRef, useState } from "react";
 import { useLiveRefresh } from "../../lib/liveEvents";
 import { IconRefresh as Refresh } from "@tabler/icons-react";
@@ -66,7 +67,7 @@ export function KnowledgeMapPanel({
   useLiveRefresh(() => void load(), MAP_ACTIONS);
   const inProgress = isIndexing(map);
   if (!map) {
-    return <section className="rm-map" aria-busy="true"><p className="shared-muted-copy">Loading the knowledge map…</p></section>;
+    return <section className="rm-map" aria-busy="true"><SkeletonList label="Loading the knowledge map" rows={5} /></section>;
   }
 
   return <section className="rm-map" aria-busy={isRefreshing}>

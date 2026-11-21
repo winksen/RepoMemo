@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.25` (2026-11-21)
+> **Current:** `V0.8.26` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -45,6 +45,7 @@
 | **V0.8.23** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Organizations page | Move organizations out of the sidebar to an Organizations page at /orgs, reached from a button above System, and list only workspaces in the sidebar, ten before Show more | The sidebar lists workspaces only, /orgs lists and opens every organization, and Organizations sits above System |
 | **V0.8.24** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Addresses | Shorten workspace addresses to /spaces/… and give each organization its own address /orgs/… instead of /workspaces?organization=… | Workspaces open at /spaces/<id>/…, organizations at /orgs/<id>, and every old /workspaces address still arrives at its new one |
 | **V0.8.25** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Page changes | Keep the top bar and the sidebar mounted when moving between pages so that only the page itself is redrawn | Moving between pages no longer redraws the top bar or the sidebar, opening a workspace shows its loader inside the page, and each page starts at the top |
+| **V0.8.26** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Loading | Show shimmering skeleton placeholders in the main area while pages and lists load, in place of spinners and empty screens, and fade pages in | Pages keep their shape while loading, a signed-in start shows the whole frame as placeholders, and reduced motion stops the shimmer |
 
 ## Verification and handoff
 

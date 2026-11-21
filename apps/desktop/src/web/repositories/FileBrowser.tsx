@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listSharedRepositoryFiles } from "../../lib/sharedApi";
 import type { RepoFile, RepoSource } from "../../types";
 import { apiMessage, lastChangeLabel } from "../format";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { SearchField } from "../../components/ui/search-field";
 import { showToast } from "../../components/ui/toast";
 import { Pagination } from "../../components/ui/pagination";
@@ -36,7 +36,7 @@ export function RepositoryFiles({
   }, [files, filter]);
 
   const paging = usePagedList(matching, filter);
-  if (!files) return <LoadingState label="Loading files" />;
+  if (!files) return <SkeletonList label="Loading files" />;
   return <div className="rm-repo-files">
     <SearchField aria-label={`Filter files of ${repository.name}`} onValueChange={setFilter} placeholder="Filter by path" value={filter} />
     <ul>

@@ -13,7 +13,7 @@ import { cancelSharedJob, getSharedRepositoryDetail, summarizeSharedRepository, 
 import type { RepositoryDetailResponse } from "../../types";
 import { apiMessage, formatBytes, formatTime } from "../format";
 import { LanguageChart } from "../../components/LanguageChart";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { CopyButton } from "../../components/ui/copy-button";
@@ -136,7 +136,7 @@ export function RepositoryDetailView({
     }
   }
 
-  if (!detail) return <section className="shared-record-panel" aria-busy="true"><LoadingState label="Loading the repository" /></section>;
+  if (!detail) return <section className="shared-record-panel" aria-busy="true"><SkeletonList label="Loading the repository" /></section>;
 
   const { repository, overview, summary } = detail;
   const job = repository.active_job;

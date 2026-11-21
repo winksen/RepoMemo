@@ -39,7 +39,7 @@ import { EmptyState } from "../../components/ui/empty-state";
 import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { SearchField } from "../../components/ui/search-field";
-import { LoadingState } from "../../components/ui/loading-state";
+import { SkeletonList } from "../../components/ui/skeleton";
 import { Dropdown } from "../../components/ui/dropdown";
 import { Tooltip } from "../../components/ui/tooltip";
 import { showToast } from "../../components/ui/toast";
@@ -199,7 +199,7 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
       </tr>)}</tbody>
     </Table>
     <Pagination {...paging.props} />
-    </> : isLoading ? <LoadingState label="Loading users" /> : <EmptyState title="Users are not available" />}
+    </> : isLoading ? <SkeletonList label="Loading users" /> : <EmptyState title="Users are not available" />}
     <Dialog description={dialog?.description} footer={<><DialogCancel onClick={() => setPending(null)} /><Button busy={isBusy} disabled={(pending?.kind === "anonymize" || pending?.kind === "mfa-reset") && confirmText.trim().toLowerCase() !== pending.user.email.toLowerCase()} type="submit" variant={pending && DESTRUCTIVE_KINDS.has(pending.kind) ? "danger" : "main"}>{dialog?.action}</Button></>} onClose={() => setPending(null)} onSubmit={() => void confirm()} open={Boolean(pending)} title={dialog?.title ?? ""}>
       {pending?.kind === "anonymize" || pending?.kind === "mfa-reset" ? <Field label="Confirm the email address"><Input autoComplete="off" onChange={(event) => setConfirmText(event.target.value)} placeholder={pending.user.email} value={confirmText} /></Field> : null}
     </Dialog>
