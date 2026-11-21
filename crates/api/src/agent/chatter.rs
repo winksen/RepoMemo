@@ -24,11 +24,34 @@ pub(crate) struct Chatter {
     pub greeting: Option<&'static str>,
 }
 
-/// What a reply may say about the workspace and CAIRN's means. Later releases add to it; it starts with the one fact the list of
-/// jobs depends on.
+/// The workspace CAIRN is working in, as a greeting names it (V0.9.6).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct WorkspaceBrief {
+    pub name: String,
+    pub files: i64,
+}
+
+/// What a reply may say about the workspace and CAIRN's means.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ChatterContext {
     pub ai_available: bool,
+    pub workspace: Option<WorkspaceBrief>,
+}
+
+impl ChatterContext {
+    /// How the workspace is named in a sentence: by name with what is indexed, or just "this workspace".
+    fn workspace_clause(&self) -> String {
+        match &self.workspace {
+            Some(workspace) if workspace.files > 0 => format!(
+                "**{}** ({} indexed {})",
+                workspace.name,
+                workspace.files,
+                if workspace.files == 1 { "file" } else { "files" }
+            ),
+            Some(workspace) => format!("**{}** (nothing is indexed yet)", workspace.name),
+            None => "this workspace".to_owned(),
+        }
+    }
 }
 
 /// Greetings by their words, longest first, and the word CAIRN answers with.
@@ -354,16 +377,17 @@ fn jobs_markdown(context: &ChatterContext) -> String {
 /// CAIRN's own answer to a chatty message. It says nothing about the workspace's files, so nothing in it needs a source.
 pub(crate) fn chatter_reply(chatter: Chatter, context: &ChatterContext) -> AgentReply {
     let jobs = jobs_markdown(context);
+    let workspace = context.workspace_clause();
     let opener = chatter.greeting.map(|word| format!("{word}! ")).unwrap_or_default();
     let markdown = match chatter.kind {
         ChatterKind::Greeting => format!(
-            "{opener}I'm CAIRN, the assistant for this workspace. I can help you find and understand what is in its indexed files:\n\n{jobs}\n\nWhat would you like to do?"
+            "{opener}I'm CAIRN, the assistant for {workspace}. I can help you find and understand what is in its indexed files:\n\n{jobs}\n\nWhat would you like to do?"
         ),
         ChatterKind::Identity => format!(
-            "{opener}I'm CAIRN, the assistant built into RepoMemo. I work inside this workspace and I only know what its indexed files say, so what I tell you comes with the files it came from. Here is what I can do:\n\n{jobs}"
+            "{opener}I'm CAIRN, the assistant built into RepoMemo. I work inside {workspace} and I only know what its indexed files say, so what I tell you comes with the files it came from. Here is what I can do:\n\n{jobs}"
         ),
         ChatterKind::Capabilities => format!(
-            "{opener}Here is what I can do in this workspace:\n\n{jobs}\n\nType what you need, or pick one of these."
+            "{opener}Here is what I can do in {workspace}:\n\n{jobs}\n\nType what you need, or pick one of these."
         ),
         ChatterKind::HowAreYou => format!("{opener}I'm doing well, thank you. What would you like to look up in this workspace?"),
         ChatterKind::Thanks => {
@@ -389,7 +413,8 @@ pub(crate) fn chat_system() -> String {
 /// what it can do instead of a bare refusal.
 pub(crate) fn unmatched_reply(context: &ChatterContext) -> AgentReply {
     let mut answer = reply(format!(
-        "I'm not sure how to help with that one. Here is what I can do in this workspace:\n\n{}\n\nTry rephrasing your request as one of these.",
+        "I'm not sure how to help with that one. Here is what I can do in {}:\n\n{}\n\nTry rephrasing your request as one of these.",
+        context.workspace_clause(),
         jobs_markdown(context)
     ));
     answer.routing = AgentRouting::Unmatched;
@@ -402,7 +427,10 @@ mod tests {
 
     #[test]
     fn an_unmatched_reply_speaks_as_cairn_and_shows_what_it_can_do() {
-        let answer = unmatched_reply(&ChatterContext { ai_available: false });
+        let answer = unmatched_reply(&ChatterContext {
+            ai_available: false,
+            workspace: None,
+        });
         assert!(answer.reply_markdown.starts_with("I'm not sure how to help"));
         assert!(answer.reply_markdown.contains("Find files") && answer.reply_markdown.contains("No AI provider"));
         assert_eq!(answer.routing, AgentRouting::Unmatched);
@@ -480,7 +508,10 @@ mod tests {
     fn the_list_of_jobs_comes_from_the_capability_list_and_says_what_needs_ai() {
         let with_ai = chatter_reply(
             recognise_chatter("what can you do").unwrap(),
-            &ChatterContext { ai_available: true },
+            &ChatterContext {
+                ai_available: true,
+                workspace: None,
+            },
         );
         for info in agent_capabilities(true) {
             assert!(with_ai.reply_markdown.contains(&info.label), "{}", info.label);
@@ -491,17 +522,50 @@ mod tests {
 
         let without_ai = chatter_reply(
             recognise_chatter("what can you do").unwrap(),
-            &ChatterContext { ai_available: false },
+            &ChatterContext {
+                ai_available: false,
+                workspace: None,
+            },
         );
         assert!(without_ai.reply_markdown.contains("needs an AI provider"));
         assert!(without_ai.reply_markdown.contains("No AI provider is enabled"));
     }
 
     #[test]
+    fn a_greeting_names_the_workspace_and_what_is_indexed_in_it() {
+        let in_workspace = |name: &str, files: i64| ChatterContext {
+            ai_available: true,
+            workspace: Some(WorkspaceBrief {
+                name: name.to_owned(),
+                files,
+            }),
+        };
+        let greet = |files: i64| {
+            chatter_reply(
+                recognise_chatter("Salam").unwrap(),
+                &in_workspace("Engineering / Bendly", files),
+            )
+            .reply_markdown
+        };
+        assert!(
+            greet(42).starts_with("Salam! I'm CAIRN, the assistant for **Engineering / Bendly** (42 indexed files).")
+        );
+        assert!(greet(1).contains("(1 indexed file)"));
+        assert!(greet(0).contains("(nothing is indexed yet)"));
+        let identity = chatter_reply(recognise_chatter("who are you").unwrap(), &in_workspace("Docs", 3));
+        assert!(identity
+            .reply_markdown
+            .contains("I work inside **Docs** (3 indexed files)"));
+    }
+
+    #[test]
     fn a_greeting_is_answered_in_kind_and_introduces_cairn() {
         let answer = chatter_reply(
             recognise_chatter("Salam").unwrap(),
-            &ChatterContext { ai_available: true },
+            &ChatterContext {
+                ai_available: true,
+                workspace: None,
+            },
         );
         assert!(answer.reply_markdown.starts_with("Salam! I'm CAIRN"));
         let thanks = chatter_reply(recognise_chatter("thanks").unwrap(), &ChatterContext::default());

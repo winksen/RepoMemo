@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.6 (2026-11-21)
+
+CAIRN's greeting names the workspace.
+
+### Changed
+- **Knows where it is.** CAIRN's own replies (greetings, *who are you*, *what can you do*, and the reply to a message it cannot place) now name the workspace and what is indexed in it: *Salam! I'm CAIRN, the assistant for **Engineering / Bendly** (42 indexed files).* An empty workspace says *nothing is indexed yet*, so it is clear why there is little to read.
+- **Where the facts come from.** The workspace's name and its file count are read from the server when CAIRN replies; if either cannot be read, the reply says *this workspace* instead. No file names or content are read, and nothing is sent to an AI provider for these replies.
+- No API, setting or migration changes.
+
+### Checks
+- A unit test for the greeting with a workspace, one file, many files and none; compiled and linted, not run. Nothing was built into the app or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.5 (2026-11-21)
 
 When CAIRN finds nothing, it says what to try next.

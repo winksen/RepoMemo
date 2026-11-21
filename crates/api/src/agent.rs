@@ -15,7 +15,7 @@ use crate::RepoMemoCore;
 
 mod chatter;
 mod evidence;
-use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext};
+use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};
 use evidence::{evidence_for, next_steps, says_insufficient};
 
 const MAX_MESSAGE_CHARS: usize = 2_000;
@@ -300,9 +300,7 @@ impl RepoMemoCore {
         // A greeting, "who are you" or "what can you do" is answered by CAIRN itself, with no AI and no search (V0.9.1).
         if request.capability.is_none() && request.artifact_id.is_none() {
             if let Some(chatter) = recognise_chatter(message) {
-                let context = ChatterContext {
-                    ai_available: request.provider_id.is_some(),
-                };
+                let context = self.chatter_context(&request).await;
                 return Ok(chatter_reply(chatter, &context));
             }
         }
@@ -406,6 +404,28 @@ impl RepoMemoCore {
         Ok(parse_model_route(&raw, message))
     }
 
+    /// What CAIRN's own replies may say: whether an AI provider is enabled, and the workspace's name and how many files are
+    /// indexed in it (V0.9.6). A workspace that cannot be read is simply not named.
+    async fn chatter_context(&self, request: &AgentRequest) -> ChatterContext {
+        let name = self
+            .storage
+            .list_workspaces()
+            .await
+            .ok()
+            .and_then(|all| all.into_iter().find(|workspace| workspace.id == request.workspace_id))
+            .map(|workspace| workspace.name);
+        let files = self
+            .storage
+            .workspace_overview(&request.workspace_id)
+            .await
+            .map(|overview| overview.artifact_count)
+            .unwrap_or(0);
+        ChatterContext {
+            ai_available: request.provider_id.is_some(),
+            workspace: name.map(|name| WorkspaceBrief { name, files }),
+        }
+    }
+
     /// CAIRN's reply to a message that asks for none of its jobs. With a provider the AI answers as CAIRN from the persona and the
     /// earlier turns, with no passages and no sources; without one, or when the provider fails, CAIRN says what it can do instead.
     async fn agent_converse(
@@ -415,11 +435,8 @@ impl RepoMemoCore {
         history: &[AgentHistoryTurn],
         warnings: &mut Vec<String>,
     ) -> AgentReply {
-        let context = ChatterContext {
-            ai_available: request.provider_id.is_some(),
-        };
         let Some(provider_id) = request.provider_id.as_deref() else {
-            return unmatched_reply(&context);
+            return unmatched_reply(&self.chatter_context(request).await);
         };
         let written: Result<String> = async {
             let settings = self.storage.get_provider_settings(provider_id).await?;
@@ -444,10 +461,10 @@ impl RepoMemoCore {
                 answer.context_turns = history.len() as i64;
                 answer
             }
-            Ok(_) => unmatched_reply(&context),
+            Ok(_) => unmatched_reply(&self.chatter_context(request).await),
             Err(error) => {
                 warnings.push(format!("The AI provider could not answer this message: {error:#}"));
-                unmatched_reply(&context)
+                unmatched_reply(&self.chatter_context(request).await)
             }
         }
     }
