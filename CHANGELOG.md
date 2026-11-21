@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.31 (2026-11-21)
+
+Every workspace opens on its Overview.
+
+### Changed
+- **Always Overview.** Opening a workspace from the sidebar, the dashboard, an organization page, the command palette or a link without a section lands on **Overview**. Some workspaces used to open elsewhere because their template named another landing section (a knowledge base opened on Documents). A link that names a section still opens that section.
+- **Templates.** A template's `landing` is still accepted and still puts that section first among the tabs, but it no longer decides where the workspace opens. The template is no longer requested just to open a workspace, so there is no loader in between.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the landing test was rewritten and not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.30 (2026-11-21)
 
 A contrasting grey for the current sidebar item.

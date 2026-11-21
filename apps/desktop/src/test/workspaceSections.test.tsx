@@ -12,7 +12,7 @@ import { artifactKindLabel, artifactTypeLabel } from "../web/format";
 import { pageTitle } from "../web/pageTitle";
 import { paletteEntries } from "../web/paletteEntries";
 import { navigate, parseRoute, workspaceHomePath } from "../web/router";
-import { arrangeSections, landingSection } from "../web/templateSections";
+import { arrangeSections } from "../web/templateSections";
 import { WorkspaceLanding } from "../web/WorkspaceLanding";
 import { useReviewQueue, useTemplate } from "../web/workspace/data";
 
@@ -88,17 +88,6 @@ it("lists workspaces in the rail, opens the chosen one and folds a long list beh
   expect(screen.queryByRole("button", { name: "Workspaces" })).toBeNull();
 });
 
-describe("landingSection", () => {
-  it("is the template's landing section, or Overview when there is none, it is unknown, or it is for administrators", () => {
-    expect(landingSection(knowledgeBase)).toBe("documents");
-    expect(landingSection(null)).toBe("overview");
-    expect(landingSection(undefined)).toBe("overview");
-    expect(landingSection({ landing: "dashboard" })).toBe("overview");
-    expect(landingSection({ landing: "settings" })).toBe("overview");
-    expect(landingSection({ landing: "people" })).toBe("overview");
-  });
-});
-
 describe("opening a workspace by its address alone", () => {
   const query = (isError: boolean) => ({ isError }) as never;
 
@@ -108,26 +97,11 @@ describe("opening a workspace by its address alone", () => {
     expect(parseRoute("/spaces/w1/review")).toEqual({ name: "workspace", workspaceId: "w1", section: "review" });
   });
 
-  it("waits for the template, then replaces its own address with the landing section", () => {
-    vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), query(false)]);
-    const { rerender } = render(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
-    expect(screen.getByRole("status").textContent).toContain("Opening the workspace");
-    expect(navigate).not.toHaveBeenCalled();
+  it("replaces its own address with Overview at once, whatever the template's landing section", () => {
     vi.mocked(useTemplate).mockReturnValue([templateView(knowledgeBase), vi.fn(), query(false)]);
-    rerender(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
-    expect(navigate).toHaveBeenCalledWith("/spaces/w1/documents", true);
-  });
-
-  it("draws no placeholder when the template is already in memory", () => {
-    vi.mocked(useTemplate).mockReturnValue([templateView(knowledgeBase), vi.fn(), query(false)]);
-    render(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
+    render(<WorkspaceLanding workspaceId="w1" />);
     expect(screen.queryByRole("status")).toBeNull();
-    expect(navigate).toHaveBeenCalledWith("/spaces/w1/documents", true);
-  });
-
-  it("opens on Overview when the template cannot be read, as it always did", () => {
-    vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), query(true)]);
-    render(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
+    expect(navigate).toHaveBeenCalledTimes(1);
     expect(navigate).toHaveBeenCalledWith("/spaces/w1/overview", true);
   });
 });

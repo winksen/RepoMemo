@@ -35,7 +35,7 @@ A workspace template is a small JSON file. It does not add anything to RepoMemo:
 | `format` | the number of the format the file is written for | `1` |
 | `meta` | `id`, `version`, `name`, `summary`, `icon` | the id rules above; 32 workspace icons |
 | `starter_folders` | folders made when a workspace is created from the template | 12 folders in all, two levels; 40 characters a name |
-| `sections` | `order` of the tabs, `more` for the *More* menu, `landing` | the 12 workspace sections, each named once; `people` and `settings` stay for administrators and cannot be the landing |
+| `sections` | `order` of the tabs, `more` for the *More* menu, `landing` | the 12 workspace sections, each named once; `people` and `settings` stay for administrators and cannot be the landing; since V0.8.31 `landing` only puts a section first among the tabs, a workspace always opens on Overview |
 | `labels` | display names for `sections` and `artifact_types` | the section and artifact-type ids; 24 characters each |
 | `overview` | `cards` of the Overview in order; `headline` for the dashboard card | 1 to 8 of the 15 pulse cards (the four added in V0.3.18 are `repositories_in_sync`, `reviewed_90_days`, `needing_review` and `duplicates`); a headline is `memory_cards`, `active_tasks`, `code_symbols` or `sources` |
 | `evidence` | `default_view` (`grid` or `list`), `types_first` | the 12 file types of the ledger |

@@ -330,7 +330,7 @@ function SharedWebAppContent() {
 
     case "workspace":
       if (!workspace) return notFound("/dashboard");
-      if (route.landing) return <WorkspaceLanding accessToken={accessToken} key={workspace.workspace.id} workspaceId={workspace.workspace.id} />;
+      if (route.landing) return <WorkspaceLanding key={workspace.workspace.id} workspaceId={workspace.workspace.id} />;
       return (
         <SharedWorkspaceDetail
           accessToken={accessToken}
