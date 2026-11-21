@@ -1,10 +1,10 @@
+import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useState } from "react";
 import { CaretDown as ChevronDown, Plus, Stack as Layers } from "@phosphor-icons/react";
 import { AssistantPanel } from "../components/AssistantPanel";
 import { CairnIcon } from "../components/CairnIcon";
 import { SharedLayout } from "../components/SharedLayout";
 import { Button } from "../components/ui/button";
-import { Dropdown } from "../components/ui/dropdown";
 import { IconButton } from "../components/ui/icon-button";
 import { Tooltip } from "../components/ui/tooltip";
 import { EmptyState } from "../components/ui/empty-state";
@@ -17,6 +17,7 @@ import { formatRecentTime } from "./format";
 import { RailSection } from "./Organization";
 import { type CairnChat, cairnContextWorkspace, groupCairnChats, onCairnWorkspaceChange, rememberCairnWorkspace, rememberedCairnWorkspace, useCairnChats } from "./cairn";
 import { cairnPath, navigate, routePath } from "./router";
+import { WorkspaceIcon } from "./workspaceIcons";
 
 /** One workspace's chats in the sidebar: its name folds them away, and its + starts a chat in it. */
 function CairnGroup({ activeId, chats, workspace }: { activeId: string | null; chats: CairnChat[]; workspace: SharedWorkspace }) {
@@ -49,6 +50,24 @@ export function CairnRail({ accessToken, chatId, workspaces }: { accessToken: st
       {groups.length ? groups.map((group) => <CairnGroup activeId={chatId} chats={group.chats} key={group.workspace.workspace.id} workspace={group.workspace} />) : <p className="shared-rail-empty">{loaded ? "Your chats appear here. Only you can see them." : "Loading chats…"}</p>}
     </RailSection>
   </div>;
+}
+
+/** The workspace a chat draws on, above the message box, with its own icon: a menu for a new chat, a plain label once the chat has begun. */
+function WorkspaceChooser({ editable, onChoose, organizations, selected, workspaces }: { editable: boolean; onChoose: (workspaceId: string) => void; organizations: Organization[]; selected: SharedWorkspace; workspaces: SharedWorkspace[] }) {
+  const face = (entry: SharedWorkspace) => <><span className="shared-cairn-workspace-icon"><WorkspaceIcon size={16} weight="fill" workspace={entry.workspace} /></span><span className="shared-cairn-workspace-name">{workspaceLabel(entry, organizations)}</span></>;
+  if (!editable) return <div className="shared-cairn-workspace" title="The workspace this chat draws on">{face(selected)}</div>;
+  return <MenuPrimitive.Root>
+    <MenuPrimitive.Trigger asChild>
+      <button aria-label="Workspace for this chat" className="shared-cairn-workspace shared-cairn-workspace-button" type="button">{face(selected)}<ChevronDown size={ICON_SIZE.sm} /></button>
+    </MenuPrimitive.Trigger>
+    <MenuPrimitive.Portal>
+      <MenuPrimitive.Content align="start" aria-label="Workspace for this chat" className="rm-action-menu" side="top" sideOffset={6}>
+        {workspaces.map((entry) => <MenuPrimitive.Item className="rm-action-item" key={entry.workspace.id} onSelect={() => onChoose(entry.workspace.id)}>
+          <WorkspaceIcon size={ICON_SIZE.md} weight={entry.workspace.id === selected.workspace.id ? "fill" : "regular"} workspace={entry.workspace} /><span>{workspaceLabel(entry, organizations)}</span>
+        </MenuPrimitive.Item>)}
+      </MenuPrimitive.Content>
+    </MenuPrimitive.Portal>
+  </MenuPrimitive.Root>;
 }
 
 /** A workspace as the chooser and the label name it: with its organization when the person has several. */
@@ -94,17 +113,12 @@ export function SharedCairnPage({ accessToken, chatId, organizations, session, s
   >
     <section className="shared-page-content shared-assistant-page">
       <PageHeader
-        actions={chosen
-          ? isNewChat
-            ? <Dropdown aria-label="Workspace for this chat" className="shared-assistant-page-workspace" onValueChange={rememberCairnWorkspace} options={workspaces.map((entry) => ({ label: workspaceLabel(entry, organizations), value: entry.workspace.id }))} value={chosen.workspace.id} />
-            : <span className="shared-cairn-context" title="The workspace this chat draws on"><Layers size={ICON_SIZE.sm} /> {workspaceLabel(chosen, organizations)}</span>
-          : null}
         description="Ask a question, search the evidence or get a workspace summarized, in conversation."
-        icon={<CairnIcon size={ICON_SIZE.lg} />}
+        icon={<CairnIcon size={32} weight="fill" />}
         title={ASSISTANT_NAME}
       />
       {chosen
-        ? <div className="shared-assistant-page-body"><AssistantPanel accessToken={accessToken} hideChatList key={chosenId} onChatChange={(id) => navigate(cairnPath(id), true)} onOpenArtifact={(artifactId) => navigate(routePath({ name: "artifact", workspaceId: chosen.workspace.id, artifactId }))} requestedChatId={chatId} workspaceId={chosen.workspace.id} /></div>
+        ? <div className="shared-assistant-page-body"><AssistantPanel accessToken={accessToken} composerHeader={<WorkspaceChooser editable={isNewChat} onChoose={rememberCairnWorkspace} organizations={organizations} selected={chosen} workspaces={workspaces} />} hideChatList key={chosenId} onChatChange={(id) => navigate(cairnPath(id), true)} onOpenArtifact={(artifactId) => navigate(routePath({ name: "artifact", workspaceId: chosen.workspace.id, artifactId }))} requestedChatId={chatId} variant="page" workspaceId={chosen.workspace.id} /></div>
         : <EmptyState action={<Button onClick={() => openNewWorkspace()} type="button" variant="main">New workspace</Button>} description={`${ASSISTANT_NAME} works on the evidence of a workspace. Create one, or ask an administrator to add you to one.`} title="No workspace to talk about yet" />}
     </section>
   </SharedLayout>;

@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-vi.mock("../components/AssistantPanel", () => ({ AssistantPanel: ({ workspaceId, requestedChatId }: { workspaceId: string; requestedChatId?: string | null }) => <div data-testid="panel">cairn for {workspaceId} chat {String(requestedChatId)}</div> }));
+vi.mock("../components/AssistantPanel", () => ({ AssistantPanel: ({ workspaceId, requestedChatId, composerHeader }: { workspaceId: string; requestedChatId?: string | null; composerHeader?: React.ReactNode }) => <div><div data-testid="panel">cairn for {workspaceId} chat {String(requestedChatId)}</div>{composerHeader}</div> }));
 vi.mock("../lib/sharedApi", async (original) => ({ ...(await original<typeof import("../lib/sharedApi")>()), listSharedAgentConversations: vi.fn() }));
 vi.mock("../web/router", async (original) => ({ ...(await original<typeof import("../web/router")>()), navigate: vi.fn() }));
 
@@ -58,8 +58,15 @@ it("offers a choice of workspace for a new chat, starting from the remembered on
   window.localStorage.setItem("repomemo.cairn.workspace", "w2");
   const { unmount } = render(wrap(<SharedCairnPage accessToken="t" chatId={null} organizations={organizations} session={session} signOut={vi.fn()} workspaces={workspaces} />));
   expect((await screen.findByTestId("panel")).textContent).toBe("cairn for w2 chat null");
-  expect(screen.getByRole("combobox", { name: "Workspace for this chat" }).textContent).toContain("Pay");
+  expect(screen.getByRole("button", { name: "Workspace for this chat" }).textContent).toContain("Pay");
   unmount();
   render(wrap(<SharedCairnPage accessToken="t" chatId={null} organizations={organizations} session={session} signOut={vi.fn()} workspaces={[]} />));
   expect(screen.getByText("No workspace to talk about yet")).toBeTruthy();
+});
+
+it("shows the workspace above the box as a plain label once the chat has begun", async () => {
+  render(wrap(<SharedCairnPage accessToken="t" chatId="c1" organizations={organizations} session={session} signOut={vi.fn()} workspaces={workspaces} />));
+  await screen.findByTestId("panel");
+  expect(screen.queryByRole("button", { name: "Workspace for this chat" })).toBeNull();
+  expect(screen.getByTitle("The workspace this chat draws on").textContent).toContain("Code");
 });

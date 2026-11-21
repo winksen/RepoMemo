@@ -2,7 +2,17 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.52` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.53` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.53 — A simpler Cairn message box.
+
+- **Icon.** Cairn's icon is now a Phosphor icon (mountains), filled, and as large as the page title.
+- **One message box** on Cairn's page: the text field and, under it in the same box, **Send** at the left and a **+** at the right. The **+** opens the list of actions (find files, search content, summarize a file, ask a question, workspace overview); the chosen action shows as a small tag beside Send, with a cross to drop it.
+- **Nothing under the box**: the line about Enter and the note about the AI provider are gone from this page.
+- **Workspace above the box**: a new chat shows the workspace it draws on, with that workspace's icon, as a menu above the message box; once the chat has begun it is a plain label. The workspace list that was beside the heading is gone.
+- The dock on workspace pages keeps its row of action buttons.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.52 — Filled tab icons.
 

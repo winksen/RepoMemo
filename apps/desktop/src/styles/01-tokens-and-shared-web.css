@@ -972,3 +972,21 @@ input[type="file"] {
 .shared-cairn-group { grid-template-columns: minmax(0, 1fr); }
 .shared-cairn-group > div { min-width: 0; }
 .rm-button.shared-cairn-chat { max-width: 100%; }
+
+/* Cairn's message box (V0.8.53): one box, Send at its left, the actions menu (+) at its right, the workspace above it. */
+.shared-assistant-composer-page { gap: 10px; padding: 12px 0 16px; border-top: 0; }
+.shared-assistant-box { display: grid; gap: 4px; padding: 10px 10px 8px 14px; background: var(--color-surface); border: var(--control-border) solid var(--color-border); border-radius: 16px; transition: border-color 110ms var(--ease-control); }
+.shared-assistant-box:focus-within { border-color: var(--color-border-strong); }
+.shared-assistant-box .rm-textarea { min-height: 52px; padding: 4px 0; background: transparent; border: 0; box-shadow: none; resize: none; }
+.shared-assistant-box .rm-textarea:focus-visible { outline: none; }
+.shared-assistant-box-bar { display: flex; align-items: center; gap: 8px; }
+.shared-assistant-box-bar .shared-assistant-more { margin-left: auto; }
+.shared-assistant-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; color: var(--color-text); background: var(--color-surface-3); border-radius: 999px; font-size: 12px; font-weight: 650; }
+.shared-assistant-chip button { display: grid; width: 18px; height: 18px; padding: 0; place-items: center; color: inherit; background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
+.shared-assistant-chip button:hover { background: var(--color-border); }
+.shared-cairn-workspace { display: inline-flex; align-items: center; gap: 8px; align-self: start; max-width: 100%; padding: 4px 10px 4px 4px; color: var(--color-text); background: var(--color-surface-2); border: 0; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 650; }
+.shared-cairn-workspace-button { cursor: pointer; }
+.shared-cairn-workspace-button:hover { background: var(--color-surface-3); }
+.shared-cairn-workspace-button:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: 2px; }
+.shared-cairn-workspace-icon { display: grid; flex: 0 0 auto; width: 26px; height: 26px; place-items: center; color: var(--color-surface); background: var(--color-text); border-radius: 50%; }
+.shared-cairn-workspace-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

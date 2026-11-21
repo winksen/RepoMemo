@@ -1,7 +1,8 @@
-import type { FormEvent, KeyboardEvent } from "react";
+import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { SafeMarkdown } from "./SafeMarkdown";
+import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
-import { Brain, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash } from "@phosphor-icons/react";
+import { Brain, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear } from "@phosphor-icons/react";
 import { deleteSharedAgentConversation, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";
@@ -68,8 +69,12 @@ function storedTurn(turn: AgentTurn): ThreadTurn {
 }
 
 /** Workspace assistant: routes each message to one capability on the server and keeps the user's chats there. */
-export function AssistantPanel({ accessToken, hideChatList = false, onChatChange, onOpenArtifact, requestedChatId, workspaceId }: {
+export function AssistantPanel({ accessToken, composerHeader, hideChatList = false, onChatChange, onOpenArtifact, requestedChatId, variant = "dock", workspaceId }: {
   accessToken: string;
+  /** On Cairn's page, what sits above the message box (the workspace the chat draws on). */
+  composerHeader?: ReactNode;
+  /** `page` is Cairn's page: the message box is one box with *Send* at its left and a **+** menu of actions at its right, and nothing under it. */
+  variant?: "dock" | "page";
   /** Cairn's page lists the chats beside the page, so the panel does not offer its own list or *New chat*. */
   hideChatList?: boolean;
   /** Called with the chat the panel itself moved to: a chat that was just started (its id), or none after *New chat* or a deletion. */
@@ -307,11 +312,38 @@ export function AssistantPanel({ accessToken, hideChatList = false, onChatChange
         </article>) : <div className="shared-assistant-intro">
           <CairnIcon size={22} />
           <strong>Hi, I&apos;m {ASSISTANT_NAME}. What do you need from this workspace?</strong>
-          <span>Pick an action below or just type. Requests are matched to one of these actions; anything else gets a short reply for now. Chats are saved so you can come back to them.</span>
+          <span>{variant === "page" ? "Use the + to pick an action, or just type." : "Pick an action below or just type."} Requests are matched to one of these actions; anything else gets a short reply for now. Chats are saved so you can come back to them.</span>
         </div>}
         <div ref={threadEnd} />
       </div>
-      <form className="shared-assistant-composer" onSubmit={submit}>
+      {variant === "page" ? <form className="shared-assistant-composer shared-assistant-composer-page" onSubmit={submit}>
+        {composerHeader}
+        {!draft.trim() && !turns.length && suggestedQuestions(template?.assistant).length ? <div aria-label="Suggested questions" className="shared-assistant-suggestions" role="group">
+          {suggestedQuestions(template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
+        </div> : null}
+        <div className="shared-assistant-box">
+          <Textarea aria-label={`Message ${ASSISTANT_NAME}`} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={2} value={draft} />
+          <div className="shared-assistant-box-bar">
+            <IconButton busy={isBusy} className="shared-assistant-send" disabled={isLoadingChat || !draft.trim()} label="Send" size="sm" type="submit"><Send size={ICON_SIZE.md} weight="fill" /></IconButton>
+            {selectedInfo ? <span className="shared-assistant-chip">{selectedInfo.label}<button aria-label={`Stop using ${selectedInfo.label}`} onClick={() => setSelected(null)} type="button"><Clear size={ICON_SIZE.sm} /></button></span> : null}
+            <MenuPrimitive.Root>
+              <MenuPrimitive.Trigger asChild>
+                <IconButton className="shared-assistant-more" label="Actions" size="sm"><Plus size={ICON_SIZE.md} /></IconButton>
+              </MenuPrimitive.Trigger>
+              <MenuPrimitive.Portal>
+                <MenuPrimitive.Content align="end" aria-label={`${ASSISTANT_NAME} actions`} className="rm-action-menu" side="top" sideOffset={8}>
+                  {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
+                    const Icon = CAPABILITY_ICONS[capability.id];
+                    return <MenuPrimitive.Item className="rm-action-item" disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onSelect={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`}>
+                      <Icon size={ICON_SIZE.md} weight={selected === capability.id ? "fill" : "regular"} /><span>{capability.label}</span>
+                    </MenuPrimitive.Item>;
+                  })}
+                </MenuPrimitive.Content>
+              </MenuPrimitive.Portal>
+            </MenuPrimitive.Root>
+          </div>
+        </div>
+      </form> : <form className="shared-assistant-composer" onSubmit={submit}>
         <div className="shared-assistant-actions" role="group" aria-label={`${ASSISTANT_NAME} actions`}>
           {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
             const Icon = CAPABILITY_ICONS[capability.id];
@@ -329,7 +361,7 @@ export function AssistantPanel({ accessToken, hideChatList = false, onChatChange
           <span>Enter or {submitShortcutLabel()} sends; Shift+Enter adds a line.</span>
           <span>{capabilities?.provider_name ? <><Brain size={ICON_SIZE.sm} /> AI actions use {capabilities.provider_name}. Search and file lookup stay on the server.</> : "No AI provider is enabled, so file lookup and search are available. An administrator can enable AI in Settings."}</span>
         </div>
-      </form>
+      </form>}
     </div>
   </section>;
 }

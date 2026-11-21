@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.53 (2026-11-21)
+
+A simpler Cairn message box.
+
+### Changed
+- **Icon.** Cairn's icon is now a Phosphor icon (mountains), drawn filled, and as large as the page title (it was smaller than the text). It is the same icon in the top bar, the dock and the chat.
+- **One message box.** On Cairn's page the text field and its buttons are one rounded box: **Send** at the bottom left and a **+** at the bottom right. The **+** opens the list of actions (find files, search content, summarize a file, ask a question, workspace overview), replacing the row of buttons; the chosen action shows as a small tag beside Send, with a cross to drop it.
+- **Nothing under the box.** The shortcut line and the AI provider note are removed from that page. The suggested questions of a new chat stay above the box.
+- **Workspace above the box.** The workspace a chat draws on is shown above the message box with its own icon: a menu for a new chat, a plain label once the chat has begun. The list beside the heading is removed.
+- The assistant dock on workspace pages is unchanged.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the page was not opened. The page test was updated and not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.52 (2026-11-21)
 
 Filled tab icons.
