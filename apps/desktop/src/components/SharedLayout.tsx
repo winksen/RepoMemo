@@ -16,6 +16,7 @@ import { openCommandPalette } from "../lib/assistantBridge";
 import { MAIN_CONTENT_ID } from "../web/RouteAnnouncer";
 import { Button } from "./ui/button";
 import { IconButton } from "./ui/icon-button";
+import { CreateMenu } from "./CreateMenu";
 import { DesktopServerNote } from "./DesktopServerNote";
 import { OpenInAppLink } from "./OpenInAppLink";
 import { ICON_SIZE } from "./ui/icon";
@@ -88,6 +89,7 @@ export function SharedLayout({
       <div className="shared-header-actions">
         <div className="shared-user-menu" aria-label="Account controls" role="group">
           <div className="shared-account-controls">
+            <CreateMenu canCreateOrganization={session.can_create_organizations !== false} />
             <ThemeToggle />
             <Button aria-label="Open command palette" className="shared-palette-link" onClick={openCommandPalette} title="Command palette (Ctrl K)" type="button" variant="secondary"><Search size={ICON_SIZE.md} /></Button>
             <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={ICON_SIZE.md} /></Button>

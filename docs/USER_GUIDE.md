@@ -92,6 +92,7 @@ An invitation link works once, only for your email address, for 7 days.
 ### Move around fast
 
 - **Ctrl K** (or **⌘ K**) opens the **command palette**: jump to any workspace, section, file or memory card, or hand your text to the assistant. It remembers the last places you opened from it and lists them when you open it, and **New note** starts a note in the workspace you are in.
+- The left rail lists your **workspaces** and **organizations** (four each, then **Show more**). The **+** button in the top bar creates a **new workspace** or a **new organization**.
 - Everything works from the keyboard, in light and dark themes, down to phone width.
 
 ---
@@ -105,7 +106,7 @@ Each workflow says **who can do it**, the steps, and **what you should see** whe
 **Who:** an organization owner or admin. Members and viewers cannot create workspaces; ask one of them.
 
 1. Open the **dashboard** (the workspace directory) and pick the organization.
-2. Choose **New workspace**, give it a name and, if the form offers them, a [template](#templates-a-workspace-shaped-to-its-job). *General* changes nothing.
+2. Choose **New workspace** from the **+** menu in the top bar, give it a name and, if the form offers them, a [template](#templates-a-workspace-shaped-to-its-job). *General* changes nothing.
 3. Open it.
 
 **Expected:** the workspace opens on its Overview (or the template's first tab), empty apart from the template's starter folders. You are its owner. Nothing is sent to any AI provider.

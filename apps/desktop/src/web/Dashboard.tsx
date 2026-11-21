@@ -127,6 +127,14 @@ export function SharedWorkspaceHome({
   // The same request as the dashboard's, so the list below can say which template each workspace uses.
   const [figures] = useDashboardFigures(accessToken, workspaces);
 
+  // "New workspace" from the navbar lands here: bring the creation form into view and put the cursor in its name field.
+  useEffect(() => {
+    if (!organizationNavigation.isCreatingWorkspace || !canManageOrganization) return;
+    const field = document.getElementById("shared-workspace-name");
+    field?.scrollIntoView({ block: "center" });
+    field?.focus();
+  }, [organizationNavigation.isCreatingWorkspace, canManageOrganization, organizationId]);
+
   async function createOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true); setFormError(null); setError(null);

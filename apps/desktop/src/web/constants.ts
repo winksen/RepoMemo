@@ -82,6 +82,8 @@ export type ArtifactViewMode = "grid" | "list";
 export type OrganizationNavigation = {
   activeOrganizationId: string | null;
   isCreatingOrganization: boolean;
+  /** True when the address asks to land on the workspace creation form. */
+  isCreatingWorkspace: boolean;
   selectOrganization: (organizationId: string) => void;
   startCreatingOrganization: () => void;
   cancelOrganizationCreation: () => void;

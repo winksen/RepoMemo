@@ -1,5 +1,5 @@
-import { type FormEvent, useEffect, useState } from "react";
-import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconPlus as Plus, IconSearch as Search, IconSettings as Settings, IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users, type TablerIcon } from "@tabler/icons-react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconSearch as Search, IconSettings as Settings,  IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users, type TablerIcon } from "@tabler/icons-react";
 import { SharedApiError, listSharedOrganizationMembers, removeSharedOrganizationMember, transferSharedOrganizationOwnership, updateSharedOrganization, upsertSharedOrganizationMember } from "../lib/sharedApi";
 import { type Organization, type OrganizationMember, type OrganizationRole, type SharedWorkspace } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
@@ -20,6 +20,7 @@ import { arrangeSections } from "./templateSections";
 import { useReviewQueue, useTemplate } from "./workspace/data";
 import { ADMIN_WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { apiMessage } from "./format";
+import { WorkspaceIcon } from "./workspaceIcons";
 import { navigate, workspaceHomePath } from "./router";
 import { useOrganizationNavigation } from "./navigation";
 import { ICON_SIZE } from "../components/ui/icon";
@@ -123,22 +124,35 @@ export function OrganizationRail({
   const selectedOrganizationId = showSelection ? organizationId ?? organizationNavigation.activeOrganizationId ?? organizations[0]?.id : undefined;
   const canManageOrganizations = !organizations.length || organizations.some((organization) => organization.role === "owner" || organization.role === "admin");
 
+  const workspaceEntries = (workspaces ?? []).map((workspace) => {
+    const organization = organizations.find((entry) => entry.id === workspace.organization_id);
+    return { id: workspace.workspace.id, workspace: workspace.workspace, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name };
+  });
+
   return <div className="shared-rail-navigation">
     {workspaces ? <section className="shared-rail-workspaces" aria-label="Workspaces">
-      <label className="shared-eyebrow" htmlFor="shared-workspace-switcher">Workspace</label>
-      {workspaces.length ? <select aria-label="Switch workspace" className="shared-workspace-switcher" id="shared-workspace-switcher" onChange={(event) => navigate(workspaceHomePath(event.target.value))} value={workspaceId ?? ""}>
-        {!workspaceId ? <option value="">Choose a workspace</option> : null}
-        {workspaces.map((workspace) => {
-        const organization = organizations.find((entry) => entry.id === workspace.organization_id);
-        const label = organizations.length > 1 ? `${organization?.name ?? "Organization"} / ${workspace.workspace.name}` : workspace.workspace.name;
-        return <option key={workspace.workspace.id} value={workspace.workspace.id}>{label}</option>;
-      })}</select> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
+      <p className="shared-eyebrow">Workspaces</p>
+      {workspaceEntries.length ? <RailList activeId={workspaceId} items={workspaceEntries.map((entry) => ({ id: entry.id, name: entry.name, title: entry.title, icon: <WorkspaceIcon size={ICON_SIZE.md} workspace={entry.workspace} />, onSelect: () => navigate(workspaceHomePath(entry.id)) }))} kind="workspace" /> : <p className="shared-rail-empty">No accessible workspaces yet.</p>}
     </section> : null}
     {canManageOrganizations ? <section className="shared-rail-organizations" aria-label="Organization management">
       <p className="shared-eyebrow">Organizations</p>
-      {organizations.length ? <div className="shared-rail-list">{organizations.map((organization) => <Button aria-current={organization.id === selectedOrganizationId ? "page" : undefined} className={`shared-rail-organization${organization.id === selectedOrganizationId ? " active" : ""}`} key={organization.id} onClick={() => organizationNavigation.selectOrganization(organization.id)} type="button" variant="secondary"><Building size={ICON_SIZE.md} /><span>{organization.name}</span></Button>)}</div> : <p className="shared-rail-empty">Create an organization to begin.</p>}
-      <Button className="shared-organization-create" onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New organization</Button>
+      {organizations.length ? <RailList activeId={selectedOrganizationId} items={organizations.map((organization) => ({ id: organization.id, name: organization.name, title: organization.name, icon: <Building size={ICON_SIZE.md} />, onSelect: () => organizationNavigation.selectOrganization(organization.id) }))} kind="organization" /> : <p className="shared-rail-empty">Create an organization to begin.</p>}
     </section> : null}
+  </div>;
+}
+
+/** Lists longer than this fold behind a *Show more* button; the current item always stays visible. */
+const RAIL_LIST_LIMIT = 4;
+
+function RailList({ activeId, items, kind }: { activeId?: string; items: { id: string; name: string; title: string; icon: ReactNode; onSelect: () => void }[]; kind: "workspace" | "organization" }) {
+  const [expanded, setExpanded] = useState(false);
+  const folded = items.length > RAIL_LIST_LIMIT && !expanded;
+  let visible = folded ? items.slice(0, RAIL_LIST_LIMIT) : items;
+  const active = items.find((item) => item.id === activeId);
+  if (folded && active && !visible.includes(active)) visible = [...visible.slice(0, RAIL_LIST_LIMIT - 1), active];
+  return <div className="shared-rail-list">
+    {visible.map((item) => <Button aria-current={item.id === activeId ? "page" : undefined} className={`shared-rail-${kind}${item.id === activeId ? " active" : ""}`} key={item.id} onClick={item.onSelect} title={item.title} type="button" variant="secondary">{item.icon}<span>{item.name}</span></Button>)}
+    {items.length > RAIL_LIST_LIMIT ? <Button aria-expanded={expanded} className="shared-rail-more" onClick={() => setExpanded((open) => !open)} type="button" variant="secondary">{expanded ? "Show less" : `Show more (${items.length - visible.length})`}</Button> : null}
   </div>;
 }
 

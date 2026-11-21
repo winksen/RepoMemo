@@ -12,6 +12,7 @@ export function OrganizationNavigationProvider({ children }: { children: ReactNo
   const parameters = new URLSearchParams(queryIndex === -1 ? "" : location.slice(queryIndex + 1));
   const activeOrganizationId = parameters.get("organization");
   const isCreatingOrganization = parameters.get("createOrganization") === "1";
+  const isCreatingWorkspace = parameters.get("createWorkspace") === "1";
 
   useEffect(() => {
     const syncLocation = () => setLocation(currentLocation());
@@ -22,6 +23,7 @@ export function OrganizationNavigationProvider({ children }: { children: ReactNo
   const value: OrganizationNavigation = {
     activeOrganizationId,
     isCreatingOrganization,
+    isCreatingWorkspace,
     selectOrganization: (organizationId) => navigate(`/workspaces?organization=${encodeURIComponent(organizationId)}`),
     startCreatingOrganization: () => navigate("/workspaces?createOrganization=1"),
     cancelOrganizationCreation: () => navigate(activeOrganizationId ? `/workspaces?organization=${encodeURIComponent(activeOrganizationId)}` : "/workspaces"),

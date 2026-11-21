@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.21 (2026-11-21)
+
+A narrower sidebar with workspaces listed like organizations, and a plus menu in the navbar to create.
+
+### Changed
+- **Narrower sidebar.** The left rail is 176 px wide instead of 216 px.
+- **Workspaces are a list.** The workspace select is replaced by a list of buttons, like the organizations. Each list shows four rows and a **Show more (n)** button for the rest (**Show less** folds it back); the current workspace or organization is always kept in view. The full `organization / workspace` name is the tooltip.
+- **Create from the navbar.** A **+** button opens a menu with **New workspace**, which goes to the organization page with the name field focused, and **New organization**, shown only when the account may create one. The rail's *New organization* button is removed.
+- No route, setting or migration changes.
+
+### Checks
+- Nothing was built or run; the rail test was rewritten for the list and the fold and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.20 (2026-11-18)
 
 Close the 0.8 line with what it delivers, what was and was not checked, the exit journey written as a sheet for the maintainer, and the support claims.
