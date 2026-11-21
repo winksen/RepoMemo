@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.7 (2026-11-21)
+
+CAIRN suggests what to ask, from the workspace's template.
+
+### Changed
+- **Ideas of what to ask.** When a workspace's template offers suggested questions (the assistant's buttons), CAIRN's greeting and its *what can you do* reply now end the list of jobs with up to three of them: *This workspace is set up for questions like: ...*. A template with none adds nothing.
+- **Same source as the buttons.** They are the template's `assistant.suggestions`, trimmed and without blanks, in the template's order; nothing is written for them and nothing is sent to an AI provider.
+- No API, setting or migration changes.
+
+### Checks
+- A unit test for the template's questions (three of five shown, blanks dropped, none when there are none); compiled and linted, not run. Nothing was built into the app or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.6 (2026-11-21)
 
 CAIRN's greeting names the workspace.

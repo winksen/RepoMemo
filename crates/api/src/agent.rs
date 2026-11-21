@@ -420,9 +420,15 @@ impl RepoMemoCore {
             .await
             .map(|overview| overview.artifact_count)
             .unwrap_or(0);
+        // The questions the workspace's template offers (V0.9.7); none when it cannot be read.
+        let suggestions = match self.effective_template(&request.workspace_id).await {
+            Ok(effective) => effective.template.assistant().suggestions,
+            Err(_) => Vec::new(),
+        };
         ChatterContext {
             ai_available: request.provider_id.is_some(),
             workspace: name.map(|name| WorkspaceBrief { name, files }),
+            suggestions,
         }
     }
 

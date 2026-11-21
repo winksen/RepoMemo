@@ -36,9 +36,30 @@ pub(crate) struct WorkspaceBrief {
 pub(crate) struct ChatterContext {
     pub ai_available: bool,
     pub workspace: Option<WorkspaceBrief>,
+    /// Questions the workspace's template offers as buttons (V0.9.7), shown as ideas of what to ask.
+    pub suggestions: Vec<String>,
 }
 
+/// How many of a template's questions a reply shows.
+const IDEAS_SHOWN: usize = 3;
+
 impl ChatterContext {
+    /// The template's questions as a short Markdown list to follow the jobs, or nothing when it offers none.
+    fn ideas_markdown(&self) -> String {
+        let ideas = self
+            .suggestions
+            .iter()
+            .filter(|idea| !idea.trim().is_empty())
+            .take(IDEAS_SHOWN)
+            .map(|idea| format!("- {}", idea.trim()))
+            .collect::<Vec<_>>();
+        if ideas.is_empty() {
+            String::new()
+        } else {
+            format!("\n\nThis workspace is set up for questions like:\n{}", ideas.join("\n"))
+        }
+    }
+
     /// How the workspace is named in a sentence: by name with what is indexed, or just "this workspace".
     fn workspace_clause(&self) -> String {
         match &self.workspace {
@@ -377,17 +398,18 @@ fn jobs_markdown(context: &ChatterContext) -> String {
 /// CAIRN's own answer to a chatty message. It says nothing about the workspace's files, so nothing in it needs a source.
 pub(crate) fn chatter_reply(chatter: Chatter, context: &ChatterContext) -> AgentReply {
     let jobs = jobs_markdown(context);
+    let ideas = context.ideas_markdown();
     let workspace = context.workspace_clause();
     let opener = chatter.greeting.map(|word| format!("{word}! ")).unwrap_or_default();
     let markdown = match chatter.kind {
         ChatterKind::Greeting => format!(
-            "{opener}I'm CAIRN, the assistant for {workspace}. I can help you find and understand what is in its indexed files:\n\n{jobs}\n\nWhat would you like to do?"
+            "{opener}I'm CAIRN, the assistant for {workspace}. I can help you find and understand what is in its indexed files:\n\n{jobs}{ideas}\n\nWhat would you like to do?"
         ),
         ChatterKind::Identity => format!(
             "{opener}I'm CAIRN, the assistant built into RepoMemo. I work inside {workspace} and I only know what its indexed files say, so what I tell you comes with the files it came from. Here is what I can do:\n\n{jobs}"
         ),
         ChatterKind::Capabilities => format!(
-            "{opener}Here is what I can do in {workspace}:\n\n{jobs}\n\nType what you need, or pick one of these."
+            "{opener}Here is what I can do in {workspace}:\n\n{jobs}{ideas}\n\nType what you need, or pick one of these."
         ),
         ChatterKind::HowAreYou => format!("{opener}I'm doing well, thank you. What would you like to look up in this workspace?"),
         ChatterKind::Thanks => {
@@ -430,6 +452,7 @@ mod tests {
         let answer = unmatched_reply(&ChatterContext {
             ai_available: false,
             workspace: None,
+            ..Default::default()
         });
         assert!(answer.reply_markdown.starts_with("I'm not sure how to help"));
         assert!(answer.reply_markdown.contains("Find files") && answer.reply_markdown.contains("No AI provider"));
@@ -511,6 +534,7 @@ mod tests {
             &ChatterContext {
                 ai_available: true,
                 workspace: None,
+                ..Default::default()
             },
         );
         for info in agent_capabilities(true) {
@@ -525,6 +549,7 @@ mod tests {
             &ChatterContext {
                 ai_available: false,
                 workspace: None,
+                ..Default::default()
             },
         );
         assert!(without_ai.reply_markdown.contains("needs an AI provider"));
@@ -539,6 +564,7 @@ mod tests {
                 name: name.to_owned(),
                 files,
             }),
+            ..Default::default()
         };
         let greet = |files: i64| {
             chatter_reply(
@@ -559,12 +585,40 @@ mod tests {
     }
 
     #[test]
+    fn a_templates_questions_follow_the_jobs_in_a_greeting_and_in_what_can_you_do() {
+        let context = ChatterContext {
+            ai_available: true,
+            suggestions: vec![
+                "What is the runbook for…".to_owned(),
+                "  ".to_owned(),
+                "Who is on call?".to_owned(),
+                "Where is the pager policy?".to_owned(),
+                "A fourth one".to_owned(),
+            ],
+            ..Default::default()
+        };
+        for message in ["hello", "what can you do"] {
+            let shown = chatter_reply(recognise_chatter(message).unwrap(), &context).reply_markdown;
+            assert!(
+                shown.contains(
+                    "set up for questions like:\n- What is the runbook for…\n- Who is on call?\n- Where is the pager policy?"
+                ),
+                "{shown}"
+            );
+            assert!(!shown.contains("A fourth one"), "only three are shown");
+        }
+        let without = chatter_reply(recognise_chatter("hello").unwrap(), &ChatterContext::default()).reply_markdown;
+        assert!(!without.contains("set up for questions"));
+    }
+
+    #[test]
     fn a_greeting_is_answered_in_kind_and_introduces_cairn() {
         let answer = chatter_reply(
             recognise_chatter("Salam").unwrap(),
             &ChatterContext {
                 ai_available: true,
                 workspace: None,
+                ..Default::default()
             },
         );
         assert!(answer.reply_markdown.starts_with("Salam! I'm CAIRN"));
