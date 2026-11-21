@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use crate::RepoMemoCore;
 
 mod chatter;
-use chatter::{chatter_reply, recognise_chatter, ChatterContext};
+use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext};
 
 const MAX_MESSAGE_CHARS: usize = 2_000;
 const FILE_RESULT_LIMIT: usize = 20;
@@ -336,7 +336,8 @@ impl RepoMemoCore {
         };
 
         let Some((capability, routing, mut subject)) = routed else {
-            let mut unmatched = reply("I can't help with that yet. Right now I can find files, search inside indexed files, summarize a file, answer questions from your evidence, and give a workspace overview. Pick one of those or rephrase your request.");
+            // Not one of CAIRN's jobs: it answers in its own voice instead of refusing (V0.9.2).
+            let mut unmatched = self.agent_converse(&request, message, &history, &mut warnings).await;
             unmatched.warnings = warnings;
             return Ok(unmatched);
         };
@@ -401,6 +402,52 @@ impl RepoMemoCore {
             })
             .await?;
         Ok(parse_model_route(&raw, message))
+    }
+
+    /// CAIRN's reply to a message that asks for none of its jobs. With a provider the AI answers as CAIRN from the persona and the
+    /// earlier turns, with no passages and no sources; without one, or when the provider fails, CAIRN says what it can do instead.
+    async fn agent_converse(
+        &self,
+        request: &AgentRequest,
+        message: &str,
+        history: &[AgentHistoryTurn],
+        warnings: &mut Vec<String>,
+    ) -> AgentReply {
+        let context = ChatterContext {
+            ai_available: request.provider_id.is_some(),
+        };
+        let Some(provider_id) = request.provider_id.as_deref() else {
+            return unmatched_reply(&context);
+        };
+        let written: Result<String> = async {
+            let settings = self.storage.get_provider_settings(provider_id).await?;
+            if !settings.enabled || settings.workspace_id.as_deref() != Some(request.workspace_id.as_str()) {
+                repomemo_domain::bail_invalid!("The selected provider is not enabled for this workspace.");
+            }
+            let provider = provider_from_settings(settings)?;
+            provider
+                .generate(GenerateRequest {
+                    system: Some(chat_system()),
+                    prompt: format!("{}Reply to the user's message below.", render_history(history)),
+                    context: message.to_owned(),
+                    options: json!({ "temperature": 0.4 }),
+                })
+                .await
+        }
+        .await;
+        match written {
+            Ok(text) if !text.trim().is_empty() => {
+                let mut answer = reply(text.trim().to_owned());
+                answer.generated = true;
+                answer.context_turns = history.len() as i64;
+                answer
+            }
+            Ok(_) => unmatched_reply(&context),
+            Err(error) => {
+                warnings.push(format!("The AI provider could not answer this message: {error:#}"));
+                unmatched_reply(&context)
+            }
+        }
     }
 
     async fn agent_find_files(&self, workspace_id: &str, subject: &str) -> Result<AgentReply> {

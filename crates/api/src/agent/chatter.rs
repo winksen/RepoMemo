@@ -376,9 +376,46 @@ pub(crate) fn chatter_reply(chatter: Chatter, context: &ChatterContext) -> Agent
     answer
 }
 
+/// What CAIRN's AI is told when a message asks for none of its jobs (V0.9.2). It has no passages to read for such a message, so
+/// it speaks for itself and states nothing about the files.
+pub(crate) const CHAT_RULES: &str = "The user's message asks for none of your jobs, and you have been given no passages from the workspace for it. Reply as CAIRN in a few short sentences. Do not state facts about the workspace's files, and never invent file names, code or sources. You cannot write or edit files or code, run anything, or take actions; if the user asks for that, say so plainly and point to the closest job you can do. For small talk, answer naturally and offer to help with the workspace.";
+
+/// The system prompt of CAIRN's own replies: its persona, then [`CHAT_RULES`].
+pub(crate) fn chat_system() -> String {
+    format!("{} {CHAT_RULES}", super::cairn_persona())
+}
+
+/// What CAIRN says to a message that asks for none of its jobs when no AI can answer it: it says so in its own voice and shows
+/// what it can do instead of a bare refusal.
+pub(crate) fn unmatched_reply(context: &ChatterContext) -> AgentReply {
+    let mut answer = reply(format!(
+        "I'm not sure how to help with that one. Here is what I can do in this workspace:\n\n{}\n\nTry rephrasing your request as one of these.",
+        jobs_markdown(context)
+    ));
+    answer.routing = AgentRouting::Unmatched;
+    answer
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_unmatched_reply_speaks_as_cairn_and_shows_what_it_can_do() {
+        let answer = unmatched_reply(&ChatterContext { ai_available: false });
+        assert!(answer.reply_markdown.starts_with("I'm not sure how to help"));
+        assert!(answer.reply_markdown.contains("Find files") && answer.reply_markdown.contains("No AI provider"));
+        assert_eq!(answer.routing, AgentRouting::Unmatched);
+        assert!(!answer.reply_markdown.contains("can't help with that yet"));
+    }
+
+    #[test]
+    fn the_chat_prompt_is_cairn_and_forbids_inventing_the_workspace() {
+        let system = chat_system();
+        assert!(system.starts_with("You are CAIRN"));
+        assert!(system.contains("never invent file names"));
+        assert!(system.contains("cannot write or edit files"));
+    }
 
     fn kind(message: &str) -> Option<ChatterKind> {
         recognise_chatter(message).map(|chatter| chatter.kind)

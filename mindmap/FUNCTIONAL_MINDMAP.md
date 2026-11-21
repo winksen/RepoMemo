@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.2 — Anything else, CAIRN answers in its own voice.
+
+- **Anything else.** A message that is none of CAIRN's jobs is answered by CAIRN in its own voice: written by the AI when one is enabled (with no sources, and no claim about the files), or else a short reply showing what CAIRN can do. The fixed *I can't help with that yet* is gone.
+- Asked to write code, edit a file or run something, CAIRN says plainly that it cannot and points to the closest job.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.1 — CAIRN answers greetings and "what can you do" itself.
 

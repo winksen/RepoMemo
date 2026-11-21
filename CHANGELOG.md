@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.2 (2026-11-21)
+
+Anything else, CAIRN answers in its own voice.
+
+### Changed
+- **No more dead end.** A message that is none of CAIRN's jobs (small talk, a request to write code, a question about CAIRN itself that the phrases did not catch) no longer gets the fixed *I can't help with that yet*. With an AI provider enabled, the AI answers as CAIRN, in a few sentences, from its persona and the earlier turns of the chat. The model router's *none* answer lands here too.
+- **No invented sources.** That reply is written with no passages, so the prompt forbids stating facts about the workspace's files and inventing file names, code or sources, and says CAIRN cannot write or edit files, run anything or take actions; asked for that, it says so and points to the closest job it can do. It carries no evidence and is labelled AI-generated.
+- **Without a provider**, or when the provider fails (the reason is shown as a warning), CAIRN says *I'm not sure how to help with that one* and shows what it can do, with something to type for each job.
+- No API, setting or migration changes.
+
+### Checks
+- Unit tests for the fallback reply and the prompt; compiled and linted, not run. Nothing was built into the app or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.1 (2026-11-21)
 
 CAIRN answers greetings and "what can you do" itself.
