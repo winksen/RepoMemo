@@ -6,6 +6,8 @@ FIRST VIEWPORT: A calm explanatory field balances a focused access form; after a
 FORM: The established RepoMemo operate composition, adapted into a protected browser session with direct API-state feedback.
 */
 
+import { NewWorkspaceDialog } from "./components/NewWorkspaceDialog";
+import { onNewWorkspaceRequest } from "./lib/newWorkspaceBridge";
 import { AppSkeleton } from "./components/ui/skeleton";
 import { SharedOrganizations } from "./web/Organizations";
 import { forgetSignIn, rememberSignIn } from "./lib/signedIn";
@@ -61,6 +63,8 @@ function SharedWebAppContent() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [workspaces, setWorkspaces] = useState<SharedWorkspace[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // The New workspace dialog, opened from the + menu and from an organization page (`lib/newWorkspaceBridge.ts`).
+  const [newWorkspace, setNewWorkspace] = useState<{ organizationId?: string } | null>(null);
   const [pathname, setPathname] = useState(currentPathname);
   // Invitation and reset links carry their secret in the fragment (`/invite#<secret>`), never sent to a server.
   const [linkSecret, setLinkSecret] = useState(currentLinkSecret);
@@ -71,6 +75,8 @@ function SharedWebAppContent() {
   const [setup, setSetup] = useState<ServerSetupStatus | null>(null);
   // Whether the server has an environment folder attached; without one it can only show the environment menu.
   const [platform, setPlatform] = useState<{ attached: boolean; folder: string; pinned_environment?: string | null } | null>(null);
+
+  useEffect(() => onNewWorkspaceRequest((organizationId) => setNewWorkspace({ organizationId })), []);
 
   useEffect(() => {
     // An older server has no platform routes and is always attached.
@@ -395,6 +401,17 @@ function SharedWebAppContent() {
     >
       {renderPage()}
     </SharedShell>
+    <NewWorkspaceDialog
+      accessToken={accessToken}
+      defaultOrganizationId={newWorkspace?.organizationId}
+      onClose={() => setNewWorkspace(null)}
+      onCreated={(created) => {
+        setWorkspaces((current) => [created, ...current]);
+        navigate(workspaceHomePath(created.workspace.id));
+      }}
+      open={newWorkspace !== null}
+      organizations={organizations}
+    />
     <CommandPalette accessToken={accessToken} userId={session.user.id} assistantWorkspaceId={route.name === "workspace" ? route.workspaceId : null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
   </>;
 }

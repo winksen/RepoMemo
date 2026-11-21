@@ -1,16 +1,16 @@
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { IconBuildingCommunity as Building, IconPlus as Plus, IconStack2 as Layers } from "@tabler/icons-react";
-import { navigate, organizationPath, parseRoute } from "../web/router";
+import { openNewWorkspace } from "../lib/newWorkspaceBridge";
+import { navigate, parseRoute } from "../web/router";
 import { IconButton } from "./ui/icon-button";
 import { ICON_SIZE } from "./ui/icon";
 
 /** The plus button of the navbar: start a new organization or a new workspace from any page. */
 export function CreateMenu({ canCreateOrganization, defaultOrganizationId }: { canCreateOrganization: boolean; defaultOrganizationId?: string }) {
   function newWorkspace() {
-    // The organization being viewed, else the one the shell proposes; with none the organizations page is the way in.
+    // The organization being viewed, else the one the shell proposes; the dialog lets the person pick another.
     const route = parseRoute(window.location.pathname);
-    const organizationId = route.name === "organization" ? route.organizationId : defaultOrganizationId;
-    navigate(organizationId ? `${organizationPath(organizationId)}?createWorkspace=1` : "/orgs");
+    openNewWorkspace(route.name === "organization" ? route.organizationId : defaultOrganizationId);
   }
   return (
     <MenuPrimitive.Root>

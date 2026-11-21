@@ -46,7 +46,7 @@ describe("parseRoute", () => {
   it("moves the old workspace addresses to the current ones", () => {
     expect(legacyRedirect("/workspaces/w1/memory", "?q=a")).toBe("/spaces/w1/memory?q=a");
     expect(legacyRedirect("/workspaces", "?organization=o%201")).toBe("/orgs/o%201");
-    expect(legacyRedirect("/workspaces", "?organization=o1&createWorkspace=1")).toBe("/orgs/o1?createWorkspace=1");
+    expect(legacyRedirect("/workspaces", "?organization=o1&createWorkspace=1")).toBe("/orgs/o1");
     expect(legacyRedirect("/workspaces", "?createOrganization=1")).toBe("/orgs/new");
     expect(legacyRedirect("/workspaces", "")).toBe("/spaces");
     expect(legacyRedirect("/spaces/w1", "")).toBeNull();

@@ -136,7 +136,7 @@ export function legacyRedirect(pathname: string, search: string): string | null 
   if (pathname === "/workspaces") {
     const parameters = new URLSearchParams(search);
     const organization = parameters.get("organization");
-    if (organization) return `${organizationPath(organization)}${parameters.get("createWorkspace") === "1" ? "?createWorkspace=1" : ""}`;
+    if (organization) return organizationPath(organization);
     if (parameters.get("createOrganization") === "1") return "/orgs/new";
     return "/spaces";
   }

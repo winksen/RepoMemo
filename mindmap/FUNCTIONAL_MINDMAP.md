@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.32` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.33` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.33 — A New workspace dialog.
+
+- **New workspace** opens a dialog with the **organization**, the **workspace name**, the **template** and the *Restricted* switch. From an organization's page the organization is already chosen; from the **+** menu in the top bar it starts on the organization you are viewing (or the first one you administer) and a list lets you pick another. Only organizations you own or administer are listed; with none, the dialog says who can create workspaces. Creating the workspace opens it on its Overview.
+- An organization's page shows **New workspace** where it showed *New organization* (an administrator sees it; *New organization* stays in the **+** menu and on `/orgs`). The inline *Create a workspace* form is gone; importing a workspace archive stays on the page.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.32 — Organizations as cards.
 

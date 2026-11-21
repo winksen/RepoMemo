@@ -13,7 +13,6 @@ export function OrganizationNavigationProvider({ children }: { children: ReactNo
   const route = parseRoute(queryIndex === -1 ? location : location.slice(0, queryIndex));
   const activeOrganizationId = route.name === "organization" ? route.organizationId : null;
   const isCreatingOrganization = route.name === "new-organization";
-  const isCreatingWorkspace = parameters.get("createWorkspace") === "1";
 
   useEffect(() => {
     const syncLocation = () => setLocation(currentLocation());
@@ -24,7 +23,6 @@ export function OrganizationNavigationProvider({ children }: { children: ReactNo
   const value: OrganizationNavigation = {
     activeOrganizationId,
     isCreatingOrganization,
-    isCreatingWorkspace,
     selectOrganization: (organizationId) => navigate(organizationPath(organizationId)),
     startCreatingOrganization: () => navigate("/orgs/new"),
     cancelOrganizationCreation: () => navigate(activeOrganizationId ? organizationPath(activeOrganizationId) : "/orgs"),

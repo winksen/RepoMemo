@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.33 (2026-11-21)
+
+A dialog to create workspaces, from the **+** menu and from an organization page.
+
+### Added
+- **New workspace dialog.** Organization, workspace name, template and the *Restricted* switch. From an organization's page the organization is already chosen; from the **+** menu in the top bar it starts on the organization you are viewing (or the first you administer) and you can pick another from the list. Only organizations you own or administer are listed; with none, the dialog says who can create workspaces. A created workspace opens on its Overview.
+
+### Changed
+- **Organization page.** *New workspace* replaces the *New organization* button in its header (for administrators); *New organization* stays in the **+** menu and on the Organizations page. The inline *Create a workspace* form is removed. Importing a workspace archive stays.
+- An old address with `createWorkspace=1` now opens the organization alone.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; a new test covers the dialog and the request bridge and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.32 (2026-11-21)
 
 Organizations as cards.
