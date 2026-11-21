@@ -902,3 +902,7 @@ input[type="file"] {
 .shared-color-swatch[aria-pressed="true"] { border-color: var(--color-text); }
 .shared-color-swatch:disabled { cursor: wait; opacity: 0.58; }
 .shared-color-swatch:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: 2px; }
+
+/* A workspace in the sidebar shows its icon on a chip of the workspace's colour (the app's accent by default); the current one is plain on its grey fill. */
+.shared-rail-chip { display: grid; flex: 0 0 auto; width: 26px; height: 26px; place-items: center; color: var(--color-on-accent); background: var(--color-accent); border-radius: 7px; }
+.rm-button.shared-rail-workspace.active .shared-rail-chip { color: inherit; background: transparent; }

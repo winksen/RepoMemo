@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Workspace } from "../types";
 
 /** The colours of one theme: the accent, its hover, the soft background, the text that reads on the page, and the text on the accent. */
@@ -24,6 +25,21 @@ export const WORKSPACE_COLORS: { key: string; label: string; light: ColorTones; 
 export function workspaceColorKey(workspace: Pick<Workspace, "settings">): string | null {
   const chosen = workspace.settings?.color;
   return typeof chosen === "string" && WORKSPACE_COLORS.some((entry) => entry.key === chosen) ? chosen : null;
+}
+
+/**
+ * The same colour as React props, for an element a component draws itself (a chip in a list): spread `data-workspace-color`
+ * and `style` on it. `null`, or a key not in the palette, gives the app's own accent.
+ */
+export function workspaceColorProps(key: string | null): { "data-workspace-color"?: string; style?: CSSProperties } {
+  const color = key ? WORKSPACE_COLORS.find((entry) => entry.key === key) : undefined;
+  if (!color) return {};
+  const style: Record<string, string> = {};
+  for (const token of ["accent", "hover", "soft", "text", "on"] as const) {
+    style[`--ws-light-${token}`] = color.light[token];
+    style[`--ws-dark-${token}`] = color.dark[token];
+  }
+  return { "data-workspace-color": color.key, style: style as CSSProperties };
 }
 
 const TOKENS: (keyof ColorTones)[] = ["accent", "hover", "soft", "text", "on"];

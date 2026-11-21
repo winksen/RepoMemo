@@ -22,6 +22,7 @@ import { useReviewQueue, useTemplate } from "./workspace/data";
 import { ADMIN_WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { apiMessage } from "./format";
 import { WorkspaceIcon } from "./workspaceIcons";
+import { workspaceColorKey, workspaceColorProps } from "./workspaceColors";
 import { navigate, workspaceHomePath } from "./router";
 import { ICON_SIZE } from "../components/ui/icon";
 
@@ -118,7 +119,7 @@ export function OrganizationRail({
   if (!workspaces) return <div className="shared-rail-navigation" />;
   const entries = workspaces.map((workspace) => {
     const organization = organizations.find((entry) => entry.id === workspace.organization_id);
-    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, icon: <WorkspaceIcon size={ICON_SIZE.lg} workspace={workspace.workspace} />, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
+    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, icon: <span className="shared-rail-chip" {...workspaceColorProps(workspaceColorKey(workspace.workspace))}><WorkspaceIcon size={ICON_SIZE.md} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
   });
   return <div className="shared-rail-navigation">
     <RailSection label="Workspaces" name="workspaces">
