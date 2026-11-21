@@ -189,15 +189,16 @@ export function WorkspaceTopbar({
   const { tabs, more } = arrangeSections(template?.sections, activeSection, isWorkspaceAdmin);
   // The workspace's own names for its sections (V0.2.173); the usual name stays as the tooltip of a renamed tab.
   const nameOf = (section: WorkspaceSection) => template?.labels.sections[section] ?? TABS[section].label;
-  const sectionIcon = (section: WorkspaceSection) => {
+  // The icon of the open tab is drawn filled; the others, and the ones in the More menu, are outlined.
+  const sectionIcon = (section: WorkspaceSection, filled = false) => {
     const Icon = TABS[section].icon;
-    return <Icon size={ICON_SIZE.md} />;
+    return <Icon size={ICON_SIZE.md} weight={filled ? "fill" : "regular"} />;
   };
   const workspaceTab = (section: WorkspaceSection) => {
     const label = nameOf(section);
-    const icon = sectionIcon(section);
     const isAdminOnly = ADMIN_WORKSPACE_SECTIONS.has(section);
     const isActive = activeSection === section;
+    const icon = sectionIcon(section, isActive);
     return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" key={section} title={label !== TABS[section].label ? TABS[section].label : undefined} variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}{section === "review" && waiting > 0 ? <span className="shared-workspace-tab-count">{waiting}<span className="sr-only"> waiting</span></span> : null}</span></Button>;
   };
 

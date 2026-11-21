@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.51` (2026-11-21)
+> **Current:** `V0.8.52` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -71,6 +71,7 @@
 | **V0.8.49** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Cairn as a global agent page | Give Cairn an icon of its own and show its name in capitals, move its page to /cairn, replace the sidebar with the person's chat history across workspaces, and remove the workspace dropdown | /cairn is a chat with the history of every workspace in the sidebar, no workspace list, and a cairn icon wherever the assistant appears |
 | **V0.8.50** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Cairn sidebar and new chat | Group Cairn's chats by workspace in its sidebar, leave only chat content in that sidebar, and offer a choice of workspace when a new chat starts | The sidebar lists chats under each workspace's name with nothing else, and a new chat has a workspace chooser |
 | **V0.8.51** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Phosphor icons and Cairn sidebar | Change the icon pack from Tabler to Phosphor, draw the current sidebar item's icon filled, keep the sidebar from scrolling sideways with a wider Cairn sidebar, and stop Cairn from using the workspace color | Every icon is a Phosphor icon, the current sidebar item's icon is filled, no sidebar has a horizontal scrollbar, and Cairn's page uses the app's own colors |
+| **V0.8.52** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Filled tab icons | Draw the icon of the open tab filled on workspace and organization pages | The open tab's icon is filled and the others are outlined |
 
 ## Verification and handoff
 

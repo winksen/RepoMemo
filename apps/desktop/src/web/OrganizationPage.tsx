@@ -32,7 +32,7 @@ export function OrganizationTopbar({ activeSection, onNavigate, organization }: 
       {organizationSections(organization).map((section) => {
         const Icon = TABS[section].icon;
         const isActive = section === activeSection;
-        return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} key={section} onClick={() => onNavigate(section)} type="button" variant="secondary"><span className="shared-workspace-tab-label"><Icon size={ICON_SIZE.md} />{TABS[section].label}</span></Button>;
+        return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} key={section} onClick={() => onNavigate(section)} type="button" variant="secondary"><span className="shared-workspace-tab-label"><Icon size={ICON_SIZE.md} weight={isActive ? "fill" : "regular"} />{TABS[section].label}</span></Button>;
       })}
       {indicator}
     </div>
