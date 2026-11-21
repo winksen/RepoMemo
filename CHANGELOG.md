@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.62 (2026-11-21)
+
+A user menu in the sidebar, and a top bar that lines up.
+
+### Changed
+- **User menu.** The foot of the sidebar shows your picture, name and email and opens a dropdown to the right with your name and when this browser signed in, **Profile**, **Settings** and **Log out**. It replaces the *Session connected* note. *Settings* opens your profile at its notification preferences. It is also at the foot of CAIRN's chat sidebar. Entries for other account pages can be added to it later.
+- **Top bar.** The *Profile* and *Sign out* buttons are removed (they are in the user menu). Every control left in it, the create button, the theme toggle, CAIRN with its menu, search and notifications, is now the same height (36 px) and lines up; before, some were 32 px and some 36 px.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen. A new test covers the menu, and the narrow-screen header test was changed to check that the menu is in the sidebar; neither was executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.61 (2026-11-21)
 
 A CAIRN button, a notifications dropdown, and no assistant dock.

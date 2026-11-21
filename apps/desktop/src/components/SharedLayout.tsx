@@ -6,6 +6,7 @@ import { parseRoute } from "../web/router";
 import { rememberCairnWorkspace } from "../web/cairn";
 import { CairnButton } from "./CairnButton";
 import { NotificationsMenu } from "./NotificationsMenu";
+import { UserMenu } from "./UserMenu";
 import { Bell, Buildings as Building, CaretDown as ChevronDown, MagnifyingGlass as Search, SignOut as Logout, Moon, HardDrives as Server, LockKey as Shield, Sun, UserCircle } from "@phosphor-icons/react";
 import type { SharedSession } from "../types";
 import { openCommandPalette } from "../lib/assistantBridge";
@@ -96,16 +97,14 @@ function LayoutFrame({ accessToken, chatsOnly = false, session, sidebar, signOut
             <CairnButton onNavigate={onNavigate} />
             <IconButton className="shared-palette-link" label="Open command palette" onClick={openCommandPalette} size="sm"><Search size={ICON_SIZE.md} /></IconButton>
             {accessToken ? <NotificationsMenu accessToken={accessToken} onNavigate={onNavigate} userId={session.user.id} /> : <IconButton className="shared-notifications-link" label="Notifications" onClick={() => onNavigate("/notifications")} size="sm"><Bell size={ICON_SIZE.md} /></IconButton>}
-            <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={ICON_SIZE.md} /> <span className="shared-button-label">Profile</span></Button>
           </div>
-          <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={ICON_SIZE.md} /> <span className="shared-button-label">Sign out</span></Button>
         </div>
       </div>
     </header>
     <div className="shared-home-frame" data-wide={chatsOnly ? "true" : undefined}>
       <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
         <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={ICON_SIZE.md} /></Button>
-        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{chatsOnly ? null : <><AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><SessionNote /><DesktopServerNote signedIn /></>}</div>
+        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{chatsOnly ? null : <><AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><DesktopServerNote signedIn /></>}<UserMenu onNavigate={onNavigate} session={session} signOut={signOut} /></div>
       </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {slots ? <div className="shared-shell-slot" ref={slots.setNavigation} /> : navigation}
@@ -200,10 +199,4 @@ function AdministrationRail({ onNavigate, showSystem }: { onNavigate: (to: strin
     <Tooltip content="Manage your organizations" side="right"><Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} type="button" variant="secondary"><Building size={ICON_SIZE.lg} weight={inOrganizations ? "fill" : "regular"} /><span>Organizations</span></Button></Tooltip>
     {showSystem ? <Tooltip content="Administer this server" side="right"><Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} type="button" variant="secondary"><Server size={ICON_SIZE.lg} weight={inSystem ? "fill" : "regular"} /><span>System</span></Button></Tooltip> : null}
   </section>;
-}
-
-/** The foot of the rail: the session is connected, and when this browser signed in, if it knows. */
-function SessionNote() {
-  const since = lastSignIn();
-  return <div className="shared-rail-footer"><Shield size={ICON_SIZE.md} /><span>Session connected{since ? <small>Signed in {since.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</small> : null}</span></div>;
 }

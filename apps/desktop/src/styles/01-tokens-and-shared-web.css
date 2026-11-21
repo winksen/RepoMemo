@@ -1034,3 +1034,25 @@ input[type="file"] {
 .shared-notifications-popover-list .is-unread .shared-notifications-popover-dot { background: var(--color-accent); }
 .shared-notifications-popover-empty { margin: 4px 2px; color: var(--color-text-muted); font-size: 13px; }
 .shared-notifications-popover-all { justify-self: stretch; }
+
+/* The top bar's controls share one height (V0.8.62), and the person's menu is the foot of the sidebar. */
+.shared-header-actions, .shared-user-menu, .shared-account-controls { align-items: center; }
+.shared-account-controls > *, .shared-cairn-split { height: 36px; }
+.shared-account-controls button, .shared-account-controls .rm-icon-button { box-sizing: border-box; min-height: 36px; height: 36px; }
+.shared-account-controls .rm-icon-button { width: 36px; min-width: 36px; padding: 0; }
+.shared-account-controls .shared-cairn-caret { width: 30px; min-width: 30px; }
+.shared-user-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.shared-user-trigger { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; color: var(--color-text); background: transparent; border: 0; border-radius: 10px; cursor: pointer; font: inherit; text-align: left; }
+.shared-user-trigger:hover, .shared-user-trigger[data-state="open"] { background: var(--color-surface-2); }
+.shared-user-trigger:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: -2px; }
+.shared-user-trigger-text { display: grid; flex: 1; min-width: 0; }
+.shared-user-trigger-text strong, .shared-user-trigger-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-user-trigger-text strong { font-size: 14px; }
+.shared-user-trigger-text small { color: var(--color-text-muted); font-size: 12px; }
+.shared-user-trigger > svg { flex: 0 0 auto; color: var(--color-text-subtle); }
+.shared-user-dropdown { min-width: 220px; }
+.shared-user-dropdown-who { display: grid; gap: 2px; padding: 8px 10px; }
+.shared-user-dropdown-who strong { font-size: 13px; }
+.shared-user-dropdown-who span { color: var(--color-text-muted); font-size: 12px; }
+.shared-user-dropdown-line { height: 1px; margin: 4px 0; background: var(--color-border); }
+.shared-user-dropdown-out { color: var(--color-danger); }

@@ -39,11 +39,12 @@ describe("the rail on a narrow screen", () => {
     expect(toggle.getAttribute("aria-controls")).toBe(document.querySelector(".shared-rail-body")?.id);
   });
 
-  it("keeps the header buttons named when their words are hidden", () => {
+  it("keeps the person's menu in the rail, named, and out of the top bar", () => {
     screenIs("narrow");
-    render(<SharedLayout apiAvailable onNavigate={() => undefined} session={session} sidebar={<p>rail</p>} signOut={() => undefined}><h1>Page</h1></SharedLayout>);
-    expect(screen.getByRole("button", { name: "Profile" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+    render(<SharedLayout apiAvailable onNavigate={() => undefined} session={session} sidebar={<p>rail</p>} signOut={() => undefined}><p>page</p></SharedLayout>);
+    expect(screen.getByRole("button", { name: "Account menu for Ada" })).toBeTruthy();
+    expect(document.querySelector(".shared-home-header")?.querySelector(".shared-user-trigger")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
 });
 

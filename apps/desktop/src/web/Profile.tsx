@@ -62,6 +62,13 @@ export function SharedProfile({
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const isLoading = profileQuery.isLoading || tasksQuery.isLoading;
+  // The user menu's Settings is this page at its preferences (`/profile#settings`).
+  useEffect(() => {
+    const toSettings = () => { if (window.location.hash === "#settings") document.getElementById("settings")?.scrollIntoView?.({ block: "start", behavior: "smooth" }); };
+    toSettings();
+    window.addEventListener("popstate", toSettings);
+    return () => window.removeEventListener("popstate", toSettings);
+  }, [isLoading]);
   const { isBusy: isSubmitting, run } = useAsyncAction();
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
   const [hasAvatar, setHasAvatar] = useState(false);
@@ -156,7 +163,7 @@ export function SharedProfile({
           {profile?.email_verified === false ? <Button busy={isSubmitting} onClick={() => void resendVerification()} variant="secondary">Send the link again</Button> : null}
           <form onSubmit={changeEmail}><Field label="New address" required><Input autoComplete="email" onChange={(event) => setNewEmail(event.target.value)} type="email" value={newEmail} /></Field><Field label="Current password" required><Input autoComplete="current-password" onChange={(event) => setEmailPassword(event.target.value)} type="password" value={emailPassword} /></Field><Button busy={isSubmitting} type="submit" variant="secondary">Change address</Button></form>
         </section>
-        <section className="shared-profile-panel"><PanelHeading icon={Checklist} title="Notifications" />
+        <section className="shared-profile-panel" id="settings"><PanelHeading icon={Checklist} title="Notifications" />
           <p className="shared-muted-copy">Choose where each kind of notice reaches you. Password reset notices always reach you in the app and by mail.</p>
           {preferences.map((preference) => <Field key={preference.kind} label={preference.label}>{(control) => <Dropdown disabled={preferencesQuery.isLoading} id={control.id} onValueChange={(value) => void chooseChannel(preference.kind, value)} options={preference.kind === "daily_digest" ? [{ label: "Off", value: "none" }, { label: "By mail, once a day", value: "mail" }] : [{ label: "In the app and by mail", value: "both" }, { label: "In the app only", value: "app" }, { label: "By mail only", value: "mail" }, { label: "Nowhere", value: "none" }]} value={preference.channel} />}</Field>)}
         </section>

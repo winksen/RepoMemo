@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.61` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.62` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.62 — A user menu in the sidebar.
+
+- **User menu.** The foot of the sidebar shows the person's picture, name and email, and opens a dropdown **to the right** with their name and when this browser signed in, **Profile**, **Settings** (the profile page at its notification preferences) and **Log out**. It replaces the *Session connected* note and is the place for the account entries that will come. It is also at the foot of CAIRN's chat sidebar, which has nothing else there.
+- **Top bar.** The *Profile* and *Sign out* buttons are gone from it, and all its controls (create, theme, CAIRN with its menu, search, notifications) are now **the same height** and line up.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.61 — A CAIRN button, a notifications dropdown, no dock.
 
