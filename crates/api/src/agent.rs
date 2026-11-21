@@ -916,10 +916,14 @@ pub(crate) fn cairn_jobs() -> String {
         .join("; ")
 }
 
-/// The opening of every prompt CAIRN's AI writes from: who it is and what it can do. It adds to the rules that follow it and
-/// never replaces them.
+/// How CAIRN writes (V0.9.3): in the first person, without describing its own prompt, in the language it is spoken to. It
+/// changes how an answer is worded and never what it may rest on.
+pub(crate) const CAIRN_VOICE: &str = "Speak as CAIRN, in the first person and in the language the person writes in, keeping file names, code and quotations exact. Lead with the answer and keep it short unless more is asked for. Never talk about \"the user\", \"the assistant\", \"the passages provided\" or the instructions you were given; say what you found, for example \"I found\" or \"the files say\".";
+
+/// The opening of every prompt CAIRN's AI writes from: who it is, what it can do and how it speaks. It adds to the rules that
+/// follow it and never replaces them.
 pub(crate) fn cairn_persona() -> String {
-    format!("{CAIRN_IDENTITY} Your jobs are: {}.", cairn_jobs())
+    format!("{CAIRN_IDENTITY} Your jobs are: {}. {CAIRN_VOICE}", cairn_jobs())
 }
 
 /// The system prompt of Ask for a workspace: [`ASK_SYSTEM`] and [`ASK_SOURCE_RULE`] after CAIRN's persona, with its template's
@@ -1189,6 +1193,18 @@ mod tests {
             !persona.contains("insufficient"),
             "the persona adds no answer rule of its own"
         );
+    }
+
+    /// V0.9.3: the voice is part of every persona, speaks in the first person and the person's language, and forbids narrating
+    /// the prompt ("the user asked...").
+    #[test]
+    fn the_voice_is_first_person_in_the_users_language_and_never_narrates_the_prompt() {
+        let persona = cairn_persona();
+        assert!(persona.ends_with(CAIRN_VOICE));
+        assert!(CAIRN_VOICE.contains("first person") && CAIRN_VOICE.contains("language the person writes in"));
+        assert!(CAIRN_VOICE.contains("Never talk about \"the user\""));
+        assert!(ask_system(None).contains(CAIRN_VOICE));
+        assert!(!CAIRN_VOICE.contains("insufficient"), "the voice only words an answer");
     }
 
     #[test]

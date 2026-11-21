@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.2` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.3 — CAIRN speaks in the first person, in your language.
+
+- **Voice.** CAIRN answers as itself: first person, in the language you wrote in, answer first and short. It no longer narrates its own prompt (*the user asked ... the passages provided*).
+- How it words an answer changes; what an answer may rest on does not.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.2 — Anything else, CAIRN answers in its own voice.
 

@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.3 (2026-11-21)
+
+CAIRN speaks in the first person, in your language.
+
+### Changed
+- **Voice.** Every prompt CAIRN's AI writes from now carries how CAIRN speaks: as CAIRN, in the first person; in the language the person writes in (file names, code and quotations stay exact); leading with the answer and short unless more is asked for.
+- **No narrating the prompt.** The model is told never to talk about *the user*, *the assistant*, *the passages provided* or its instructions. Before, an answer could open *Based on the passages provided, I can see that the user asked ...*; it now says what it found (*I found*, *the files say*).
+- It changes how an answer is worded and never what it may rest on: the citation rule, the *insufficient context* answer and the source rule are untouched, and the voice adds no answer rule of its own.
+- No API, setting or migration changes.
+
+### Checks
+- A unit test for the voice; compiled and linted, not run. Nothing was built into the app or run; the wording of real answers was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.2 (2026-11-21)
 
 Anything else, CAIRN answers in its own voice.
