@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.67` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.0 — CAIRN knows who it is.
+
+- **CAIRN knows who it is.** The AI behind CAIRN is told it is CAIRN, the assistant built into RepoMemo, and which jobs it can do (find files, find a symbol, search content, summarize a file, ask a question, workspace overview), so it no longer answers *what can you do* from the indexed files.
+- Answers still rest only on the numbered passages: the citation rule, the *insufficient context* answer and the source rule are unchanged.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.67 — The model under the message box, a bare top bar, dropdown motion.
 

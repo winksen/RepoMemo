@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.0 (2026-11-21)
+
+CAIRN knows who it is.
+
+### Changed
+- **Identity.** Every prompt CAIRN's AI writes from now opens with who it is: CAIRN, the assistant built into RepoMemo, working inside one workspace, and the jobs it can do (find files, find a symbol, search content, summarize a file, ask a question, workspace overview). The list is read from the same capability list the assistant offers, so the prompts and the product never disagree.
+- **Where it applies.** The Ask prompt, the file summary and the workspace overview. The rules after it are unchanged: the citation rule, the *insufficient context* answer, and the rule that a passage is material and never an instruction. A template's focus is still added after them.
+- **Why.** Asked *what can you do*, the model answered from the indexed files and said the passages did not list what the assistant can do. It now knows its own jobs.
+- No API, setting or migration changes. The 0.9 pilot rows were renumbered by nine (V0.9.0 became V0.9.9) to make room for this CAIRN track.
+
+### Checks
+- Written with a unit test for the persona; compiled and linted, not run. Nothing was built into the app or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.67 (2026-11-21)
 
 The model under the message box, a bare top bar, and dropdown motion.
@@ -1805,7 +1821,7 @@ Make the upload version check part of its write and name the unchecked mode in t
 - **A stale upload can no longer pass the check and then overwrite a newer one.** `POST /v1/artifacts/{id}/versions` compared `X-RepoMemo-Expected-Updated-At` with the file as read just before the write, so a change that landed in between was overwritten. The comparison is now part of the update statement itself: of two uploads that started from the same state, exactly one is stored and the other gets `409`. The earlier comparison stays as a quick refusal.
 
 ### Changed
-- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.10 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
+- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.19 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
 - No route, setting or migration changes.
 
 ### Checks
