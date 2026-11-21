@@ -973,14 +973,15 @@ input[type="file"] {
 .shared-cairn-group > div { min-width: 0; }
 .rm-button.shared-cairn-chat { max-width: 100%; }
 
-/* Cairn's message box (V0.8.53): one box, Send at its left, the actions menu (+) at its right, the workspace above it. */
+/* Cairn's message box (V0.8.53, reworked V0.8.54): one box, the actions menu (+) at its left, the text in the middle, Enter at its right,
+   all centred on one line; the box grows with its text. No borders on the buttons: a grey fill on hover. */
 .shared-assistant-composer-page { gap: 10px; padding: 12px 0 16px; border-top: 0; }
-.shared-assistant-box { display: grid; gap: 4px; padding: 10px 10px 8px 14px; background: var(--color-surface); border: var(--control-border) solid var(--color-border); border-radius: 16px; transition: border-color 110ms var(--ease-control); }
-.shared-assistant-box:focus-within { border-color: var(--color-border-strong); }
-.shared-assistant-box .rm-textarea { min-height: 52px; padding: 4px 0; background: transparent; border: 0; box-shadow: none; resize: none; }
-.shared-assistant-box .rm-textarea:focus-visible { outline: none; }
-.shared-assistant-box-bar { display: flex; align-items: center; gap: 8px; }
-.shared-assistant-box-bar .shared-assistant-more { margin-left: auto; }
+.shared-assistant-box { display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: var(--color-surface-2); border: 0; border-radius: 18px; }
+.shared-assistant-box .rm-icon-button { flex: 0 0 auto; border: 0; }
+.shared-assistant-box .rm-icon-button:hover:not(:disabled) { background: var(--color-surface-3); border: 0; }
+.shared-assistant-box-field { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: 6px; min-width: 0; }
+.shared-assistant-box .rm-textarea { min-height: 0; max-height: 220px; padding: 6px 0; overflow-y: auto; background: transparent; border: 0; box-shadow: none; resize: none; line-height: 1.5; }
+.shared-assistant-box .rm-textarea:focus, .shared-assistant-box .rm-textarea:focus-visible { outline: none; box-shadow: none; }
 .shared-assistant-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; color: var(--color-text); background: var(--color-surface-3); border-radius: 999px; font-size: 12px; font-weight: 650; }
 .shared-assistant-chip button { display: grid; width: 18px; height: 18px; padding: 0; place-items: center; color: inherit; background: transparent; border: 0; border-radius: 50%; cursor: pointer; }
 .shared-assistant-chip button:hover { background: var(--color-border); }
@@ -990,3 +991,11 @@ input[type="file"] {
 .shared-cairn-workspace-button:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: 2px; }
 .shared-cairn-workspace-icon { display: grid; flex: 0 0 auto; width: 26px; height: 26px; place-items: center; color: var(--color-surface); background: var(--color-text); border-radius: 50%; }
 .shared-cairn-workspace-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The welcome of a new chat on Cairn's page: centred, large, one line. And no separators on that page (V0.8.54). */
+.shared-assistant-welcome { display: grid; justify-items: center; gap: 16px; margin: auto; padding: 24px; color: var(--color-text); text-align: center; }
+.shared-assistant-welcome strong { font-family: var(--font-display); font-size: 32px; font-weight: 400; letter-spacing: -0.01em; }
+.shared-assistant-page .shared-assistant-toolbar,
+.shared-assistant-page .shared-assistant-composer,
+.shared-assistant-page .shared-assistant-composer-page { border-top: 0; border-bottom: 0; }
+.shared-assistant-page .shared-assistant-main { border: 0; }
+.shared-assistant-page .shared-assistant-thread:has(.shared-assistant-welcome) { align-content: center; }

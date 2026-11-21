@@ -2,7 +2,7 @@ import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { SafeMarkdown } from "./SafeMarkdown";
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
-import { Brain, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear } from "@phosphor-icons/react";
+import { Brain, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
 import { deleteSharedAgentConversation, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";
@@ -127,6 +127,13 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     const last = rememberedChat(workspaceId);
     if (last && conversations.some((conversation) => conversation.id === last)) void openChat(last);
   }, [chatsLoaded, workspaceId]);
+  // The message box on Cairn's page is as tall as its text, up to a limit; it scrolls beyond that.
+  useEffect(() => {
+    const field = input.current;
+    if (!field || variant !== "page") return;
+    field.style.height = "auto";
+    field.style.height = `${Math.min(field.scrollHeight, 220)}px`;
+  }, [draft, variant]);
   // On Cairn's page the address decides which chat is open.
   useEffect(() => {
     if (requestedChatId === undefined || requestedChatId === activeId) return;
@@ -309,10 +316,15 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           {turn.status === "pending" ? <LoadingState label="Working on it" /> : null}
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
           {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} isBusy={isBusy} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} /> : null}
-        </article>) : <div className="shared-assistant-intro">
+        </article>) : variant === "page"
+          ? <div className="shared-assistant-welcome">
+            <CairnIcon size={56} weight="fill" />
+            <strong>How can I help?</strong>
+          </div>
+          : <div className="shared-assistant-intro">
           <CairnIcon size={22} />
           <strong>Hi, I&apos;m {ASSISTANT_NAME}. What do you need from this workspace?</strong>
-          <span>{variant === "page" ? "Use the + to pick an action, or just type." : "Pick an action below or just type."} Requests are matched to one of these actions; anything else gets a short reply for now. Chats are saved so you can come back to them.</span>
+          <span>Pick an action below or just type. Requests are matched to one of these actions; anything else gets a short reply for now. Chats are saved so you can come back to them.</span>
         </div>}
         <div ref={threadEnd} />
       </div>
@@ -322,26 +334,26 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           {suggestedQuestions(template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
         </div> : null}
         <div className="shared-assistant-box">
-          <Textarea aria-label={`Message ${ASSISTANT_NAME}`} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={2} value={draft} />
-          <div className="shared-assistant-box-bar">
-            <IconButton busy={isBusy} className="shared-assistant-send" disabled={isLoadingChat || !draft.trim()} label="Send" size="sm" type="submit"><Send size={ICON_SIZE.md} weight="fill" /></IconButton>
+          <MenuPrimitive.Root>
+            <MenuPrimitive.Trigger asChild>
+              <IconButton appearance="plain" className="shared-assistant-more" label="Actions" size="sm" type="button"><Plus size={ICON_SIZE.lg} /></IconButton>
+            </MenuPrimitive.Trigger>
+            <MenuPrimitive.Portal>
+              <MenuPrimitive.Content align="start" aria-label={`${ASSISTANT_NAME} actions`} className="rm-action-menu" side="top" sideOffset={8}>
+                {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
+                  const Icon = CAPABILITY_ICONS[capability.id];
+                  return <MenuPrimitive.Item className="rm-action-item" disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onSelect={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`}>
+                    <Icon size={ICON_SIZE.md} weight={selected === capability.id ? "fill" : "regular"} /><span>{capability.label}</span>
+                  </MenuPrimitive.Item>;
+                })}
+              </MenuPrimitive.Content>
+            </MenuPrimitive.Portal>
+          </MenuPrimitive.Root>
+          <div className="shared-assistant-box-field">
             {selectedInfo ? <span className="shared-assistant-chip">{selectedInfo.label}<button aria-label={`Stop using ${selectedInfo.label}`} onClick={() => setSelected(null)} type="button"><Clear size={ICON_SIZE.sm} /></button></span> : null}
-            <MenuPrimitive.Root>
-              <MenuPrimitive.Trigger asChild>
-                <IconButton className="shared-assistant-more" label="Actions" size="sm"><Plus size={ICON_SIZE.md} /></IconButton>
-              </MenuPrimitive.Trigger>
-              <MenuPrimitive.Portal>
-                <MenuPrimitive.Content align="end" aria-label={`${ASSISTANT_NAME} actions`} className="rm-action-menu" side="top" sideOffset={8}>
-                  {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
-                    const Icon = CAPABILITY_ICONS[capability.id];
-                    return <MenuPrimitive.Item className="rm-action-item" disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onSelect={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`}>
-                      <Icon size={ICON_SIZE.md} weight={selected === capability.id ? "fill" : "regular"} /><span>{capability.label}</span>
-                    </MenuPrimitive.Item>;
-                  })}
-                </MenuPrimitive.Content>
-              </MenuPrimitive.Portal>
-            </MenuPrimitive.Root>
+            <Textarea aria-label={`Message ${ASSISTANT_NAME}`} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={1} value={draft} />
           </div>
+          <IconButton appearance="plain" busy={isBusy} className="shared-assistant-send" disabled={isLoadingChat || !draft.trim()} label="Send" size="sm" type="submit"><ArrowElbowDownLeft size={ICON_SIZE.lg} /></IconButton>
         </div>
       </form> : <form className="shared-assistant-composer" onSubmit={submit}>
         <div className="shared-assistant-actions" role="group" aria-label={`${ASSISTANT_NAME} actions`}>

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.54 (2026-11-21)
+
+A centred welcome and a self-sizing message box on Cairn's page.
+
+### Changed
+- **Icon.** Cairn's icon is now a rocket taking off (Phosphor *rocket launch*), filled in the page title.
+- **No separator lines** on Cairn's page.
+- **New chat.** The welcome is centred in the page with a large rocket and one line, *How can I help?*; the paragraph under it is gone.
+- **Message box.** One grey box with no outline: the **+** for the actions at the left, the text in the middle, and **Enter** (an elbow arrow) at the right. The buttons have no border and take a grey fill on hover. The box grows with its text, up to a limit and then scrolls, and the text stays centred between the buttons.
+- The assistant dock on workspace pages is unchanged. No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the page was not opened.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.53 (2026-11-21)
 
 A simpler Cairn message box.

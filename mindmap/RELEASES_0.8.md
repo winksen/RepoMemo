@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.53` (2026-11-21)
+> **Current:** `V0.8.54` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -73,6 +73,7 @@
 | **V0.8.51** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Phosphor icons and Cairn sidebar | Change the icon pack from Tabler to Phosphor, draw the current sidebar item's icon filled, keep the sidebar from scrolling sideways with a wider Cairn sidebar, and stop Cairn from using the workspace color | Every icon is a Phosphor icon, the current sidebar item's icon is filled, no sidebar has a horizontal scrollbar, and Cairn's page uses the app's own colors |
 | **V0.8.52** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Filled tab icons | Draw the icon of the open tab filled on workspace and organization pages | The open tab's icon is filled and the others are outlined |
 | **V0.8.53** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Cairn message box | Make Cairn's icon a filled Phosphor icon as large as the page title, replace the row of action buttons with a + menu, put Send at the left and the + at the right of one message box, remove the text under it, and show the workspace with its icon above it | The title icon matches the title, the message box is one box with Send, an actions menu and nothing under it, and the workspace is chosen above it with its icon |
+| **V0.8.54** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Cairn welcome and message box | Use the rocket launch icon, drop the separator lines on Cairn's page, make the new-chat welcome centred and minimal, and rework the message box so it grows with its text, with the + at the left, Enter at the right and no button borders | The icon is a rocket, a new chat shows a large centred icon and one line, and the message box is one grey box that grows and keeps its text centred between the buttons |
 
 ## Verification and handoff
 

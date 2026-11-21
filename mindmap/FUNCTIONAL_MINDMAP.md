@@ -2,7 +2,16 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.53` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.54` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.54 — A centred welcome and a self-sizing message box.
+
+- **Icon.** Cairn's icon is a **rocket taking off** (Phosphor *rocket launch*), filled in the page title.
+- **No separator lines** on Cairn's page.
+- **New chat.** The welcome is centred in the page: a large rocket and one line, *How can I help?*, with no paragraph.
+- **Message box.** One grey box with no outline: the **+** (actions) at the left, the text in the middle, and **Enter** (an elbow arrow) at the right. The buttons have no border and show a grey fill on hover. The box **grows with the text**, up to a limit and then scrolls, and the text stays centred between the buttons on the left and the right.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.53 — A simpler Cairn message box.
 
