@@ -18,7 +18,7 @@ const APP_AREAS: [&str; 8] = [
     "workspaces",
     "dashboard",
     "orgs",
-    "assistant",
+    "cairn",
     "profile",
     "notifications",
     "system",

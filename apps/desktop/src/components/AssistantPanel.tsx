@@ -14,7 +14,6 @@ import {
   IconRefresh as Refresh,
   IconSearch as Search,
   IconSend as Send,
-  IconSparkles as Sparkles,
   IconTrash as Trash,
 } from "@tabler/icons-react";
 import { deleteSharedAgentConversation, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
@@ -22,6 +21,7 @@ import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessag
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
+import { CairnIcon } from "./CairnIcon";
 import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -82,7 +82,17 @@ function storedTurn(turn: AgentTurn): ThreadTurn {
 }
 
 /** Workspace assistant: routes each message to one capability on the server and keeps the user's chats there. */
-export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { accessToken: string; onOpenArtifact: (artifactId: string) => void; workspaceId: string }) {
+export function AssistantPanel({ accessToken, hideChatList = false, onChatChange, onOpenArtifact, requestedChatId, workspaceId }: {
+  accessToken: string;
+  /** Cairn's page lists the chats beside the page, so the panel does not offer its own list or *New chat*. */
+  hideChatList?: boolean;
+  /** Called with the chat the panel itself moved to: a chat that was just started (its id), or none after *New chat* or a deletion. */
+  onChatChange?: (conversationId: string | null) => void;
+  onOpenArtifact: (artifactId: string) => void;
+  /** Gives the chat that is open to whoever holds the address: the panel follows it (`null` is a new chat). Left out, the panel keeps its own. */
+  requestedChatId?: string | null;
+  workspaceId: string;
+}) {
   const [capabilities, , capabilitiesQuery] = useServerState<AgentCapabilities | null>({
     key: workspaceKeys.assistantCapabilities(workspaceId),
     fetch: () => getSharedAgentCapabilities(accessToken, workspaceId),
@@ -121,11 +131,17 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
   const restoredFor = useRef<string | null>(null);
   const chatsLoaded = chatsQuery.data !== undefined;
   useEffect(() => {
-    if (!chatsLoaded || restoredFor.current === workspaceId) return;
+    if (!chatsLoaded || restoredFor.current === workspaceId || requestedChatId !== undefined) return;
     restoredFor.current = workspaceId;
     const last = rememberedChat(workspaceId);
     if (last && conversations.some((conversation) => conversation.id === last)) void openChat(last);
   }, [chatsLoaded, workspaceId]);
+  // On Cairn's page the address decides which chat is open.
+  useEffect(() => {
+    if (requestedChatId === undefined || requestedChatId === activeId) return;
+    if (requestedChatId) void openChat(requestedChatId);
+    else startNewChat();
+  }, [requestedChatId]);
   useEffect(() => { threadEnd.current?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [turns.length, isBusy]);
 
   // Commands from the command palette wait until the capabilities are loaded and the chat is idle.
@@ -171,6 +187,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
     setTurns([]);
     setIsLoadingChat(false);
     input.current?.focus();
+    onChatChange?.(null);
   }
 
   function upsertConversation(conversation: AgentConversation) {
@@ -189,6 +206,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
       if (!conversationId) {
         setActiveId(conversation.id);
         rememberChat(workspaceId, conversation.id);
+        onChatChange?.(conversation.id);
       }
       setTurns((current) => current.map((entry) => entry.key === turn.key ? storedTurn(saved) : entry));
     } catch (error) {
@@ -273,10 +291,12 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
     {dialog}
     <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
-      <IconButton aria-expanded={showChats} label="Chat history" onClick={() => setShowChats((current) => !current)} size="sm"><History size={ICON_SIZE.md} /></IconButton>
-      <IconButton disabled={isBusy} label="New chat" onClick={() => { startNewChat(); setShowChats(false); }} size="sm"><Plus size={ICON_SIZE.md} /></IconButton>
+      {hideChatList ? null : <>
+        <IconButton aria-expanded={showChats} label="Chat history" onClick={() => setShowChats((current) => !current)} size="sm"><History size={ICON_SIZE.md} /></IconButton>
+        <IconButton disabled={isBusy} label="New chat" onClick={() => { startNewChat(); setShowChats(false); }} size="sm"><Plus size={ICON_SIZE.md} /></IconButton>
+      </>}
     </div>
-    {showChats ? <nav className="shared-assistant-chats" aria-label={`${ASSISTANT_NAME} chats`}>
+    {showChats && !hideChatList ? <nav className="shared-assistant-chats" aria-label={`${ASSISTANT_NAME} chats`}>
       {conversations.length ? <ul className="rm-option-list">{conversations.map((conversation) => {
         const isActive = conversation.id === activeId;
         return <li className={isActive ? "rm-option-row active" : "rm-option-row"} key={conversation.id}>
@@ -299,7 +319,7 @@ export function AssistantPanel({ accessToken, onOpenArtifact, workspaceId }: { a
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
           {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} isBusy={isBusy} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} /> : null}
         </article>) : <div className="shared-assistant-intro">
-          <Sparkles size={22} />
+          <CairnIcon size={22} />
           <strong>Hi, I&apos;m {ASSISTANT_NAME}. What do you need from this workspace?</strong>
           <span>Pick an action below or just type. Requests are matched to one of these actions; anything else gets a short reply for now. Chats are saved so you can come back to them.</span>
         </div>}
@@ -367,7 +387,7 @@ function Reply({ accessToken, canSummarize, capabilities, isBusy, onOpenArtifact
   const offerSummary = canSummarize && !(reply.capability === "summarize_file" && reply.generated);
   return <div className="shared-assistant-reply">
     <div className="shared-assistant-reply-meta">
-      <span><Sparkles size={ICON_SIZE.sm} /> {ASSISTANT_NAME}{note ? ` · ${note}` : ""}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
+      <span><CairnIcon size={ICON_SIZE.sm} /> {ASSISTANT_NAME}{note ? ` · ${note}` : ""}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
       {reply.generated ? <span className="shared-assistant-generated">AI-generated · verify against the cited sources</span> : null}
     </div>
     <div className="shared-markdown"><SafeMarkdown>{reply.reply_markdown}</SafeMarkdown></div>

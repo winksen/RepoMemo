@@ -6,7 +6,7 @@ FIRST VIEWPORT: A calm explanatory field balances a focused access form; after a
 FORM: The established RepoMemo operate composition, adapted into a protected browser session with direct API-state feedback.
 */
 
-import { SharedAssistantPage } from "./web/AssistantPage";
+import { CairnRail, SharedCairnPage } from "./web/CairnPage";
 import { ServerUnreachable } from "./components/ServerUnreachable";
 import { NewWorkspaceDialog } from "./components/NewWorkspaceDialog";
 import { onNewWorkspaceRequest } from "./lib/newWorkspaceBridge";
@@ -324,8 +324,8 @@ function SharedWebAppContent() {
       if (!(session.is_system_admin || session.is_app_admin)) return notFound("/dashboard");
       return <SystemArea accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} section={route.section} session={session} signOut={signOut} workspaces={workspaces} />;
 
-    case "assistant":
-      return <SharedAssistantPage accessToken={accessToken} organizations={organizations} requestedWorkspaceId={route.workspaceId} session={session} signOut={signOut} workspaces={workspaces} />;
+    case "cairn":
+      return <SharedCairnPage accessToken={accessToken} chatId={route.chatId} session={session} signOut={signOut} workspaces={workspaces} />;
 
     case "orgs":
       return <SharedOrganizations apiAvailable={apiAvailable} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
@@ -407,7 +407,7 @@ function SharedWebAppContent() {
       onNavigate={navigate}
       scrollKey={pageKey(route)}
       session={session}
-      sidebar={<OrganizationRail organizations={organizations} workspaceId={routedWorkspaceId ?? undefined} workspaces={workspaces} />}
+      sidebar={route.name === "cairn" ? <CairnRail accessToken={accessToken} chatId={route.chatId} organizations={organizations} workspaces={workspaces} /> : <OrganizationRail organizations={organizations} workspaceId={routedWorkspaceId ?? undefined} workspaces={workspaces} />}
       signOut={signOut}
     >
       {renderPage()}

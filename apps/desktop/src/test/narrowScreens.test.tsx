@@ -34,31 +34,31 @@ describe("the assistant on a narrow screen", () => {
     window.localStorage.setItem("repomemo.assistant.dock", JSON.stringify({ open: true, width: 500 }));
     screenIs("narrow");
     dock();
-    expect(screen.getByRole("button", { name: "Open Cairn" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Close Cairn" })).toBeNull();
-    expect(screen.getByLabelText("Cairn, the workspace assistant").classList.contains("sheet")).toBe(true);
+    expect(screen.getByRole("button", { name: "Open CAIRN" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Close CAIRN" })).toBeNull();
+    expect(screen.getByLabelText("CAIRN, the workspace assistant").classList.contains("sheet")).toBe(true);
   });
 
   it("opens as a sheet with a backdrop and closes with Esc, the close button or the backdrop, giving focus back to its button", () => {
     screenIs("narrow");
     dock();
-    fireEvent.click(screen.getByRole("button", { name: "Open Cairn" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
     expect(screen.getByTestId("panel").textContent).toContain("assistant for w1");
-    const sheet = screen.getByLabelText("Cairn, the workspace assistant");
+    const sheet = screen.getByLabelText("CAIRN, the workspace assistant");
     expect(sheet.classList.contains("collapsed")).toBe(false);
     expect(document.activeElement).toBe(sheet);
-    // Two buttons are named Close Cairn: the backdrop (out of the tab order) and the sheet's own.
-    expect(screen.getAllByRole("button", { name: "Close Cairn" })).toHaveLength(2);
+    // Two buttons are named Close CAIRN: the backdrop (out of the tab order) and the sheet's own.
+    expect(screen.getAllByRole("button", { name: "Close CAIRN" })).toHaveLength(2);
 
     fireEvent.keyDown(screen.getByText("inside"), { key: "Escape" });
     expect(sheet.classList.contains("collapsed")).toBe(true);
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Open Cairn" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Open CAIRN" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Cairn" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
     fireEvent.click(document.querySelector(".shared-assistant-backdrop") as HTMLElement);
     expect(sheet.classList.contains("collapsed")).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open Cairn" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
     fireEvent.click(document.querySelector(".shared-assistant-dock-header button") as HTMLElement);
     expect(sheet.classList.contains("collapsed")).toBe(true);
   });
@@ -67,8 +67,8 @@ describe("the assistant on a narrow screen", () => {
     document.documentElement.dataset.theme = theme;
     screenIs("narrow");
     dock();
-    fireEvent.click(screen.getByRole("button", { name: "Open Cairn" }));
-    const sheet = screen.getByRole("dialog", { name: "Cairn, the workspace assistant" });
+    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
+    const sheet = screen.getByRole("dialog", { name: "CAIRN, the workspace assistant" });
     expect(sheet.getAttribute("aria-modal")).toBe("true");
     const first = sheet.querySelector(".shared-assistant-dock-header button") as HTMLButtonElement;
     const last = screen.getByRole("button", { name: "inside" });
@@ -83,7 +83,7 @@ describe("the assistant on a narrow screen", () => {
   it("keeps the conversation mounted while the sheet is closed", () => {
     screenIs("narrow");
     dock();
-    fireEvent.click(screen.getByRole("button", { name: "Open Cairn" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open CAIRN" }));
     const panel = screen.getByTestId("panel");
     fireEvent.keyDown(panel, { key: "Escape" });
     expect(document.querySelector('[data-testid="panel"]')).toBe(panel);
@@ -92,11 +92,11 @@ describe("the assistant on a narrow screen", () => {
   it("does not change the wide-screen dock or its saved state", () => {
     screenIs("wide");
     dock();
-    expect(screen.queryByRole("button", { name: "Open Cairn" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Shrink Cairn" })).toBeTruthy();
-    expect(screen.getByLabelText("Cairn, the workspace assistant").classList.contains("sheet")).toBe(false);
+    expect(screen.queryByRole("button", { name: "Open CAIRN" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Shrink CAIRN" })).toBeTruthy();
+    expect(screen.getByLabelText("CAIRN, the workspace assistant").classList.contains("sheet")).toBe(false);
     fireEvent.keyDown(screen.getByText("inside"), { key: "Escape" });
-    expect(screen.getByRole("button", { name: "Shrink Cairn" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Shrink CAIRN" })).toBeTruthy();
     expect(JSON.parse(window.localStorage.getItem("repomemo.assistant.dock") ?? "{}").open).toBe(true);
   });
 });

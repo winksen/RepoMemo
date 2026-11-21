@@ -2,13 +2,14 @@ import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, 
 import { createPortal } from "react-dom";
 import { applyWorkspaceColor } from "../web/workspaceColors";
 import { ASSISTANT_NAME } from "../lib/assistantName";
-import { assistantEntryPath } from "../web/router";
+import { parseRoute } from "../web/router";
+import { rememberCairnWorkspace } from "../web/cairn";
+import { CairnIcon } from "./CairnIcon";
 import {
   IconBell as Bell,
   IconBuildingCommunity as Building,
   IconChevronDown as ChevronDown,
   IconSearch as Search,
-  IconSparkles as Sparkles,
   IconLogout as Logout,
   IconMoon as Moon,
   IconServer as Server,
@@ -89,6 +90,12 @@ function LayoutFrame({ session, sidebar, signOut, onNavigate, defaultOrganizatio
 }) {
   // On a narrow screen the rail folds away behind a button so the page starts at the top; wide screens always show it.
   const [railOpen, setRailOpen] = useState(false);
+  // From a workspace page Cairn starts its next chat in that workspace.
+  function openCairn() {
+    const route = parseRoute(window.location.pathname);
+    if (route.name === "workspace" || route.name === "artifact" || route.name === "memory-card") rememberCairnWorkspace(route.workspaceId);
+    onNavigate("/cairn");
+  }
   return <div className="shared-home">
     <a className="rm-skip-link" href={`#${MAIN_CONTENT_ID}`} onClick={(event) => { event.preventDefault(); document.getElementById(MAIN_CONTENT_ID)?.focus(); }}>Skip to the page</a>
     <header className="shared-home-header">
@@ -98,7 +105,7 @@ function LayoutFrame({ session, sidebar, signOut, onNavigate, defaultOrganizatio
           <div className="shared-account-controls">
             <CreateMenu canCreateOrganization={session.can_create_organizations !== false} defaultOrganizationId={defaultOrganizationId} />
             <ThemeToggle />
-            <IconButton className="shared-assistant-link" label={ASSISTANT_NAME} onClick={() => onNavigate(assistantEntryPath(window.location.pathname))} pressed={window.location.pathname === "/assistant" || window.location.pathname.startsWith("/assistant/")} size="sm"><Sparkles size={ICON_SIZE.md} /></IconButton>
+            <IconButton className="shared-assistant-link" label={ASSISTANT_NAME} onClick={openCairn} pressed={window.location.pathname === "/cairn" || window.location.pathname.startsWith("/cairn/")} size="sm"><CairnIcon size={ICON_SIZE.md} /></IconButton>
             <IconButton className="shared-palette-link" label="Open command palette" onClick={openCommandPalette} size="sm"><Search size={ICON_SIZE.md} /></IconButton>
             <IconButton className="shared-notifications-link" label="Notifications" onClick={() => onNavigate("/notifications")} size="sm"><Bell size={ICON_SIZE.md} /></IconButton>
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={ICON_SIZE.md} /> <span className="shared-button-label">Profile</span></Button>

@@ -6,7 +6,7 @@ import { arrangeSections } from "./templateSections";
 import { orderCapabilities } from "./templateAssistant";
 import { type RecentItem } from "../lib/paletteRecents";
 
-export type PaletteGroup = "Recent" | "Cairn" | "Files" | "Memory" | "This workspace" | "Workspaces" | "Pages" | "System";
+export type PaletteGroup = "Recent" | "CAIRN" | "Files" | "Memory" | "This workspace" | "Workspaces" | "Pages" | "System";
 
 export type PaletteAction =
   | { kind: "navigate"; to: string }
@@ -39,7 +39,7 @@ export const SECTION_LABELS: Record<WorkspaceSection, string> = {
   settings: "Workspace settings",
 };
 
-const GROUP_ORDER: PaletteGroup[] = ["Recent", "Cairn", "Files", "Memory", "This workspace", "Workspaces", "Pages", "System"];
+const GROUP_ORDER: PaletteGroup[] = ["Recent", "CAIRN", "Files", "Memory", "This workspace", "Workspaces", "Pages", "System"];
 const MAX_FILES = 8;
 const MAX_CARDS = 6;
 const MAX_ENTRIES = 40;
@@ -99,7 +99,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
     const name = input.assistantWorkspace.workspace.name;
     const assistant = (capability: AgentCapability, typedLabel: string, emptyLabel: string): PaletteEntry => ({
       id: `assistant:${capability}`,
-      group: "Cairn",
+      group: "CAIRN",
       label: query ? `${typedLabel} “${query}”` : emptyLabel,
       hint: name,
       action: { kind: "assistant", capability, message: query },
@@ -114,7 +114,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
     orderCapabilities(commands.map((entry) => ({ id: entry.id.replace("assistant:", ""), entry })), input.assistantOrder ? { order: input.assistantOrder } : null)
       .forEach(({ entry }) => add(entry));
     if (matchesAll(words, "summarize workspace overview")) {
-      add({ id: "assistant:overview", group: "Cairn", label: "Give a workspace overview", hint: name, action: { kind: "assistant", capability: "workspace_overview", message: "" } });
+      add({ id: "assistant:overview", group: "CAIRN", label: "Give a workspace overview", hint: name, action: { kind: "assistant", capability: "workspace_overview", message: "" } });
     }
   }
 
@@ -181,7 +181,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
 
   [
     { id: "dashboard", label: "Dashboard", hint: "Search all workspaces", to: routePath({ name: "dashboard" }) },
-    { id: "assistant", label: ASSISTANT_NAME, hint: "Chat on a page of its own", to: routePath({ name: "assistant", workspaceId: null }) },
+    { id: "cairn", label: ASSISTANT_NAME, hint: "Chat on a page of its own", to: routePath({ name: "cairn", chatId: null }) },
     { id: "orgs", label: "Organizations", hint: "Manage every organization", to: routePath({ name: "orgs" }) },
     { id: "notifications", label: "Notifications", hint: "Mentions and assignments", to: routePath({ name: "notifications" }) },
     { id: "profile", label: "Profile and security", hint: "Your account, password and tokens", to: routePath({ name: "profile" }) },

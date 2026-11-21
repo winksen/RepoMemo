@@ -943,3 +943,8 @@ input[type="file"] {
 .shared-assistant-page .shared-assistant-composer { border-top-color: var(--color-accent); }
 .shared-assistant-page .shared-assistant-toolbar strong { color: var(--color-accent-text); }
 .shared-assistant-page .shared-assistant-chats li.active { background: var(--color-accent-soft); }
+
+/* Cairn's page (V0.8.49): the chat list is the sidebar, and the workspace Cairn draws on is a label, not a control. */
+.shared-cairn-context { display: inline-flex; align-items: center; gap: 6px; max-width: 260px; padding: 4px 10px; overflow: hidden; color: var(--color-text-muted); background: var(--color-surface-2); border-radius: 999px; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.rm-button.shared-rail-new-chat { justify-content: flex-start; width: 100%; margin-bottom: 8px; }
+.shared-rail-chats > div { margin-top: 8px; }

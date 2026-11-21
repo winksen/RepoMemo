@@ -229,7 +229,7 @@ A workspace is one body of knowledge: a project, a service, a team's runbooks. I
 | **People** | Members, invitations and the activity feed *(admins)* |
 | **Settings** | AI, repositories, template, export, rename, delete *(admins)* |
 
-**Cairn**, the assistant, is docked on the right of every section. It's always one click away, and the sparkles button in the top bar opens it on a page of its own.
+**CAIRN**, the assistant, is docked on the right of every section. It's always one click away, and the cairn button in the top bar opens it on a page of its own (`/cairn`), with your chats from every workspace in the sidebar.
 
 ### Templates: a workspace shaped to its job
 

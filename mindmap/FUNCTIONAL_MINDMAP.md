@@ -2,7 +2,16 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.48` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.49` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.49 — Cairn as an agent page.
+
+- **Name and icon.** The name is shown in capitals, **CAIRN**, and the sparkles are replaced by a cairn drawn as three stacked stones, in the top bar, the dock, the chat and the page.
+- **Address.** The page is `/cairn` (a chat is `/cairn/<chat>`); `/assistant` is gone.
+- **Sidebar.** On Cairn's page the sidebar is the person's **chat history**, across every workspace, newest first, with **New chat** above it: each row shows the chat's title, the workspace it belongs to and when it was last used, on a chip in that workspace's color. The workspace list is not shown there.
+- **No workspace to choose.** The workspace dropdown is gone: Cairn is one assistant for the person. For now a chat still draws on one workspace, shown as a label beside the heading: a chat that exists keeps the workspace it was started in, and a new chat starts in the workspace you came from with the top-bar button (or worked in last, or the first).
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.48 — The assistant is called Cairn.
 

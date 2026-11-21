@@ -3,13 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import {
   IconLayoutSidebarRightCollapse as Collapse,
   IconLayoutSidebarRightExpand as Expand,
-  IconSparkles as Sparkles,
   IconX as Close,
 } from "@tabler/icons-react";
 import { onAssistantCommand } from "../lib/assistantBridge";
 import { NARROW_QUERY, useMediaQuery } from "../lib/useMediaQuery";
 import { ASSISTANT_NAME } from "../lib/assistantName";
 import { AssistantPanel } from "./AssistantPanel";
+import { CairnIcon } from "./CairnIcon";
 import { Button } from "./ui/button";
 import { IconButton } from "./ui/icon-button";
 import { ICON_SIZE } from "./ui/icon";
@@ -123,11 +123,11 @@ export function AssistantDock({ accessToken, onOpenArtifact, workspaceId }: { ac
   return <>
     {narrow && sheetOpen ? <button aria-label={`Close ${ASSISTANT_NAME}`} className="shared-assistant-backdrop" onClick={() => toggle(false)} tabIndex={-1} type="button" /> : null}
     <aside aria-label={`${ASSISTANT_NAME}, the workspace assistant`} aria-modal={narrow && sheetOpen ? true : undefined} className={`shared-assistant-dock${isOpen ? "" : " collapsed"}${narrow ? " sheet" : ""}`} onKeyDown={handleSheetKeys} ref={dock} role={narrow && sheetOpen ? "dialog" : undefined} style={isOpen && !narrow ? { width } : undefined} tabIndex={narrow && sheetOpen ? -1 : undefined}>
-    {isOpen ? null : <Button aria-expanded={false} aria-label={`Open ${ASSISTANT_NAME}`} onClick={() => toggle(true)} ref={opener} title={`Open ${ASSISTANT_NAME}`} type="button" variant="secondary"><Expand size={ICON_SIZE.lg} /><Sparkles size={ICON_SIZE.md} /><span className="shared-assistant-fab-label">Assistant</span></Button>}
+    {isOpen ? null : <Button aria-expanded={false} aria-label={`Open ${ASSISTANT_NAME}`} onClick={() => toggle(true)} ref={opener} title={`Open ${ASSISTANT_NAME}`} type="button" variant="secondary"><Expand size={ICON_SIZE.lg} /><CairnIcon size={ICON_SIZE.md} /><span className="shared-assistant-fab-label">Assistant</span></Button>}
     <div className="shared-assistant-dock-body" hidden={!isOpen}>
       <div aria-label={`Resize ${ASSISTANT_NAME}`} aria-orientation="vertical" aria-valuemax={MAX_WIDTH} aria-valuemin={MIN_WIDTH} aria-valuenow={width} className="shared-assistant-resize" onKeyDown={resizeWithKeys} onPointerDown={startResize} role="separator" tabIndex={0} />
       <header className="shared-assistant-dock-header">
-        <span><Sparkles size={ICON_SIZE.md} /> {ASSISTANT_NAME}</span>
+        <span><CairnIcon size={ICON_SIZE.md} /> {ASSISTANT_NAME}</span>
         <IconButton aria-expanded label={narrow ? `Close ${ASSISTANT_NAME}` : `Shrink ${ASSISTANT_NAME}`} onClick={() => toggle(false)} size="sm">{narrow ? <Close size={ICON_SIZE.md} /> : <Collapse size={ICON_SIZE.md} />}</IconButton>
       </header>
       {hasOpened ? <AssistantPanel accessToken={accessToken} key={workspaceId} onOpenArtifact={onOpenArtifact} workspaceId={workspaceId} /> : null}

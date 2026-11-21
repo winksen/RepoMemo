@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.48` (2026-11-21)
+> **Current:** `V0.8.49` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -68,6 +68,7 @@
 | **V0.8.46** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Assistant page | Give the AI assistant a page of its own that shows the chat on the whole page, with the workspace it works on chosen above it, and a button in the top bar that opens it | /assistant opens the chat full page for a workspace, the top bar has an Assistant button, and the dock on workspace pages still works |
 | **V0.8.47** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Assistant page colors and width | Color the assistant page from the workspace's main color and stretch its chat to the full width of the page | The assistant page's highlights follow the workspace color, and the chat uses the whole page width |
 | **V0.8.48** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Assistant name | Give the assistant a name of its own, Cairn, wherever the interface speaks of it | The dock, the page, the top-bar button, the command palette and the messages call the assistant Cairn |
+| **V0.8.49** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Cairn as a global agent page | Give Cairn an icon of its own and show its name in capitals, move its page to /cairn, replace the sidebar with the person's chat history across workspaces, and remove the workspace dropdown | /cairn is a chat with the history of every workspace in the sidebar, no workspace list, and a cairn icon wherever the assistant appears |
 
 ## Verification and handoff
 

@@ -1,2 +1,2 @@
-/** What the assistant is called in the interface (V0.8.48): a cairn is a stack of stones that marks the way for whoever comes next. */
-export const ASSISTANT_NAME = "Cairn";
+/** What the assistant is called in the interface: a cairn is a stack of stones that marks the way for whoever comes next. Shown in capitals. */
+export const ASSISTANT_NAME = "CAIRN";

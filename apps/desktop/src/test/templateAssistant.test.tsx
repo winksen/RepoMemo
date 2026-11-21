@@ -74,12 +74,12 @@ describe("the assistant panel with a template", () => {
   it("lists its jobs in the template's order and suggests its questions, which fill the box and send nothing", async () => {
     vi.mocked(useTemplate).mockReturnValue([templateWith({ order: ["ask_question", "find_files"], suggestions: ["What is the runbook for…", "Who is on call?"], phrases: [], focus: null }), vi.fn(), {} as never]);
     renderPanel();
-    const actions = await screen.findByRole("group", { name: "Cairn actions" });
+    const actions = await screen.findByRole("group", { name: "CAIRN actions" });
     await waitFor(() => expect(within(actions).getAllByRole("button").map((button) => button.textContent)).toEqual(["ask question", "find files", "search content"]));
     const suggestions = screen.getByRole("group", { name: "Suggested questions" });
     expect(within(suggestions).getAllByRole("button").map((button) => button.textContent)).toEqual(["What is the runbook for…", "Who is on call?"]);
     fireEvent.click(within(suggestions).getByRole("button", { name: "What is the runbook for…" }));
-    expect((screen.getByRole("textbox", { name: "Message Cairn" }) as HTMLTextAreaElement).value).toBe("What is the runbook for…");
+    expect((screen.getByRole("textbox", { name: "Message CAIRN" }) as HTMLTextAreaElement).value).toBe("What is the runbook for…");
     expect(sendSharedAgentMessage).not.toHaveBeenCalled();
     // Once there is something in the box the suggestions step aside.
     expect(screen.queryByRole("group", { name: "Suggested questions" })).toBeNull();
@@ -88,7 +88,7 @@ describe("the assistant panel with a template", () => {
   it("keeps the usual order and suggests nothing for a workspace with no template", async () => {
     vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), {} as never]);
     renderPanel();
-    const actions = await screen.findByRole("group", { name: "Cairn actions" });
+    const actions = await screen.findByRole("group", { name: "CAIRN actions" });
     await waitFor(() => expect(within(actions).getAllByRole("button").map((button) => button.textContent)).toEqual(["find files", "search content", "ask question"]));
     expect(screen.queryByRole("group", { name: "Suggested questions" })).toBeNull();
   });
@@ -106,7 +106,7 @@ describe("the Retrieval chips", () => {
 describe("the command palette's assistant commands", () => {
   const workspace: SharedWorkspace = { workspace: { id: "w1", name: "Ops", created_at: "", updated_at: "", settings: {} }, organization_id: "o1", role: "owner" };
   const input = (assistantOrder?: string[]) => ({ query: "", workspaces: [workspace], assistantWorkspace: workspace, currentWorkspace: workspace, files: [], cards: [], canAdministerSystem: false, assistantOrder });
-  const commands = (entries: ReturnType<typeof paletteEntries>) => entries.filter((entry) => entry.group === "Cairn").map((entry) => entry.id);
+  const commands = (entries: ReturnType<typeof paletteEntries>) => entries.filter((entry) => entry.group === "CAIRN").map((entry) => entry.id);
 
   it("are in the usual order without a template", () => {
     expect(commands(paletteEntries(input()))).toEqual(["assistant:ask_question", "assistant:find_files", "assistant:search_content", "assistant:find_symbol", "assistant:overview"]);

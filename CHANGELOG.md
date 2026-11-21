@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.49 (2026-11-21)
+
+Cairn as an agent page.
+
+### Changed
+- **Name and icon.** The name is shown in capitals, **CAIRN**, and the sparkles are replaced by a cairn drawn as three stacked stones: in the top bar, the dock, the chat and the page.
+- **Address.** Cairn's page is `/cairn` (`/cairn/<chat>` for an open chat). `/assistant`, which shipped in V0.8.46 and was never documented as stable, no longer exists.
+- **Chat history in the sidebar.** On Cairn's page the sidebar is the person's chat history across every workspace, newest first, with **New chat** above it and **Show more** after ten. Each row shows the chat's title, its workspace and when it was last used, on a chip in that workspace's color. The workspace list is not shown on that page. Rename and delete stay in the chat's own history menu in the dock.
+- **No workspace to choose.** The workspace dropdown is removed: Cairn is one assistant for the person. For now a chat still draws on a single workspace, shown as a label next to the heading. A chat that exists keeps the workspace it was started in, and a new chat starts in the workspace you opened Cairn from (or worked in last, or the first).
+- No server, API, setting or migration changes.
+
+### Not yet
+- **A Cairn that answers across all workspaces** is not built. Chats are stored per workspace and every message goes to one workspace's assistant API. Doing it needs an account-level conversation scope and retrieval across workspaces on the server, with the same access checks.
+- **Renaming and deleting a chat** from the sidebar: they are in the dock's chat menu.
+
+### Checks
+- Typecheck and formatting pass. Nothing was built or run; the page was not opened. A new test covers the page and its sidebar, and the router, palette, narrow-screen and template-assistant tests were updated; none was executed.
+
+### Upgrading
+- Nothing to do. A bookmark of `/assistant` shows the page-not-found screen.
+
 ## V0.8.48 (2026-11-21)
 
 The assistant is called Cairn.

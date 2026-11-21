@@ -130,7 +130,7 @@ export function OrganizationRail({
 }
 
 /** A titled part of the rail. */
-function RailSection({ children, label, name }: { children: ReactNode; label: string; name: string }) {
+export function RailSection({ children, label, name }: { children: ReactNode; label: string; name: string }) {
   return <section aria-label={label} className={`shared-rail-${name}`}>
     <p className="shared-eyebrow shared-rail-title">{label}</p>
     <div>{children}</div>
@@ -140,7 +140,7 @@ function RailSection({ children, label, name }: { children: ReactNode; label: st
 /** Lists longer than this fold behind a *Show more* button; the current item always stays visible. */
 const RAIL_LIST_LIMIT = 10;
 
-function RailList({ activeId, items }: { activeId?: string; items: { id: string; name: string; title: string; subtitle?: ReactNode; colorProps?: ReturnType<typeof workspaceColorProps>; icon: ReactNode; onSelect: () => void }[] }) {
+export function RailList({ activeId, items }: { activeId?: string; items: { id: string; name: string; title: string; subtitle?: ReactNode; colorProps?: ReturnType<typeof workspaceColorProps>; icon: ReactNode; onSelect: () => void }[] }) {
   const [expanded, setExpanded] = useState(false);
   const folded = items.length > RAIL_LIST_LIMIT && !expanded;
   let visible = folded ? items.slice(0, RAIL_LIST_LIMIT) : items;
