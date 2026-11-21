@@ -215,9 +215,9 @@ input[type="file"] {
 .rm-button.shared-rail-workspace:hover:not(:disabled),
 .rm-button.shared-rail-organization:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
 .rm-button.shared-rail-workspace.active,
-.rm-button.shared-rail-organization.active { color: var(--color-text); background: var(--color-surface-2); font-weight: 750; }
+.rm-button.shared-rail-organization.active { color: var(--color-surface); background: color-mix(in srgb, var(--color-text) 78%, var(--color-surface)); font-weight: 750; }
 .rm-button.shared-rail-workspace.active:hover:not(:disabled),
-.rm-button.shared-rail-organization.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
+.rm-button.shared-rail-organization.active:hover:not(:disabled) { color: var(--color-surface); background: color-mix(in srgb, var(--color-text) 78%, var(--color-surface)); border-color: transparent; }
 .rm-button.shared-rail-more { justify-content: flex-start; width: 100%; min-width: 0; min-height: 30px; padding: 0 10px; color: var(--color-text-subtle); background: transparent; border: 0; font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
 .rm-button.shared-rail-more:hover:not(:disabled) { color: var(--color-text); background: transparent; border-color: transparent; }
 .shared-rail-empty { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.5; }
@@ -226,8 +226,9 @@ input[type="file"] {
 .shared-rail-footer svg { flex: 0 0 auto; margin-top: 2px; }
 .shared-rail-footer small { display: block; margin-top: 2px; font-size: 12px; }
 .shared-rail-workspaces > div { margin-top: 8px; }
-/* In the rail, keyboard focus is a quiet grey ring, not the blue one; the current item is a grey fill. */
+/* In the rail, keyboard focus is a quiet grey ring, not the blue one; the current item is a contrasting grey fill (dark grey in light mode, light grey in dark mode). */
 .shared-home-rail .rm-button:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: -2px; }
+.shared-home-rail .rm-button.active:focus-visible { outline-color: var(--color-surface); }
 .shared-home-content { --shared-content-inset: clamp(24px, 2vw, 36px); display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 0; overflow: hidden; }
 .shared-layout-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .shared-workspace-topbar { display: flex; align-items: stretch; min-height: 48px; padding: 0 var(--shared-content-inset); overflow: hidden; border-bottom: 1px solid var(--color-border); }
