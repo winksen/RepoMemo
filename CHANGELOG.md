@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.37 (2026-11-21)
+
+A page of its own when the server cannot be reached.
+
+### Changed
+- **No sign-in page without a server.** When the server does not answer at all, the app shows **We can't connect to the server right now**, with advice (check the connection, contact the administrator if it persists) and a **Try again** button, instead of the sign-in page, where nothing could work and a failed attempt looked like a wrong password. **Try again** starts the app over, so the server's setup state and your session are asked again.
+- **Scope.** The check is the one made when the app starts. A server that stops answering while someone is signed in is not covered by this page.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run, and the page was not shown against a stopped server; a new test covers its content and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.36 (2026-11-21)
 
 Cleaner tab bars and matching card borders.

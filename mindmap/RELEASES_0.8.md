@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.36` (2026-11-21)
+> **Current:** `V0.8.37` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -56,6 +56,7 @@
 | **V0.8.34** | 🧪 2026-11-21 | AM. Interface enhancements | 🐞 | Cards and tooltips | Align the content of the organization cards to the card edges, and open the sidebar tooltips to the right | Every card lays out the same whatever its content, and a sidebar tooltip opens beside the item instead of above it |
 | **V0.8.35** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Organization tabs | Give an organization's page a tab bar like a workspace's, starting with an Overview of figures and graphs for the organization and its workspaces, backed by a new overview endpoint | /orgs/<id> opens an Overview with totals, charts and a row per workspace, next to Workspaces and Administration tabs, and the figures respect what the person can open |
 | **V0.8.36** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Tab bars and cards | Remove the location label in front of the workspace and organization tabs, and give the organization cards the same border thickness as buttons | The tab bars start with their first tab, and a card's border is as thick as a button's |
+| **V0.8.37** | 🧪 2026-11-21 | AM. Interface enhancements | 🐞 | Server unreachable | Show a generic error page, not the sign-in page, when the server cannot be reached | When the server does not answer, the app says it cannot connect right now and offers Try again, and the sign-in page is not shown |
 
 ## Verification and handoff
 

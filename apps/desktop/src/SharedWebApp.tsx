@@ -6,6 +6,7 @@ FIRST VIEWPORT: A calm explanatory field balances a focused access form; after a
 FORM: The established RepoMemo operate composition, adapted into a protected browser session with direct API-state feedback.
 */
 
+import { ServerUnreachable } from "./components/ServerUnreachable";
 import { NewWorkspaceDialog } from "./components/NewWorkspaceDialog";
 import { onNewWorkspaceRequest } from "./lib/newWorkspaceBridge";
 import { AppSkeleton } from "./components/ui/skeleton";
@@ -210,6 +211,11 @@ function SharedWebAppContent() {
   const versionVerdict = serverVersion.known ? checkServerVersion(serverVersion.version) : { ok: true as const };
   if (!versionVerdict.ok) {
     return <VersionMismatch verdict={versionVerdict} desktop={clientPlatform.installedApp} />;
+  }
+
+  // The server did not answer at all: say so, rather than show a sign-in page that cannot work.
+  if (apiAvailable === false && !session) {
+    return <ServerUnreachable />;
   }
 
   if (!platform) {
