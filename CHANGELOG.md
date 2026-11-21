@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.8 (2026-11-21)
+
+The markers in an answer match the evidence beside it.
+
+### Changed
+- **Fix to V0.9.4.** Since an answer shows only the passages it cites, the page numbers that evidence 1, 2, 3 in the order shown, while the answer still said, for example, *[3]* and *[1]*. A marker and the row it points to could name different passages. CAIRN now renumbers the markers in the answer to the evidence shown: the passage cited first becomes *[1]*, the next *[2]*, and so on, in every common shape (`[3]`, `[1][3]`, `[1, 3]`).
+- **Only what matches.** A number that names no cited passage, and brackets that are not markers (a link such as `[text](url)`, `[x]`), are left as they were. An answer that cites nothing is not changed.
+- The 0.9 pilot rows were renumbered once more, by one (the first is now V0.9.10), to make room for the CAIRN track's tenth release.
+- No API, setting or migration changes.
+
+### Checks
+- Unit tests for renumbering each marker shape and for the evidence in order; compiled and linted, not run. Nothing was built into the app or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.7 (2026-11-21)
 
 CAIRN suggests what to ask, from the workspace's template.
@@ -1933,7 +1949,7 @@ Make the upload version check part of its write and name the unchecked mode in t
 - **A stale upload can no longer pass the check and then overwrite a newer one.** `POST /v1/artifacts/{id}/versions` compared `X-RepoMemo-Expected-Updated-At` with the file as read just before the write, so a change that landed in between was overwritten. The comparison is now part of the update statement itself: of two uploads that started from the same state, exactly one is stored and the other gets `409`. The earlier comparison stays as a quick refusal.
 
 ### Changed
-- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.19 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
+- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.20 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
 - No route, setting or migration changes.
 
 ### Checks

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.7` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.8` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.8 — The markers in an answer match the evidence beside it.
+
+- **Markers match the evidence.** In CAIRN's answer the numbers in brackets (*[1]*, *[2]*, ...) are the same as the numbers beside the evidence rows, in the order cited.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.7 — CAIRN suggests what to ask, from the workspace's template.
 

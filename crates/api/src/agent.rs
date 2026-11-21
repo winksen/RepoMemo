@@ -644,7 +644,9 @@ impl RepoMemoCore {
             result.context_turns = history.len() as i64;
         }
         // Only the passages the answer cites are its evidence (V0.9.4).
-        result.citations = evidence_for(&result.reply_markdown, answer.citations);
+        let (text, citations) = evidence_for(&result.reply_markdown, answer.citations);
+        result.reply_markdown = text;
+        result.citations = citations;
         // A fixed refusal or an insufficient answer says what to try next, in CAIRN's own voice (V0.9.5).
         if result.citations.is_empty() && says_insufficient(&result.reply_markdown) {
             if answer.retrieved_context.is_empty() {
