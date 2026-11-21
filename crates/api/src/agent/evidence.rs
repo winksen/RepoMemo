@@ -4,6 +4,7 @@
 
 use repomemo_domain::Citation;
 
+use super::{words_of, FILLER_WORDS, QUESTION_WORDS};
 /// The numbers of the passages an answer cites, in the order they first appear, each once and each within `1..=total`. It reads
 /// `[2]`, `[1][3]` and `[1, 4]` alike.
 pub(crate) fn cited_numbers(answer: &str, total: usize) -> Vec<usize> {
@@ -47,6 +48,50 @@ pub(crate) fn evidence_for(answer: &str, passages: Vec<Citation>) -> Vec<Citatio
     passages
 }
 
+/// Words too common to look a file up by.
+const COMMON_WORDS: &[&str] = &[
+    "is", "are", "was", "were", "be", "been", "do", "does", "did", "we", "you", "i", "it", "its", "in", "at", "by",
+    "as", "and", "or", "this", "there", "here", "use", "used", "uses", "work", "works", "happen", "happens", "get",
+    "gets",
+];
+
+/// The few words of a question worth searching for: not question words, fillers or common words.
+pub(crate) fn search_words(question: &str) -> Vec<String> {
+    let mut words: Vec<String> = Vec::new();
+    for word in words_of(question) {
+        let plain = word.as_str();
+        if word.chars().count() < 3
+            || QUESTION_WORDS.contains(&plain)
+            || FILLER_WORDS.contains(&plain)
+            || COMMON_WORDS.contains(&plain)
+            || words.contains(&word)
+        {
+            continue;
+        }
+        words.push(word);
+        if words.len() == 3 {
+            break;
+        }
+    }
+    words
+}
+
+/// What CAIRN offers after an answer that found nothing (V0.9.5): the lookups that need no AI and no sentence-level match,
+/// with the question's own words filled in.
+pub(crate) fn next_steps(question: &str) -> String {
+    let words = search_words(question);
+    let try_this = if words.is_empty() {
+        "Try **Search content** with a few exact words, or **Find files** if you know the file's name.".to_owned()
+    } else {
+        let joined = words.join(" ");
+        format!(
+            "Try `search for {joined}` to see where those words appear, or `find the file about {}` if you know what the file is called.",
+            words[0]
+        )
+    };
+    format!("\n\n{try_this} If the files were only just added, they may still be indexing.")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -68,6 +113,18 @@ mod tests {
 
     fn titles(citations: &[Citation]) -> Vec<&str> {
         citations.iter().map(|citation| citation.title.as_str()).collect()
+    }
+
+    #[test]
+    fn the_next_steps_use_the_questions_own_words() {
+        assert_eq!(search_words("How does the retry backoff work?"), ["retry", "backoff"]);
+        assert_eq!(
+            search_words("What is the deployment rollback timeout policy"),
+            ["deployment", "rollback", "timeout"]
+        );
+        assert!(next_steps("How does the retry backoff work?").contains("`search for retry backoff`"));
+        assert!(next_steps("how is it?").contains("**Search content**"));
+        assert!(next_steps("retry").contains("may still be indexing"));
     }
 
     #[test]

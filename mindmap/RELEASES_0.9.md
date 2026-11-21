@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.4` (2026-11-21)
+> **Current:** `V0.9.5` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -26,6 +26,7 @@
 | **V0.9.2** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | In-character replies | Answer a message that is none of CAIRN's jobs in CAIRN's own voice with the AI when one is enabled, or with what CAIRN can do when none is, instead of a fixed refusal | A request such as "write me a poem" gets a short CAIRN reply with no sources, a failing provider falls back to the list of jobs with a warning, and no reply says "I can't help with that yet" |
 | **V0.9.3** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | CAIRN voice | Tell CAIRN's AI to speak in the first person, in the language the person writes in, and never to narrate its prompt (the user, the passages provided) | The voice is part of every CAIRN prompt, answers no longer describe their own prompt, and the answer rules are unchanged |
 | **V0.9.4** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Evidence of an answer | Show as a chat answer's evidence only the passages it cites, in the order cited, and none when it says the context is insufficient | An answer citing [2] and [1] lists those two, an insufficient answer lists none, an answer with no markers keeps its passages, and Ask outside the chat is unchanged |
+| **V0.9.5** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Answers that find nothing | Say in CAIRN's own words when a chat question finds nothing, and suggest a search and a file lookup built from the question's words | An empty retrieval reads "I couldn't find anything in the indexed files", an insufficient answer gains next steps, and the Ask page is unchanged |
 | **V0.9.9** | 🔜 | AM. Public readiness | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
 | **V0.9.10** | 🔜 | AM. Public readiness | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
 | **V0.9.11** | 🔜 | AM. Public readiness | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |

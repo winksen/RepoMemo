@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.5 (2026-11-21)
+
+When CAIRN finds nothing, it says what to try next.
+
+### Changed
+- **First person, with next steps.** When a chat question finds nothing (the retrieval is empty), CAIRN says *I couldn't find anything in the indexed files that answers this.* in place of the fixed *Indexed context is insufficient for a reliable answer.* When the AI says the context is insufficient, its own words stay. Either way CAIRN adds what to try next: `search for <the question's own words>` to see where they appear, and `find the file about <first word>` if the file's name is known, with a note that files only just added may still be indexing.
+- **Words, not the whole question.** The suggested words are the few that matter (up to three): question words, fillers and common words are dropped. When none are left, it points to *Search content* and *Find files* by name.
+- **Only in the chat.** The Ask page and the `ask` route keep their fixed insufficient-context answer and their wording.
+- No API, setting or migration changes.
+
+### Checks
+- Unit tests for picking the words and the next steps; compiled and linted, not run. Nothing was built into the app or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.4 (2026-11-21)
 
 CAIRN shows only the evidence it used.

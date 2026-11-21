@@ -16,7 +16,7 @@ use crate::RepoMemoCore;
 mod chatter;
 mod evidence;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext};
-use evidence::evidence_for;
+use evidence::{evidence_for, next_steps, says_insufficient};
 
 const MAX_MESSAGE_CHARS: usize = 2_000;
 const FILE_RESULT_LIMIT: usize = 20;
@@ -622,6 +622,13 @@ impl RepoMemoCore {
         }
         // Only the passages the answer cites are its evidence (V0.9.4).
         result.citations = evidence_for(&result.reply_markdown, answer.citations);
+        // A fixed refusal or an insufficient answer says what to try next, in CAIRN's own voice (V0.9.5).
+        if result.citations.is_empty() && says_insufficient(&result.reply_markdown) {
+            if answer.retrieved_context.is_empty() {
+                result.reply_markdown = "I couldn't find anything in the indexed files that answers this.".to_owned();
+            }
+            result.reply_markdown.push_str(&next_steps(question));
+        }
         result.warnings = answer.warnings;
         Ok(result)
     }
