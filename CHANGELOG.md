@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.46 (2026-11-21)
+
+The assistant on a page of its own.
+
+### Added
+- **Assistant page.** A sparkles button in the top bar (tooltip *Assistant*) opens `/assistant`: the chat takes the whole page under a heading, centred, with the chat history, capabilities and suggested questions of the dock.
+- **Which workspace.** The assistant still works on one workspace, chosen from a list above the chat. From a workspace page the button opens the assistant for that workspace; otherwise it opens the workspace used last time, or the first one. The address (`/assistant/<workspace>`) names it, so a reload or a shared link comes back to the same one, and the page takes that workspace's color. With no workspace, the page offers **New workspace**.
+- The assistant is also listed in the command palette and accepted in the desktop app's links.
+
+### Unchanged
+- The assistant dock on workspace pages, which is the same assistant beside the work. No server route, API, setting or migration changes: the assistant is still per workspace.
+
+### Checks
+- Typecheck and formatting pass. Nothing was built or run; the page was not opened. A new test covers the page and the router test was extended; neither was executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.45 (2026-11-21)
 
 Sidebar title, organization mark and white icons.

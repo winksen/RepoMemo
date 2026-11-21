@@ -48,6 +48,8 @@ export function navigate(to: string, replace = false) {
 export type Route =
   | { name: "dashboard" }
   | { name: "orgs" }
+  /** The assistant on a page of its own; `workspaceId` is the workspace it is talking about, when the address names one. */
+  | { name: "assistant"; workspaceId: string | null }
   | { name: "organization"; organizationId: string; section: OrganizationSection }
   | { name: "new-organization" }
   | { name: "profile" }
@@ -71,10 +73,14 @@ export function parseRoute(pathname: string): Route {
   if (parts.length === 1) {
     if (first === "dashboard") return { name: "dashboard" };
     if (first === "orgs") return { name: "orgs" };
+    if (first === "assistant") return { name: "assistant", workspaceId: null };
     if (first === "profile") return { name: "profile" };
     if (first === "notifications") return { name: "notifications" };
     if (first === "system") return { name: "system", section: "overview" };
     return { name: "not-found", workspaceId: null };
+  }
+  if (first === "assistant") {
+    return parts.length === 2 ? { name: "assistant", workspaceId: second } : { name: "not-found", workspaceId: null };
   }
   if (first === "orgs") {
     if (parts.length === 2) return second === "new" ? { name: "new-organization" } : { name: "organization", organizationId: second, section: "overview" };
@@ -114,6 +120,7 @@ export function routePath(route: Exclude<Route, { name: "not-found" }>): string 
   switch (route.name) {
     case "dashboard": return "/dashboard";
     case "orgs": return "/orgs";
+    case "assistant": return assistantPath(route.workspaceId);
     case "organization": return organizationPath(route.organizationId, route.section);
     case "new-organization": return "/orgs/new";
     case "profile": return "/profile";
@@ -144,4 +151,15 @@ export function legacyRedirect(pathname: string, search: string): string | null 
     return "/spaces";
   }
   return `/spaces${pathname.slice("/workspaces".length)}${search}`;
+}
+
+/** The address of the assistant page, for a workspace when one is known. */
+export function assistantPath(workspaceId: string | null): string {
+  return workspaceId ? `/assistant/${encodeURIComponent(workspaceId)}` : "/assistant";
+}
+
+/** Where the assistant button of the top bar goes from `pathname`: to the workspace being viewed, else to the page's own choice. */
+export function assistantEntryPath(pathname: string): string {
+  const route = parseRoute(pathname);
+  return assistantPath(route.name === "workspace" || route.name === "artifact" || route.name === "memory-card" ? route.workspaceId : route.name === "assistant" ? route.workspaceId : null);
 }

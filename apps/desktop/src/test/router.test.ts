@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { legacyRedirect, parseRoute, routePath } from "../web/router";
+import { assistantEntryPath, assistantPath, legacyRedirect, parseRoute, routePath } from "../web/router";
 
 describe("parseRoute", () => {
   it("names the pages", () => {
@@ -13,6 +13,9 @@ describe("parseRoute", () => {
     expect(parseRoute("/orgs/o1/x")).toEqual({ name: "not-found", workspaceId: null });
     expect(parseRoute("/dashboard")).toEqual({ name: "dashboard" });
     expect(parseRoute("/orgs")).toEqual({ name: "orgs" });
+    expect(parseRoute("/assistant")).toEqual({ name: "assistant", workspaceId: null });
+    expect(parseRoute("/assistant/w%201")).toEqual({ name: "assistant", workspaceId: "w 1" });
+    expect(parseRoute("/assistant/w1/x")).toEqual({ name: "not-found", workspaceId: null });
     expect(parseRoute("/profile")).toEqual({ name: "profile" });
     expect(parseRoute("/notifications")).toEqual({ name: "notifications" });
   });
@@ -54,5 +57,14 @@ describe("parseRoute", () => {
     expect(legacyRedirect("/workspaces", "")).toBe("/spaces");
     expect(legacyRedirect("/spaces/w1", "")).toBeNull();
     expect(parseRoute("/workspaces/w1/memory")).toEqual({ name: "workspace", workspaceId: "w1", section: "memory" });
+  });
+
+  it("takes the assistant button to the workspace being viewed, else to the page's own choice", () => {
+    expect(assistantPath("w 1")).toBe("/assistant/w%201");
+    expect(assistantEntryPath("/spaces/w1/memory")).toBe("/assistant/w1");
+    expect(assistantEntryPath("/spaces/w1/artifacts/a1")).toBe("/assistant/w1");
+    expect(assistantEntryPath("/assistant/w2")).toBe("/assistant/w2");
+    expect(assistantEntryPath("/dashboard")).toBe("/assistant");
+    expect(routePath({ name: "assistant", workspaceId: "w1" })).toBe("/assistant/w1");
   });
 });

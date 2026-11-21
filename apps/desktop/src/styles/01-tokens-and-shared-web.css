@@ -924,3 +924,11 @@ input[type="file"] {
 .rm-button.shared-rail-workspace.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); }
 .rm-button.shared-rail-workspace.active .shared-rail-sub { color: var(--color-text-muted); }
 .shared-home-rail .rm-button.active:focus-visible { outline-color: var(--color-border-strong); }
+
+/* The assistant on a page of its own (V0.8.46): the chat fills the page under a heading, centred and no wider than reads well. */
+.shared-assistant-page { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.shared-assistant-page > .rm-page-header { flex: 0 0 auto; margin-bottom: 12px; }
+.shared-assistant-page-workspace { min-width: 240px; }
+.shared-assistant-page-body { display: flex; flex: 1; justify-content: center; min-height: 0; padding-bottom: 12px; }
+.shared-assistant-page-body > .shared-assistant { width: 100%; max-width: 960px; padding: 0; }
+.shared-assistant-link[aria-pressed="true"] { border-color: var(--color-border-strong); background: var(--color-surface-3); }

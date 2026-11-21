@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.45` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.46` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.46 — The assistant on a page of its own.
+
+- A **sparkles button** in the top bar (tooltip *Assistant*) opens the assistant page, `/assistant` (`/assistant/<workspace>`). The chat takes the whole page under a heading, centred, with its chat history, capabilities and suggested questions as in the dock.
+- The assistant still works on **one workspace**: a list above the chat chooses which. From a workspace page the button opens the assistant for that workspace; otherwise it opens the workspace used last time, or the first one. The address names the workspace, so a reload or a shared link returns to it, and the page takes that workspace's color. With no workspace the page offers **New workspace**.
+- The assistant is also in the command palette (*Assistant*), and in the desktop app's links. The dock on workspace pages is unchanged: it is the same assistant, beside the work.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.45 — Sidebar title, organization mark, white icons.
 
