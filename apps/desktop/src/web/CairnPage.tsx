@@ -26,7 +26,7 @@ function CairnGroup({ activeId, chats, workspace }: { activeId: string | null; c
   const visible = all || chats.length <= GROUP_LIMIT ? chats : chats.slice(0, GROUP_LIMIT);
   return <section aria-label={workspace.workspace.name} className="shared-cairn-group">
     <div className="shared-cairn-group-head">
-      <button aria-expanded={open} className="shared-cairn-group-toggle" onClick={() => setOpen((current) => !current)} type="button"><span>{workspace.workspace.name}</span><ChevronDown size={ICON_SIZE.sm} /></button>
+      <button aria-expanded={open} className="shared-cairn-group-toggle" onClick={() => setOpen((current) => !current)} type="button"><span className="shared-cairn-group-icon"><WorkspaceIcon size={14} weight="fill" workspace={workspace.workspace} /></span><span className="shared-cairn-group-name">{workspace.workspace.name}</span><ChevronDown size={ICON_SIZE.sm} /></button>
       <IconButton appearance="plain" className="shared-cairn-group-new" label={`New chat in ${workspace.workspace.name}`} onClick={() => { rememberCairnWorkspace(workspace.workspace.id); navigate(cairnPath(null)); }} size="sm"><Plus size={ICON_SIZE.sm} /></IconButton>
     </div>
     <div hidden={!open}>

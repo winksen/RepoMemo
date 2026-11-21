@@ -1014,7 +1014,6 @@ input[type="file"] {
 .shared-cairn-split { display: inline-flex; align-items: stretch; }
 .shared-account-controls .shared-cairn-main { min-height: 36px; padding: 0 14px 0 12px; border-right-width: 0; border-radius: 8px 0 0 8px; }
 .shared-account-controls .shared-cairn-caret { min-height: 36px; min-width: 30px; padding: 0 6px; border-radius: 0 8px 8px 0; }
-.shared-cairn-main[aria-current="page"] { background: var(--color-surface-2); }
 .shared-notifications-link { position: relative; }
 .shared-notifications-count { position: absolute; top: -5px; right: -5px; display: grid; min-width: 16px; height: 16px; padding: 0 4px; place-items: center; color: var(--color-on-accent); background: var(--color-accent); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1; }
 .shared-notifications-popover { z-index: var(--layer-popover); display: grid; gap: 8px; width: min(380px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 80px)); padding: 12px; overflow: auto; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 12px; box-shadow: var(--shadow-floating); }
@@ -1086,3 +1085,30 @@ input[type="file"] {
 .shared-home-header .shared-cairn-split:hover .shared-cairn-caret { border-color: var(--color-accent); }
 .shared-search-bar { background: transparent; border: 2px solid var(--color-border); border-radius: 8px; transition: border-color 110ms var(--ease-control); }
 .shared-search-bar:hover { background: transparent; border-color: var(--color-accent); }
+
+/* Cairn's sidebar, more compact, each workspace with its icon (V0.8.65); the open page of CAIRN in the bar has no fill. */
+.shared-cairn-group { margin-top: 8px; gap: 0; }
+.shared-cairn-group-head { padding-left: 6px; }
+.shared-cairn-group-toggle { gap: 8px; padding: 3px 0; font-size: 13px; }
+.shared-cairn-group-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-cairn-group-icon { display: grid; flex: 0 0 auto; width: 22px; height: 22px; place-items: center; color: var(--color-text); background: var(--color-surface-3); border-radius: 6px; }
+.shared-cairn-group-toggle { color: var(--color-text); }
+.rm-button.shared-cairn-chat { min-height: 28px; padding: 0 10px 0 36px; font-size: 13px; font-weight: 600; }
+.shared-home-header .shared-cairn-main[aria-current="page"] { background: transparent; }
+/* The chat options, a dropdown at the top right of the chat. */
+.shared-chat-options { z-index: var(--layer-popover); display: grid; gap: 12px; width: min(340px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 80px)); padding: 14px; overflow: auto; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 12px; box-shadow: var(--shadow-floating); }
+.shared-chat-options[data-state="open"] { animation: rm-dialog-in 160ms cubic-bezier(0.22, 1, 0.36, 1); }
+.shared-chat-options-facts { display: grid; gap: 8px; margin: 0; }
+.shared-chat-options-facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.shared-chat-options dt { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); font-size: 13px; }
+.shared-chat-options dd { margin: 0; font-size: 13px; font-weight: 650; text-align: right; }
+.shared-chat-options dd small, .shared-chat-options li small { color: var(--color-text-subtle); font-size: 12px; font-weight: 500; }
+.shared-chat-options-block { display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--color-border); }
+.shared-chat-options-block > strong { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.shared-chat-options-block ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.shared-chat-options-block li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; font-size: 13px; }
+.shared-chat-options-block li button { max-width: 100%; padding: 4px 0; overflow: hidden; color: var(--color-text-muted); background: transparent; border: 0; cursor: pointer; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.shared-chat-options-block li button:hover { color: var(--color-text); text-decoration: underline; }
+.shared-chat-options-block p { margin: 0; color: var(--color-text-muted); font-size: 13px; }
+.shared-chat-options-actions { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--color-border); }
+.shared-chat-options-actions .rm-button { flex: 1; min-height: 32px; }

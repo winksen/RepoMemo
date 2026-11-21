@@ -9,6 +9,7 @@ import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
 import { CairnIcon } from "./CairnIcon";
+import { ChatOptions } from "./ChatOptions";
 import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
 import { Dialog, DialogCancel } from "./ui/dialog";
@@ -289,6 +290,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     {dialog}
     <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
+      {hideChatList ? <ChatOptions capabilities={capabilities} conversation={activeConversation} onDelete={() => activeConversation && setChatDialog({ kind: "delete", conversation: activeConversation })} onOpenArtifact={onOpenArtifact} onRename={() => { if (activeConversation) { setRenameValue(activeConversation.title); setChatDialog({ kind: "rename", conversation: activeConversation }); } }} replies={turns.map((turn) => turn.reply)} /> : null}
       {hideChatList ? null : <>
         <IconButton aria-expanded={showChats} label="Chat history" onClick={() => setShowChats((current) => !current)} size="sm"><History size={ICON_SIZE.md} /></IconButton>
         <IconButton disabled={isBusy} label="New chat" onClick={() => { startNewChat(); setShowChats(false); }} size="sm"><Plus size={ICON_SIZE.md} /></IconButton>

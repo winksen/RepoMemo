@@ -2,7 +2,16 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.64` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.65` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.65 — A compact chat list and chat options.
+
+- **Compact chat list.** Chats are shorter rows (28 px) and the groups sit closer together.
+- **Workspace icons.** Each group is headed by its workspace's **icon** (filled, on a small grey tile) before its name.
+- **Chat options.** A button at the top right of the chat opens a dropdown with: the **exchanges** in the chat and the messages back and forth; when it started and was last used; how many replies an **AI provider wrote** (and which provider); what was **asked of CAIRN** (find files, search content, …, with counts); the **files used** (every file cited or found, each opening on a click); and **Rename** and **Delete** for the chat. Rename and delete used to be reachable only from the chat history menu that this page does not show.
+- The **CAIRN button** in the bar no longer has a fill when its page is open (its icon is filled).
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.64 — CAIRN's button and the search bar, in the same style.
 

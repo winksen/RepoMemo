@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.65 (2026-11-21)
+
+A compact chat list, and options for the chat.
+
+### Changed
+- **Compact chat list.** Chats in Cairn's sidebar are shorter rows (28 px) with the groups closer together.
+- **Workspace icons.** Each group is headed by its workspace's icon (filled, on a small grey tile) before its name, so the groups are easy to tell apart.
+- **CAIRN button.** It no longer has a fill when its page is open; its icon is filled instead.
+
+### Added
+- **Chat options**, a button at the top right of the chat that opens a dropdown with: the number of **exchanges** and the messages back and forth, when the chat started and was last used, how many replies an **AI provider wrote** (and which provider), what was **asked of CAIRN** (with counts), the **files used** (every file cited or found, each opening on a click), and **Rename** and **Delete** for the chat.
+- The figures are worked out from the replies shown in the chat. A token count or a cost per chat is not available from the server, so none is shown; the AI usage of the whole server stays under System › Usage.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen. A new test covers the facts and the dropdown and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.64 (2026-11-21)
 
 CAIRN's button and the search bar, in the same style.
