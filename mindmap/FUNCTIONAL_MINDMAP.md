@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.62` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.63` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.63 — A top bar in three parts, equal sidebars.
+
+- **Top bar.** The logo on the left; **search as a bar in the middle** (*Search or jump to…* and the shortcut Ctrl K, opening the command palette); and on the right the controls in this order: **create (+)**, **theme**, **notifications** and, last, **CAIRN** with its menu. All of them are the same height and line up. On a narrow window the search bar shrinks to its icon.
+- **Sidebars.** The workspaces sidebar is as wide as CAIRN's (288 px).
+- **Smaller workspace chips** (36 px, from 44) with their icons, so more workspaces fit without scrolling.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.62 — A user menu in the sidebar.
 

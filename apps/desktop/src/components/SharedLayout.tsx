@@ -89,14 +89,14 @@ function LayoutFrame({ accessToken, chatsOnly = false, session, sidebar, signOut
     <a className="rm-skip-link" href={`#${MAIN_CONTENT_ID}`} onClick={(event) => { event.preventDefault(); document.getElementById(MAIN_CONTENT_ID)?.focus(); }}>Skip to the page</a>
     <header className="shared-home-header">
       <Button aria-label="Go to dashboard" className="shared-brand" onClick={() => onNavigate("/dashboard")} type="button" variant="secondary"><img alt="RepoMemo" className="shared-brand-full" src="/RM-logofull.svg" /></Button>
+      <button aria-label="Open command palette" className="shared-search-bar" onClick={openCommandPalette} type="button"><Search size={ICON_SIZE.md} /><span className="shared-search-bar-text">Search or jump to…</span><kbd>Ctrl K</kbd></button>
       <div className="shared-header-actions">
         <div className="shared-user-menu" aria-label="Account controls" role="group">
           <div className="shared-account-controls">
             <CreateMenu canCreateOrganization={session.can_create_organizations !== false} defaultOrganizationId={defaultOrganizationId} />
             <ThemeToggle />
-            <CairnButton onNavigate={onNavigate} />
-            <IconButton className="shared-palette-link" label="Open command palette" onClick={openCommandPalette} size="sm"><Search size={ICON_SIZE.md} /></IconButton>
             {accessToken ? <NotificationsMenu accessToken={accessToken} onNavigate={onNavigate} userId={session.user.id} /> : <IconButton className="shared-notifications-link" label="Notifications" onClick={() => onNavigate("/notifications")} size="sm"><Bell size={ICON_SIZE.md} /></IconButton>}
+            <CairnButton onNavigate={onNavigate} />
           </div>
         </div>
       </div>

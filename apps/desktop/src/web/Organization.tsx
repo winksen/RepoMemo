@@ -130,7 +130,7 @@ export function OrganizationRail({
   if (!workspaces) return <div className="shared-rail-navigation" />;
   const entries = workspaces.map((workspace) => {
     const organization = organizations.find((entry) => entry.id === workspace.organization_id);
-    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, subtitle: organization ? <><OrganizationIcon organization={organization} size={15} weight="fill" /><span>{organization.name}</span></> : undefined, colorProps: workspaceColorProps(workspaceColorKey(workspace.workspace)), icon: (active: boolean) => <span className="shared-rail-chip"><WorkspaceIcon size={22} weight={active ? "fill" : "regular"} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
+    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, subtitle: organization ? <><OrganizationIcon organization={organization} size={15} weight="fill" /><span>{organization.name}</span></> : undefined, colorProps: workspaceColorProps(workspaceColorKey(workspace.workspace)), icon: (active: boolean) => <span className="shared-rail-chip"><WorkspaceIcon size={18} weight={active ? "fill" : "regular"} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
   });
   return <div className="shared-rail-navigation">
     <RailSection label="Workspaces" name="workspaces">

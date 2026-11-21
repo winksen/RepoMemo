@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.63 (2026-11-21)
+
+A top bar in three parts, and equal sidebars.
+
+### Changed
+- **Top bar.** The logo is on the left, **search is a bar in the middle** (*Search or jump to…* with the shortcut Ctrl K; it opens the command palette), and the controls are on the right in this order: **create (+)**, **theme**, **notifications** and, rightmost, **CAIRN** with its menu. Every control has the same height (36 px) and they line up; the earlier rule could lose to a more specific one, so the heights are now fixed under the bar itself. On a narrow window the search bar becomes an icon.
+- **Equal sidebars.** The workspaces sidebar is as wide as CAIRN's: 288 px for both.
+- **Smaller workspace chips.** A workspace's chip in the sidebar is 36 px (it was 44), with an 18 px icon, and its row is shorter, so more workspaces fit before *Show more*.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.62 (2026-11-21)
 
 A user menu in the sidebar, and a top bar that lines up.

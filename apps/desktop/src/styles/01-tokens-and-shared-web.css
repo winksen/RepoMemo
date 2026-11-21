@@ -199,7 +199,7 @@ input[type="file"] {
 .shared-account-controls button:hover { border-color: var(--color-accent); }
 .shared-theme-toggle,
 .shared-notifications-link { justify-content: center; padding: 0 9px !important; }
-.shared-home-frame { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 10px; min-height: 0; padding-top: 10px; }
+.shared-home-frame { display: grid; grid-template-columns: 288px minmax(0, 1fr); gap: 10px; min-height: 0; padding-top: 10px; }
 .shared-home-rail,
 .shared-home-content { background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
 .shared-shell-slot { display: contents; }
@@ -965,7 +965,6 @@ input[type="file"] {
 .rm-button.shared-cairn-chat.active, .rm-button.shared-cairn-chat.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); }
 
 /* Cairn's sidebar is a little wider, and nothing in any sidebar scrolls sideways: a title that does not fit is cut with an ellipsis (V0.8.51). */
-.shared-home-frame[data-wide="true"] { grid-template-columns: 288px minmax(0, 1fr); }
 .shared-rail-navigation { overflow-x: hidden; }
 .shared-rail-navigation section, .shared-rail-navigation section > div { min-width: 0; }
 .shared-cairn-group { grid-template-columns: minmax(0, 1fr); }
@@ -1056,3 +1055,27 @@ input[type="file"] {
 .shared-user-dropdown-who span { color: var(--color-text-muted); font-size: 12px; }
 .shared-user-dropdown-line { height: 1px; margin: 4px 0; background: var(--color-border); }
 .shared-user-dropdown-out { color: var(--color-danger); }
+
+/* The top bar (V0.8.63): the logo, a search bar in the middle, the controls on the right with CAIRN last, all the same height.
+   Both sidebars are 288 px, and a workspace's chip is smaller so more of them fit. */
+.shared-home-header { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 560px) minmax(0, 1fr); align-items: center; gap: 16px; }
+.shared-home-header > .shared-brand { justify-self: start; }
+.shared-home-header .shared-header-actions { justify-self: end; }
+.shared-search-bar { display: flex; align-items: center; gap: 10px; width: 100%; height: 36px; padding: 0 12px; color: var(--color-text-muted); background: var(--color-surface-2); border: 0; border-radius: 10px; cursor: pointer; font: inherit; font-size: 13px; text-align: left; transition: background 110ms var(--ease-control); }
+.shared-search-bar:hover { background: var(--color-surface-3); }
+.shared-search-bar:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: 2px; }
+.shared-search-bar-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-search-bar kbd { padding: 1px 6px; color: var(--color-text-subtle); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; font: inherit; font-size: 11px; }
+.shared-home-header .shared-account-controls { align-items: center; gap: 8px; }
+.shared-home-header .shared-account-controls .rm-button,
+.shared-home-header .shared-account-controls .rm-icon-button { box-sizing: border-box; height: 36px; min-height: 36px; max-height: 36px; padding-block: 0; line-height: 1; }
+.shared-home-header .shared-account-controls .rm-icon-button { width: 36px; min-width: 36px; padding-inline: 0; }
+.shared-home-header .shared-account-controls .shared-cairn-caret { width: 30px; min-width: 30px; }
+.shared-home-header .shared-account-controls .shared-cairn-main { padding-inline: 12px 14px; }
+.rm-button.shared-rail-workspace { min-height: 48px; padding: 5px 10px; gap: 10px; }
+.rm-button.shared-rail-workspace .shared-rail-chip { width: 36px; height: 36px; border-radius: 6px; }
+@media (max-width: 900px) {
+  .shared-home-header { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
+  .shared-search-bar-text, .shared-search-bar kbd { display: none; }
+  .shared-search-bar { width: 36px; justify-self: center; justify-content: center; padding: 0; }
+}
