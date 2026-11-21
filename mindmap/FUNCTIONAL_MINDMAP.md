@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.3` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.4` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.4 — CAIRN shows only the evidence it used.
+
+- **Evidence is only what was used.** Under CAIRN's answer, the evidence lists the passages the answer cites, in the order it cites them. An answer that says the indexed context is insufficient shows none. The Ask page is unchanged.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.3 — CAIRN speaks in the first person, in your language.
 

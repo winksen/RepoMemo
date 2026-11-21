@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.4 (2026-11-21)
+
+CAIRN shows only the evidence it used.
+
+### Changed
+- **Evidence is what the answer cites.** Under an answer in the chat, the evidence is now the passages the answer cites ([1], [2], ...), in the order it cites them, instead of every passage CAIRN was given. A marker is read in any common shape (`[2]`, `[1][3]`, `[1, 4]`) and each passage appears once.
+- **Nothing when there is nothing.** An answer that says the indexed context is insufficient relied on nothing, so it shows no evidence; before, it listed the passages it had just said did not help.
+- **When an answer cites nothing** but does answer, all the passages it was given stay as evidence, since nothing says which it used.
+- Ask on the Retrieval page, the API's `ask` route and the stored answers are unchanged: this applies to CAIRN's chat replies only.
+- No API, setting or migration changes.
+
+### Checks
+- Unit tests for reading the markers and choosing the evidence; compiled and linted, not run. Nothing was built into the app or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.3 (2026-11-21)
 
 CAIRN speaks in the first person, in your language.

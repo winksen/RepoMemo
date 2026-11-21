@@ -14,7 +14,9 @@ use serde_json::{json, Value};
 use crate::RepoMemoCore;
 
 mod chatter;
+mod evidence;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext};
+use evidence::evidence_for;
 
 const MAX_MESSAGE_CHARS: usize = 2_000;
 const FILE_RESULT_LIMIT: usize = 20;
@@ -618,7 +620,8 @@ impl RepoMemoCore {
         if result.generated {
             result.context_turns = history.len() as i64;
         }
-        result.citations = answer.citations;
+        // Only the passages the answer cites are its evidence (V0.9.4).
+        result.citations = evidence_for(&result.reply_markdown, answer.citations);
         result.warnings = answer.warnings;
         Ok(result)
     }
