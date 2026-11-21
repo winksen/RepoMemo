@@ -17,8 +17,29 @@ export function rememberedCairnWorkspace(): string | null {
   try { return window.localStorage.getItem(CONTEXT_KEY); } catch { return null; }
 }
 
+const CONTEXT_EVENT = "repomemo:cairn-context";
+
+/** Sets the workspace a new chat starts in, and tells whoever shows it (the page's chooser). */
 export function rememberCairnWorkspace(workspaceId: string) {
   try { window.localStorage.setItem(CONTEXT_KEY, workspaceId); } catch { /* only a convenience */ }
+  window.dispatchEvent(new Event(CONTEXT_EVENT));
+}
+
+/** Calls `listener` when `rememberCairnWorkspace` is used; returns the function that stops listening. */
+export function onCairnWorkspaceChange(listener: () => void): () => void {
+  window.addEventListener(CONTEXT_EVENT, listener);
+  return () => window.removeEventListener(CONTEXT_EVENT, listener);
+}
+
+/** The chats of each workspace, the workspace with the latest chat first; a workspace with no chat has no group. */
+export function groupCairnChats(chats: CairnChat[]): { workspace: SharedWorkspace; chats: CairnChat[] }[] {
+  const groups = new Map<string, { workspace: SharedWorkspace; chats: CairnChat[] }>();
+  for (const chat of chats) {
+    const group = groups.get(chat.workspace.workspace.id) ?? { workspace: chat.workspace, chats: [] };
+    group.chats.push(chat);
+    groups.set(chat.workspace.workspace.id, group);
+  }
+  return [...groups.values()];
 }
 
 /** Every chat of the person across their workspaces, the most recent first. Shares the cache the chat panel writes to. */

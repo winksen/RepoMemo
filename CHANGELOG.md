@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.50 (2026-11-21)
+
+Chats by workspace, and a choice of workspace for a new chat.
+
+### Changed
+- **Grouped history.** On Cairn's page the sidebar lists the chats under the name of the workspace each belongs to. A workspace's name folds its chats away; a **+** that appears when you hover it starts a chat in that workspace; a long group shows six chats and **Show more**. Workspaces with no chat have no group. Chats are listed without chips, newest first within a group.
+- **Only chats in the sidebar.** *New chat* and the groups are all it holds: the Organizations and System entries, the session note and the server note are not shown on this page.
+- **Choose the workspace for a new chat.** On `/cairn` (a new chat) a list above the chat chooses the workspace the chat draws on, starting from the one you opened Cairn from or used last; the **+** beside a workspace in the sidebar chooses it too. Once the chat has started, the workspace is shown as a label, because a chat keeps the workspace it was started in.
+- No server, API, setting or migration changes. Cairn still draws on one workspace per chat; a Cairn that answers across workspaces needs server work.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the page was not opened. The Cairn page test was rewritten and not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.49 (2026-11-21)
 
 Cairn as an agent page.

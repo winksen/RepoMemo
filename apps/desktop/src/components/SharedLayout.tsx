@@ -76,7 +76,9 @@ const ShellContext = createContext<ShellSlots | null>(null);
  * for all of them, so `SharedWebApp` keeps ONE copy mounted while the page inside it changes, and moving from page
  * to page redraws only the page, never the bar or the rail (V0.8.25).
  */
-function LayoutFrame({ session, sidebar, signOut, onNavigate, defaultOrganizationId, navigation, aside, children, slots }: {
+function LayoutFrame({ chatsOnly = false, session, sidebar, signOut, onNavigate, defaultOrganizationId, navigation, aside, children, slots }: {
+  /** The rail holds only what `sidebar` gives it: no Organizations, System, session or server notes (Cairn's page). */
+  chatsOnly?: boolean;
   session: SharedSession;
   sidebar: ReactNode;
   signOut: () => void;
@@ -117,7 +119,7 @@ function LayoutFrame({ session, sidebar, signOut, onNavigate, defaultOrganizatio
     <div className="shared-home-frame">
       <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
         <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={ICON_SIZE.md} /></Button>
-        <div className="shared-rail-body" id="shared-rail-body">{sidebar}<AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><SessionNote /><DesktopServerNote signedIn /></div>
+        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{chatsOnly ? null : <><AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><SessionNote /><DesktopServerNote signedIn /></>}</div>
       </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {slots ? <div className="shared-shell-slot" ref={slots.setNavigation} /> : navigation}
@@ -135,7 +137,8 @@ function LayoutFrame({ session, sidebar, signOut, onNavigate, defaultOrganizatio
  * into the frame's slots; the rail comes from here, so it does not blink while a page loads.
  * `scrollKey` changes with the page: the content starts at the top again.
  */
-export function SharedShell({ children, defaultOrganizationId, scrollKey, session, sidebar, signOut, onNavigate }: {
+export function SharedShell({ chatsOnly = false, children, defaultOrganizationId, scrollKey, session, sidebar, signOut, onNavigate }: {
+  chatsOnly?: boolean;
   children: ReactNode;
   defaultOrganizationId?: string;
   scrollKey: string;
@@ -150,7 +153,7 @@ export function SharedShell({ children, defaultOrganizationId, scrollKey, sessio
   const slots = useMemo(() => ({ navigation, content, aside }), [navigation, content, aside]);
   useEffect(() => { content?.scrollTo?.({ top: 0 }); }, [content, scrollKey]);
   return <ShellContext.Provider value={slots}>
-    <LayoutFrame defaultOrganizationId={defaultOrganizationId} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut} slots={{ setNavigation, setContent, setAside }} />
+    <LayoutFrame chatsOnly={chatsOnly} defaultOrganizationId={defaultOrganizationId} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut} slots={{ setNavigation, setContent, setAside }} />
     {children}
   </ShellContext.Provider>;
 }

@@ -948,3 +948,19 @@ input[type="file"] {
 .shared-cairn-context { display: inline-flex; align-items: center; gap: 6px; max-width: 260px; padding: 4px 10px; overflow: hidden; color: var(--color-text-muted); background: var(--color-surface-2); border-radius: 999px; font-size: 12px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .rm-button.shared-rail-new-chat { justify-content: flex-start; width: 100%; margin-bottom: 8px; }
 .shared-rail-chats > div { margin-top: 8px; }
+
+/* Cairn's chat list (V0.8.50): the chats of each workspace under its name, in the manner of a chat app's history. */
+.shared-cairn-group { display: grid; gap: 2px; margin-top: 14px; }
+.shared-cairn-group-head { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding-left: 10px; }
+.shared-cairn-group-toggle { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 4px 0; color: var(--color-text-muted); background: transparent; border: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.shared-cairn-group-toggle span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-cairn-group-toggle svg { flex: 0 0 auto; transition: transform 120ms var(--ease-standard); }
+.shared-cairn-group-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.shared-cairn-group-toggle:hover { color: var(--color-text); }
+.shared-cairn-group-toggle:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: 2px; }
+.shared-cairn-group-new { opacity: 0; }
+.shared-cairn-group:hover .shared-cairn-group-new, .shared-cairn-group-new:focus-visible { opacity: 1; }
+.rm-button.shared-cairn-chat { justify-content: flex-start; width: 100%; min-width: 0; min-height: 34px; padding: 0 10px 0 18px; color: var(--color-text-muted); background: transparent; border: 0; border-radius: 7px; font-size: 14px; font-weight: 600; text-align: left; }
+.rm-button.shared-cairn-chat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-button.shared-cairn-chat:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
+.rm-button.shared-cairn-chat.active, .rm-button.shared-cairn-chat.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); }

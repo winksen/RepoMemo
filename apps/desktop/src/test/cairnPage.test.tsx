@@ -34,28 +34,32 @@ it("starts a new chat in the workspace last worked in, else the first", () => {
   expect(cairnContextWorkspace([], null)).toBeUndefined();
 });
 
-it("lists the chats of every workspace in the sidebar, the newest first, and opens one", async () => {
-  render(wrap(<CairnRail accessToken="t" chatId="c1" organizations={organizations} workspaces={workspaces} />));
-  const rows = await screen.findAllByRole("button", { name: /Retry policy|Refund rules/ });
-  expect(rows.map((row) => row.textContent)).toEqual([expect.stringContaining("Refund rules"), expect.stringContaining("Retry policy")]);
-  expect(screen.getByRole("button", { name: /Retry policy/ }).getAttribute("aria-current")).toBe("page");
-  expect(screen.getByText("Chats")).toBeTruthy();
-  rows[0].click();
+it("groups the chats in the sidebar by workspace, the workspace with the latest chat first, and opens one", async () => {
+  render(wrap(<CairnRail accessToken="t" chatId="c1" workspaces={workspaces} />));
+  const groups = await screen.findAllByRole("region");
+  expect(groups.map((group) => group.getAttribute("aria-label"))).toEqual(["Pay", "Code"]);
+  expect(screen.getByRole("button", { name: "Retry policy" }).getAttribute("aria-current")).toBe("page");
+  screen.getByRole("button", { name: "Refund rules" }).click();
   expect(navigate).toHaveBeenCalledWith("/cairn/c2");
+  screen.getByRole("button", { name: "New chat in Code" }).click();
+  expect(window.localStorage.getItem("repomemo.cairn.workspace")).toBe("w1");
+  expect(navigate).toHaveBeenLastCalledWith("/cairn");
 });
 
-it("shows Cairn for the workspace of the open chat, with no workspace to choose", async () => {
-  render(wrap(<SharedCairnPage accessToken="t" chatId="c2" session={session} signOut={vi.fn()} workspaces={workspaces} />));
+it("shows Cairn for the workspace of the open chat, as a label and not a choice", async () => {
+  render(wrap(<SharedCairnPage accessToken="t" chatId="c2" organizations={organizations} session={session} signOut={vi.fn()} workspaces={workspaces} />));
   expect((await screen.findByTestId("panel")).textContent).toBe("cairn for w2 chat c2");
   expect(screen.getByRole("heading", { name: "CAIRN" })).toBeTruthy();
   expect(screen.queryByRole("combobox")).toBeNull();
+  expect(screen.getByTitle("The workspace this chat draws on").textContent).toContain("Pay");
 });
 
-it("opens a new chat in the remembered workspace when no chat is named, and says so when there is no workspace", async () => {
+it("offers a choice of workspace for a new chat, starting from the remembered one", async () => {
   window.localStorage.setItem("repomemo.cairn.workspace", "w2");
-  const { unmount } = render(wrap(<SharedCairnPage accessToken="t" chatId={null} session={session} signOut={vi.fn()} workspaces={workspaces} />));
+  const { unmount } = render(wrap(<SharedCairnPage accessToken="t" chatId={null} organizations={organizations} session={session} signOut={vi.fn()} workspaces={workspaces} />));
   expect((await screen.findByTestId("panel")).textContent).toBe("cairn for w2 chat null");
+  expect(screen.getByRole("combobox", { name: "Workspace for this chat" }).textContent).toContain("Pay");
   unmount();
-  render(wrap(<SharedCairnPage accessToken="t" chatId={null} session={session} signOut={vi.fn()} workspaces={[]} />));
+  render(wrap(<SharedCairnPage accessToken="t" chatId={null} organizations={organizations} session={session} signOut={vi.fn()} workspaces={[]} />));
   expect(screen.getByText("No workspace to talk about yet")).toBeTruthy();
 });

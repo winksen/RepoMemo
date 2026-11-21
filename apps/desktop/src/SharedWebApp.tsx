@@ -325,7 +325,7 @@ function SharedWebAppContent() {
       return <SystemArea accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} section={route.section} session={session} signOut={signOut} workspaces={workspaces} />;
 
     case "cairn":
-      return <SharedCairnPage accessToken={accessToken} chatId={route.chatId} session={session} signOut={signOut} workspaces={workspaces} />;
+      return <SharedCairnPage accessToken={accessToken} chatId={route.chatId} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
 
     case "orgs":
       return <SharedOrganizations apiAvailable={apiAvailable} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
@@ -403,11 +403,12 @@ function SharedWebAppContent() {
     <PageAnnouncer accessToken={accessToken} route={route} workspaceName={workspace?.workspace.name} />
     {clientPlatform.nativeNotices ? <NoticeWatcher accessToken={accessToken} userId={session.user.id} workspaceIds={workspaces.map((entry) => entry.workspace.id)} /> : null}
     <SharedShell
+      chatsOnly={route.name === "cairn"}
       defaultOrganizationId={workspaceOrganization?.id ?? organizations[0]?.id}
       onNavigate={navigate}
       scrollKey={pageKey(route)}
       session={session}
-      sidebar={route.name === "cairn" ? <CairnRail accessToken={accessToken} chatId={route.chatId} organizations={organizations} workspaces={workspaces} /> : <OrganizationRail organizations={organizations} workspaceId={routedWorkspaceId ?? undefined} workspaces={workspaces} />}
+      sidebar={route.name === "cairn" ? <CairnRail accessToken={accessToken} chatId={route.chatId} workspaces={workspaces} /> : <OrganizationRail organizations={organizations} workspaceId={routedWorkspaceId ?? undefined} workspaces={workspaces} />}
       signOut={signOut}
     >
       {renderPage()}

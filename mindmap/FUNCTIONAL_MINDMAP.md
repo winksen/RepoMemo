@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.49` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.50` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.50 — Chats by workspace.
+
+- On Cairn's page the sidebar lists the chats **under the name of the workspace** each belongs to, as a chat app's history does: a workspace's name folds its chats away, a **+** that appears on hover starts a chat in it, and a long group shows six and **Show more**. Workspaces with no chat have no group.
+- The sidebar holds **only chats**: *New chat* and the groups. The Organizations and System entries, the session note and the server note are not shown on that page.
+- **A new chat offers the workspace.** On `/cairn` (a new chat) a list above the chat chooses the workspace it draws on, starting from the one you opened Cairn from or used last; the **+** beside a workspace in the sidebar chooses it too. Once the chat has started, the workspace is shown as a label.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.49 — Cairn as an agent page.
 
