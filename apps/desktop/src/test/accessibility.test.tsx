@@ -34,16 +34,16 @@ describe("the page frame", () => {
 describe("page titles", () => {
   it("name the page, with the workspace and the section where there is one", () => {
     expect(pageTitle(parseRoute("/dashboard"))).toBe("Dashboard");
-    expect(pageTitle(parseRoute("/workspaces/w1/people"), { workspace: "Atlas" })).toBe("Atlas · People & Activity");
-    expect(pageTitle(parseRoute("/workspaces/w1/retrieval"), { workspace: "Atlas" })).toBe("Atlas · Retrieval");
+    expect(pageTitle(parseRoute("/spaces/w1/people"), { workspace: "Atlas" })).toBe("Atlas · People & Activity");
+    expect(pageTitle(parseRoute("/spaces/w1/retrieval"), { workspace: "Atlas" })).toBe("Atlas · Retrieval");
     expect(pageTitle(parseRoute("/system/audit"))).toBe("System · Audit trail");
     expect(pageTitle(parseRoute("/nowhere"))).toBe("Page not found");
   });
 
   it("change the page key for another page but not for another section of the same workspace", () => {
-    expect(pageKey(parseRoute("/workspaces/w1/evidence"))).toBe(pageKey(parseRoute("/workspaces/w1/memory")));
-    expect(pageKey(parseRoute("/workspaces/w1/evidence"))).not.toBe(pageKey(parseRoute("/workspaces/w2/evidence")));
-    expect(pageKey(parseRoute("/workspaces/w1/artifacts/a1"))).not.toBe(pageKey(parseRoute("/workspaces/w1/evidence")));
+    expect(pageKey(parseRoute("/spaces/w1/evidence"))).toBe(pageKey(parseRoute("/spaces/w1/memory")));
+    expect(pageKey(parseRoute("/spaces/w1/evidence"))).not.toBe(pageKey(parseRoute("/spaces/w2/evidence")));
+    expect(pageKey(parseRoute("/spaces/w1/artifacts/a1"))).not.toBe(pageKey(parseRoute("/spaces/w1/evidence")));
     expect(pageKey(parseRoute("/system/logs"))).toBe(pageKey(parseRoute("/system/jobs")));
   });
 });

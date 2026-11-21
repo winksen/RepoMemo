@@ -34,10 +34,10 @@ afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("a repomemo:// link reaching the app (V0.4.54)", () => {
   it("shows the page of the link the app was started with, once the client is up", async () => {
-    vi.mocked(appLinks.takePending).mockResolvedValue("/workspaces/w1/evidence");
+    vi.mocked(appLinks.takePending).mockResolvedValue("/spaces/w1/evidence");
     render(<DesktopApp />);
     await screen.findByText("the web client");
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/workspaces/w1/evidence"));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/spaces/w1/evidence"));
   });
 
   it("shows the page of a link opened while it runs", async () => {

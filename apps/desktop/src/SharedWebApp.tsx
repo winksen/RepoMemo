@@ -23,7 +23,7 @@ import { VerifyEmailPage } from "./components/VerifyEmailPage";
 import { SharedLayout, initialSharedTheme } from "./components/SharedLayout";
 import { type PageState } from "./web/constants";
 import { apiMessage } from "./web/format";
-import { currentLinkSecret, currentLocation, currentPathname, navigate, parseRoute, routePath, workspaceHomePath } from "./web/router";
+import { currentLinkSecret, currentLocation, currentPathname, legacyRedirect, navigate, organizationPath, parseRoute, routePath, workspaceHomePath } from "./web/router";
 import { SystemArea } from "./web/lazy";
 import { OrganizationNavigationProvider } from "./web/navigation";
 import { LoadingCanvas } from "./web/common";
@@ -120,7 +120,7 @@ function SharedWebAppContent() {
 
   useEffect(() => {
     function showSignIn() {
-      if (currentPathname() === "/" || currentPathname() === "/dashboard" || currentPathname().startsWith("/workspaces") || currentPathname() === "/orgs" || currentPathname().startsWith("/system")) {
+      if (currentPathname() === "/" || currentPathname() === "/dashboard" || currentPathname().startsWith("/spaces") || currentPathname().startsWith("/workspaces") || currentPathname().startsWith("/orgs") ||  currentPathname().startsWith("/system")) {
         navigate("/login", true);
       }
       setPageState("unauthenticated");
@@ -193,6 +193,9 @@ function SharedWebAppContent() {
     if (pageState === "ready" && (pathname === "/" || pathname === "/login" || pathname === "/register")) {
       navigate("/dashboard", true);
     }
+    // An address of the old shape (`/workspaces/...`, `/workspaces?organization=...`) moves to its current one.
+    const moved = legacyRedirect(pathname, window.location.search);
+    if (pageState === "ready" && moved) navigate(moved, true);
   }, [pageState, pathname, setup]);
 
   const versionVerdict = serverVersion.known ? checkServerVersion(serverVersion.version) : { ok: true as const };
@@ -315,15 +318,15 @@ function SharedWebAppContent() {
       return <SharedDashboard accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} onOpenWorkspace={(entry) => openWorkspace(entry.workspace.id)} session={session} signOut={signOut} workspaces={workspaces} />;
 
     case "artifact":
-      if (!workspace) return notFound("/workspaces");
+      if (!workspace) return notFound("/dashboard");
       return <SharedArtifactDetail accessToken={accessToken} apiAvailable={apiAvailable} artifactId={route.artifactId} onBack={() => openWorkspace(workspace.workspace.id)} onOpenArtifact={openArtifact} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} workspaces={workspaces} />;
 
     case "memory-card":
-      if (!workspace) return notFound("/workspaces");
+      if (!workspace) return notFound("/dashboard");
       return <SharedMemoryCardDetail accessToken={accessToken} apiAvailable={apiAvailable} cardId={route.cardId} onBack={() => openWorkspace(workspace.workspace.id)} onOpenArtifact={openArtifact} organization={workspaceOrganization} organizations={organizations} session={session} signOut={signOut} workspace={workspace} workspaces={workspaces} />;
 
     case "workspace":
-      if (!workspace) return notFound("/workspaces");
+      if (!workspace) return notFound("/dashboard");
       if (route.landing) return <WorkspaceLanding accessToken={accessToken} key={workspace.workspace.id} workspaceId={workspace.workspace.id} />;
       return (
         <SharedWorkspaceDetail
@@ -331,7 +334,7 @@ function SharedWebAppContent() {
           apiAvailable={apiAvailable}
           onWorkspaceDeleted={(deletedWorkspaceId) => {
             setWorkspaces((current) => current.filter((entry) => entry.workspace.id !== deletedWorkspaceId));
-            navigate(`/workspaces?organization=${encodeURIComponent(workspace.organization_id)}`);
+            navigate(organizationPath(workspace.organization_id));
           }}
           onWorkspaceUpdated={(updatedWorkspace) => {
             setWorkspaces((current) => current.map((entry) => (
@@ -353,9 +356,11 @@ function SharedWebAppContent() {
 
     case "not-found":
       if (route.workspaceId) return notFound(routePath({ name: "workspace", workspaceId: route.workspaceId, section: "overview" }), { workspace, organization: workspaceOrganization });
-      return notFound("/workspaces");
+      return notFound("/dashboard");
 
-    case "workspaces":
+    case "new-organization":
+    case "organization":
+      if (route.name === "organization" && !organizations.some((organization) => organization.id === route.organizationId)) return notFound("/orgs");
       return (
         <SharedWorkspaceHome
           accessToken={accessToken}

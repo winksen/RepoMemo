@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { parseRoute, routePath } from "../web/router";
+import { legacyRedirect, parseRoute, routePath } from "../web/router";
 
 describe("parseRoute", () => {
   it("names the pages", () => {
-    expect(parseRoute("/")).toEqual({ name: "workspaces" });
-    expect(parseRoute("/workspaces")).toEqual({ name: "workspaces" });
+    expect(parseRoute("/")).toEqual({ name: "dashboard" });
+    expect(parseRoute("/spaces")).toEqual({ name: "dashboard" });
+    expect(parseRoute("/orgs/o1")).toEqual({ name: "organization", organizationId: "o1" });
+    expect(parseRoute("/orgs/new")).toEqual({ name: "new-organization" });
+    expect(parseRoute("/orgs/o1/x")).toEqual({ name: "not-found", workspaceId: null });
     expect(parseRoute("/dashboard")).toEqual({ name: "dashboard" });
     expect(parseRoute("/orgs")).toEqual({ name: "orgs" });
     expect(parseRoute("/profile")).toEqual({ name: "profile" });
@@ -12,11 +15,11 @@ describe("parseRoute", () => {
   });
 
   it("reads workspace sections, artifacts and memory cards", () => {
-    expect(parseRoute("/workspaces/w1")).toEqual({ name: "workspace", workspaceId: "w1", section: "overview", landing: true });
-    expect(parseRoute("/workspaces/w1/overview")).toEqual({ name: "workspace", workspaceId: "w1", section: "overview" });
-    expect(parseRoute("/workspaces/w1/memory")).toEqual({ name: "workspace", workspaceId: "w1", section: "memory" });
-    expect(parseRoute("/workspaces/w%201/artifacts/a%2F1")).toEqual({ name: "artifact", workspaceId: "w 1", artifactId: "a/1" });
-    expect(parseRoute("/workspaces/w1/memory-cards/c1")).toEqual({ name: "memory-card", workspaceId: "w1", cardId: "c1" });
+    expect(parseRoute("/spaces/w1")).toEqual({ name: "workspace", workspaceId: "w1", section: "overview", landing: true });
+    expect(parseRoute("/spaces/w1/overview")).toEqual({ name: "workspace", workspaceId: "w1", section: "overview" });
+    expect(parseRoute("/spaces/w1/memory")).toEqual({ name: "workspace", workspaceId: "w1", section: "memory" });
+    expect(parseRoute("/spaces/w%201/artifacts/a%2F1")).toEqual({ name: "artifact", workspaceId: "w 1", artifactId: "a/1" });
+    expect(parseRoute("/spaces/w1/memory-cards/c1")).toEqual({ name: "memory-card", workspaceId: "w1", cardId: "c1" });
   });
 
   it("reads the System area, with overview as its front page", () => {
@@ -27,16 +30,26 @@ describe("parseRoute", () => {
   });
 
   it("keeps the workspace of an address that names nothing", () => {
-    expect(parseRoute("/workspaces/w1/unknown")).toEqual({ name: "not-found", workspaceId: "w1" });
-    expect(parseRoute("/workspaces/w1/artifacts")).toEqual({ name: "not-found", workspaceId: "w1" });
+    expect(parseRoute("/spaces/w1/unknown")).toEqual({ name: "not-found", workspaceId: "w1" });
+    expect(parseRoute("/spaces/w1/artifacts")).toEqual({ name: "not-found", workspaceId: "w1" });
     expect(parseRoute("/elsewhere")).toEqual({ name: "not-found", workspaceId: null });
   });
 
   it("is the inverse of routePath", () => {
-    for (const path of ["/workspaces", "/dashboard", "/system/audit", "/workspaces/w%201/tasks", "/workspaces/w1/artifacts/a%2F1", "/workspaces/w1/memory-cards/c1"]) {
+    for (const path of ["/orgs", "/orgs/o1", "/orgs/new", "/dashboard", "/system/audit", "/spaces/w%201/tasks", "/spaces/w1/artifacts/a%2F1", "/spaces/w1/memory-cards/c1"]) {
       const route = parseRoute(path);
       if (route.name === "not-found") throw new Error(path);
       expect(routePath(route)).toBe(path);
     }
+  });
+
+  it("moves the old workspace addresses to the current ones", () => {
+    expect(legacyRedirect("/workspaces/w1/memory", "?q=a")).toBe("/spaces/w1/memory?q=a");
+    expect(legacyRedirect("/workspaces", "?organization=o%201")).toBe("/orgs/o%201");
+    expect(legacyRedirect("/workspaces", "?organization=o1&createWorkspace=1")).toBe("/orgs/o1?createWorkspace=1");
+    expect(legacyRedirect("/workspaces", "?createOrganization=1")).toBe("/orgs/new");
+    expect(legacyRedirect("/workspaces", "")).toBe("/spaces");
+    expect(legacyRedirect("/spaces/w1", "")).toBeNull();
+    expect(parseRoute("/workspaces/w1/memory")).toEqual({ name: "workspace", workspaceId: "w1", section: "memory" });
   });
 });

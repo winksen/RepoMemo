@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.23` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.24` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.24 — Shorter addresses.
+
+- Workspaces open at `/spaces/<id>/<section>` (artifacts at `/spaces/<id>/artifacts/<id>`, memory cards at `/spaces/<id>/memory-cards/<id>`); an organization has its own page at `/orgs/<id>` and `/orgs/new` creates one; `/orgs` lists them. `/spaces` alone is the dashboard.
+- An old address (`/workspaces/…`, `/workspaces?organization=<id>`, `?createOrganization=1`) still works and is rewritten to the new one, so bookmarks, invitation links and desktop links keep working.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.23 — An Organizations page.
 
@@ -887,7 +894,7 @@ A **System** button in the header opens `/system`, with these pages:
 
 ## 4. Workspaces
 
-A workspace is opened at `/workspaces/:id/<section>` and has **twelve sections**. The **assistant** (§7b) is docked on the right of every section page. Each section's title is led by the workspace's icon and name and a dot (for example "Bendly · Evidence ledger"); the Overview shows the icon and the name alone.
+A workspace is opened at `/spaces/:id/<section>` and has **twelve sections**. The **assistant** (§7b) is docked on the right of every section page. Each section's title is led by the workspace's icon and name and a dot (for example "Bendly · Evidence ledger"); the Overview shows the icon and the name alone.
 
 | Section | Purpose | Who sees it |
 |---|---|---|
@@ -960,7 +967,7 @@ Office files, PDFs and emails are previewed in the browser: text and tables for 
 
 - **Browse**: filter by name or path and by type, and switch between grid and list views.
 - **Review several items**: select files, preview their names and paths, then mark them verified, needing review or outdated. The result lists each updated item and each refusal. Failed items stay selected; every successful change enters that item's lifecycle history.
-- **Artifact page** (`/workspaces/:id/artifacts/:artifactId`) shows:
+- **Artifact page** (`/spaces/:id/artifacts/:artifactId`) shows:
   - metadata: type, language, and whether it is indexed
   - **provenance** in one place: source name and identifier, import or latest source sync time, current content time, last successful index and index version, and review state; an item whose current content has no index says so
   - **stored content** as a text preview; Word files are converted to text
@@ -1132,7 +1139,7 @@ A memory card is a **short, durable statement the team wants to keep**. Examples
 
 - **Create**: a title and a Markdown body, linked to **as many evidence items** as needed. A card can also be saved straight from an Ask answer or the AI overview, keeping the passages they cited.
 - **Search**: a text match on the title and body.
-- **Card page** (`/workspaces/:id/memory-cards/:cardId`): the statement (formatted Markdown), its source, and **linked evidence**, each opening its file. If the linked artifact has been deleted, the evidence is shown as missing. Writers can edit the linked evidence of an existing card.
+- **Card page** (`/spaces/:id/memory-cards/:cardId`): the statement (formatted Markdown), its source, and **linked evidence**, each opening its file. If the linked artifact has been deleted, the evidence is shown as missing. Writers can edit the linked evidence of an existing card.
 - **Edit / delete**: writers only.
 - **Export** a card as a Markdown file that includes its evidence links and line ranges, for use in a wiki, an ADR or a PR description.
 

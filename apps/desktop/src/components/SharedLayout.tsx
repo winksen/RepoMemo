@@ -119,7 +119,7 @@ export function SharedLayout({
 /** The bottom of the rail: every organization (everyone) and the System pages (administrators). Each is highlighted on its own pages. */
 function AdministrationRail({ onNavigate, showSystem }: { onNavigate: (to: string) => void; showSystem: boolean }) {
   const path = window.location.pathname;
-  const inOrganizations = path === "/orgs" || (path === "/workspaces" && new URLSearchParams(window.location.search).has("organization"));
+  const inOrganizations = path === "/orgs" || path.startsWith("/orgs/");
   const inSystem = path === "/system" || path.startsWith("/system/");
   return <section aria-label="Administration" className="shared-rail-system">
     <Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} title="Manage your organizations" type="button" variant="secondary"><Building size={ICON_SIZE.lg} /><span>Organizations</span></Button>

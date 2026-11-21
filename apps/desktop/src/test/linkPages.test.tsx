@@ -82,7 +82,7 @@ describe("invitation page", () => {
     expect(screen.queryByLabelText("Display name")).toBeNull();
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery" } });
     fireEvent.click(screen.getByRole("button", { name: /Sign in and join/ }));
-    await waitFor(() => expect(props.onAuthenticated).toHaveBeenCalledWith("new-token", "/workspaces/w1/overview"));
+    await waitFor(() => expect(props.onAuthenticated).toHaveBeenCalledWith("new-token", "/spaces/w1/overview"));
     expect(loginSharedUser).toHaveBeenCalledWith({ email: "ada@example.com", password: "correct horse battery" });
     expect(acceptSharedInvitation).toHaveBeenCalledWith("new-token", "secret");
     expect(registerSharedUser).not.toHaveBeenCalled();
@@ -98,7 +98,7 @@ describe("invitation page", () => {
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Ada" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct horse battery" } });
     fireEvent.click(screen.getByRole("button", { name: /Create account and join/ }));
-    await waitFor(() => expect(props.onAuthenticated).toHaveBeenCalledWith("created", "/workspaces/w1/overview"));
+    await waitFor(() => expect(props.onAuthenticated).toHaveBeenCalledWith("created", "/spaces/w1/overview"));
     expect(registerSharedUser).toHaveBeenCalledWith({
       email: "ada@example.com", displayName: "Ada", password: "correct horse battery", invitationToken: "secret",
     });
@@ -122,7 +122,7 @@ describe("invitation page", () => {
     const props = renderInvite({ accessToken: "mine", session: sessionFor("Ada@Example.com") });
     await screen.findByRole("heading", { name: "Join the Atlas workspace" });
     fireEvent.click(screen.getByRole("button", { name: /Accept the invitation/ }));
-    await waitFor(() => expect(props.onJoined).toHaveBeenCalledWith("/workspaces/w1/overview"));
+    await waitFor(() => expect(props.onJoined).toHaveBeenCalledWith("/spaces/w1/overview"));
     expect(acceptSharedInvitation).toHaveBeenCalledWith("mine", "secret");
     expect(showToast).toHaveBeenCalledWith("success", "You joined the Atlas workspace.");
   });
@@ -165,7 +165,7 @@ describe("invitation page", () => {
   });
 
   it("goes to the organization for an organization invitation", () => {
-    expect(invitationDestination({ ...accepted, target_type: "organization", target_id: "o 1" })).toBe("/workspaces?organization=o%201");
+    expect(invitationDestination({ ...accepted, target_type: "organization", target_id: "o 1" })).toBe("/orgs/o%201");
   });
 });
 

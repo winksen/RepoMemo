@@ -180,7 +180,6 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
 
   [
     { id: "dashboard", label: "Dashboard", hint: "Search all workspaces", to: routePath({ name: "dashboard" }) },
-    { id: "workspaces", label: "All workspaces", hint: "Organizations and workspaces", to: routePath({ name: "workspaces" }) },
     { id: "orgs", label: "Organizations", hint: "Manage every organization", to: routePath({ name: "orgs" }) },
     { id: "notifications", label: "Notifications", hint: "Mentions and assignments", to: routePath({ name: "notifications" }) },
     { id: "profile", label: "Profile and security", hint: "Your account, password and tokens", to: routePath({ name: "profile" }) },

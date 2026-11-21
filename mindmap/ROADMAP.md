@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.8.23` (2026-11-21) · **Next:** the maintainer's test run and the 0.8 exit-journey sheet, then the 0.9 line. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.8.24` (2026-11-21) · **Next:** the maintainer's test run and the 0.8 exit-journey sheet, then the 0.9 line. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `RM-V0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -1952,6 +1952,7 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.8.21** 🧪 2026-11-21 | 🔧 | Sidebar | Narrow the sidebar, list workspaces like organizations with a Show more fold, and move creation to a plus menu in the navbar | — | The sidebar is narrower, both lists fold past four items, and New workspace and New organization are reached from the navbar |
 | **V0.8.22** 🧪 2026-11-21 | 🔧 | Sidebar | Larger text and icons, an accent current item, lists folded from their headings with five rows before Show more, and a session line in place of the JWT text | — | The current item is highlighted, each list folds, five rows show before Show more, and the footer shows the session and its sign-in time |
 | **V0.8.23** 🧪 2026-11-21 | 🔧 | Organizations page | Move organizations out of the sidebar to an Organizations page at /orgs, reached from a button above System, and list only workspaces in the sidebar, ten before Show more | — | The sidebar lists workspaces only, /orgs lists and opens every organization, and Organizations sits above System |
+| **V0.8.24** 🧪 2026-11-21 | 🔧 | Addresses | Shorten workspace addresses to /spaces/… and give each organization its own address /orgs/… instead of /workspaces?organization=… | — | Workspaces open at /spaces/<id>/…, organizations at /orgs/<id>, and every old /workspaces address still arrives at its new one |
 
 ### The 0.9.x line: pilot proof and public release candidate
 

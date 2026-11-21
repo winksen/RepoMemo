@@ -13,9 +13,10 @@ function sectionLabel(section: string, renamed?: Record<string, string>): string
 /** What a page is called to someone who cannot see it: the tab title and the announcement after a move. */
 export function pageTitle(route: Route, names: { workspace?: string; artifact?: string; card?: string; sectionLabels?: Record<string, string> } = {}): string {
   switch (route.name) {
-    case "workspaces": return "Workspaces";
     case "dashboard": return "Dashboard";
     case "orgs": return "Organizations";
+    case "organization": return "Organization";
+    case "new-organization": return "New organization";
     case "profile": return "Profile";
     case "notifications": return "Notifications";
     case "system": return `System · ${sectionLabel(route.section)}`;

@@ -5,7 +5,7 @@ import { landingSection } from "./templateSections";
 import { useTemplate } from "./workspace/data";
 
 /**
- * What `/workspaces/<id>` shows: it asks for the workspace's template and replaces its own address with the
+ * What `/spaces/<id>` shows: it asks for the workspace's template and replaces its own address with the
  * landing section, so the back button leaves the workspace instead of coming back here. If the template cannot
  * be read the workspace opens on Overview, as it always did.
  */

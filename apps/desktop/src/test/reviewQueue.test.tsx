@@ -145,7 +145,7 @@ describe("ReviewQueuePanel", () => {
   });
 
   it("has its own address under a workspace", () => {
-    expect(parseRoute("/workspaces/w1/review")).toEqual({ name: "workspace", workspaceId: "w1", section: "review" });
-    expect(routePath({ name: "workspace", workspaceId: "w1", section: "review" })).toBe("/workspaces/w1/review");
+    expect(parseRoute("/spaces/w1/review")).toEqual({ name: "workspace", workspaceId: "w1", section: "review" });
+    expect(routePath({ name: "workspace", workspaceId: "w1", section: "review" })).toBe("/spaces/w1/review");
   });
 });

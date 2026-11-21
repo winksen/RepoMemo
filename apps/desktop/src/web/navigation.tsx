@@ -1,7 +1,7 @@
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 import { type Organization } from "../types";
 import { type OrganizationNavigation } from "./constants";
-import { currentLocation, navigate } from "./router";
+import { currentLocation, navigate, organizationPath, parseRoute } from "./router";
 import { SharedWebApp } from "../SharedWebApp";
 
 export const OrganizationNavigationContext = createContext<OrganizationNavigation | null>(null);
@@ -10,8 +10,9 @@ export function OrganizationNavigationProvider({ children }: { children: ReactNo
   const [location, setLocation] = useState(currentLocation);
   const queryIndex = location.indexOf("?");
   const parameters = new URLSearchParams(queryIndex === -1 ? "" : location.slice(queryIndex + 1));
-  const activeOrganizationId = parameters.get("organization");
-  const isCreatingOrganization = parameters.get("createOrganization") === "1";
+  const route = parseRoute(queryIndex === -1 ? location : location.slice(0, queryIndex));
+  const activeOrganizationId = route.name === "organization" ? route.organizationId : null;
+  const isCreatingOrganization = route.name === "new-organization";
   const isCreatingWorkspace = parameters.get("createWorkspace") === "1";
 
   useEffect(() => {
@@ -24,9 +25,9 @@ export function OrganizationNavigationProvider({ children }: { children: ReactNo
     activeOrganizationId,
     isCreatingOrganization,
     isCreatingWorkspace,
-    selectOrganization: (organizationId) => navigate(`/workspaces?organization=${encodeURIComponent(organizationId)}`),
-    startCreatingOrganization: () => navigate("/workspaces?createOrganization=1"),
-    cancelOrganizationCreation: () => navigate(activeOrganizationId ? `/workspaces?organization=${encodeURIComponent(activeOrganizationId)}` : "/workspaces"),
+    selectOrganization: (organizationId) => navigate(organizationPath(organizationId)),
+    startCreatingOrganization: () => navigate("/orgs/new"),
+    cancelOrganizationCreation: () => navigate(activeOrganizationId ? organizationPath(activeOrganizationId) : "/orgs"),
   };
 
   return <OrganizationNavigationContext.Provider value={value}>{children}</OrganizationNavigationContext.Provider>;

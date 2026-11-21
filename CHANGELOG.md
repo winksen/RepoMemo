@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.24 (2026-11-21)
+
+Shorter addresses for workspaces and organizations.
+
+### Changed
+- **Workspaces** open at `/spaces/<id>/…` instead of `/workspaces/<id>/…`. `/spaces` on its own shows the dashboard.
+- **Organizations** have their own address, `/orgs/<id>`, instead of `/workspaces?organization=<id>`. `/orgs/new` creates one and `/orgs` lists them. The **+** menu, invitation links and the Organizations button use them.
+- **Old addresses still work.** `/workspaces/…` and `/workspaces?organization=…` are rewritten to the new address when the page opens, so bookmarks, invitation links and desktop links keep working. The desktop app also accepts `/spaces` and `/orgs` links.
+- No server route, API path, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the route, link and navigation tests were updated and not executed. The desktop app's link list (`deeplink.rs`) was changed and not compiled.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.23 (2026-11-21)
 
 Organizations move to a page of their own, and the sidebar lists workspaces only.

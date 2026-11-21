@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.23` (2026-11-21)
+> **Current:** `V0.8.24` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -43,6 +43,7 @@
 | **V0.8.21** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Sidebar | Narrow the sidebar, list workspaces like organizations with a Show more fold, and move creation to a plus menu in the navbar | The sidebar is narrower, both lists fold past four items, and New workspace and New organization are reached from the navbar |
 | **V0.8.22** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Sidebar | Make the sidebar text and icons larger with an accent-coloured current item, fold each list from its heading with five rows before Show more, and replace the footer with the session line | The current item is highlighted, each list folds, five rows show before Show more, and the footer shows the session and its sign-in time |
 | **V0.8.23** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Organizations page | Move organizations out of the sidebar to an Organizations page at /orgs, reached from a button above System, and list only workspaces in the sidebar, ten before Show more | The sidebar lists workspaces only, /orgs lists and opens every organization, and Organizations sits above System |
+| **V0.8.24** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Addresses | Shorten workspace addresses to /spaces/… and give each organization its own address /orgs/… instead of /workspaces?organization=… | Workspaces open at /spaces/<id>/…, organizations at /orgs/<id>, and every old /workspaces address still arrives at its new one |
 
 ## Verification and handoff
 

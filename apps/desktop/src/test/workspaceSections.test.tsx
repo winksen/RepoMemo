@@ -80,7 +80,7 @@ it("lists workspaces in the rail, opens the chosen one and folds a long list beh
   expect(screen.queryByRole("button", { name: "Eleven" })).toBeNull();
   expect(screen.getByRole("button", { name: "Ten" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Research" }));
-  expect(navigate).toHaveBeenCalledWith("/workspaces/w2");
+  expect(navigate).toHaveBeenCalledWith("/spaces/w2");
   fireEvent.click(screen.getByRole("button", { name: "Show more (2)" }));
   expect(screen.getByRole("button", { name: "Twelve" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Show less" })).toBeTruthy();
@@ -107,9 +107,9 @@ describe("opening a workspace by its address alone", () => {
   const query = (isError: boolean) => ({ isError }) as never;
 
   it("names no section in the address that opens a workspace, and reads one without a section as the landing request", () => {
-    expect(workspaceHomePath("w 1")).toBe("/workspaces/w%201");
-    expect(parseRoute("/workspaces/w1")).toMatchObject({ name: "workspace", workspaceId: "w1", landing: true });
-    expect(parseRoute("/workspaces/w1/review")).toEqual({ name: "workspace", workspaceId: "w1", section: "review" });
+    expect(workspaceHomePath("w 1")).toBe("/spaces/w%201");
+    expect(parseRoute("/spaces/w1")).toMatchObject({ name: "workspace", workspaceId: "w1", landing: true });
+    expect(parseRoute("/spaces/w1/review")).toEqual({ name: "workspace", workspaceId: "w1", section: "review" });
   });
 
   it("waits for the template, then replaces its own address with the landing section", () => {
@@ -119,13 +119,13 @@ describe("opening a workspace by its address alone", () => {
     expect(navigate).not.toHaveBeenCalled();
     vi.mocked(useTemplate).mockReturnValue([templateView(knowledgeBase), vi.fn(), query(false)]);
     rerender(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
-    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/documents", true);
+    expect(navigate).toHaveBeenCalledWith("/spaces/w1/documents", true);
   });
 
   it("opens on Overview when the template cannot be read, as it always did", () => {
     vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), query(true)]);
     render(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
-    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/overview", true);
+    expect(navigate).toHaveBeenCalledWith("/spaces/w1/overview", true);
   });
 });
 
@@ -147,7 +147,7 @@ describe("the command palette's sections", () => {
 
   it("opens a workspace from the palette on its landing section", () => {
     const entry = paletteEntries(input("owner")).find((candidate) => candidate.group === "Workspaces");
-    expect(entry?.action).toEqual({ kind: "navigate", to: "/workspaces/w1" });
+    expect(entry?.action).toEqual({ kind: "navigate", to: "/spaces/w1" });
   });
 });
 

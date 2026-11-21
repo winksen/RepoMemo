@@ -1,3 +1,4 @@
+import { organizationPath } from "../web/router";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { IconArrowRight as ArrowRight, IconMailForward as MailForward } from "@tabler/icons-react";
@@ -16,8 +17,8 @@ import { apiMessage, formatTime } from "../web/format";
 /** Where to go once the invitation is accepted. */
 export function invitationDestination(accepted: AcceptedInvitation): string {
   return accepted.target_type === "workspace"
-    ? `/workspaces/${encodeURIComponent(accepted.target_id)}/overview`
-    : `/workspaces?organization=${encodeURIComponent(accepted.target_id)}`;
+    ? `/spaces/${encodeURIComponent(accepted.target_id)}/overview`
+    : organizationPath(accepted.target_id);
 }
 
 /**

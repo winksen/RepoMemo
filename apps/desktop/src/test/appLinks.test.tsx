@@ -14,16 +14,16 @@ afterEach(cleanup);
 
 describe("the paths a link may carry (the same cases as the shell's tests)", () => {
   it("takes the client's own paths", () => {
-    for (const good of ["/dashboard", "/profile", "/notifications", "/workspaces", "/workspaces/w1", "/workspaces/w1/evidence?q=a%20b#top", "/workspaces/w1/artifacts/a1", "/system/jobs"]) {
+    for (const good of ["/dashboard", "/profile", "/notifications", "/spaces", "/spaces/w1", "/spaces/w1/evidence?q=a%20b#top", "/spaces/w1/artifacts/a1", "/system/jobs"]) {
       expect(isAppPath(good), good).toBe(true);
     }
   });
 
   it("refuses everything that leaves the client", () => {
-    for (const bad of ["", "/", "dashboard", "//evil.example.com/workspaces", "/\\evil.example.com", "https://evil.example.com/dashboard", "javascript:alert(1)", "/login", "/v1/system/backups", "/workspaces/../../etc/passwd", "/workspaces/%2e%2e/system", "/workspaces/w1%2Fx", "/workspaces/w1\u0000", "/workspaces/%zz", "/dashboard\n/x"]) {
+    for (const bad of ["", "/", "dashboard", "//evil.example.com/spaces", "/\\evil.example.com", "https://evil.example.com/dashboard", "javascript:alert(1)", "/login", "/v1/system/backups", "/spaces/../../etc/passwd", "/spaces/%2e%2e/system", "/spaces/w1%2Fx", "/spaces/w1\u0000", "/spaces/%zz", "/dashboard\n/x"]) {
       expect(isAppPath(bad), JSON.stringify(bad)).toBe(false);
     }
-    expect(isAppPath(`/workspaces/${"a".repeat(2100)}`)).toBe(false);
+    expect(isAppPath(`/spaces/${"a".repeat(2100)}`)).toBe(false);
   });
 
   it("names the same areas as the shell and the client's router", () => {
@@ -36,7 +36,7 @@ describe("the paths a link may carry (the same cases as the shell's tests)", () 
 
 describe("a link from a page", () => {
   it("carries the server and the page, both encoded", () => {
-    expect(appLinkFor("https://memo.example.com/some/path", "/workspaces/w1/evidence?q=a b")).toBe(
+    expect(appLinkFor("https://memo.example.com/some/path", "/spaces/w1/evidence?q=a b")).toBe(
       "repomemo://open?server=https%3A%2F%2Fmemo.example.com&path=%2Fworkspaces%2Fw1%2Fevidence%3Fq%3Da%20b",
     );
   });

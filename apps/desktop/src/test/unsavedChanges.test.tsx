@@ -35,12 +35,12 @@ describe("unsaved changes", () => {
   });
 
   it("does not ask for a redirect or where the draft is kept", () => {
-    render(<ConfirmProvider><Form dirty keepsOn={(to) => to.startsWith("/workspaces/w1")} /></ConfirmProvider>);
+    render(<ConfirmProvider><Form dirty keepsOn={(to) => to.startsWith("/spaces/w1")} /></ConfirmProvider>);
     navigate("/login", true);
     expect(currentLocation()).toBe("/login");
-    window.history.replaceState({}, "", "/workspaces/w1/tasks");
-    navigate("/workspaces/w1/memory");
-    return waitFor(() => expect(currentLocation()).toBe("/workspaces/w1/memory"));
+    window.history.replaceState({}, "", "/spaces/w1/tasks");
+    navigate("/spaces/w1/memory");
+    return waitFor(() => expect(currentLocation()).toBe("/spaces/w1/memory"));
   });
 
   it("warns before the tab is closed only while something is unsaved", () => {

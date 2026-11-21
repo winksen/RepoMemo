@@ -46,9 +46,10 @@ export function navigate(to: string, replace = false) {
 
 /** Everything the address bar can name once someone is signed in. */
 export type Route =
-  | { name: "workspaces" }
   | { name: "dashboard" }
   | { name: "orgs" }
+  | { name: "organization"; organizationId: string }
+  | { name: "new-organization" }
   | { name: "profile" }
   | { name: "notifications" }
   | { name: "system"; section: SystemSection }
@@ -62,11 +63,11 @@ function decodePart(part: string): string {
   try { return decodeURIComponent(part); } catch { return part; }
 }
 
-/** Reads a pathname (`/workspaces/<id>/memory`, `/system/logs`, …) into a route. */
+/** Reads a pathname (`/spaces/<id>/memory`, `/system/logs`, …) into a route. */
 export function parseRoute(pathname: string): Route {
   const parts = pathname.split("/").filter(Boolean).map(decodePart);
   const [first, second, third, fourth] = parts;
-  if (parts.length === 0 || (parts.length === 1 && first === "workspaces")) return { name: "workspaces" };
+  if (parts.length === 0 || (parts.length === 1 && (first === "spaces" || first === "workspaces"))) return { name: "dashboard" };
   if (parts.length === 1) {
     if (first === "dashboard") return { name: "dashboard" };
     if (first === "orgs") return { name: "orgs" };
@@ -75,13 +76,18 @@ export function parseRoute(pathname: string): Route {
     if (first === "system") return { name: "system", section: "overview" };
     return { name: "not-found", workspaceId: null };
   }
+  if (first === "orgs") {
+    if (parts.length !== 2) return { name: "not-found", workspaceId: null };
+    return second === "new" ? { name: "new-organization" } : { name: "organization", organizationId: second };
+  }
   if (first === "system") {
     if (parts.length === 2 && (SYSTEM_SECTIONS as readonly string[]).includes(second)) {
       return { name: "system", section: second as SystemSection };
     }
     return { name: "not-found", workspaceId: null };
   }
-  if (first === "workspaces") {
+  // `/workspaces/...` is the address these pages had before V0.8.24; it is still read, and rewritten by `legacyRedirect`.
+  if (first === "spaces" || first === "workspaces") {
     // No section named: the workspace opens on its template's landing section (`landing` says to look it up).
     if (parts.length === 2) return { name: "workspace", workspaceId: second, section: "overview", landing: true };
     if (parts.length === 3 && (WORKSPACE_SECTIONS as readonly string[]).includes(third)) {
@@ -96,21 +102,43 @@ export function parseRoute(pathname: string): Route {
 
 /** The address that opens a workspace on its landing section: no section named. */
 export function workspaceHomePath(workspaceId: string): string {
-  return `/workspaces/${encodeURIComponent(workspaceId)}`;
+  return `/spaces/${encodeURIComponent(workspaceId)}`;
 }
 
 /** The pathname of a route; the inverse of [`parseRoute`]. */
 export function routePath(route: Exclude<Route, { name: "not-found" }>): string {
   const encode = encodeURIComponent;
   switch (route.name) {
-    case "workspaces": return "/workspaces";
     case "dashboard": return "/dashboard";
     case "orgs": return "/orgs";
+    case "organization": return organizationPath(route.organizationId);
+    case "new-organization": return "/orgs/new";
     case "profile": return "/profile";
     case "notifications": return "/notifications";
     case "system": return `/system/${route.section}`;
-    case "workspace": return `/workspaces/${encode(route.workspaceId)}/${route.section}`;
-    case "artifact": return `/workspaces/${encode(route.workspaceId)}/artifacts/${encode(route.artifactId)}`;
-    case "memory-card": return `/workspaces/${encode(route.workspaceId)}/memory-cards/${encode(route.cardId)}`;
+    case "workspace": return `/spaces/${encode(route.workspaceId)}/${route.section}`;
+    case "artifact": return `/spaces/${encode(route.workspaceId)}/artifacts/${encode(route.artifactId)}`;
+    case "memory-card": return `/spaces/${encode(route.workspaceId)}/memory-cards/${encode(route.cardId)}`;
   }
+}
+
+/** The address of an organization's page. */
+export function organizationPath(organizationId: string): string {
+  return `/orgs/${encodeURIComponent(organizationId)}`;
+}
+
+/**
+ * Where an address of the old shape belongs now (`/workspaces/<id>/...` is `/spaces/<id>/...`, and
+ * `/workspaces?organization=<id>` is `/orgs/<id>`), or `null` for an address that is already current.
+ */
+export function legacyRedirect(pathname: string, search: string): string | null {
+  if (pathname !== "/workspaces" && !pathname.startsWith("/workspaces/")) return null;
+  if (pathname === "/workspaces") {
+    const parameters = new URLSearchParams(search);
+    const organization = parameters.get("organization");
+    if (organization) return `${organizationPath(organization)}${parameters.get("createWorkspace") === "1" ? "?createWorkspace=1" : ""}`;
+    if (parameters.get("createOrganization") === "1") return "/orgs/new";
+    return "/spaces";
+  }
+  return `/spaces${pathname.slice("/workspaces".length)}${search}`;
 }

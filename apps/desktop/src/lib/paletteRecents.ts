@@ -4,7 +4,7 @@ export interface RecentItem {
   id: string;
   label: string;
   hint?: string;
-  /** An address of the web app, such as `/workspaces/w1/artifacts/a1`. */
+  /** An address of the web app, such as `/spaces/w1/artifacts/a1`. */
   to: string;
   /** The workspace it belongs to; it is listed only while the person can still read that workspace. */
   workspaceId: string;

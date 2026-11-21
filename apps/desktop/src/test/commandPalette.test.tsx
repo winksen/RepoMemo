@@ -39,7 +39,7 @@ describe("paletteEntries", () => {
     const writer = paletteEntries({ ...base, currentWorkspace: ATLAS });
     const entry = writer.find((candidate) => candidate.id === "new-note");
     expect(entry?.group).toBe("This workspace");
-    expect(entry?.action).toEqual({ kind: "new-note", workspaceId: "w1", to: "/workspaces/w1/evidence" });
+    expect(entry?.action).toEqual({ kind: "new-note", workspaceId: "w1", to: "/spaces/w1/evidence" });
     expect(paletteEntries({ ...base, currentWorkspace: BORROWED }).some((candidate) => candidate.id === "new-note")).toBe(false);
     expect(paletteEntries(base).some((candidate) => candidate.id === "new-note")).toBe(false);
     expect(paletteEntries({ ...base, currentWorkspace: ATLAS, query: "note" }).some((candidate) => candidate.id === "new-note")).toBe(true);
@@ -48,11 +48,11 @@ describe("paletteEntries", () => {
 
   it("lists recent places first while nothing is typed, only of workspaces the person can still read", () => {
     const recents = [
-      { id: "file:a1", label: "Retry policy", hint: "Atlas", to: "/workspaces/w1/artifacts/a1", workspaceId: "w1" },
-      { id: "file:z9", label: "Lost file", hint: "Gone", to: "/workspaces/w9/artifacts/z9", workspaceId: "w9" },
+      { id: "file:a1", label: "Retry policy", hint: "Atlas", to: "/spaces/w1/artifacts/a1", workspaceId: "w1" },
+      { id: "file:z9", label: "Lost file", hint: "Gone", to: "/spaces/w9/artifacts/z9", workspaceId: "w9" },
     ];
     const empty = paletteEntries({ ...base, currentWorkspace: ATLAS, recents });
-    expect(empty[0]).toMatchObject({ group: "Recent", label: "Retry policy", action: { kind: "navigate", to: "/workspaces/w1/artifacts/a1" } });
+    expect(empty[0]).toMatchObject({ group: "Recent", label: "Retry policy", action: { kind: "navigate", to: "/spaces/w1/artifacts/a1" } });
     expect(empty.filter((candidate) => candidate.group === "Recent")).toHaveLength(1);
     expect(paletteEntries({ ...base, currentWorkspace: ATLAS, recents, query: "retry" }).some((candidate) => candidate.group === "Recent")).toBe(false);
   });
@@ -83,8 +83,8 @@ describe("paletteEntries", () => {
       cards: [card("c1", "Uploads retry with backoff")],
     });
     expect(entries.filter((entry) => entry.group === "Files").map((entry) => entry.label)).toEqual(["Retry policy"]);
-    expect(entries.find((entry) => entry.group === "Files")?.action).toEqual({ kind: "navigate", to: "/workspaces/w1/artifacts/a1" });
-    expect(entries.find((entry) => entry.group === "Memory")?.action).toEqual({ kind: "navigate", to: "/workspaces/w1/memory-cards/c1" });
+    expect(entries.find((entry) => entry.group === "Files")?.action).toEqual({ kind: "navigate", to: "/spaces/w1/artifacts/a1" });
+    expect(entries.find((entry) => entry.group === "Memory")?.action).toEqual({ kind: "navigate", to: "/spaces/w1/memory-cards/c1" });
   });
 
   it("starts assistant actions with what was typed, only where the assistant is docked", () => {
@@ -125,7 +125,7 @@ describe("CommandPalette", () => {
     fireEvent.change(input, { target: { value: "retry" } });
     await waitFor(() => expect(screen.getByRole("option", { name: /Retry policy/ })).toBeTruthy());
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/artifacts/a1");
+    expect(navigate).toHaveBeenCalledWith("/spaces/w1/artifacts/a1");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -134,7 +134,7 @@ describe("CommandPalette", () => {
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     fireEvent.change(await screen.findByRole("combobox"), { target: { value: "retry" } });
     fireEvent.click(await screen.findByRole("option", { name: /Retry policy/ }));
-    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/artifacts/a1");
+    expect(navigate).toHaveBeenCalledWith("/spaces/w1/artifacts/a1");
     expect(readRecents("u1").map((entry) => entry.label)).toEqual(["Retry policy"]);
     // A page loaded again starts from the browser's storage.
     unmount();
@@ -156,7 +156,7 @@ describe("CommandPalette", () => {
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     fireEvent.change(await screen.findByRole("combobox"), { target: { value: "new note" } });
     fireEvent.click(await screen.findByRole("option", { name: /New note/ }));
-    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/evidence");
+    expect(navigate).toHaveBeenCalledWith("/spaces/w1/evidence");
     // The evidence page takes the request once, for its own workspace only.
     expect(takeNewNoteRequest("w2")).toBe(false);
     expect(takeNewNoteRequest("w1")).toBe(true);

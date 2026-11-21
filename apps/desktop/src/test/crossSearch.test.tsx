@@ -61,9 +61,9 @@ describe("CrossWorkspaceSearch", () => {
     render(<CrossWorkspaceSearch accessToken="t" />);
     ask("session");
     fireEvent.click(await screen.findByRole("button", { name: /Login flow/ }));
-    expect(navigate).toHaveBeenCalledWith("/workspaces/w1/artifacts/a1");
+    expect(navigate).toHaveBeenCalledWith("/spaces/w1/artifacts/a1");
     fireEvent.click(screen.getByRole("button", { name: /Session rule/ }));
-    expect(navigate).toHaveBeenLastCalledWith("/workspaces/w2/memory-cards/m1");
+    expect(navigate).toHaveBeenLastCalledWith("/spaces/w2/memory-cards/m1");
   });
 
   it("sends the language and the days chosen", async () => {

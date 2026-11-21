@@ -308,7 +308,7 @@ export function SharedRecordLayout({
   workspaces: SharedWorkspace[];
 }) {
   return (
-    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar accessToken={accessToken} activeSection={activeSection} onNavigate={(section) => navigate(`/workspaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} workspace={workspace} />}>
+    <SharedLayout apiAvailable={apiAvailable} onNavigate={navigate} session={session} signOut={signOut} sidebar={<OrganizationRail organizations={organizations} workspaceId={workspace.workspace.id} workspaces={workspaces} />} workspaceNavigation={<WorkspaceTopbar accessToken={accessToken} activeSection={activeSection} onNavigate={(section) => navigate(`/spaces/${encodeURIComponent(workspace.workspace.id)}/${section}`)} workspace={workspace} />}>
       <section className="shared-detail-shell">
         <PageHeader description={subtitle} title={title} />
         <div className="shared-record-content">{children}</div>

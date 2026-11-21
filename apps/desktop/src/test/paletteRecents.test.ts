@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { clearRecents, MAX_RECENTS, readRecents, rememberRecent, type RecentItem } from "../lib/paletteRecents";
 
-const item = (id: string, overrides: Partial<RecentItem> = {}): RecentItem => ({ id, label: `Item ${id}`, hint: "Atlas", to: `/workspaces/w1/artifacts/${id}`, workspaceId: "w1", ...overrides });
+const item = (id: string, overrides: Partial<RecentItem> = {}): RecentItem => ({ id, label: `Item ${id}`, hint: "Atlas", to: `/spaces/w1/artifacts/${id}`, workspaceId: "w1", ...overrides });
 
 beforeEach(() => window.localStorage.clear());
 afterEach(() => window.localStorage.clear());
@@ -35,7 +35,7 @@ describe("recent places of the command palette", () => {
   });
 
   it("refuses an address that is not a path of the app, however it got there", () => {
-    for (const to of ["https://evil.example/x", "//evil.example/x", "javascript:alert(1)", "workspaces/w1", "/workspaces/w1?x=<script>"]) {
+    for (const to of ["https://evil.example/x", "//evil.example/x", "javascript:alert(1)", "workspaces/w1", "/spaces/w1?x=<script>"]) {
       rememberRecent("u1", item("bad", { to }));
     }
     expect(readRecents("u1")).toEqual([]);

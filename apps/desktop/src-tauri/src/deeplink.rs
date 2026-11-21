@@ -13,7 +13,7 @@ use crate::{connection::normalize_server_url, files::percent_decode};
 /// The scheme the installer registers with the system.
 pub const SCHEME: &str = "repomemo";
 /// The first parts of the paths the client has pages under (its router's: `src/web/router.ts`).
-const APP_AREAS: [&str; 6] = ["workspaces", "dashboard", "orgs", "profile", "notifications", "system"];
+const APP_AREAS: [&str; 7] = ["spaces", "workspaces", "dashboard", "orgs", "profile", "notifications", "system"];
 const MAX_PATH_CHARS: usize = 2048;
 
 /// The link that arrived before the page was ready to show it (the app was started by the link).

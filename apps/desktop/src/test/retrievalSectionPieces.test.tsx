@@ -73,7 +73,7 @@ describe("retrieval on the shared pieces", () => {
   });
 
   it("reopens URL filters and labels match provenance and keyword fallback", async () => {
-    window.history.replaceState(null, "", "/workspaces/w1/retrieval?q=login&limit=10");
+    window.history.replaceState(null, "", "/spaces/w1/retrieval?q=login&limit=10");
     vi.mocked(searchSharedWorkspace).mockResolvedValue({
       semanticAvailable: false,
       timedOut: false,
@@ -91,7 +91,7 @@ describe("retrieval on the shared pieces", () => {
   });
 
   it("explains a timed-out search without presenting an empty result as complete", async () => {
-    window.history.replaceState(null, "", "/workspaces/w1/retrieval?q=broad");
+    window.history.replaceState(null, "", "/spaces/w1/retrieval?q=broad");
     vi.mocked(searchSharedWorkspace).mockResolvedValue({ results: [], semanticAvailable: false, timedOut: true });
     render(<RetrievalSection page={makePage({ section: "retrieval" })} />);
     expect(await screen.findByText(/Search timed out after five seconds/)).toBeTruthy();
