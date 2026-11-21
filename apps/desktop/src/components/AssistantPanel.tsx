@@ -407,10 +407,10 @@ function Evidence({ accessToken, citations, isQuestion, onOpenArtifact }: { acce
     <ViewAtCommit accessToken={accessToken} citation={citation} />
   </span>;
   return <div className="shared-ai-citations">
-    <strong>Evidence used</strong>
+    <strong>What {ASSISTANT_NAME} read</strong>
     {citations.slice(0, EVIDENCE_PREVIEW_LIMIT).map((citation, index) => renderCitation(citation, index, onOpenArtifact))}
     {hidden > 0 ? <button className="shared-assistant-citation-more" onClick={() => setShowAll(true)} type="button">Show all {citations.length} sources</button> : null}
-    {showAll ? <Dialog size="lg" footer={<DialogCancel label="Close" onClick={() => setShowAll(false)} />} onClose={() => setShowAll(false)} open title={`Evidence used (${citations.length})`}>
+    {showAll ? <Dialog size="lg" footer={<DialogCancel label="Close" onClick={() => setShowAll(false)} />} onClose={() => setShowAll(false)} open title={`What ${ASSISTANT_NAME} read (${citations.length})`}>
       <div className="shared-ai-citations shared-ai-citations-full">{citations.map((citation, index) => renderCitation(citation, index, (id) => { setShowAll(false); onOpenArtifact(id); }))}</div>
     </Dialog> : null}
   </div>;

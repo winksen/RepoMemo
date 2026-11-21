@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.8` (2026-11-21)
+> **Current:** `V0.9.9` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -30,6 +30,7 @@
 | **V0.9.6** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Workspace-aware replies | Name the workspace and how many files are indexed in it in CAIRN's own replies, and say so when nothing is indexed yet | "Salam" in a workspace with 42 files is answered with its name and "42 indexed files", an empty workspace says nothing is indexed, and an unreadable workspace falls back to "this workspace" |
 | **V0.9.7** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Suggested questions | End CAIRN's greeting and its list of jobs with up to three of the questions the workspace's template suggests | A workspace whose template suggests questions shows three of them in CAIRN's greeting and in "what can you do", and one without shows none |
 | **V0.9.8** | 🧪 2026-11-21 | AN. CAIRN agent | 🐞 | Markers and evidence | Renumber the markers in a chat answer to the evidence shown, so [3] and [1] cited in that order read [1] and [2] beside evidence rows 1 and 2 | An answer citing [3] then [1] reads [1] then [2] and the evidence lists those passages in that order; links and other brackets are untouched |
+| **V0.9.9** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | What CAIRN read | Head the list under a chat answer What CAIRN read in place of Evidence used | The list under an answer in CAIRN's chat and its full-list dialog read What CAIRN read, and other pages keep Evidence used |
 | **V0.9.10** | 🔜 | AM. Public readiness | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
 | **V0.9.11** | 🔜 | AM. Public readiness | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
 | **V0.9.12** | 🔜 | AM. Public readiness | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |

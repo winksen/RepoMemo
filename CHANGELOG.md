@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.9 (2026-11-21)
+
+Evidence reads as what CAIRN read.
+
+### Changed
+- **Heading.** In CAIRN's chat, the list under an answer is headed *What CAIRN read* instead of *Evidence used*, and the full list opens as *What CAIRN read (n)*. It is the agent saying which passages it read and relied on (V0.9.4 and V0.9.8), each with its number, file, path, line and *View at* link as before.
+- **Where.** CAIRN's chat only. The Ask page and the other places that show an answer's sources keep *Evidence used*.
+- The name comes from the assistant's name, so a renamed assistant reads *What <name> read*.
+- Markup and text only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the heading was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.8 (2026-11-21)
 
 The markers in an answer match the evidence beside it.
