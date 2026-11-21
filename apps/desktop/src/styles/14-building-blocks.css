@@ -249,6 +249,13 @@ th > .rm-badge,
 .rm-skeleton-body { display: grid; gap: 22px; }
 .rm-skeleton-bar-actions { display: inline-flex; gap: 8px; margin-left: auto; }
 .rm-skeleton-rail { display: grid; gap: 10px; margin-top: 18px; }
-/* A page's content fades in rather than snapping in when it replaces its skeleton. */
+/* Skeletons wait before they show, so a load that is quick (or a page already in memory) never flashes one:
+   the group starts invisible and fades in after the delay. Reduced motion removes the animation, so it shows at once. */
+.rm-skeleton-list, .rm-skeleton-cards, .rm-skeleton-page { animation: rm-skeleton-reveal 200ms var(--ease-standard, ease-out) 220ms backwards; }
+@keyframes rm-skeleton-reveal { from { opacity: 0; } to { opacity: 1; } }
+/* Content eases in: the page fades, and what arrives inside it (a list replacing its skeleton, a section once its data is there)
+   rises a few pixels as it fades. Only newly mounted elements animate, so content already on screen stays still. */
 @keyframes rm-content-in { from { opacity: 0; } to { opacity: 1; } }
-.shared-layout-content > * { animation: rm-content-in 160ms var(--ease-standard, ease-out); }
+@keyframes rm-content-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.shared-layout-content > * { animation: rm-content-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+.shared-page-content > *:not(.rm-skeleton-page), .shared-detail-shell > * { animation: rm-content-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }

@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.26` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.27` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.27 — Skeletons only when waiting, and content that eases in.
+
+- A placeholder shows only when a load takes a moment: it waits about a fifth of a second before it appears, so a quick load shows none. A page whose data is already in memory (one you have just visited) appears directly, and opening a workspace whose template is already known goes straight to its section without a placeholder.
+- Content eases in: the page fades in, and what arrives inside it (a list replacing its placeholder) rises a few pixels as it fades. With reduced motion it appears at once.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.26 — Skeleton loading.
 

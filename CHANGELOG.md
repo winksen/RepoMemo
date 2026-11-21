@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.27 (2026-11-21)
+
+Placeholders only when a load is slow, and content that eases in.
+
+### Changed
+- **No placeholder for what is already there.** A page whose data is already in memory appears directly. Opening a workspace whose template is already known goes straight to its section, with no loader in between.
+- **No flash for quick loads.** A placeholder now waits about 0.2 s before it fades in, so a load that finishes sooner shows none.
+- **Content eases in.** The page fades in, and what arrives inside it (a list replacing its placeholder) rises a few pixels as it fades, over about a quarter of a second with a soft ease-out. Only elements that appear animate; content already on screen stays still. With reduced motion everything appears at once.
+- No data is fetched differently, and there are no route, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the workspace-landing test gained a case for a template already in memory and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.26 (2026-11-21)
 
 Pages load with placeholders instead of spinners and blank areas.

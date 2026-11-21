@@ -17,6 +17,7 @@ export function WorkspaceLanding({ accessToken, workspaceId }: { accessToken: st
   useEffect(() => {
     if (settled) navigate(routePath({ name: "workspace", workspaceId, section }), true);
   }, [section, settled, workspaceId]);
-  // Drawn inside the frame that is already on screen, so opening a workspace does not replace the whole page.
-  return <ShellContent><PageSkeleton label="Opening the workspace" /></ShellContent>;
+  // The template is often already in memory: then the address changes at once and nothing is drawn, so no placeholder flashes.
+  // Otherwise the placeholder is drawn inside the frame that is on screen, and it waits a moment before it shows.
+  return settled ? null : <ShellContent><PageSkeleton label="Opening the workspace" /></ShellContent>;
 }

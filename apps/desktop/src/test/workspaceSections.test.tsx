@@ -122,6 +122,13 @@ describe("opening a workspace by its address alone", () => {
     expect(navigate).toHaveBeenCalledWith("/spaces/w1/documents", true);
   });
 
+  it("draws no placeholder when the template is already in memory", () => {
+    vi.mocked(useTemplate).mockReturnValue([templateView(knowledgeBase), vi.fn(), query(false)]);
+    render(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(navigate).toHaveBeenCalledWith("/spaces/w1/documents", true);
+  });
+
   it("opens on Overview when the template cannot be read, as it always did", () => {
     vi.mocked(useTemplate).mockReturnValue([null, vi.fn(), query(true)]);
     render(<WorkspaceLanding accessToken="t" workspaceId="w1" />);
