@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.27` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.28` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.28 — Sidebar and navbar details.
+
+- The **Workspaces** list is always shown: its heading no longer folds (the **Show more** button for a long list stays).
+- Hovering or focusing a workspace in the sidebar shows its full path, *organization / workspace*, in the app's tooltip. The search, notifications, **Organizations** and **System** buttons use the same tooltip instead of the browser's generic one.
+- Keyboard focus in the sidebar is a grey ring instead of the blue one.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.27 — Skeletons only when waiting, and content that eases in.
 

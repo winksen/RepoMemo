@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.28 (2026-11-21)
+
+Sidebar and navbar details.
+
+### Changed
+- **Workspaces are always displayed.** The Workspaces heading no longer folds. A long list still folds behind **Show more**.
+- **Full path on hover.** Hovering or focusing a workspace in the sidebar shows *organization / workspace* in the app's tooltip.
+- **One kind of tooltip.** The search, notifications, **Organizations** and **System** buttons use the same tooltip as the **+** button instead of the browser's generic one. The notifications button is now named *Notifications* for screen readers.
+- **Grey keyboard focus in the sidebar.** The focus ring on sidebar items is grey instead of blue. The current page's item keeps its filled highlight.
+- No route, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the rail test no longer expects a folding heading and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.27 (2026-11-21)
 
 Placeholders only when a load is slow, and content that eases in.

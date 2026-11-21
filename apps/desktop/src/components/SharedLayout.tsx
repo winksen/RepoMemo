@@ -17,6 +17,7 @@ import { openCommandPalette } from "../lib/assistantBridge";
 import { MAIN_CONTENT_ID } from "../web/RouteAnnouncer";
 import { Button } from "./ui/button";
 import { IconButton } from "./ui/icon-button";
+import { Tooltip } from "./ui/tooltip";
 import { CreateMenu } from "./CreateMenu";
 import { DesktopServerNote } from "./DesktopServerNote";
 import { lastSignIn } from "../lib/signedIn";
@@ -93,8 +94,8 @@ function LayoutFrame({ session, sidebar, signOut, onNavigate, defaultOrganizatio
           <div className="shared-account-controls">
             <CreateMenu canCreateOrganization={session.can_create_organizations !== false} defaultOrganizationId={defaultOrganizationId} />
             <ThemeToggle />
-            <Button aria-label="Open command palette" className="shared-palette-link" onClick={openCommandPalette} title="Command palette (Ctrl K)" type="button" variant="secondary"><Search size={ICON_SIZE.md} /></Button>
-            <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={ICON_SIZE.md} /></Button>
+            <IconButton className="shared-palette-link" label="Open command palette" onClick={openCommandPalette} size="sm"><Search size={ICON_SIZE.md} /></IconButton>
+            <IconButton className="shared-notifications-link" label="Notifications" onClick={() => onNavigate("/notifications")} size="sm"><Bell size={ICON_SIZE.md} /></IconButton>
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={ICON_SIZE.md} /> <span className="shared-button-label">Profile</span></Button>
           </div>
           <Button className="shared-user-signout" onClick={signOut} type="button" variant="secondary"><Logout size={ICON_SIZE.md} /> <span className="shared-button-label">Sign out</span></Button>
@@ -185,8 +186,8 @@ function AdministrationRail({ onNavigate, showSystem }: { onNavigate: (to: strin
   const inOrganizations = path === "/orgs" || path.startsWith("/orgs/");
   const inSystem = path === "/system" || path.startsWith("/system/");
   return <section aria-label="Administration" className="shared-rail-system">
-    <Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} title="Manage your organizations" type="button" variant="secondary"><Building size={ICON_SIZE.lg} /><span>Organizations</span></Button>
-    {showSystem ? <Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} title="Administer this server" type="button" variant="secondary"><Server size={ICON_SIZE.lg} /><span>System</span></Button> : null}
+    <Tooltip content="Manage your organizations"><Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} type="button" variant="secondary"><Building size={ICON_SIZE.lg} /><span>Organizations</span></Button></Tooltip>
+    {showSystem ? <Tooltip content="Administer this server"><Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} type="button" variant="secondary"><Server size={ICON_SIZE.lg} /><span>System</span></Button></Tooltip> : null}
   </section>;
 }
 

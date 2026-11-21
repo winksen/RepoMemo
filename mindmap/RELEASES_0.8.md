@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.27` (2026-11-21)
+> **Current:** `V0.8.28` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -47,6 +47,7 @@
 | **V0.8.25** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Page changes | Keep the top bar and the sidebar mounted when moving between pages so that only the page itself is redrawn | Moving between pages no longer redraws the top bar or the sidebar, opening a workspace shows its loader inside the page, and each page starts at the top |
 | **V0.8.26** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Loading | Show shimmering skeleton placeholders in the main area while pages and lists load, in place of spinners and empty screens, and fade pages in | Pages keep their shape while loading, a signed-in start shows the whole frame as placeholders, and reduced motion stops the shimmer |
 | **V0.8.27** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Loading | Ease content in, and show a skeleton only when a load is actually slow: never when the data is already in memory | A page whose data is already loaded appears at once without a placeholder, a quick load shows none, and content rises and fades in |
+| **V0.8.28** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Sidebar and navbar | Always show the workspaces list, name each workspace and each header button with the app's tooltip, and use a grey keyboard focus ring in the sidebar | The Workspaces heading no longer folds, hovering a workspace shows organization / workspace, and search, notifications, Organizations and System use the same tooltip as the plus button |
 
 ## Verification and handoff
 

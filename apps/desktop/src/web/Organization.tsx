@@ -1,5 +1,5 @@
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { IconBook2 as Book, IconBuildingCommunity as Building, IconChevronDown as ChevronDown, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconSearch as Search, IconSettings as Settings,  IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users, type TablerIcon } from "@tabler/icons-react";
+import { IconBook2 as Book, IconBuildingCommunity as Building, IconChartDots3 as MapIcon, IconChecklist as Checklist, IconEyeCheck as ReviewIcon, IconFileText as FileText, IconGitBranch as RepositoryIcon, IconLayoutDashboard as Dashboard, IconSearch as Search, IconSettings as Settings,  IconStethoscope as HealthIcon, IconTrash as Trash, IconUsers as Users, type TablerIcon } from "@tabler/icons-react";
 import { SharedApiError, listSharedOrganizationMembers, removeSharedOrganizationMember, transferSharedOrganizationOwnership, updateSharedOrganization, upsertSharedOrganizationMember } from "../lib/sharedApi";
 import { type Organization, type OrganizationMember, type OrganizationRole, type SharedWorkspace } from "../types";
 import { UserAvatar } from "../components/UserAvatar";
@@ -10,6 +10,7 @@ import { SkeletonList } from "../components/ui/skeleton";
 import { PanelHeading } from "../components/ui/panel-heading";
 import { useConfirm } from "../components/ui/confirm-dialog";
 import { Dropdown } from "../components/ui/dropdown";
+import { Tooltip } from "../components/ui/tooltip";
 import { IconButton } from "../components/ui/icon-button";
 import { Input } from "../components/ui/input";
 import { Toast, showToast } from "../components/ui/toast";
@@ -126,12 +127,11 @@ export function OrganizationRail({
   </div>;
 }
 
-/** A titled part of the rail that its heading folds away and brings back. */
+/** A titled part of the rail. */
 function RailSection({ children, label, name }: { children: ReactNode; label: string; name: string }) {
-  const [open, setOpen] = useState(true);
   return <section aria-label={label} className={`shared-rail-${name}`}>
-    <button aria-controls={`shared-rail-${name}-list`} aria-expanded={open} className="shared-rail-heading" onClick={() => setOpen((current) => !current)} type="button"><span>{label}</span><ChevronDown size={ICON_SIZE.md} /></button>
-    <div hidden={!open} id={`shared-rail-${name}-list`}>{children}</div>
+    <p className="shared-eyebrow">{label}</p>
+    <div>{children}</div>
   </section>;
 }
 
@@ -145,7 +145,7 @@ function RailList({ activeId, items }: { activeId?: string; items: { id: string;
   const active = items.find((item) => item.id === activeId);
   if (folded && active && !visible.includes(active)) visible = [...visible.slice(0, RAIL_LIST_LIMIT - 1), active];
   return <div className="shared-rail-list">
-    {visible.map((item) => <Button aria-current={item.id === activeId ? "page" : undefined} className={`shared-rail-workspace${item.id === activeId ? " active" : ""}`} key={item.id} onClick={item.onSelect} title={item.title} type="button" variant="secondary">{item.icon}<span>{item.name}</span></Button>)}
+    {visible.map((item) => <Tooltip content={item.title} key={item.id}><Button aria-current={item.id === activeId ? "page" : undefined} className={`shared-rail-workspace${item.id === activeId ? " active" : ""}`} onClick={item.onSelect} type="button" variant="secondary">{item.icon}<span>{item.name}</span></Button></Tooltip>)}
     {items.length > RAIL_LIST_LIMIT ? <Button aria-expanded={expanded} className="shared-rail-more" onClick={() => setExpanded((open) => !open)} type="button" variant="secondary">{expanded ? "Show less" : `Show more (${items.length - visible.length})`}</Button> : null}
   </div>;
 }

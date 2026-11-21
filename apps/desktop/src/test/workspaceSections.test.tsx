@@ -84,12 +84,8 @@ it("lists workspaces in the rail, opens the chosen one and folds a long list beh
   fireEvent.click(screen.getByRole("button", { name: "Show more (2)" }));
   expect(screen.getByRole("button", { name: "Twelve" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Show less" })).toBeTruthy();
-  // The heading folds the whole list away and brings it back.
-  const heading = screen.getByRole("button", { name: "Workspaces" });
-  fireEvent.click(heading);
-  expect(heading.getAttribute("aria-expanded")).toBe("false");
-  fireEvent.click(heading);
-  expect(heading.getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByText("Workspaces")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Workspaces" })).toBeNull();
 });
 
 describe("landingSection", () => {
