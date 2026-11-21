@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.46` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.47` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.47 — A colored, full-width assistant page.
+
+- On the assistant page the chat takes the **workspace's main color** (the app's own when it has none): your messages, the chosen capability, the chat title and the active chat in the history, the line above the message box, and the heading icon. Before, they were plain greys.
+- The chat now uses the **whole width of the page** instead of a centred column. The dock beside a workspace page is unchanged.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.46 — The assistant on a page of its own.
 
