@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.33` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.34` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.34 — Aligned cards, side tooltips.
+
+- The content of an organization card now fills the card and starts at its left edge whatever its length; before, a card with little content (the last one on a row) centred its text. The workspace chips keep clear of the arrow.
+- A tooltip in the sidebar (a workspace, **Organizations**, **System**) opens to the right of the item instead of above it.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.33 — A New workspace dialog.
 

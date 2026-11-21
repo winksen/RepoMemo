@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.33` (2026-11-21)
+> **Current:** `V0.8.34` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -53,6 +53,7 @@
 | **V0.8.31** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Workspace opening | Open every workspace on its Overview, whatever its template names as its landing section | Opening a workspace from the sidebar, the dashboard, an organization or the palette always lands on Overview |
 | **V0.8.32** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Organizations page | Show organizations as large cards instead of a list | /orgs shows one card per organization with its role, workspace count and first workspaces, and a click opens it |
 | **V0.8.33** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | New workspace dialog | Create workspaces from a dialog with the organization, name and template, opened from the + menu (organization picked from a list) and from an organization page (organization already chosen), which now offers New workspace in place of New organization | One dialog creates a workspace from both entry points and opens it; the inline form on the organization page is gone |
+| **V0.8.34** | 🧪 2026-11-21 | AM. Interface enhancements | 🐞 | Cards and tooltips | Align the content of the organization cards to the card edges, and open the sidebar tooltips to the right | Every card lays out the same whatever its content, and a sidebar tooltip opens beside the item instead of above it |
 
 ## Verification and handoff
 

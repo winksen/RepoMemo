@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.34 (2026-11-21)
+
+Aligned organization cards and side tooltips.
+
+### Fixed
+- **Card layout.** The content of an organization card now starts at the card's left edge and fills its width whatever its length. A card with little content, such as the last one on a row, used to centre its text and look misaligned. The workspace chips keep clear of the arrow.
+- **Sidebar tooltips** open to the right of the item (workspaces, **Organizations**, **System**) instead of above it. Other tooltips are unchanged.
+- CSS and layout only: no data, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.33 (2026-11-21)
 
 A dialog to create workspaces, from the **+** menu and from an organization page.

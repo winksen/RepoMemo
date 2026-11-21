@@ -186,8 +186,8 @@ function AdministrationRail({ onNavigate, showSystem }: { onNavigate: (to: strin
   const inOrganizations = path === "/orgs" || path.startsWith("/orgs/");
   const inSystem = path === "/system" || path.startsWith("/system/");
   return <section aria-label="Administration" className="shared-rail-system">
-    <Tooltip content="Manage your organizations"><Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} type="button" variant="secondary"><Building size={ICON_SIZE.lg} /><span>Organizations</span></Button></Tooltip>
-    {showSystem ? <Tooltip content="Administer this server"><Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} type="button" variant="secondary"><Server size={ICON_SIZE.lg} /><span>System</span></Button></Tooltip> : null}
+    <Tooltip content="Manage your organizations" side="right"><Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} type="button" variant="secondary"><Building size={ICON_SIZE.lg} /><span>Organizations</span></Button></Tooltip>
+    {showSystem ? <Tooltip content="Administer this server" side="right"><Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} type="button" variant="secondary"><Server size={ICON_SIZE.lg} /><span>System</span></Button></Tooltip> : null}
   </section>;
 }
 

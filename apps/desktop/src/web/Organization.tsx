@@ -145,7 +145,7 @@ function RailList({ activeId, items }: { activeId?: string; items: { id: string;
   const active = items.find((item) => item.id === activeId);
   if (folded && active && !visible.includes(active)) visible = [...visible.slice(0, RAIL_LIST_LIMIT - 1), active];
   return <div className="shared-rail-list">
-    {visible.map((item) => <Tooltip content={item.title} key={item.id}><Button aria-current={item.id === activeId ? "page" : undefined} className={`shared-rail-workspace${item.id === activeId ? " active" : ""}`} onClick={item.onSelect} type="button" variant="secondary">{item.icon}<span>{item.name}</span></Button></Tooltip>)}
+    {visible.map((item) => <Tooltip content={item.title} key={item.id} side="right"><Button aria-current={item.id === activeId ? "page" : undefined} className={`shared-rail-workspace${item.id === activeId ? " active" : ""}`} onClick={item.onSelect} type="button" variant="secondary">{item.icon}<span>{item.name}</span></Button></Tooltip>)}
     {items.length > RAIL_LIST_LIMIT ? <Button aria-expanded={expanded} className="shared-rail-more" onClick={() => setExpanded((open) => !open)} type="button" variant="secondary">{expanded ? "Show less" : `Show more (${items.length - visible.length})`}</Button> : null}
   </div>;
 }
