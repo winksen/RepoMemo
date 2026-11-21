@@ -17,6 +17,7 @@ afterEach(cleanup);
 
 it("says how the organization, and then its first workspace, will be named, each in its own section", () => {
   render(<NewOrganizationDialog accessToken="t" onClose={vi.fn()} onCreated={vi.fn()} open />);
+  fireEvent.click(screen.getByRole("switch", { name: "Create a first workspace" }));
   expect(screen.getByText(/Organization will be created as/).textContent).toContain("Organization name");
   expect(screen.getByText(/Workspace will be created as/).textContent).toContain("Organization name / General");
   fireEvent.change(screen.getByLabelText(/Organization name/), { target: { value: "Engineering" } });
@@ -38,6 +39,7 @@ it("creates the organization with its description and icon, then its first works
   vi.mocked(saveSharedWorkspaceColor).mockResolvedValue({ color: "teal" });
   const onCreated = vi.fn();
   render(<NewOrganizationDialog accessToken="t" onClose={vi.fn()} onCreated={onCreated} open />);
+  fireEvent.click(screen.getByRole("switch", { name: "Create a first workspace" }));
   fireEvent.change(screen.getByLabelText(/Organization name/), { target: { value: "Engineering" } });
   fireEvent.change(screen.getByLabelText("Description"), { target: { value: "  The platform team  " } });
   fireEvent.click(screen.getByRole("button", { name: "House" }));
@@ -50,11 +52,11 @@ it("creates the organization with its description and icon, then its first works
   expect(onCreated.mock.calls[0][1].workspace.settings.color).toBe("teal");
 });
 
-it("can start empty: no workspace is made, and its fields are not asked for", async () => {
+it("starts empty by default: no workspace section, and none is made", async () => {
   vi.mocked(createSharedOrganization).mockResolvedValue(organization);
   const onCreated = vi.fn();
   render(<NewOrganizationDialog accessToken="t" onClose={vi.fn()} onCreated={onCreated} open />);
-  fireEvent.click(screen.getByRole("switch", { name: "Create a first workspace" }));
+  expect(screen.getByRole("switch", { name: "Create a first workspace" }).getAttribute("aria-checked")).toBe("false");
   expect(screen.getByText("Start empty")).toBeTruthy();
   expect(screen.queryByRole("group", { name: "Workspace icon" })).toBeNull();
   expect(screen.queryByRole("region", { name: "First workspace" })).toBeNull();
@@ -69,6 +71,7 @@ it("keeps the organization when its first workspace cannot be made", async () =>
   vi.mocked(createSharedWorkspace).mockRejectedValue(new Error("refused"));
   const onCreated = vi.fn();
   render(<NewOrganizationDialog accessToken="t" onClose={vi.fn()} onCreated={onCreated} open />);
+  fireEvent.click(screen.getByRole("switch", { name: "Create a first workspace" }));
   fireEvent.change(screen.getByLabelText(/Organization name/), { target: { value: "Engineering" } });
   fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith(organization, null));

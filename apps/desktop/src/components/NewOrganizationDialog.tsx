@@ -31,7 +31,7 @@ export function NewOrganizationDialog({ accessToken, onClose, onCreated, open }:
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState(DEFAULT_ORGANIZATION_ICON);
-  const [withWorkspace, setWithWorkspace] = useState(true);
+  const [withWorkspace, setWithWorkspace] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("General");
   const [setup, setSetup] = useState<WorkspaceSetup>(DEFAULT_WORKSPACE_SETUP);
   const [busy, setBusy] = useState(false);
@@ -40,7 +40,7 @@ export function NewOrganizationDialog({ accessToken, onClose, onCreated, open }:
   useEffect(() => {
     if (!open) return;
     setName(""); setDescription(""); setIcon(DEFAULT_ORGANIZATION_ICON);
-    setWithWorkspace(true); setWorkspaceName("General"); setSetup(DEFAULT_WORKSPACE_SETUP);
+    setWithWorkspace(false); setWorkspaceName("General"); setSetup(DEFAULT_WORKSPACE_SETUP);
   }, [open]);
 
   const canCreate = Boolean(name.trim()) && (!withWorkspace || Boolean(workspaceName.trim()));

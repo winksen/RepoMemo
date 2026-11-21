@@ -2,7 +2,17 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.57` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.58` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.58 — Workspace cards, steadier sidebar names.
+
+- **Workspace cards.** In an organization's **Workspaces** tab each workspace is a card laid out like the organization cards (a large mark, its role, its name, what template it uses and when it was created, an arrow), in the **workspace's own color**: the mark is a gradient of it and the arrow follows it. A click opens the workspace.
+- **Sidebar names.** A workspace's name in the sidebar is always at full contrast (black on light, white on dark); it no longer fades to grey when the row is not hovered.
+- **Filled icons.** A workspace's icon is drawn filled wherever it stands beside its name, on its card and in lists. In the sidebar only the current workspace's icon is filled, as before.
+- **Organization title.** An organization's page has its icon before its name, in the page title, on every tab.
+- **New organization starts empty:** the switch for a first workspace is off by default, and the workspace section is shown once it is turned on.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.57 — An organization profile, and dialogs with a close button.
 

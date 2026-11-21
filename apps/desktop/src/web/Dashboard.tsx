@@ -5,6 +5,9 @@ import { createSharedOrganization, type DashboardWorkspaceFigures } from "../lib
 import { WorkspaceImport } from "../components/WorkspaceImport";
 import { openNewOrganization, openNewWorkspace } from "../lib/newWorkspaceBridge";
 import { OrganizationOverviewTab, OrganizationTopbar } from "./OrganizationPage";
+import { OrganizationIcon } from "./organizationIcons";
+import { workspaceColorKey, workspaceColorProps } from "./workspaceColors";
+import { Badge } from "../components/ui/badge";
 import { type OrganizationSection } from "./constants";
 import { type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { Button } from "../components/ui/button";
@@ -136,12 +139,23 @@ export function SharedWorkspaceHome({
       workspaceNavigation={!showOrganizationForm && currentOrganization ? <OrganizationTopbar activeSection={activeSection} onNavigate={(next) => navigate(organizationPath(currentOrganization.id, next))} organization={currentOrganization} /> : undefined}
     >
         <div className="shared-page-content">
-          <PageHeader actions={!showOrganizationForm && canManageOrganization ? <Button onClick={() => openNewWorkspace(organizationId)} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New workspace</Button> : null} description={showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : activeSection === "overview" ? currentOrganization?.description || "How the organization and its workspaces are doing." : activeSection === "workspaces" ? "Workspaces are server-authoritative and available only to their members." : "Members, templates and invitations."} title={showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"} />
+          <PageHeader icon={currentOrganization && !showOrganizationForm ? <OrganizationIcon organization={currentOrganization} size={30} weight="fill" /> : undefined} actions={!showOrganizationForm && canManageOrganization ? <Button onClick={() => openNewWorkspace(organizationId)} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New workspace</Button> : null} description={showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : activeSection === "overview" ? currentOrganization?.description || "How the organization and its workspaces are doing." : activeSection === "workspaces" ? "Workspaces are server-authoritative and available only to their members." : "Members, templates and invitations."} title={showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"} />
           {showOrganizationForm ? <div className="shared-empty-state"><Building size={26} /><strong>No organizations yet</strong>{session.can_create_organizations === false ? <span>Ask a system administrator to create one or to invite you to one.</span> : <><span>Create an organization to start a shared workspace boundary.</span><Button onClick={openNewOrganization} type="button" variant="main"><Plus size={ICON_SIZE.md} /> Create organization</Button></>}</div> : <>
             {activeSection === "overview" && currentOrganization ? <OrganizationOverviewTab accessToken={accessToken} onOpenWorkspace={(workspaceId) => navigate(workspaceHomePath(workspaceId))} organization={currentOrganization} /> : null}
             {activeSection === "workspaces" ? <>
             {canManageOrganization ? <WorkspaceImport accessToken={accessToken} key={`import-${organizationId}`} onImported={(workspace) => setWorkspaces((current) => [workspace, ...current])} organizationId={organizationId} /> : null}
-            <div className="shared-workspace-list">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => <article className="shared-workspace-row" key={entry.workspace.id}><span className="shared-workspace-icon"><WorkspaceIcon size={ICON_SIZE.lg} workspace={entry.workspace} /></span><div><h2>{entry.workspace.name}</h2><p>Created {new Date(entry.workspace.created_at).toLocaleDateString()} · Your role: {entry.role}{templateName(figures[entry.workspace.id]) ? ` · ${templateName(figures[entry.workspace.id])}` : ""}{headlineText(figures[entry.workspace.id]?.template) ? ` · ${headlineText(figures[entry.workspace.id]?.template)}` : ""}</p></div><Button aria-label={`Open ${entry.workspace.name}`} className="shared-workspace-open" onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary"><ChevronRight size={ICON_SIZE.lg} /></Button></article>)}{workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}</div>
+            <div className="shared-org-cards">{workspaces.filter((workspace) => workspace.organization_id === organizationId).map((entry) => {
+              const figure = figures[entry.workspace.id];
+              const about = [templateName(figure), headlineText(figure?.template)].filter(Boolean).join(" \u00b7 ");
+              return <Button className="shared-org-card shared-workspace-card" key={entry.workspace.id} onClick={() => onOpenWorkspace(entry)} type="button" variant="secondary" {...workspaceColorProps(workspaceColorKey(entry.workspace))}>
+                <span className="shared-org-card-head"><span className="shared-org-card-mark"><WorkspaceIcon size={28} weight="fill" workspace={entry.workspace} /></span><Badge>{entry.role}</Badge></span>
+                <strong>{entry.workspace.name}</strong>
+                {about ? <span className="shared-org-card-count">{about}</span> : null}
+                <span className="shared-org-card-description">Created {new Date(entry.workspace.created_at).toLocaleDateString()}</span>
+                <ChevronRight className="shared-org-card-arrow" size={ICON_SIZE.lg} />
+              </Button>;
+            })}</div>
+            {workspaces.filter((workspace) => workspace.organization_id === organizationId).length === 0 ? <div className="shared-empty-state"><Layers size={26} /><strong>No workspaces yet</strong><span>Create the first shared workspace for {currentOrganization?.name}.</span></div> : null}
             </> : null}
             {activeSection === "administration" ? <>
             {currentOrganization && canManageOrganization ? <OrganizationAdministration accessToken={accessToken} onOrganizationUpdated={(updated) => setOrganizations((current) => current.map((organization) => organization.id === updated.id ? updated : organization))} organization={currentOrganization} /> : null}

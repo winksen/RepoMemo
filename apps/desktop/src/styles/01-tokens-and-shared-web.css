@@ -914,7 +914,7 @@ input[type="file"] {
 /* Keyboard focus in the rail is a grey a step stronger than hover; the current item keeps its fill. */
 .shared-home-rail .rm-button:not(.active):focus-visible { color: var(--color-text); background: var(--color-surface-3); }
 .rm-button.shared-rail-workspace .shared-rail-text { display: grid; flex: 1; gap: 2px; min-width: 0; }
-.rm-button.shared-rail-workspace .shared-rail-name { color: inherit; font-size: 14px; font-weight: 700; line-height: 1.3; }
+.rm-button.shared-rail-workspace .shared-rail-name { color: var(--color-text); font-size: 14px; font-weight: 700; line-height: 1.3; }
 .rm-button.shared-rail-workspace .shared-rail-sub { display: flex; align-items: center; gap: 5px; color: var(--color-text-subtle); font-size: 12px; font-weight: 500; line-height: 1.3; }
 .rm-button.shared-rail-workspace .shared-rail-sub svg { flex: 0 0 auto; }
 /* The rail's title: the page-title face, capitals, plain grey, and in line with the icon chips below it (the rows' 10px of padding). */
@@ -999,3 +999,9 @@ input[type="file"] {
 .shared-assistant-page .shared-assistant-composer-page { border-top: 0; border-bottom: 0; }
 .shared-assistant-page .shared-assistant-main { border: 0; }
 .shared-assistant-page .shared-assistant-thread:has(.shared-assistant-welcome) { align-content: center; }
+
+/* A workspace as a card in its organization's Workspaces tab (V0.8.58): the organization card's layout, in the workspace's color. */
+.shared-workspace-card .shared-org-card-mark { color: var(--color-on-accent); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 80%, white), color-mix(in srgb, var(--color-accent) 80%, black)); }
+.rm-button.shared-workspace-card { min-height: 180px; }
+.shared-workspace-card .shared-org-card-description { -webkit-line-clamp: 1; }
+.shared-workspace-card .shared-org-card-arrow { color: var(--color-accent-text); }

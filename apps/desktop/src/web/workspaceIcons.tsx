@@ -55,7 +55,7 @@ export function workspaceIconKey(workspace: Pick<Workspace, "settings">): string
 }
 
 /** The icon of a workspace, as chosen by its administrators. */
-export function WorkspaceIcon({ size, weight = "regular", workspace }: { size: number | string; /** `fill` for the current item of a menu. */ weight?: IconWeight; workspace: Pick<Workspace, "settings"> }) {
+export function WorkspaceIcon({ size, weight = "fill", workspace }: { size: number | string; /** `fill` by default, where the icon stands by the workspace's name; the sidebar draws the others outlined. */ weight?: IconWeight; workspace: Pick<Workspace, "settings"> }) {
   const key = workspaceIconKey(workspace);
   const Icon = (WORKSPACE_ICONS.find((entry) => entry.key === key) ?? WORKSPACE_ICONS[0]).icon;
   return <Icon size={size} weight={weight} />;

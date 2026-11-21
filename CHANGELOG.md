@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.58 (2026-11-21)
+
+Workspace cards, steadier sidebar names, and a few details.
+
+### Changed
+- **Workspace cards.** An organization's **Workspaces** tab shows each workspace as a card laid out like the organization cards: a large mark with the workspace's icon, its role, its name, its template and when it was created, and an arrow. The cards take the **workspace's own color**: the mark is a gradient of it and the arrow follows it. The list rows are gone.
+- **Sidebar names.** A workspace's name in the sidebar is always at full contrast; it no longer fades to grey when the row is not hovered.
+- **Filled icons.** A workspace's icon is drawn filled beside its name (cards, lists and headings). In the sidebar the icon is filled only for the current workspace, as before.
+- **Organization title.** The organization's icon is shown before its name in the page title, on every tab.
+- **New organization starts empty.** The first-workspace switch is off by default; turn it on to set a workspace up under the line.
+- CSS and markup only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen. The organization dialog test was updated for the new default and not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.57 (2026-11-21)
 
 An organization profile, and dialogs with a close button and transitions.

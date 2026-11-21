@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.57` (2026-11-21)
+> **Current:** `V0.8.58` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -77,6 +77,7 @@
 | **V0.8.55** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | New workspace dialog and template cards | Add icon and color choices to the New workspace dialog, show templates as cards with a drawing of each, explain access in words, widen the dialog with the organization and the name side by side, and say how the workspace will be named | The dialog is wide, shows Workspace will be created as Org / Space, offers an icon, a color, template cards and a readable access choice, and the building mark in the workspace list is always filled |
 | **V0.8.56** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Compact pickers and a New organization dialog | Make the icon and color pickers compact, complete the icon grid with eight icons and add three colors, lay the New workspace dialog out in aligned halves with the five templates on one line, and give New organization a dialog of the same form that can also create a first workspace | The icon grid is four full rows, the dialog's halves line up, five templates fit on one line, and New organization is a dialog with an optional first workspace |
 | **V0.8.57** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Organization profile and dialog chrome | Give an organization a description and an icon (new fields on the server), add a close button and transitions to every dialog, and lay the New organization dialog out in sections: the organization, the choice of a first workspace, and below a line the workspace | An organization has a description and an icon it shows on its card, page and sidebar, every dialog has an X and eases in and out, and the New organization dialog keeps the workspace's choices apart from the organization's |
+| **V0.8.58** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Workspace cards and sidebar names | Show an organization's workspaces as cards in the workspace's color, keep workspace names in the sidebar at full contrast, draw a workspace's icon filled beside its name, put the organization's icon in its page title, and start the New organization dialog empty | The Workspaces tab shows colored cards, sidebar names never fade, icons beside names are filled, an organization's page title has its icon, and New organization starts empty |
 
 ## Verification and handoff
 
