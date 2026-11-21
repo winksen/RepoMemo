@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.41` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.42` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.42 — Chips, tab line and focus.
+
+- The workspace icon chips in the sidebar have squarer corners (6 px instead of 10) and a **gradient** from a lighter to a darker shade of the workspace's color instead of a flat fill.
+- The line under the active tab is thicker (4 px instead of 2).
+- **Keyboard focus** on a tab or a sidebar item is a grey fill one step stronger than the hover grey, with a grey ring, so the two states can be told apart; it no longer uses a colored border.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.41 — Larger workspace rows.
 

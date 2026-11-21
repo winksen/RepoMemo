@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.41` (2026-11-21)
+> **Current:** `V0.8.42` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -61,6 +61,7 @@
 | **V0.8.39** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Workspace customization | Let a workspace choose a main color, from a few colors with a darker shade for the light theme and a lighter one for the dark theme, in a Customization section of its settings next to the icon, and apply it to the workspace's tabs and highlights | Administrators pick a color that every member sees on the workspace's tabs, buttons and highlights, readable in both themes |
 | **V0.8.40** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Workspace colors in the sidebar | Show each workspace's icon in the sidebar on a chip of its color, the app's blue by default, and plain on the grey fill when it is the current one | The sidebar list shows a colored chip per workspace and the current workspace stays grey |
 | **V0.8.41** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Sidebar workspaces | Show workspaces in the sidebar as larger rows with a big icon chip, the name and the organization under it, and fill the current workspace with its own color | Each workspace row shows its organization, and the current one is filled with the workspace's color instead of grey |
+| **V0.8.42** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Chips, tabs and focus | Give the sidebar icon chips squarer corners and a gradient between two shades of the color, make the active tab's line thicker, and make keyboard focus a grey a step stronger than hover | The chips are gradient tiles with small corners, the active tab line is 4 px, and a focused tab or sidebar item is greyer than a hovered one |
 
 ## Verification and handoff
 

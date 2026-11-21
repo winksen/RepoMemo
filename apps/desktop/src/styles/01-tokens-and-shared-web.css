@@ -234,11 +234,12 @@ input[type="file"] {
 .shared-workspace-topbar { display: flex; align-items: stretch; min-height: 48px; padding: 0 var(--shared-content-inset); overflow: hidden; border-bottom: 1px solid var(--color-border); }
 .shared-workspace-tabs { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .shared-workspace-tabs::-webkit-scrollbar { display: none; }
-.shared-workspace-tabs .rm-button { position: relative; flex: 0 0 auto; min-height: 48px; padding: 0 11px; color: var(--color-text-muted); background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; font-size: 12px; }
+.shared-workspace-tabs .rm-button { position: relative; flex: 0 0 auto; min-height: 48px; padding: 0 11px; color: var(--color-text-muted); background: transparent; border: 0; border-bottom: 4px solid transparent; border-radius: 0; font-size: 12px; }
 .shared-workspace-tabs .rm-button:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
 .shared-workspace-tabs .rm-button.active { color: var(--color-accent-text); border-bottom-color: var(--color-accent); }
 .shared-workspace-tabs .rm-button.active:hover:not(:disabled) { color: var(--color-accent-text); border-bottom-color: var(--color-accent); }
-.shared-workspace-tabs .rm-button:focus-visible { z-index: var(--layer-raised); border-color: var(--color-accent); }
+.shared-workspace-tabs .rm-button:focus-visible:not(.active) { z-index: var(--layer-raised); color: var(--color-text); background: var(--color-surface-3); border-color: transparent; outline: 2px solid var(--color-border-strong); outline-offset: -2px; }
+.shared-workspace-tabs .rm-button.active:focus-visible { z-index: var(--layer-raised); outline: 2px solid var(--color-border-strong); outline-offset: -2px; }
 .shared-workspace-tab-label { display: inline-flex; align-items: center; gap: 6px; }
 .shared-workspace-tab-restricted { padding: 2px 5px; color: var(--color-text-muted); background: var(--color-surface-3); border: 1px solid var(--color-border); border-radius: 4px; font-size: 9px; font-weight: 700; line-height: 1; }
 .shared-workspace-tab-count { min-width: 18px; padding: 2px 6px; color: var(--color-text); background: var(--color-surface-3); border: 1px solid var(--color-border); border-radius: 999px; font-size: 11px; font-weight: 700; line-height: 1; text-align: center; }
@@ -906,7 +907,9 @@ input[type="file"] {
 /* A workspace in the sidebar (V0.8.41): a large icon on a chip of the workspace's colour, its name, and the organization under it.
    The current one is filled with the workspace's colour (the app's accent by default). */
 .rm-button.shared-rail-workspace { min-height: 58px; padding: 7px 10px; gap: 12px; }
-.shared-rail-chip { display: grid; flex: 0 0 auto; width: 44px; height: 44px; place-items: center; color: var(--color-on-accent); background: var(--color-accent); border-radius: 10px; }
+.shared-rail-chip { display: grid; flex: 0 0 auto; width: 44px; height: 44px; place-items: center; color: var(--color-on-accent); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 80%, white), color-mix(in srgb, var(--color-accent) 80%, black)); border-radius: 6px; }
+/* Keyboard focus in the rail is a grey a step stronger than hover; the current item keeps its fill. */
+.shared-home-rail .rm-button:not(.active):focus-visible { color: var(--color-text); background: var(--color-surface-3); }
 .rm-button.shared-rail-workspace .shared-rail-text { display: grid; flex: 1; gap: 2px; min-width: 0; }
 .rm-button.shared-rail-workspace .shared-rail-name { color: inherit; font-size: 14px; font-weight: 700; line-height: 1.3; }
 .rm-button.shared-rail-workspace .shared-rail-sub { color: var(--color-text-subtle); font-size: 12px; font-weight: 500; line-height: 1.3; }

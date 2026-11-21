@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.42 (2026-11-21)
+
+Chips, tab line and focus.
+
+### Changed
+- **Icon chips.** The workspace chips in the sidebar have squarer corners (6 px) and a gradient from a lighter to a darker shade of the workspace's color, in place of a flat fill.
+- **Active tab line.** The line under the active tab is thicker (4 px).
+- **Keyboard focus.** A focused tab or sidebar item is a grey fill one step stronger than the hover grey, with a grey ring, instead of a colored border, so focus and hover look different. The current item keeps its fill.
+- CSS only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.41 (2026-11-21)
 
 Larger workspace rows in the sidebar.
