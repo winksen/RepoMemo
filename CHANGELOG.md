@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.32 (2026-11-21)
+
+Organizations as cards.
+
+### Changed
+- **Cards.** `/orgs` shows each organization as a large card with a big mark, its name, your role, its workspace count and its first four workspaces (name and icon, then *+n more*). A click opens the organization. The cards fill the width of the page and lift slightly on hover.
+- CSS and layout only: no data, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.31 (2026-11-21)
 
 Every workspace opens on its Overview.

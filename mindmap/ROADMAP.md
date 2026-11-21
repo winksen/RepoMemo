@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.8.31` (2026-11-21) · **Next:** the maintainer's test run and the 0.8 exit-journey sheet, then the 0.9 line. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.8.32` (2026-11-21) · **Next:** the maintainer's test run and the 0.8 exit-journey sheet, then the 0.9 line. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `RM-V0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -1960,6 +1960,7 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.8.29** 🧪 2026-11-21 | 🔧 | Sidebar | Show the current sidebar item as a grey fill with dark text instead of the accent fill | — | The current workspace, Organizations and System items are grey, bold and readable in light and dark themes |
 | **V0.8.30** 🧪 2026-11-21 | 🔧 | Sidebar | Show the current sidebar item as a contrasting grey: dark grey with light text in light mode, light grey with dark text in dark mode | — | The current workspace, Organizations and System items stand out from hover in both themes without any accent colour |
 | **V0.8.31** 🧪 2026-11-21 | 🔧 | Workspace opening | Open every workspace on its Overview, whatever its template names as its landing section | — | Opening a workspace from the sidebar, the dashboard, an organization or the palette always lands on Overview |
+| **V0.8.32** 🧪 2026-11-21 | 🔧 | Organizations page | Show organizations as large cards instead of a list | — | /orgs shows one card per organization with its role, workspace count and first workspaces, and a click opens it |
 
 ### The 0.9.x line: pilot proof and public release candidate
 

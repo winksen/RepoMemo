@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.31` (2026-11-21)
+> **Current:** `V0.8.32` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -51,6 +51,7 @@
 | **V0.8.29** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Sidebar | Show the current sidebar item as a grey fill with dark text instead of the accent fill | The current workspace, Organizations and System items are grey, bold and readable in light and dark themes |
 | **V0.8.30** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Sidebar | Show the current sidebar item as a contrasting grey: dark grey with light text in light mode, light grey with dark text in dark mode | The current workspace, Organizations and System items stand out from hover in both themes without any accent colour |
 | **V0.8.31** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Workspace opening | Open every workspace on its Overview, whatever its template names as its landing section | Opening a workspace from the sidebar, the dashboard, an organization or the palette always lands on Overview |
+| **V0.8.32** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Organizations page | Show organizations as large cards instead of a list | /orgs shows one card per organization with its role, workspace count and first workspaces, and a click opens it |
 
 ## Verification and handoff
 
