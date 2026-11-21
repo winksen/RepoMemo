@@ -2,7 +2,18 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.54` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.55` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.55 — A fuller New workspace dialog.
+
+- **Wider.** The dialog is wider, with the **organization** and the **workspace name** side by side.
+- **How it will be named.** Under them, *Workspace will be created as* **Organization / Workspace**, with the icon and color chosen so far on a chip.
+- **Icon and color.** The same choices as in the workspace's Settings › Customization are offered while creating; they are saved right after the workspace exists.
+- **Template cards.** Each template is a card, as the organizations are: a **drawing of what it is for** (a stack of cards for General, a code window and a branch for Software engineering, an open book for the Knowledge base, a checklist and a pulse for Operations, a decision with two branches for Product and decisions, a neutral grid for custom templates), its name and a line about it. This also applies where a template is chosen in a workspace's Settings and in the first-run setup.
+- **Access in words.** The switch says *Access inherited from the organization* (*Everyone in <organization> can open it, with the role they have there.*) or *Restricted access* (*Only the people you add one by one can open this workspace.*).
+- The building mark under each workspace in the sidebar is always filled.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.54 — A centred welcome and a self-sizing message box.
 

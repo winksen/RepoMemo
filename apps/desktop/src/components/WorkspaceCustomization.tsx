@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { Check, Palette as PaletteIcon } from "@phosphor-icons/react";
+import { Palette as PaletteIcon } from "@phosphor-icons/react";
 import { saveSharedWorkspaceColor, saveSharedWorkspaceIcon } from "../lib/sharedApi";
-import { WORKSPACE_ICONS, workspaceIconKey } from "../web/workspaceIcons";
-import { WORKSPACE_COLORS, workspaceColorKey } from "../web/workspaceColors";
+import { workspaceIconKey } from "../web/workspaceIcons";
+import { workspaceColorKey } from "../web/workspaceColors";
+import { WorkspaceColorPicker, WorkspaceIconPicker } from "./WorkspaceLookPickers";
 import type { Workspace } from "../types";
 import { apiMessage } from "../web/format";
-import { ICON_SIZE } from "./ui/icon";
-import { IconButton } from "./ui/icon-button";
 import { PanelHeading } from "./ui/panel-heading";
-import { Tooltip } from "./ui/tooltip";
 import { showToast } from "./ui/toast";
 
 /**
@@ -56,27 +54,12 @@ export function WorkspaceCustomization({ accessToken, onSaved, workspace }: {
       <div className="shared-customization-block">
         <strong>Icon</strong>
         <span className="shared-muted-copy">Stands for the workspace in the dashboard, the workspace lists and the sidebar.</span>
-        <div aria-label="Workspace icon" className="shared-icon-picker" role="group">
-          {WORKSPACE_ICONS.map(({ icon: Icon, key, label }) => (
-            <IconButton appearance="outline" disabled={pending !== null && pending !== `icon:${key}`} key={key} label={label} onClick={() => void chooseIcon(key)} pressed={key === currentIcon}>
-              <Icon size={ICON_SIZE.lg} />
-            </IconButton>
-          ))}
-        </div>
+        <WorkspaceIconPicker disabled={pending !== null} onChange={(key) => void chooseIcon(key)} value={currentIcon} />
       </div>
       <div className="shared-customization-block">
         <strong>Main color</strong>
         <span className="shared-muted-copy">Colors the tabs and highlights of this workspace. Each color has a darker shade for the light theme and a lighter one for the dark theme, so it reads well on both.</span>
-        <div aria-label="Workspace color" className="shared-color-picker" role="group">
-          {[{ key: null, label: "Default", light: null, dark: null }, ...WORKSPACE_COLORS].map((color) => {
-            const selected = color.key === currentColor;
-            return <Tooltip content={color.label} key={color.key ?? "default"}>
-              <button aria-label={color.label} aria-pressed={selected} className="shared-color-swatch" data-default={color.key === null ? "true" : undefined} disabled={pending !== null && pending !== `color:${color.key ?? "default"}`} onClick={() => void chooseColor(color.key)} style={color.light && color.dark ? { "--swatch-light": color.light.accent, "--swatch-dark": color.dark.accent, "--swatch-on-light": color.light.on, "--swatch-on-dark": color.dark.on } as React.CSSProperties : undefined} type="button">
-                {selected ? <Check size={ICON_SIZE.md} /> : null}
-              </button>
-            </Tooltip>;
-          })}
-        </div>
+        <WorkspaceColorPicker disabled={pending !== null} onChange={(key) => void chooseColor(key)} value={currentColor} />
       </div>
     </section>
   );

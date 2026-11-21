@@ -259,3 +259,29 @@ th > .rm-badge,
 @keyframes rm-content-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .shared-layout-content > * { animation: rm-content-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
 .shared-page-content > *:not(.rm-skeleton-page), .shared-detail-shell > * { animation: rm-content-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+/* Template cards (V0.8.55): a drawing, a name and a line, as the organization cards are laid out. */
+.rm-template-options { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.rm-template-option { flex-direction: column; align-items: stretch; gap: 10px; padding: 8px 8px 12px; border-radius: 14px; }
+.rm-template-art-box { display: grid; place-items: center; padding: 10px; background: var(--color-surface-2); border-radius: 10px; }
+.rm-template-art { width: 100%; max-width: 180px; height: auto; }
+.rm-template-option .rm-template-text { padding: 0 6px; }
+.rm-template-text strong { font-size: 14px; }
+.rm-template-check { position: absolute; top: 14px; right: 14px; display: none; color: var(--color-text); background: var(--color-surface); border-radius: 50%; }
+.rm-template-option:has(.rm-template-radio:checked) .rm-template-check { display: block; }
+.rm-template-option:has(.rm-template-radio:checked) { background: var(--color-surface); border-color: var(--color-text); }
+.rm-template-option > svg.rm-template-check { margin-top: 0; }
+/* The New workspace dialog (V0.8.55): wider, the organization and the name side by side. */
+.rm-dialog.shared-new-workspace-dialog { width: min(900px, calc(100vw - 32px)); }
+.shared-new-workspace-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.shared-new-workspace-as { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--color-text-muted); font-size: 13px; }
+.shared-new-workspace-as strong { color: var(--color-text); }
+.shared-new-workspace-as .shared-rail-chip { width: 36px; height: 36px; }
+.shared-new-workspace-look { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; }
+.shared-new-workspace-look > div { display: grid; align-content: start; gap: 8px; }
+.shared-new-workspace-look > div > strong { font-size: 13px; }
+.shared-access-choice { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: var(--color-surface-2); border-radius: 12px; }
+.shared-access-choice > div { display: grid; gap: 2px; min-width: 0; }
+.shared-access-choice strong { font-size: 13px; }
+.shared-access-choice span { color: var(--color-text-muted); font-size: 12px; line-height: 1.45; }
+@media (max-width: 720px) { .shared-new-workspace-row, .shared-new-workspace-look { grid-template-columns: 1fr; } }

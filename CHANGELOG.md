@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.55 (2026-11-21)
+
+A fuller New workspace dialog, and template cards.
+
+### Changed
+- **Wider dialog.** The organization and the workspace name sit side by side, with *Workspace will be created as* **Organization / Workspace** under them, and the icon and color chosen so far on a chip.
+- **Icon and color.** The icon and main color choices of the workspace's Settings are offered while creating. They are saved right after the workspace is created; if one cannot be saved the workspace still exists and a warning says what to choose again in its Settings.
+- **Template cards.** Each template is a card, laid out like the organization cards, with a drawing of what it is for (General: stacked cards; Software engineering: a code window and a branch; Knowledge base: an open book; Operations: a checklist and a pulse; Product and decisions: a decision with two branches; any custom template: a neutral grid), its name and a line about it, and a check mark when chosen. The cards are used wherever a template is chosen: this dialog, the workspace's Settings and the first-run setup.
+- **Readable access choice.** The switch is explained in words: *Access inherited from the organization* (everyone in the organization can open it, with the role they have there) or *Restricted access* (only the people you add one by one).
+- **Filled building mark.** The building icon before the organization's name under each workspace in the sidebar is always filled.
+- No server, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the dialog and the drawings were not seen. A new test covers the drawings and the dialog's test was extended; neither was executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.54 (2026-11-21)
 
 A centred welcome and a self-sizing message box on Cairn's page.

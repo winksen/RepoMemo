@@ -1,10 +1,11 @@
-import { WORKSPACE_ICONS } from "../web/workspaceIcons";
-import { ICON_SIZE } from "./ui/icon";
+import { CheckCircle } from "@phosphor-icons/react";
 import type { TemplateSummary } from "../types";
 import { Badge } from "./ui/badge";
+import { ICON_SIZE } from "./ui/icon";
+import { TemplateArt } from "./TemplateArt";
 
 /**
- * Which template a new workspace starts with: one card for each, with its icon, name and what it is for.
+ * Which template a new workspace starts with: a card for each, with a drawing of what it is for, its name and a line about it.
  * It shows nothing while the server offers only `general`, so a server with no other template looks as it did.
  */
 export function TemplatePicker({ disabled = false, name, onChange, templates, value }: {
@@ -20,16 +21,14 @@ export function TemplatePicker({ disabled = false, name, onChange, templates, va
     <fieldset className="rm-template-picker" disabled={disabled}>
       <legend>Template</legend>
       <div className="rm-template-options">
-        {templates.map((template) => {
-          const Icon = (WORKSPACE_ICONS.find((entry) => entry.key === template.icon) ?? WORKSPACE_ICONS[0]).icon;
-          return (
-            <label className="rm-template-option" key={template.id}>
-              <input checked={value === template.id} className="rm-template-radio" name={name} onChange={() => onChange(template.id)} type="radio" value={template.id} />
-              <Icon size={ICON_SIZE.md} />
-              <span className="rm-template-text"><strong>{template.name}{template.custom ? <> <Badge>Custom</Badge></> : null}</strong><span>{template.summary}</span></span>
-            </label>
-          );
-        })}
+        {templates.map((template) => (
+          <label className="rm-template-option" key={template.id}>
+            <input checked={value === template.id} className="rm-template-radio" name={name} onChange={() => onChange(template.id)} type="radio" value={template.id} />
+            <span className="rm-template-art-box"><TemplateArt id={template.id} /></span>
+            <CheckCircle aria-hidden="true" className="rm-template-check" size={ICON_SIZE.lg} weight="fill" />
+            <span className="rm-template-text"><strong>{template.name}{template.custom ? <> <Badge>Custom</Badge></> : null}</strong><span>{template.summary}</span></span>
+          </label>
+        ))}
       </div>
     </fieldset>
   );
