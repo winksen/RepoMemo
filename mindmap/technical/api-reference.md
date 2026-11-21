@@ -237,7 +237,7 @@
 | DELETE | `/v1/workspaces/{workspace_id}/review/snoozes` | auth | require_workspace_read | — | — |
 | GET | `/v1/workspaces/{workspace_id}/health` | auth | require_workspace_read | — | WorkspaceHealth |
 | POST | `/v1/workspaces/{workspace_id}/health/actions` | auth | require_workspace_admin | HealthActionRequest | HealthActionResult |
-| GET | `/v1/workspaces/{workspace_id}/agent/capabilities` | auth | require_workspace_read | — | AgentCapabilitiesResponse |
+| GET | `/v1/workspaces/{workspace_id}/agent/capabilities` | auth | require_workspace_read | — | AgentCapabilitiesResponse (capabilities, provider_name, model) |
 | POST | `/v1/workspaces/{workspace_id}/agent/messages` | auth | require_workspace_read, consume_ai_quota | AgentMessageRequest | AgentTurnResponse |
 | GET | `/v1/workspaces/{workspace_id}/agent/conversations` | auth | require_workspace_read | — | Vec<AgentConversation |
 | GET | `/v1/agent/conversations/{conversation_id}` | auth | require_workspace_read | — | AgentConversationDetail |

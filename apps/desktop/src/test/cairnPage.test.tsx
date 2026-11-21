@@ -3,12 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 vi.mock("../components/AssistantPanel", () => ({ AssistantPanel: ({ workspaceId, requestedChatId, composerHeader }: { workspaceId: string; requestedChatId?: string | null; composerHeader?: React.ReactNode }) => <div><div data-testid="panel">cairn for {workspaceId} chat {String(requestedChatId)}</div>{composerHeader}</div> }));
-vi.mock("../lib/sharedApi", async (original) => ({ ...(await original<typeof import("../lib/sharedApi")>()), listSharedAgentConversations: vi.fn() }));
+vi.mock("../lib/sharedApi", async (original) => ({ ...(await original<typeof import("../lib/sharedApi")>()), listSharedAgentConversations: vi.fn(), getSharedAgentCapabilities: vi.fn() }));
 vi.mock("../web/router", async (original) => ({ ...(await original<typeof import("../web/router")>()), navigate: vi.fn() }));
 
 import { CairnRail, SharedCairnPage } from "../web/CairnPage";
 import { cairnContextWorkspace } from "../web/cairn";
-import { listSharedAgentConversations } from "../lib/sharedApi";
+import { getSharedAgentCapabilities, listSharedAgentConversations } from "../lib/sharedApi";
 import { navigate } from "../web/router";
 import type { AgentConversation, Organization, SharedSession, SharedWorkspace } from "../types";
 
@@ -22,6 +22,7 @@ const wrap = (node: React.ReactNode) => <QueryClientProvider client={new QueryCl
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
+  vi.mocked(getSharedAgentCapabilities).mockResolvedValue({ capabilities: [], provider_name: "Local model", model: "llama-3" } as never);
   vi.mocked(listSharedAgentConversations).mockImplementation(async (_token, workspaceId) => workspaceId === "w1"
     ? [chat("c1", "w1", "Retry policy", "2026-11-20T10:00:00Z")]
     : [chat("c2", "w2", "Refund rules", "2026-11-21T10:00:00Z")]);
@@ -49,7 +50,9 @@ it("groups the chats in the sidebar by workspace, the workspace with the latest 
 it("shows Cairn for the workspace of the open chat, as a label and not a choice", async () => {
   render(wrap(<SharedCairnPage accessToken="t" chatId="c2" organizations={organizations} session={session} signOut={vi.fn()} workspaces={workspaces} />));
   expect((await screen.findByTestId("panel")).textContent).toBe("cairn for w2 chat c2");
-  expect(screen.getByRole("heading", { name: "CAIRN" })).toBeTruthy();
+  // The heading is the chat's title, and the model in use is under it.
+  expect(await screen.findByRole("heading", { name: "Refund rules" })).toBeTruthy();
+  expect(await screen.findByText("Model: llama-3 · Local model")).toBeTruthy();
   expect(screen.queryByRole("combobox")).toBeNull();
   expect(screen.getByTitle("The workspace this chat draws on").textContent).toContain("Pay");
 });

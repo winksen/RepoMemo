@@ -1,5 +1,5 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { ChatCircleText, FileText, Lightning, PencilSimple, SlidersHorizontal, Trash } from "@phosphor-icons/react";
+import { ChatCircleText, Cpu, FileText, Lightning, PencilSimple, SlidersHorizontal, Trash } from "@phosphor-icons/react";
 import { useMemo, useState } from "react";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentReply } from "../types";
 import { formatRecentTime } from "../web/format";
@@ -64,7 +64,8 @@ export function ChatOptions({ capabilities, conversation, onDelete, onOpenArtifa
             <div><dt><ChatCircleText size={ICON_SIZE.md} /> Exchanges</dt><dd>{facts.exchanges} <small>({facts.exchanges * 2} messages back and forth)</small></dd></div>
             {conversation ? <div><dt>Started</dt><dd>{formatRecentTime(conversation.created_at)}</dd></div> : null}
             {conversation ? <div><dt>Last activity</dt><dd>{formatRecentTime(conversation.updated_at)}</dd></div> : null}
-            <div><dt><Lightning size={ICON_SIZE.md} /> Written by AI</dt><dd>{facts.generated} of {facts.replies} {facts.replies === 1 ? "reply" : "replies"}{capabilities?.provider_name ? <small> · {capabilities.provider_name}</small> : null}</dd></div>
+            <div><dt><Cpu size={ICON_SIZE.md} /> Model</dt><dd>{capabilities?.provider_name ? <>{capabilities.model ?? "Provider default"}<small> · {capabilities.provider_name}</small></> : <small>None: search and file lookup only</small>}</dd></div>
+            <div><dt><Lightning size={ICON_SIZE.md} /> Written by AI</dt><dd>{facts.generated} of {facts.replies} {facts.replies === 1 ? "reply" : "replies"}</dd></div>
           </dl>
           {facts.capabilities.length ? <div className="shared-chat-options-block"><strong>Asked of CAIRN</strong><ul>{facts.capabilities.map((entry) => <li key={entry.id}><span>{labelOf(entry.id)}</span><small>{entry.count}×</small></li>)}</ul></div> : null}
           <div className="shared-chat-options-block">

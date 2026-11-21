@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.65` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.66` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.66 — The chat's title as the heading, and the model in use.
+
+- **The heading is the chat's title**, in the page-title face, replacing *CAIRN* on the page (a new chat is headed *New chat*). A long title is cut with an ellipsis; renaming the chat changes the heading at once.
+- **The model in use** is shown under the heading (*Model: <model> · <provider>*, or *No AI provider: file lookup and search only*) and in the chat options (*Model*).
+- **The chat options** button sits at the right of the heading row, and the thin row that used to hold the title above the chat is gone.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.65 — A compact chat list and chat options.
 

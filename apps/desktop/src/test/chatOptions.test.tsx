@@ -11,7 +11,7 @@ afterEach(cleanup);
 
 const citation = (id: string, title: string) => ({ artifact_id: id, chunk_id: null, title, path: `docs/${title}`, start_line: null, end_line: null, confidence: null, commit: null, changed_by: null }) as unknown as AgentReply["citations"][number];
 const reply = (capability: AgentReply["capability"], generated: boolean, citations: AgentReply["citations"], files: AgentReply["files"] = []): AgentReply => ({ capability, routing: "rules", subject: "", reply_markdown: "", generated, files, matches: [], citations, warnings: [] });
-const capabilities = { provider_name: "Local model", capabilities: [{ id: "search_content", label: "Search content", description: "", available: true, placeholder: "" }] } as unknown as AgentCapabilities;
+const capabilities = { provider_name: "Local model", model: "llama-3", capabilities: [{ id: "search_content", label: "Search content", description: "", available: true, placeholder: "" }] } as unknown as AgentCapabilities;
 const conversation = { id: "c1", workspace_id: "w1", title: "Retry policy", turn_count: 2, created_at: "2026-11-20T10:00:00Z", updated_at: "2026-11-21T10:00:00Z" } as AgentConversation;
 
 it("counts what a chat has used from its replies: exchanges, distinct files, actions and AI-written replies", () => {
@@ -33,6 +33,7 @@ it("shows the chat's facts and files in a dropdown, opens a file, and renames or
   render(<ChatOptions capabilities={capabilities} conversation={conversation} onDelete={onDelete} onOpenArtifact={onOpenArtifact} onRename={onRename} replies={[reply("search_content", true, [citation("a1", "retry.md")])]} />);
   fireEvent.click(screen.getByRole("button", { name: "Chat options" }));
   expect(screen.getByText(/2 messages back and forth/)).toBeTruthy();
+  expect(screen.getByText("llama-3")).toBeTruthy();
   expect(screen.getByText("Search content")).toBeTruthy();
   expect(screen.getByText(/Files used \(1\)/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "retry.md" }));

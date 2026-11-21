@@ -558,6 +558,8 @@ export interface ProviderSettings {
 export interface AgentCapabilities {
   capabilities: AgentCapabilityInfo[];
   provider_name: string | null;
+  /** The model the workspace's text provider is set to use, when it names one. */
+  model?: string | null;
 }
 
 export interface AgentMessage {

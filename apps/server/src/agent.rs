@@ -26,6 +26,8 @@ const MAX_TITLE_CHARS: usize = 120;
 pub(crate) struct AgentCapabilitiesResponse {
     capabilities: Vec<AgentCapabilityInfo>,
     provider_name: Option<String>,
+    /// The model the workspace's text provider is set to use, when it names one.
+    model: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,9 +63,18 @@ pub(crate) async fn list_agent_capabilities(
         Some(provider) if ai_access::role_may_use_ai(&state, &workspace_id, &role).await? => Some(provider),
         _ => None,
     };
+    let capabilities = agent_capabilities(provider.is_some());
+    let (provider_name, model) = match provider {
+        Some(provider) => (
+            Some(provider.name),
+            provider.model.filter(|model| !model.trim().is_empty()),
+        ),
+        None => (None, None),
+    };
     Ok(Json(AgentCapabilitiesResponse {
-        capabilities: agent_capabilities(provider.is_some()),
-        provider_name: provider.map(|provider| provider.name),
+        capabilities,
+        provider_name,
+        model,
     }))
 }
 

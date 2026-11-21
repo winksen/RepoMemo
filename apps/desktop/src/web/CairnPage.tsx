@@ -11,8 +11,11 @@ import { EmptyState } from "../components/ui/empty-state";
 import { ICON_SIZE } from "../components/ui/icon";
 import { PageHeader } from "../components/ui/page-header";
 import { ASSISTANT_NAME } from "../lib/assistantName";
+import { workspaceKeys } from "../lib/queryClient";
+import { getSharedAgentCapabilities } from "../lib/sharedApi";
+import { useServerState } from "../lib/useServerState";
 import { openNewWorkspace } from "../lib/newWorkspaceBridge";
-import { type Organization, type SharedSession, type SharedWorkspace } from "../types";
+import { type AgentCapabilities, type Organization, type SharedSession, type SharedWorkspace } from "../types";
 import { formatRecentTime } from "./format";
 import { RailSection } from "./Organization";
 import { type CairnChat, cairnContextWorkspace, groupCairnChats, onCairnWorkspaceChange, rememberCairnWorkspace, rememberedCairnWorkspace, useCairnChats } from "./cairn";
@@ -97,6 +100,13 @@ export function SharedCairnPage({ accessToken, chatId, organizations, session, s
   const chosen = open?.workspace ?? cairnContextWorkspace(workspaces, startIn);
   const isNewChat = chatId === null;
   const chosenId = chosen?.workspace.id ?? null;
+  // The heading is the chat's title (in the page-title face); a new chat has none yet. The model in use is under it.
+  const [optionsHost, setOptionsHost] = useState<HTMLElement | null>(null);
+  const [capabilities] = useServerState<AgentCapabilities | null>({
+    key: workspaceKeys.assistantCapabilities(chosenId ?? ""), fetch: () => getSharedAgentCapabilities(accessToken, chosenId ?? ""), initial: null, enabled: Boolean(chosenId),
+  });
+  const chatTitle = open ? open.conversation.title : chatId ? "Chat" : "New chat";
+  const modelLine = !capabilities ? "" : capabilities.provider_name ? `Model: ${capabilities.model ?? "provider default"} \u00b7 ${capabilities.provider_name}` : "No AI provider: file lookup and search only";
 
   // A chat that no longer exists (deleted, or not the person's) opens a new one.
   useEffect(() => {
@@ -113,12 +123,13 @@ export function SharedCairnPage({ accessToken, chatId, organizations, session, s
   >
     <section className="shared-page-content shared-assistant-page">
       <PageHeader
-        description="Ask a question, search the evidence or get a workspace summarized, in conversation."
+        description={modelLine}
+        actions={<span className="shared-chat-options-host" ref={setOptionsHost} />}
         icon={<CairnIcon size={32} weight="fill" />}
-        title={ASSISTANT_NAME}
+        title={chatTitle}
       />
       {chosen
-        ? <div className="shared-assistant-page-body"><AssistantPanel accessToken={accessToken} composerHeader={<WorkspaceChooser editable={isNewChat} onChoose={rememberCairnWorkspace} organizations={organizations} selected={chosen} workspaces={workspaces} />} hideChatList key={chosenId} onChatChange={(id) => navigate(cairnPath(id), true)} onOpenArtifact={(artifactId) => navigate(routePath({ name: "artifact", workspaceId: chosen.workspace.id, artifactId }))} requestedChatId={chatId} variant="page" workspaceId={chosen.workspace.id} /></div>
+        ? <div className="shared-assistant-page-body"><AssistantPanel accessToken={accessToken} composerHeader={<WorkspaceChooser editable={isNewChat} onChoose={rememberCairnWorkspace} organizations={organizations} selected={chosen} workspaces={workspaces} />} hideChatList key={chosenId} optionsHost={optionsHost} onChatChange={(id) => navigate(cairnPath(id), true)} onOpenArtifact={(artifactId) => navigate(routePath({ name: "artifact", workspaceId: chosen.workspace.id, artifactId }))} requestedChatId={chatId} variant="page" workspaceId={chosen.workspace.id} /></div>
         : <EmptyState action={<Button onClick={() => openNewWorkspace()} type="button" variant="main">New workspace</Button>} description={`${ASSISTANT_NAME} works on the evidence of a workspace. Create one, or ask an administrator to add you to one.`} title="No workspace to talk about yet" />}
     </section>
   </SharedLayout>;

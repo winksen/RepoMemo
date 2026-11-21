@@ -1112,3 +1112,8 @@ input[type="file"] {
 .shared-chat-options-block p { margin: 0; color: var(--color-text-muted); font-size: 13px; }
 .shared-chat-options-actions { display: flex; gap: 8px; padding-top: 10px; border-top: 1px solid var(--color-border); }
 .shared-chat-options-actions .rm-button { flex: 1; min-height: 32px; }
+
+/* The chat's title is the page's heading (V0.8.66): one line, cut with an ellipsis when it is long, with the chat's options at the right. */
+.shared-assistant-page .rm-page-header h1 { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shared-assistant-page .rm-page-header > div:first-child { min-width: 0; }
+.shared-chat-options-host { display: inline-flex; }

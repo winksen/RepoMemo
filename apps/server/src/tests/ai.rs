@@ -82,6 +82,7 @@ async fn assistant_routes_messages_and_works_without_ai() {
     )
     .await;
     assert_eq!(capabilities["provider_name"], Value::Null);
+    assert_eq!(capabilities["model"], Value::Null);
     let available = capabilities["capabilities"]
         .as_array()
         .unwrap()

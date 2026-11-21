@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.65` (2026-11-21)
+> **Current:** `V0.8.66` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -85,6 +85,7 @@
 | **V0.8.63** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Top bar layout and sidebar width | Lay the top bar out as the logo, a search bar in the middle and the controls on the right with CAIRN last, make every control the same height, make both sidebars 288 px wide, and make the workspace chips smaller | The search is a bar, CAIRN is the rightmost control with notifications, theme and create to its left, the controls line up, and the sidebars are the same width |
 | **V0.8.64** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | CAIRN button and search bar styling | Remove the tooltip from CAIRN's menu button, make CAIRN's two parts react together on hover including the line between them, and draw the search bar transparent with a grey border like the other controls | The menu button has no tooltip, hovering either part colors the whole control, and the search bar matches the other controls |
 | **V0.8.65** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | CAIRN sidebar and chat options | Make Cairn's chat list more compact with each workspace shown with its icon, add chat options at the top right of the chat (messages, files used, what was asked, rename and delete), and remove the fill from CAIRN's button when its page is open | The chat list is compact and its groups have icons, a dropdown at the top right of a chat shows its exchanges and files, and the CAIRN button has no fill |
+| **V0.8.66** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Chat title and model | Make the open chat's title the page's heading in the page-title face, show the model in use under it and in the chat options, and move the options to the right of the heading | The heading is the chat's title, the model is shown, and the options sit at the top right |
 
 ## Verification and handoff
 

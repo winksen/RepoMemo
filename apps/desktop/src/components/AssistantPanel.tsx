@@ -2,6 +2,7 @@ import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { SafeMarkdown } from "./SafeMarkdown";
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Brain, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
 import { deleteSharedAgentConversation, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
@@ -70,8 +71,10 @@ function storedTurn(turn: AgentTurn): ThreadTurn {
 }
 
 /** Workspace assistant: routes each message to one capability on the server and keeps the user's chats there. */
-export function AssistantPanel({ accessToken, composerHeader, hideChatList = false, onChatChange, onOpenArtifact, requestedChatId, variant = "dock", workspaceId }: {
+export function AssistantPanel({ accessToken, composerHeader, hideChatList = false, onChatChange, onOpenArtifact, optionsHost, requestedChatId, variant = "dock", workspaceId }: {
   accessToken: string;
+  /** On Cairn's page, where the chat's options are drawn (the page's header); without it the options are not shown. */
+  optionsHost?: HTMLElement | null;
   /** On Cairn's page, what sits above the message box (the workspace the chat draws on). */
   composerHeader?: ReactNode;
   /** `page` is Cairn's page: the message box is one box with *Send* at its left and a **+** menu of actions at its right, and nothing under it. */
@@ -288,14 +291,14 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
 
   return <section className="shared-assistant" aria-label={`${ASSISTANT_NAME}, the workspace assistant`}>
     {dialog}
-    <div className="shared-assistant-toolbar">
+    {optionsHost ? createPortal(<ChatOptions capabilities={capabilities} conversation={activeConversation} onDelete={() => activeConversation && setChatDialog({ kind: "delete", conversation: activeConversation })} onOpenArtifact={onOpenArtifact} onRename={() => { if (activeConversation) { setRenameValue(activeConversation.title); setChatDialog({ kind: "rename", conversation: activeConversation }); } }} replies={turns.map((turn) => turn.reply)} />, optionsHost) : null}
+    {hideChatList ? null : <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
-      {hideChatList ? <ChatOptions capabilities={capabilities} conversation={activeConversation} onDelete={() => activeConversation && setChatDialog({ kind: "delete", conversation: activeConversation })} onOpenArtifact={onOpenArtifact} onRename={() => { if (activeConversation) { setRenameValue(activeConversation.title); setChatDialog({ kind: "rename", conversation: activeConversation }); } }} replies={turns.map((turn) => turn.reply)} /> : null}
       {hideChatList ? null : <>
         <IconButton aria-expanded={showChats} label="Chat history" onClick={() => setShowChats((current) => !current)} size="sm"><History size={ICON_SIZE.md} /></IconButton>
         <IconButton disabled={isBusy} label="New chat" onClick={() => { startNewChat(); setShowChats(false); }} size="sm"><Plus size={ICON_SIZE.md} /></IconButton>
       </>}
-    </div>
+    </div>}
     {showChats && !hideChatList ? <nav className="shared-assistant-chats" aria-label={`${ASSISTANT_NAME} chats`}>
       {conversations.length ? <ul className="rm-option-list">{conversations.map((conversation) => {
         const isActive = conversation.id === activeId;

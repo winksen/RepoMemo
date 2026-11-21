@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.66 (2026-11-21)
+
+The chat's title as the heading, and the model in use.
+
+### Changed
+- **The chat's title is the heading.** On Cairn's page the open chat's title is the page heading, in the page-title face, in place of *CAIRN* (a new chat is headed *New chat*). A long title is cut with an ellipsis, and renaming the chat changes the heading at once.
+- **The chat options** button is at the right of the heading row. The thin row above the chat that held the title is gone.
+
+### Added
+- **The model in use.** Under the heading: *Model: <model> · <provider>* (or *No AI provider: file lookup and search only*). The chat options also have a *Model* row. The model is the one the workspace's text provider is set to use; a provider that names none shows *provider default*.
+- **API.** `GET /v1/workspaces/{id}/agent/capabilities` returns `model` next to `provider_name` (`null` when there is no provider). No migration or setting.
+
+### Checks
+- Typecheck, formatting and clippy (server, all targets) pass. The assertion added to the server test and the client tests were compiled but not executed; nothing was opened in a browser.
+
+### Upgrading
+- Nothing to do. With an older server the model line shows *provider default*.
+
 ## V0.8.65 (2026-11-21)
 
 A compact chat list, and options for the chat.
