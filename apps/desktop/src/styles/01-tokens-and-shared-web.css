@@ -202,6 +202,7 @@ input[type="file"] {
 .shared-home-frame { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 10px; min-height: 0; padding-top: 10px; }
 .shared-home-rail,
 .shared-home-content { background: var(--color-surface); border-radius: 12px; box-shadow: var(--shadow-block); }
+.shared-shell-slot { display: contents; }
 .shared-home-rail { display: flex; flex-direction: column; min-height: 0; padding: 18px 14px; overflow: hidden; }
 .shared-rail-navigation { margin-right: -14px; padding-right: 14px; display: grid; flex: 1; min-height: 0; align-content: start; gap: 18px; overflow-y: auto; scrollbar-width: thin; }
 .shared-rail-workspaces { display: grid; gap: 8px; }

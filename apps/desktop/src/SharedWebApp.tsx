@@ -20,7 +20,9 @@ import { ServerSetup, ServerSetupWaiting } from "./web/setup/ServerSetup";
 import { InvitePage } from "./components/InvitePage";
 import { PasswordResetPage } from "./components/PasswordResetPage";
 import { VerifyEmailPage } from "./components/VerifyEmailPage";
-import { SharedLayout, initialSharedTheme } from "./components/SharedLayout";
+import { SharedShell, initialSharedTheme } from "./components/SharedLayout";
+import { OrganizationRail } from "./web/Organization";
+import { pageKey } from "./web/pageTitle";
 import { type PageState } from "./web/constants";
 import { apiMessage } from "./web/format";
 import { currentLinkSecret, currentLocation, currentPathname, legacyRedirect, navigate, organizationPath, parseRoute, routePath, workspaceHomePath } from "./web/router";
@@ -382,7 +384,16 @@ function SharedWebAppContent() {
   return <>
     <PageAnnouncer accessToken={accessToken} route={route} workspaceName={workspace?.workspace.name} />
     {clientPlatform.nativeNotices ? <NoticeWatcher accessToken={accessToken} userId={session.user.id} workspaceIds={workspaces.map((entry) => entry.workspace.id)} /> : null}
-    {renderPage()}
+    <SharedShell
+      defaultOrganizationId={workspaceOrganization?.id ?? organizations[0]?.id}
+      onNavigate={navigate}
+      scrollKey={pageKey(route)}
+      session={session}
+      sidebar={<OrganizationRail organizations={organizations} workspaceId={routedWorkspaceId ?? undefined} workspaces={workspaces} />}
+      signOut={signOut}
+    >
+      {renderPage()}
+    </SharedShell>
     <CommandPalette accessToken={accessToken} userId={session.user.id} assistantWorkspaceId={route.name === "workspace" ? route.workspaceId : null} canAdministerSystem={Boolean(session.is_system_admin || session.is_app_admin)} currentWorkspaceId={workspace ? workspace.workspace.id : null} workspaces={workspaces} />
   </>;
 }

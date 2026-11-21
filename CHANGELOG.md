@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.25 (2026-11-21)
+
+Moving between pages no longer blinks.
+
+### Changed
+- **Only the page is redrawn.** The top bar and the sidebar stay mounted when you move between pages (dashboard, a workspace, its sections, an organization, notifications, profile, System), so they no longer flash and the sidebar keeps its folded state. Each page starts at the top.
+- **Opening a workspace** shows a small loader inside the page instead of replacing the whole screen while its first section is chosen.
+- Each page's own data is loaded as before; this release changes what is redrawn, not what is fetched.
+- No route, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; a new test checks that the bar and the rail are the same elements before and after a page change, and was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.24 (2026-11-21)
 
 Shorter addresses for workspaces and organizations.

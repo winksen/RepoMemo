@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   IconBell as Bell,
   IconBuildingCommunity as Building,
@@ -61,25 +61,26 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
   </IconButton>;
 }
 
-export function SharedLayout({
-  apiAvailable,
-  aside,
-  children,
-  session,
-  sidebar,
-  signOut,
-  onNavigate,
-  workspaceNavigation,
-}: {
-  apiAvailable: boolean | null;
-  /** A section docked on the right of the page content, below the workspace navigation. */
-  aside?: ReactNode;
-  children: ReactNode;
+/** The elements of the persistent shell that a page's parts are drawn into (see `SharedShell`). */
+interface ShellSlots { navigation: HTMLElement | null; content: HTMLElement | null; aside: HTMLElement | null }
+const ShellContext = createContext<ShellSlots | null>(null);
+
+/**
+ * The frame of every signed-in page: the top bar, the rail and the empty slots of the main area. It is the same
+ * for all of them, so `SharedWebApp` keeps ONE copy mounted while the page inside it changes, and moving from page
+ * to page redraws only the page, never the bar or the rail (V0.8.25).
+ */
+function LayoutFrame({ session, sidebar, signOut, onNavigate, defaultOrganizationId, navigation, aside, children, slots }: {
   session: SharedSession;
   sidebar: ReactNode;
   signOut: () => void;
   onNavigate: (to: string) => void;
-  workspaceNavigation?: ReactNode;
+  defaultOrganizationId?: string;
+  navigation?: ReactNode;
+  aside?: ReactNode;
+  children?: ReactNode;
+  /** Set in the persistent shell: the page's parts are drawn into these slots instead of being given here. */
+  slots?: { setNavigation: (element: HTMLElement | null) => void; setContent: (element: HTMLElement | null) => void; setAside: (element: HTMLElement | null) => void };
 }) {
   // On a narrow screen the rail folds away behind a button so the page starts at the top; wide screens always show it.
   const [railOpen, setRailOpen] = useState(false);
@@ -90,7 +91,7 @@ export function SharedLayout({
       <div className="shared-header-actions">
         <div className="shared-user-menu" aria-label="Account controls" role="group">
           <div className="shared-account-controls">
-            <CreateMenu canCreateOrganization={session.can_create_organizations !== false} />
+            <CreateMenu canCreateOrganization={session.can_create_organizations !== false} defaultOrganizationId={defaultOrganizationId} />
             <ThemeToggle />
             <Button aria-label="Open command palette" className="shared-palette-link" onClick={openCommandPalette} title="Command palette (Ctrl K)" type="button" variant="secondary"><Search size={ICON_SIZE.md} /></Button>
             <Button aria-label="Open notifications" className="shared-notifications-link" onClick={() => onNavigate("/notifications")} title="Notifications" type="button" variant="secondary"><Bell size={ICON_SIZE.md} /></Button>
@@ -106,14 +107,76 @@ export function SharedLayout({
         <div className="shared-rail-body" id="shared-rail-body">{sidebar}<AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><SessionNote /><DesktopServerNote signedIn /></div>
       </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
-        {workspaceNavigation}
+        {slots ? <div className="shared-shell-slot" ref={slots.setNavigation} /> : navigation}
         <div className="shared-layout-body">
-          <div className="shared-layout-content">{children}</div>
-          {aside}
+          {slots ? <div className="shared-layout-content" ref={slots.setContent} /> : <div className="shared-layout-content">{children}</div>}
+          {slots ? <div className="shared-shell-slot" ref={slots.setAside} /> : aside}
         </div>
       </main>
     </div>
   </div>;
+}
+
+/**
+ * Keeps the frame mounted across pages. The pages below it still render `SharedLayout`, which draws their parts
+ * into the frame's slots; the rail comes from here, so it does not blink while a page loads.
+ * `scrollKey` changes with the page: the content starts at the top again.
+ */
+export function SharedShell({ children, defaultOrganizationId, scrollKey, session, sidebar, signOut, onNavigate }: {
+  children: ReactNode;
+  defaultOrganizationId?: string;
+  scrollKey: string;
+  session: SharedSession;
+  sidebar: ReactNode;
+  signOut: () => void;
+  onNavigate: (to: string) => void;
+}) {
+  const [navigation, setNavigation] = useState<HTMLElement | null>(null);
+  const [content, setContent] = useState<HTMLElement | null>(null);
+  const [aside, setAside] = useState<HTMLElement | null>(null);
+  const slots = useMemo(() => ({ navigation, content, aside }), [navigation, content, aside]);
+  useEffect(() => { content?.scrollTo?.({ top: 0 }); }, [content, scrollKey]);
+  return <ShellContext.Provider value={slots}>
+    <LayoutFrame defaultOrganizationId={defaultOrganizationId} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut} slots={{ setNavigation, setContent, setAside }} />
+    {children}
+  </ShellContext.Provider>;
+}
+
+/** A page's frame. Inside the shell it draws the page's parts into the shell's slots; on its own (tests, pages outside the shell) it is the whole frame. */
+export function SharedLayout({
+  aside,
+  children,
+  session,
+  sidebar,
+  signOut,
+  onNavigate,
+  workspaceNavigation,
+}: {
+  /** Not used any more (the rail no longer reports the API); kept so existing callers need no change. */
+  apiAvailable?: boolean | null;
+  /** A section docked on the right of the page content, below the workspace navigation. */
+  aside?: ReactNode;
+  children: ReactNode;
+  session: SharedSession;
+  sidebar: ReactNode;
+  signOut: () => void;
+  onNavigate: (to: string) => void;
+  workspaceNavigation?: ReactNode;
+}) {
+  const slots = useContext(ShellContext);
+  if (!slots) return <LayoutFrame aside={aside} navigation={workspaceNavigation} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut}>{children}</LayoutFrame>;
+  return <>
+    {slots.navigation && workspaceNavigation ? createPortal(workspaceNavigation, slots.navigation) : null}
+    {slots.content ? createPortal(children, slots.content) : null}
+    {slots.aside && aside ? createPortal(aside, slots.aside) : null}
+  </>;
+}
+
+/** Draws `children` into the page area of the shell, for a page that has no frame props of its own (the workspace loader). */
+export function ShellContent({ children }: { children: ReactNode }) {
+  const slots = useContext(ShellContext);
+  if (!slots) return <>{children}</>;
+  return slots.content ? createPortal(children, slots.content) : null;
 }
 
 /** The bottom of the rail: every organization (everyone) and the System pages (administrators). Each is highlighted on its own pages. */

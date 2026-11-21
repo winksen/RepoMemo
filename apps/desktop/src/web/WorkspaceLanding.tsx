@@ -1,5 +1,7 @@
 import { useEffect } from "react";
-import { LoadingCanvas } from "./common";
+import { IconLoader2 as Loader } from "@tabler/icons-react";
+import { ShellContent } from "../components/SharedLayout";
+import { ICON_SIZE } from "../components/ui/icon";
 import { navigate, routePath } from "./router";
 import { landingSection } from "./templateSections";
 import { useTemplate } from "./workspace/data";
@@ -16,5 +18,6 @@ export function WorkspaceLanding({ accessToken, workspaceId }: { accessToken: st
   useEffect(() => {
     if (settled) navigate(routePath({ name: "workspace", workspaceId, section }), true);
   }, [section, settled, workspaceId]);
-  return <LoadingCanvas label="Opening the workspace" />;
+  // Drawn inside the frame that is already on screen, so opening a workspace does not replace the whole page.
+  return <ShellContent><div className="shared-loading" role="status"><Loader className="spin" size={ICON_SIZE.lg} /> Opening the workspace</div></ShellContent>;
 }
