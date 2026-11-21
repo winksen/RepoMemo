@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.22` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.23` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.23 — An Organizations page.
+
+- **Organizations** is a button at the bottom of the sidebar, above **System**, that opens `/orgs`: every organization with the account's role and workspace count, a **New organization** button (when the account may create one), and a click through to the organization's administration (`/workspaces?organization=…`). The button is highlighted on `/orgs` and on an organization's page.
+- The sidebar lists **workspaces only**, ten before **Show more**. `/orgs` is also in the command palette and in the desktop app's links.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.22 — A more readable sidebar.
 

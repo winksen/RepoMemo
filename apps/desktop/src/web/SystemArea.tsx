@@ -29,7 +29,7 @@ export default function SystemArea({
       onNavigate={navigate}
       session={session}
       signOut={signOut}
-      sidebar={<OrganizationRail organizations={organizations} showSelection={false} workspaces={workspaces} />}
+      sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}
       workspaceNavigation={<SystemNavigation active={section} onNavigate={(next) => navigate(`/system/${next}`)} />}
     >
       <SystemAdminPanel

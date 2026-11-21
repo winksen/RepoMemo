@@ -6,6 +6,7 @@ FIRST VIEWPORT: A calm explanatory field balances a focused access form; after a
 FORM: The established RepoMemo operate composition, adapted into a protected browser session with direct API-state feedback.
 */
 
+import { SharedOrganizations } from "./web/Organizations";
 import { forgetSignIn, rememberSignIn } from "./lib/signedIn";
 import { useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -119,7 +120,7 @@ function SharedWebAppContent() {
 
   useEffect(() => {
     function showSignIn() {
-      if (currentPathname() === "/" || currentPathname() === "/dashboard" || currentPathname().startsWith("/workspaces") || currentPathname().startsWith("/system")) {
+      if (currentPathname() === "/" || currentPathname() === "/dashboard" || currentPathname().startsWith("/workspaces") || currentPathname() === "/orgs" || currentPathname().startsWith("/system")) {
         navigate("/login", true);
       }
       setPageState("unauthenticated");
@@ -303,6 +304,9 @@ function SharedWebAppContent() {
     case "system":
       if (!(session.is_system_admin || session.is_app_admin)) return notFound("/dashboard");
       return <SystemArea accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} section={route.section} session={session} signOut={signOut} workspaces={workspaces} />;
+
+    case "orgs":
+      return <SharedOrganizations apiAvailable={apiAvailable} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;
 
     case "notifications":
       return <SharedNotifications accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;

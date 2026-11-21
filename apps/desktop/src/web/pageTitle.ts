@@ -15,6 +15,7 @@ export function pageTitle(route: Route, names: { workspace?: string; artifact?: 
   switch (route.name) {
     case "workspaces": return "Workspaces";
     case "dashboard": return "Dashboard";
+    case "orgs": return "Organizations";
     case "profile": return "Profile";
     case "notifications": return "Notifications";
     case "system": return `System · ${sectionLabel(route.section)}`;

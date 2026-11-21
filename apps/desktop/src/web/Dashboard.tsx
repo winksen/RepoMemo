@@ -167,7 +167,7 @@ export function SharedWorkspaceHome({
       onNavigate={navigate}
       session={session}
       signOut={signOut}
-      sidebar={<OrganizationRail organizations={organizations} organizationId={organizationId} workspaces={workspaces} />}
+      sidebar={<OrganizationRail organizations={organizations} workspaces={workspaces} />}
     >
         <div className="shared-page-content">
           <PageHeader actions={organizations.length && session.can_create_organizations !== false ? <Button onClick={organizationNavigation.startCreatingOrganization} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New organization</Button> : null} description={showOrganizationForm ? "Create a separate team boundary for its own shared workspaces and members." : "Workspaces are server-authoritative and available only to their members."} title={showOrganizationForm ? "Create an organization" : currentOrganization ? currentOrganization.name : "Set up your team"} />

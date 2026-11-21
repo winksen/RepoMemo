@@ -48,6 +48,7 @@ export function navigate(to: string, replace = false) {
 export type Route =
   | { name: "workspaces" }
   | { name: "dashboard" }
+  | { name: "orgs" }
   | { name: "profile" }
   | { name: "notifications" }
   | { name: "system"; section: SystemSection }
@@ -68,6 +69,7 @@ export function parseRoute(pathname: string): Route {
   if (parts.length === 0 || (parts.length === 1 && first === "workspaces")) return { name: "workspaces" };
   if (parts.length === 1) {
     if (first === "dashboard") return { name: "dashboard" };
+    if (first === "orgs") return { name: "orgs" };
     if (first === "profile") return { name: "profile" };
     if (first === "notifications") return { name: "notifications" };
     if (first === "system") return { name: "system", section: "overview" };
@@ -103,6 +105,7 @@ export function routePath(route: Exclude<Route, { name: "not-found" }>): string 
   switch (route.name) {
     case "workspaces": return "/workspaces";
     case "dashboard": return "/dashboard";
+    case "orgs": return "/orgs";
     case "profile": return "/profile";
     case "notifications": return "/notifications";
     case "system": return `/system/${route.section}`;

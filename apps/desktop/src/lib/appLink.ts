@@ -5,7 +5,7 @@
  */
 
 /** The first parts of the paths the client has pages under (its router's). */
-export const APP_AREAS = ["workspaces", "dashboard", "profile", "notifications", "system"] as const;
+export const APP_AREAS = ["workspaces", "dashboard", "orgs", "profile", "notifications", "system"] as const;
 const MAX_PATH_CHARS = 2048;
 
 // eslint-disable-next-line no-control-regex

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import {
   IconBell as Bell,
+  IconBuildingCommunity as Building,
   IconChevronDown as ChevronDown,
   IconSearch as Search,
   IconLogout as Logout,
@@ -102,7 +103,7 @@ export function SharedLayout({
     <div className="shared-home-frame">
       <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
         <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={ICON_SIZE.md} /></Button>
-        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{session.is_system_admin || session.is_app_admin ? <SystemRailEntry onNavigate={onNavigate} /> : null}<SessionNote /><DesktopServerNote signedIn /></div>
+        <div className="shared-rail-body" id="shared-rail-body">{sidebar}<AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><SessionNote /><DesktopServerNote signedIn /></div>
       </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {workspaceNavigation}
@@ -115,12 +116,14 @@ export function SharedLayout({
   </div>;
 }
 
-/** The System entry at the bottom of the rail, for system administrators. Highlighted on every System page. */
-function SystemRailEntry({ onNavigate }: { onNavigate: (to: string) => void }) {
-  const isActive = window.location.pathname === "/system" || window.location.pathname.startsWith("/system/");
-  return <section aria-label="System administration" className="shared-rail-system">
-    <p className="shared-eyebrow">Administration</p>
-    <Button aria-current={isActive ? "page" : undefined} className={`shared-rail-organization${isActive ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} title="Administer this server" type="button" variant="secondary"><Server size={ICON_SIZE.md} /><span>System</span></Button>
+/** The bottom of the rail: every organization (everyone) and the System pages (administrators). Each is highlighted on its own pages. */
+function AdministrationRail({ onNavigate, showSystem }: { onNavigate: (to: string) => void; showSystem: boolean }) {
+  const path = window.location.pathname;
+  const inOrganizations = path === "/orgs" || (path === "/workspaces" && new URLSearchParams(window.location.search).has("organization"));
+  const inSystem = path === "/system" || path.startsWith("/system/");
+  return <section aria-label="Administration" className="shared-rail-system">
+    <Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} title="Manage your organizations" type="button" variant="secondary"><Building size={ICON_SIZE.lg} /><span>Organizations</span></Button>
+    {showSystem ? <Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} title="Administer this server" type="button" variant="secondary"><Server size={ICON_SIZE.lg} /><span>System</span></Button> : null}
   </section>;
 }
 

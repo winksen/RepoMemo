@@ -6,6 +6,7 @@ describe("parseRoute", () => {
     expect(parseRoute("/")).toEqual({ name: "workspaces" });
     expect(parseRoute("/workspaces")).toEqual({ name: "workspaces" });
     expect(parseRoute("/dashboard")).toEqual({ name: "dashboard" });
+    expect(parseRoute("/orgs")).toEqual({ name: "orgs" });
     expect(parseRoute("/profile")).toEqual({ name: "profile" });
     expect(parseRoute("/notifications")).toEqual({ name: "notifications" });
   });

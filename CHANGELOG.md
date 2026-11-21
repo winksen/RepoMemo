@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.23 (2026-11-21)
+
+Organizations move to a page of their own, and the sidebar lists workspaces only.
+
+### Changed
+- **Organizations page.** An **Organizations** button above **System** at the bottom of the sidebar opens `/orgs`: every organization you belong to, with your role and its workspace count. Opening one shows its members, templates and workspaces as before, and **New organization** is on the page when your account may create one. The button is highlighted on `/orgs` and on an organization's page. `/orgs` is also in the command palette and in the desktop app's links.
+- **Workspaces only in the sidebar.** The organizations list is gone from the sidebar. The workspaces list shows ten rows before **Show more**.
+- No server route, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the rail and route tests were updated and not executed. The desktop app's link list (`deeplink.rs`) gained `orgs` and was not compiled.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.22 (2026-11-21)
 
 A more readable sidebar and a simpler foot.

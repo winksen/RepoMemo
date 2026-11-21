@@ -74,15 +74,15 @@ describe("arrangeSections", () => {
 it("lists workspaces in the rail, opens the chosen one and folds a long list behind Show more", () => {
   const navigation = { activeOrganizationId: null, isCreatingOrganization: false, isCreatingWorkspace: false, selectOrganization: vi.fn(), startCreatingOrganization: vi.fn(), cancelOrganizationCreation: vi.fn() };
   const named = (id: string, name: string) => ({ ...workspace("owner"), workspace: { ...workspace("owner").workspace, id, name } });
-  const many = [named("w1", "Alpha"), named("w2", "Research"), named("w3", "Three"), named("w4", "Four"), named("w5", "Five"), named("w6", "Six"), named("w7", "Seven")];
+  const many = [named("w1", "Alpha"), named("w2", "Research"), named("w3", "Three"), named("w4", "Four"), named("w5", "Five"), named("w6", "Six"), named("w7", "Seven"), named("w8", "Eight"), named("w9", "Nine"), named("w10", "Ten"), named("w11", "Eleven"), named("w12", "Twelve")];
   render(<OrganizationNavigationContext.Provider value={navigation}><OrganizationRail organizations={[] as Organization[]} workspaceId="w1" workspaces={many} /></OrganizationNavigationContext.Provider>);
   expect(screen.getByRole("button", { name: "Alpha" }).getAttribute("aria-current")).toBe("page");
-  expect(screen.queryByRole("button", { name: "Six" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Five" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Eleven" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Ten" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Research" }));
   expect(navigate).toHaveBeenCalledWith("/workspaces/w2");
   fireEvent.click(screen.getByRole("button", { name: "Show more (2)" }));
-  expect(screen.getByRole("button", { name: "Seven" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Twelve" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Show less" })).toBeTruthy();
   // The heading folds the whole list away and brings it back.
   const heading = screen.getByRole("button", { name: "Workspaces" });
