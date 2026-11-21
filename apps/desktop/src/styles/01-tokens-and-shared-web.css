@@ -215,9 +215,9 @@ input[type="file"] {
 .rm-button.shared-rail-workspace:hover:not(:disabled),
 .rm-button.shared-rail-organization:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-2); border-color: transparent; }
 .rm-button.shared-rail-workspace.active,
-.rm-button.shared-rail-organization.active { color: var(--color-surface); background: color-mix(in srgb, var(--color-text) 78%, var(--color-surface)); font-weight: 750; }
+.rm-button.shared-rail-organization.active { color: var(--color-text); background: var(--color-surface-3); font-weight: 750; }
 .rm-button.shared-rail-workspace.active:hover:not(:disabled),
-.rm-button.shared-rail-organization.active:hover:not(:disabled) { color: var(--color-surface); background: color-mix(in srgb, var(--color-text) 78%, var(--color-surface)); border-color: transparent; }
+.rm-button.shared-rail-organization.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); border-color: transparent; }
 .rm-button.shared-rail-more { justify-content: flex-start; width: 100%; min-width: 0; min-height: 30px; padding: 0 10px; color: var(--color-text-subtle); background: transparent; border: 0; font-size: 13px; font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
 .rm-button.shared-rail-more:hover:not(:disabled) { color: var(--color-text); background: transparent; border-color: transparent; }
 .shared-rail-empty { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.5; }
@@ -916,8 +916,8 @@ input[type="file"] {
 .rm-button.shared-rail-workspace .shared-rail-text { display: grid; flex: 1; gap: 2px; min-width: 0; }
 .rm-button.shared-rail-workspace .shared-rail-name { color: inherit; font-size: 14px; font-weight: 700; line-height: 1.3; }
 .rm-button.shared-rail-workspace .shared-rail-sub { color: var(--color-text-subtle); font-size: 12px; font-weight: 500; line-height: 1.3; }
-/* The current workspace is a contrasting grey (dark in the light theme, light in the dark one); its chip keeps the workspace's colour and its icon is always light on it. */
+/* The current item is one step off the hover fill: a level darker in the light theme, a level lighter in the dark one (--color-surface-3 against --color-surface-2). The workspace chip keeps its colour and its icon is always light on it. */
 .rm-button.shared-rail-workspace.active,
-.rm-button.shared-rail-workspace.active:hover:not(:disabled) { color: var(--color-surface); background: color-mix(in srgb, var(--color-text) 78%, var(--color-surface)); }
-.rm-button.shared-rail-workspace.active .shared-rail-sub { color: color-mix(in srgb, var(--color-surface) 75%, transparent); }
-.shared-home-rail .rm-button.shared-rail-workspace.active:focus-visible { outline-color: var(--color-surface); }
+.rm-button.shared-rail-workspace.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); }
+.rm-button.shared-rail-workspace.active .shared-rail-sub { color: var(--color-text-muted); }
+.shared-home-rail .rm-button.active:focus-visible { outline-color: var(--color-border-strong); }

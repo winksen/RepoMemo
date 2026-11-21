@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.43` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.44` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.44 — A subtler current item.
+
+- The current workspace, **Organizations** and **System** items in the sidebar are filled one level off the hover fill: a level **darker** than hover in the light theme and a level **lighter** than hover in the dark theme, with normal text, instead of the strong dark (or light) grey of V0.8.30 and V0.8.43. A workspace's chip keeps its color.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.43 — A sliding tab line and steadier sidebar icons.
 

@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.44 (2026-11-21)
+
+A subtler current item in the sidebar.
+
+### Changed
+- The current workspace, **Organizations** and **System** items are filled one level off the hover fill: a level darker than hover in the light theme, a level lighter than hover in the dark theme, with normal text. This replaces the strong contrasting grey of V0.8.30 and V0.8.43. The workspace chip keeps its color.
+- CSS only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.43 (2026-11-21)
 
 A sliding tab line and steadier sidebar icons.
