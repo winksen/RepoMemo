@@ -487,3 +487,60 @@ async fn an_organization_overview_counts_only_its_own_workspaces_and_is_for_its_
         .unwrap();
     assert_eq!(refused.status(), 403);
 }
+
+#[tokio::test]
+async fn a_workspace_colour_is_saved_for_administrators_and_only_as_a_slug() {
+    let data_dir = temp_data_dir("workspace-colour");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "colour-first@example.com").await;
+    let (owner, _) = register_account(&app, "colour-owner@example.com").await;
+    let (stranger, _) = register_account(&app, "colour-stranger@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    let colour_uri = format!("/v1/workspaces/{workspace_id}/color");
+    let settings = |app: axum::Router, who: String| async move {
+        response_json(app.oneshot(auth_request("GET", "/v1/workspaces", &who)).await.unwrap()).await[0]["workspace"]
+            ["settings"]["color"]
+            .clone()
+    };
+
+    let saved = app
+        .clone()
+        .oneshot(json_request("PUT", &colour_uri, &owner, json!({"color": "teal"})))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), 200);
+    assert_eq!(response_json(saved).await["color"], "teal");
+    assert_eq!(settings(app.clone(), owner.clone()).await, "teal");
+
+    let refused = app
+        .clone()
+        .oneshot(json_request(
+            "PUT",
+            &colour_uri,
+            &owner,
+            json!({"color": "Not A Slug!"}),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), 400);
+    assert_eq!(
+        settings(app.clone(), owner.clone()).await,
+        "teal",
+        "a refused colour changes nothing"
+    );
+
+    let outsider = app
+        .clone()
+        .oneshot(json_request("PUT", &colour_uri, &stranger, json!({"color": "red"})))
+        .await
+        .unwrap();
+    assert_eq!(outsider.status(), 403);
+
+    let reset = app
+        .clone()
+        .oneshot(json_request("PUT", &colour_uri, &owner, json!({"color": null})))
+        .await
+        .unwrap();
+    assert_eq!(reset.status(), 200);
+    assert!(settings(app, owner).await.is_null());
+}

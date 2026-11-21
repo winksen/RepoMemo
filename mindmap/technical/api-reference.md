@@ -160,6 +160,7 @@
 | PUT | `/v1/workspaces/{workspace_id}` | managing | require_workspace_owner | UpdateWorkspaceRequest | Workspace |
 | DELETE | `/v1/workspaces/{workspace_id}` | managing | require_workspace_owner | — | status |
 | PUT | `/v1/workspaces/{workspace_id}/icon` | managing | require_workspace_admin | UpdateWorkspaceIconRequest | WorkspaceIconResponse |
+| PUT | `/v1/workspaces/{workspace_id}/color` | managing | require_workspace_admin | UpdateWorkspaceColorRequest | WorkspaceColorResponse |
 | GET | `/v1/templates` | auth | — | — | Vec<TemplateSummary> |
 | GET | `/v1/templates/{template_id}` | auth | — | — | TemplateDetail |
 | GET | `/v1/organizations/{organization_id}/templates` | auth | require_organization_read | — | Vec<OrganizationTemplateView> |

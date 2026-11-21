@@ -340,6 +340,59 @@ pub(crate) async fn update_workspace_icon(
     Ok(Json(WorkspaceIconResponse { icon }))
 }
 
+/// Key of the workspace colour in the workspace settings object.
+const COLOR_SETTING: &str = "color";
+
+#[derive(Debug, serde::Serialize)]
+pub(crate) struct WorkspaceColorResponse {
+    color: Option<String>,
+}
+
+/// Chooses the main colour of the workspace, applied to its highlights. Administrators and owners may change it. Like
+/// the icon, the client owns the set of colours: the server only checks that the key is a short slug, and a key the
+/// client does not know shows the default colour.
+pub(crate) async fn update_workspace_color(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<UpdateWorkspaceColorRequest>,
+) -> Result<Json<WorkspaceColorResponse>, ApiError> {
+    require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let color = request
+        .color
+        .map(|color| color.trim().to_owned())
+        .filter(|color| !color.is_empty());
+    if let Some(color) = &color {
+        let is_slug = color.len() <= MAX_ICON_KEY_LENGTH
+            && color
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+        if !is_slug {
+            return Err(ApiError::bad_request("That workspace colour is not valid."));
+        }
+    }
+    state
+        .storage
+        .set_workspace_setting(&workspace_id, COLOR_SETTING, serde_json::json!(color))
+        .await
+        .map_err(map_storage_error)?;
+    record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "workspace_color_updated",
+        "workspace",
+        Some(&workspace_id),
+        if color.is_some() {
+            "Changed the workspace colour.".to_owned()
+        } else {
+            "Reset the workspace colour to the default.".to_owned()
+        },
+    )
+    .await;
+    Ok(Json(WorkspaceColorResponse { color }))
+}
+
 pub(crate) async fn delete_workspace(
     ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,

@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.38` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.39` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.39 — A main color for each workspace.
+
+- The workspace **Settings** have a **Customization** section (owners and administrators) with the **icon** and a new **main color**: Default (the app's indigo) and eight colors (blue, teal, green, orange, red, pink, purple, slate). A choice is saved at once and everyone who opens the workspace sees it.
+- The color applies to the workspace's own pages (its tabs and the page under them, including evidence and memory card pages): the highlighted tab, buttons, links and focus rings. The sidebar and the top bar keep the app's colors.
+- Each color has **two shades**: a darker one used in the light theme (white text on it) and a lighter one used in the dark theme (dark text on it), so it keeps its contrast in both; switching theme switches shade.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.38 — A calmer unreachable-server page.
 

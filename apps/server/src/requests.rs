@@ -69,6 +69,13 @@ pub(crate) struct UpdateWorkspaceRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub(crate) struct UpdateWorkspaceColorRequest {
+    /// The colour's key, or none to go back to the default colour.
+    #[serde(default)]
+    pub(crate) color: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct UpdateWorkspaceIconRequest {
     /// The icon's key, or none to go back to the default icon.
     #[serde(default)]

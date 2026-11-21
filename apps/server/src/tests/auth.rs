@@ -1310,6 +1310,11 @@ async fn the_routes_that_grant_access_or_remove_things_need_a_session_or_an_admi
         ),
         (
             "PUT",
+            format!("/v1/workspaces/{workspace}/color"),
+            json!({"color": "teal"}),
+        ),
+        (
+            "PUT",
             format!("/v1/workspaces/{workspace}/template"),
             json!({"template_id": "general"}),
         ),

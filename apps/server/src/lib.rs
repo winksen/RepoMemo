@@ -819,6 +819,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             put(update_workspace).delete(delete_workspace),
         )
         .route("/v1/workspaces/{workspace_id}/icon", put(update_workspace_icon))
+        .route("/v1/workspaces/{workspace_id}/color", put(update_workspace_color))
         .route(
             "/v1/organizations/{organization_id}/templates",
             get(organization_templates::list_organization_templates)

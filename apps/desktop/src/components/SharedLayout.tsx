@@ -1,5 +1,6 @@
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { applyWorkspaceColor } from "../web/workspaceColors";
 import {
   IconBell as Bell,
   IconBuildingCommunity as Building,
@@ -145,6 +146,7 @@ export function SharedShell({ children, defaultOrganizationId, scrollKey, sessio
 
 /** A page's frame. Inside the shell it draws the page's parts into the shell's slots; on its own (tests, pages outside the shell) it is the whole frame. */
 export function SharedLayout({
+  accent = null,
   aside,
   children,
   session,
@@ -153,6 +155,8 @@ export function SharedLayout({
   onNavigate,
   workspaceNavigation,
 }: {
+  /** The workspace colour (`workspaceColorKey`): the tabs and the page take it as their highlight. The rail and the bar keep the app's own. */
+  accent?: string | null;
   /** Not used any more (the rail no longer reports the API); kept so existing callers need no change. */
   apiAvailable?: boolean | null;
   /** A section docked on the right of the page content, below the workspace navigation. */
@@ -165,6 +169,12 @@ export function SharedLayout({
   workspaceNavigation?: ReactNode;
 }) {
   const slots = useContext(ShellContext);
+  useLayoutEffect(() => {
+    if (!slots) return;
+    const parts = [slots.navigation, slots.content, slots.aside];
+    for (const part of parts) applyWorkspaceColor(part, accent);
+    return () => { for (const part of parts) applyWorkspaceColor(part, null); };
+  }, [slots, accent]);
   if (!slots) return <LayoutFrame aside={aside} navigation={workspaceNavigation} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut}>{children}</LayoutFrame>;
   return <>
     {slots.navigation && workspaceNavigation ? createPortal(workspaceNavigation, slots.navigation) : null}

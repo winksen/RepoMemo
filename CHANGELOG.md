@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.39 (2026-11-21)
+
+A main color for each workspace.
+
+### Added
+- **Customization.** The workspace **Settings** (owners and administrators) have a **Customization** section with the workspace **icon** and a new **main color**: *Default* (the app's indigo) or one of eight colors (blue, teal, green, orange, red, pink, purple, slate). A choice is saved at once.
+- **Where it shows.** On the workspace's own pages, for everyone who opens them: the highlighted tab, buttons, links, soft backgrounds and focus rings, including the evidence and memory card pages. The sidebar, the top bar, menus and dialogs keep the app's colors.
+- **Two shades for two themes.** Each color has a darker shade for the light theme (white text on it) and a lighter shade for the dark theme (dark text on it), so it stays readable in both. Switching theme switches shade. The shades meet 4.5:1 contrast for their text and against the page, which a test checks.
+- **API.** `PUT /v1/workspaces/{workspace_id}/color` with `{"color": "teal"}`, or `null` for the default; owners and administrators only. The server accepts a short lowercase key and refuses anything else with `400`; the app ignores a key it does not know. A change is recorded in the workspace activity.
+
+### Changed
+- The icon picker moved into the Customization section; it works as before.
+- No migration.
+
+### Checks
+- Formatting and clippy (server, all targets) pass. **The new server test and the client tests were compiled but not executed**; nothing was opened in a browser, so how the colors look was not seen.
+
+### Upgrading
+- Nothing to do. An older server answers the color request with an error and the app says the color could not be saved.
+
 ## V0.8.38 (2026-11-21)
 
 A calmer page for an unreachable server.

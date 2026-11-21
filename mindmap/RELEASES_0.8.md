@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.38` (2026-11-21)
+> **Current:** `V0.8.39` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -58,6 +58,7 @@
 | **V0.8.36** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Tab bars and cards | Remove the location label in front of the workspace and organization tabs, and give the organization cards the same border thickness as buttons | The tab bars start with their first tab, and a card's border is as thick as a button's |
 | **V0.8.37** | 🧪 2026-11-21 | AM. Interface enhancements | 🐞 | Server unreachable | Show a generic error page, not the sign-in page, when the server cannot be reached | When the server does not answer, the app says it cannot connect right now and offers Try again, and the sign-in page is not shown |
 | **V0.8.38** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Server unreachable | Lay the unreachable-server page out as one centred section with the logo and an illustration, and remove the repeated wording | One centred card: logo, a broken-connection drawing, one heading, one sentence and Try again |
+| **V0.8.39** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Workspace customization | Let a workspace choose a main color, from a few colors with a darker shade for the light theme and a lighter one for the dark theme, in a Customization section of its settings next to the icon, and apply it to the workspace's tabs and highlights | Administrators pick a color that every member sees on the workspace's tabs, buttons and highlights, readable in both themes |
 
 ## Verification and handoff
 

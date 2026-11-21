@@ -872,3 +872,33 @@ input[type="file"] {
 .shared-unreachable-card h1 { margin: 0; color: var(--color-text); font-size: 24px; letter-spacing: -0.02em; line-height: 1.25; }
 .shared-unreachable-card p { margin: 0; color: var(--color-text-muted); font-size: 15px; line-height: 1.6; }
 .shared-unreachable-card .rm-button { margin-top: 10px; min-width: 140px; }
+
+/* A workspace's main colour (V0.8.39): both variants are set on the page parts as custom properties by `applyWorkspaceColor`,
+   and the one of the current theme becomes the accent there, so tabs, buttons and highlights follow it. */
+[data-workspace-color] {
+  --color-accent: var(--ws-light-accent);
+  --color-accent-hover: var(--ws-light-hover);
+  --color-accent-soft: var(--ws-light-soft);
+  --color-accent-text: var(--ws-light-text);
+  --color-on-accent: var(--ws-light-on);
+  --color-focus: var(--ws-light-accent);
+}
+:root[data-theme="dark"] [data-workspace-color] {
+  --color-accent: var(--ws-dark-accent);
+  --color-accent-hover: var(--ws-dark-hover);
+  --color-accent-soft: var(--ws-dark-soft);
+  --color-accent-text: var(--ws-dark-text);
+  --color-on-accent: var(--ws-dark-on);
+  --color-focus: var(--ws-dark-accent);
+}
+.shared-customization-block { display: grid; gap: 8px; }
+.shared-customization-block > strong { font-size: 13px; }
+.shared-customization-block > .shared-muted-copy { max-width: 72ch; margin: -4px 0 0; }
+.shared-color-picker { display: flex; flex-wrap: wrap; gap: 10px; max-width: 560px; }
+.shared-color-swatch { display: grid; width: 36px; height: 36px; padding: 0; place-items: center; color: var(--swatch-on-light); background: var(--swatch-light); border: var(--control-border) solid var(--color-border); border-radius: 50%; cursor: pointer; transition: border-color 110ms var(--ease-control), transform 110ms var(--ease-control); }
+:root[data-theme="dark"] .shared-color-swatch { color: var(--swatch-on-dark); background: var(--swatch-dark); }
+.shared-color-swatch[data-default="true"] { color: var(--color-text); background: linear-gradient(135deg, var(--color-surface) 50%, var(--color-accent) 50%); }
+.shared-color-swatch:hover:not(:disabled) { transform: scale(1.08); }
+.shared-color-swatch[aria-pressed="true"] { border-color: var(--color-text); }
+.shared-color-swatch:disabled { cursor: wait; opacity: 0.58; }
+.shared-color-swatch:focus-visible { outline: 2px solid var(--color-border-strong); outline-offset: 2px; }

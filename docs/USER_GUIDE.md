@@ -92,6 +92,7 @@ An invitation link works once, only for your email address, for 7 days.
 ### Move around fast
 
 - **Ctrl K** (or **⌘ K**) opens the **command palette**: jump to any workspace, section, file or memory card, or hand your text to the assistant. It remembers the last places you opened from it and lists them when you open it, and **New note** starts a note in the workspace you are in.
+- Workspace owners and administrators can give a workspace its own **icon** and **main color** in *Settings › Customization*; the color shows on the workspace's tabs and highlights for everyone.
 - The left rail lists your **workspaces** (ten, then **Show more**; click the heading to fold the list). **Organizations**, above **System** at the bottom of the rail, opens the page that lists every organization you belong to (`/orgs`). The **+** button in the top bar creates a **new workspace** or a **new organization**.
 - Everything works from the keyboard, in light and dark themes, down to phone width.
 
