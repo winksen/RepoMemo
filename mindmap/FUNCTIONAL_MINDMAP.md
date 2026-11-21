@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.63` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.64` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.64 — CAIRN's button and the search bar, in the same style.
+
+- The small menu button beside CAIRN has **no tooltip** (it keeps its name for screen readers).
+- Hovering **either part** of the CAIRN control colors the whole of it, including the line between the button and its menu, which did not react before.
+- The **search bar** is transparent with a grey border, like the other controls in the bar, and its border takes the accent color on hover.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.63 — A top bar in three parts, equal sidebars.
 

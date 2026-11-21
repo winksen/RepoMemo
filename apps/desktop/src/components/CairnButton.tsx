@@ -7,7 +7,6 @@ import { parseRoute } from "../web/router";
 import { CairnIcon } from "./CairnIcon";
 import { Button } from "./ui/button";
 import { ICON_SIZE } from "./ui/icon";
-import { IconButton } from "./ui/icon-button";
 
 /**
  * CAIRN in the top bar: a button with its name that opens its page, and a menu beside it for the quick ways in (a quick question
@@ -26,7 +25,7 @@ export function CairnButton({ onNavigate }: { onNavigate: (to: string) => void }
       </Button>
       <MenuPrimitive.Root>
         <MenuPrimitive.Trigger asChild>
-          <IconButton className="shared-cairn-caret" label={`Quick ways to use ${ASSISTANT_NAME}`} size="sm"><CaretDown size={ICON_SIZE.sm} /></IconButton>
+          <Button aria-label={`Quick ways to use ${ASSISTANT_NAME}`} className="shared-cairn-caret" type="button" variant="secondary"><CaretDown size={ICON_SIZE.sm} /></Button>
         </MenuPrimitive.Trigger>
         <MenuPrimitive.Portal>
           <MenuPrimitive.Content align="end" aria-label={`Quick ways to use ${ASSISTANT_NAME}`} className="rm-action-menu" sideOffset={6}>

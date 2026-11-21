@@ -1079,3 +1079,10 @@ input[type="file"] {
   .shared-search-bar-text, .shared-search-bar kbd { display: none; }
   .shared-search-bar { width: 36px; justify-self: center; justify-content: center; padding: 0; }
 }
+
+/* CAIRN's button and menu act as one control on hover, and the search bar is drawn like the other controls: transparent with a grey border (V0.8.64). */
+.shared-home-header .shared-account-controls .shared-cairn-caret { border-left-width: 2px; }
+.shared-home-header .shared-cairn-split:hover .shared-cairn-main,
+.shared-home-header .shared-cairn-split:hover .shared-cairn-caret { border-color: var(--color-accent); }
+.shared-search-bar { background: transparent; border: 2px solid var(--color-border); border-radius: 8px; transition: border-color 110ms var(--ease-control); }
+.shared-search-bar:hover { background: transparent; border-color: var(--color-accent); }

@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.63` (2026-11-21)
+> **Current:** `V0.8.64` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -83,6 +83,7 @@
 | **V0.8.61** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | Top bar: CAIRN button, notifications dropdown | Make CAIRN a button with its name and a menu of quick ways in (a quick-question dialog), show notifications in a dropdown from the bell, shrink the logo, and remove the assistant dock from workspace pages | The top bar has a CAIRN button with a menu, the bell opens a dropdown of notifications, the logo is smaller, and workspace pages have no side dock |
 | **V0.8.62** | 🧪 2026-11-21 | AM. Interface enhancements | ✨ | User menu | Move the person's controls to a user menu at the foot of the sidebar, in place of the session note, with a dropdown to the right (profile, settings, log out), and give every top bar control the same height | The sidebar ends with the person's name and a menu, the top bar has no Profile or Sign out button, and its controls line up |
 | **V0.8.63** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Top bar layout and sidebar width | Lay the top bar out as the logo, a search bar in the middle and the controls on the right with CAIRN last, make every control the same height, make both sidebars 288 px wide, and make the workspace chips smaller | The search is a bar, CAIRN is the rightmost control with notifications, theme and create to its left, the controls line up, and the sidebars are the same width |
+| **V0.8.64** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | CAIRN button and search bar styling | Remove the tooltip from CAIRN's menu button, make CAIRN's two parts react together on hover including the line between them, and draw the search bar transparent with a grey border like the other controls | The menu button has no tooltip, hovering either part colors the whole control, and the search bar matches the other controls |
 
 ## Verification and handoff
 
