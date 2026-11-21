@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.0` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.1` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.1 — CAIRN answers greetings and "what can you do" itself.
+
+- **Chatter.** Greetings in several languages, *who are you*, *what can you do*, *help*, *how are you*, *thanks* and *bye* get CAIRN's own reply at once: the greeting is returned in kind, and the reply lists CAIRN's jobs with something to type for each.
+- It needs no AI provider and no search, and it does not fall into Ask any more. A message that says more than the phrase (*who are you looking for in the logs*) is still a request.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.0 — CAIRN knows who it is.
 

@@ -13,6 +13,9 @@ use serde_json::{json, Value};
 
 use crate::RepoMemoCore;
 
+mod chatter;
+use chatter::{chatter_reply, recognise_chatter, ChatterContext};
+
 const MAX_MESSAGE_CHARS: usize = 2_000;
 const FILE_RESULT_LIMIT: usize = 20;
 const FILE_CHOICE_LIMIT: usize = 8;
@@ -292,6 +295,15 @@ impl RepoMemoCore {
         } else {
             None
         };
+        // A greeting, "who are you" or "what can you do" is answered by CAIRN itself, with no AI and no search (V0.9.1).
+        if request.capability.is_none() && request.artifact_id.is_none() {
+            if let Some(chatter) = recognise_chatter(message) {
+                let context = ChatterContext {
+                    ai_available: request.provider_id.is_some(),
+                };
+                return Ok(chatter_reply(chatter, &context));
+            }
+        }
         let mut request = request;
         let mut warnings = Vec::new();
         // The phrases the workspace's template adds after the router's own rules (V0.2.185).

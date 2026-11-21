@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.0` (2026-11-21)
+> **Current:** `V0.9.1` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -22,6 +22,7 @@
 | Release | Status | Track | Type | Area | What changes | Done when |
 |---|---|---|---|---|---|---|
 | **V0.9.0** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | CAIRN identity | Open every prompt CAIRN's AI writes from (Ask, file summary, workspace overview) with who CAIRN is and the jobs it can do, read from the capability list | The prompts name CAIRN and list its jobs, the Ask rules are unchanged, and a test checks the persona against the capability list |
+| **V0.9.1** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Greetings and self-description | Recognise greetings, "who are you", "what can you do", thanks and goodbyes by whole phrases and answer them from CAIRN's own description, with no AI and no search | "Salam" and "what can you do" get CAIRN's own reply with its jobs and examples, with or without a provider, and requests that merely contain those words are still routed |
 | **V0.9.9** | 🔜 | AM. Public readiness | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
 | **V0.9.10** | 🔜 | AM. Public readiness | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
 | **V0.9.11** | 🔜 | AM. Public readiness | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |

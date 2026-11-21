@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.1 (2026-11-21)
+
+CAIRN answers greetings and "what can you do" itself.
+
+### Changed
+- **Chatter is answered by CAIRN.** A greeting (*Salam*, *hello*, *bonjour*, *hola*, *good morning*, ...), *who are you*, *what can you do*, *help*, *how are you*, *thanks* and *bye* are recognised as whole phrases and answered at once from CAIRN's own description. They no longer fall into Ask, where the model looked for the answer in the indexed files and said the context was insufficient, and they no longer get *I can't help with that yet*.
+- **No AI and no search.** These replies work without a provider and send nothing anywhere. A greeting is answered with the same greeting (*Salam! I'm CAIRN ...*).
+- **What it can do, with examples.** The reply lists each job, read from the capability list, with something to type for it (*find the file about login*, *where is parse_config defined*, ...). Jobs that need AI say so when no provider is enabled.
+- **Only whole phrases.** A message that says more than a listed phrase is left to the router, so *who are you looking for in the logs* and *help me find the login file* still work as requests.
+- No API, setting or migration changes.
+
+### Checks
+- Unit tests for the phrases and the replies; compiled and linted, not run. Nothing was built into the app or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.0 (2026-11-21)
 
 CAIRN knows who it is.
