@@ -667,6 +667,11 @@ export interface DashboardWorkspaceFigures {
   template: DashboardTemplate | null;
 }
 
+/** The figures of an organization's Overview tab. */
+export function getSharedOrganizationOverview(accessToken: string, organizationId: string): Promise<import("../types").OrganizationOverview> {
+  return request<import("../types").OrganizationOverview>(`/v1/organizations/${organizationId}/overview`, {}, accessToken);
+}
+
 export function getSharedDashboard(accessToken: string): Promise<{ workspaces: DashboardWorkspaceFigures[] }> {
   return request<{ workspaces: DashboardWorkspaceFigures[] }>("/v1/dashboard", {}, accessToken);
 }

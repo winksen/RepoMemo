@@ -797,6 +797,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/organizations", get(list_organizations).post(create_organization))
         .route("/v1/organizations/{organization_id}", put(update_organization))
         .route(
+            "/v1/organizations/{organization_id}/overview",
+            get(organization_overview),
+        )
+        .route(
             "/v1/organizations/{organization_id}/members",
             get(list_organization_members).put(upsert_organization_member),
         )

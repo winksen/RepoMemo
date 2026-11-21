@@ -142,6 +142,7 @@
 | GET | `/v1/organizations` | auth | — | — | Vec<Organization |
 | POST | `/v1/organizations` | auth | — | CreateOrganizationRequest | Organization |
 | PUT | `/v1/organizations/{organization_id}` | managing | require_organization_owner | UpdateOrganizationRequest | Organization |
+| GET | `/v1/organizations/{organization_id}/overview` | auth | require_organization_read | — | OrganizationOverviewResponse |
 | GET | `/v1/organizations/{organization_id}/members` | auth | require_organization_read | — | Vec<OrganizationMember |
 | PUT | `/v1/organizations/{organization_id}/members` | managing | require_organization_admin | UpsertOrganizationMemberRequest | OrganizationMember |
 | GET | `/v1/organizations/{organization_id}/invitations` | auth | require_organization_admin | — | Vec<Invitation |

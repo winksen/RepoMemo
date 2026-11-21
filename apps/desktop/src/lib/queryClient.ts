@@ -72,6 +72,7 @@ export const serverKeys = {
 /** Cache keys of what belongs to the signed-in person, not to a workspace. The cache is cleared when the session ends. */
 export const accountKeys = {
   dashboard: (workspaceIds: string) => ["dashboard", workspaceIds] as const,
+  organizationOverview: (organizationId: string) => ["account", "organization-overview", organizationId] as const,
   profile: (userId: string) => ["account", userId, "profile"] as const,
   profileTasks: (userId: string) => ["account", userId, "profile-tasks"] as const,
   myWork: (userId: string) => ["account", userId, "my-work"] as const,

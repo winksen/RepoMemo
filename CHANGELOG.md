@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.35 (2026-11-21)
+
+A tab bar on an organization's page, starting with an Overview.
+
+### Added
+- **Organization tabs.** **Overview** at `/orgs/<id>`, **Workspaces** at `/orgs/<id>/workspaces` (the list and the archive import) and **Administration** at `/orgs/<id>/administration` (name, members, templates and invitations; for owners and administrators, anyone else is shown the Overview).
+- **Overview.** Five totals (workspaces, people, evidence, memory cards, active tasks), bar charts of how evidence, memory and open tasks divide between the workspaces, a 30-day activity chart and activity by workspace, and a table with a row for each workspace that opens it.
+- **API.** `GET /v1/organizations/{organization_id}/overview` returns those figures in one request. Any member of the organization may read it. It counts only the workspaces the caller can open, and reports activity only for workspaces the caller owns or administers (`activity_count` is `null` for the others, and `activity_by_day` is empty when there are none). Someone outside the organization is refused with `403`.
+
+### Changed
+- The organization page's header and bottom note follow the tab: the note about the JWT-protected API shows on Workspaces only.
+- No migration and no setting.
+
+### Checks
+- Formatting and clippy (server, all targets) pass. **The new server test and the client tests were compiled but not executed**, and nothing was started or opened in a browser.
+
+### Upgrading
+- Nothing to do. The Overview needs this server version; an older server answers the new request with an error and the tab says it could not be loaded.
+
 ## V0.8.34 (2026-11-21)
 
 Aligned organization cards and side tooltips.

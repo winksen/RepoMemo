@@ -313,6 +313,33 @@ pub(crate) struct WorkspaceActivityCalendarResponse {
     pub(crate) activity_by_day: Vec<WorkspaceMetricBreakdown>,
 }
 
+/// The figures of an organization's Overview tab, for the workspaces of it the caller can open.
+#[derive(Debug, Serialize)]
+pub(crate) struct OrganizationOverviewResponse {
+    pub(crate) organization_id: String,
+    pub(crate) member_count: i64,
+    pub(crate) workspace_count: i64,
+    pub(crate) artifact_count: i64,
+    pub(crate) memory_card_count: i64,
+    /// Tasks that are open or in progress.
+    pub(crate) active_task_count: i64,
+    /// Events a day for the last 30 days, oldest first, summed over the workspaces the caller administers (empty
+    /// when the caller administers none: activity is for administrators, as the workspace's own calendar is).
+    pub(crate) activity_by_day: Vec<WorkspaceMetricBreakdown>,
+    pub(crate) workspaces: Vec<OrganizationOverviewWorkspace>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct OrganizationOverviewWorkspace {
+    pub(crate) workspace_id: String,
+    pub(crate) name: String,
+    pub(crate) artifact_count: i64,
+    pub(crate) memory_card_count: i64,
+    pub(crate) active_task_count: i64,
+    /// Events in the last 30 days; `null` when the caller does not administer the workspace.
+    pub(crate) activity_count: Option<i64>,
+}
+
 /// The dashboard's figures, one entry per workspace the caller can open.
 #[derive(Debug, Serialize)]
 pub(crate) struct DashboardResponse {

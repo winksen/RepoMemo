@@ -5,8 +5,11 @@ describe("parseRoute", () => {
   it("names the pages", () => {
     expect(parseRoute("/")).toEqual({ name: "dashboard" });
     expect(parseRoute("/spaces")).toEqual({ name: "dashboard" });
-    expect(parseRoute("/orgs/o1")).toEqual({ name: "organization", organizationId: "o1" });
+    expect(parseRoute("/orgs/o1")).toEqual({ name: "organization", organizationId: "o1", section: "overview" });
+    expect(parseRoute("/orgs/o1/workspaces")).toEqual({ name: "organization", organizationId: "o1", section: "workspaces" });
+    expect(parseRoute("/orgs/o1/administration")).toEqual({ name: "organization", organizationId: "o1", section: "administration" });
     expect(parseRoute("/orgs/new")).toEqual({ name: "new-organization" });
+    expect(parseRoute("/orgs/new/workspaces")).toEqual({ name: "not-found", workspaceId: null });
     expect(parseRoute("/orgs/o1/x")).toEqual({ name: "not-found", workspaceId: null });
     expect(parseRoute("/dashboard")).toEqual({ name: "dashboard" });
     expect(parseRoute("/orgs")).toEqual({ name: "orgs" });
@@ -36,7 +39,7 @@ describe("parseRoute", () => {
   });
 
   it("is the inverse of routePath", () => {
-    for (const path of ["/orgs", "/orgs/o1", "/orgs/new", "/dashboard", "/system/audit", "/spaces/w%201/tasks", "/spaces/w1/artifacts/a%2F1", "/spaces/w1/memory-cards/c1"]) {
+    for (const path of ["/orgs", "/orgs/o1", "/orgs/o1/workspaces", "/orgs/o1/administration", "/orgs/new", "/dashboard", "/system/audit", "/spaces/w%201/tasks", "/spaces/w1/artifacts/a%2F1", "/spaces/w1/memory-cards/c1"]) {
       const route = parseRoute(path);
       if (route.name === "not-found") throw new Error(path);
       expect(routePath(route)).toBe(path);

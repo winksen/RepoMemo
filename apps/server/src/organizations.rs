@@ -35,6 +35,103 @@ pub(crate) async fn list_organizations(
     organizations.map(Json).map_err(ApiError::internal)
 }
 
+/// The Overview tab of an organization: totals, one row for each workspace of it the caller can open, and its recent
+/// activity. Every member may read it; it counts only the workspaces the caller can open, and activity only where the
+/// caller administers the workspace.
+pub(crate) async fn organization_overview(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(organization_id): Path<String>,
+) -> Result<Json<OrganizationOverviewResponse>, ApiError> {
+    require_organization_read(&state, &subject, &organization_id).await?;
+    consume_heavy_quota(&state, &subject)?;
+    let started = std::time::Instant::now();
+    let listed = if subject.is_system_admin {
+        state
+            .storage
+            .list_shared_workspaces_for_system_admin(&subject.user_id)
+            .await
+    } else {
+        state.storage.list_shared_workspaces_for_user(&subject.user_id).await
+    }
+    .map_err(ApiError::internal)?;
+    let workspaces: Vec<_> = listed
+        .into_iter()
+        .filter(|entry| entry.organization_id == organization_id && subject.token_reaches(&entry.workspace.id))
+        .collect();
+    let ids = workspaces
+        .iter()
+        .map(|entry| entry.workspace.id.clone())
+        .collect::<Vec<_>>();
+    let counts = state
+        .storage
+        .dashboard_counts(&ids)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .map(|counts| (counts.workspace_id.clone(), counts))
+        .collect::<std::collections::HashMap<_, _>>();
+    let member_count = state
+        .storage
+        .list_organization_members(&organization_id)
+        .await
+        .map_err(ApiError::internal)?
+        .len() as i64;
+
+    let today = Utc::now().date_naive();
+    let mut activity_by_day = (0..30)
+        .rev()
+        .map(|offset| ((today - ChronoDuration::days(offset)).to_string(), 0))
+        .collect::<BTreeMap<_, _>>();
+    let since = (Utc::now() - ChronoDuration::days(29)).to_rfc3339();
+    let mut administers_any = false;
+    let mut rows = Vec::with_capacity(workspaces.len());
+    for entry in &workspaces {
+        let counts = counts.get(&entry.workspace.id);
+        let administers = subject.is_system_admin || matches!(entry.role, WorkspaceRole::Owner | WorkspaceRole::Admin);
+        let mut activity_count = None;
+        if administers {
+            administers_any = true;
+            let days = state
+                .storage
+                .workspace_activity_by_day(&entry.workspace.id, &since)
+                .await
+                .map_err(map_storage_error)?;
+            let mut total = 0;
+            for (day, count) in days {
+                if let Some(value) = activity_by_day.get_mut(&day) {
+                    *value += count;
+                    total += count;
+                }
+            }
+            activity_count = Some(total);
+        }
+        rows.push(OrganizationOverviewWorkspace {
+            workspace_id: entry.workspace.id.clone(),
+            name: entry.workspace.name.clone(),
+            artifact_count: counts.map_or(0, |counts| counts.artifacts),
+            memory_card_count: counts.map_or(0, |counts| counts.memory_cards),
+            active_task_count: counts.map_or(0, |counts| counts.active_tasks),
+            activity_count,
+        });
+    }
+    record_timing("organization_overview", "all", started, ids.len());
+    Ok(Json(OrganizationOverviewResponse {
+        organization_id,
+        member_count,
+        workspace_count: rows.len() as i64,
+        artifact_count: rows.iter().map(|row| row.artifact_count).sum(),
+        memory_card_count: rows.iter().map(|row| row.memory_card_count).sum(),
+        active_task_count: rows.iter().map(|row| row.active_task_count).sum(),
+        activity_by_day: if administers_any {
+            metric_timeline(activity_by_day)
+        } else {
+            Vec::new()
+        },
+        workspaces: rows,
+    }))
+}
+
 pub(crate) async fn update_organization(
     ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,

@@ -432,3 +432,58 @@ async fn wait_for_indexed_artifacts_for(
     }
     panic!("{expected} files were not indexed in time");
 }
+
+#[tokio::test]
+async fn an_organization_overview_counts_only_its_own_workspaces_and_is_for_its_members() {
+    let data_dir = temp_data_dir("organization-overview");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let (_, _) = register_account(&app, "overview-first@example.com").await;
+    let (owner, _) = register_account(&app, "overview-owner@example.com").await;
+    let (stranger, _) = register_account(&app, "overview-stranger@example.com").await;
+    let workspace_id = create_workspace(&app, &owner).await;
+    add_note(&app, &owner, &workspace_id, "Plan", "First note").await;
+    add_note(&app, &owner, &workspace_id, "Notes", "Second note").await;
+    let organization = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/workspaces", &owner))
+            .await
+            .unwrap(),
+    )
+    .await[0]["organization_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    let overview = response_json(
+        app.clone()
+            .oneshot(auth_request(
+                "GET",
+                &format!("/v1/organizations/{organization}/overview"),
+                &owner,
+            ))
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(overview["organization_id"], organization);
+    assert_eq!(overview["member_count"], 1);
+    assert_eq!(overview["workspace_count"], 1);
+    assert_eq!(overview["artifact_count"], 2);
+    assert_eq!(overview["workspaces"][0]["workspace_id"], workspace_id);
+    assert_eq!(overview["workspaces"][0]["artifact_count"], 2);
+    // The owner administers the workspace, so its last 30 days are there.
+    assert_eq!(overview["activity_by_day"].as_array().unwrap().len(), 30);
+    assert!(overview["workspaces"][0]["activity_count"].is_i64());
+
+    // Someone outside the organization may not read its figures.
+    let refused = app
+        .clone()
+        .oneshot(auth_request(
+            "GET",
+            &format!("/v1/organizations/{organization}/overview"),
+            &stranger,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), 403);
+}

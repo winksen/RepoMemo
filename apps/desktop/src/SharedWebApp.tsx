@@ -375,6 +375,7 @@ function SharedWebAppContent() {
           accessToken={accessToken}
           apiAvailable={apiAvailable}
           organizations={organizations}
+          section={route.name === "organization" ? route.section : "overview"}
           session={session}
           setError={setError}
           setOrganizations={setOrganizations}

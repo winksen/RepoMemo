@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.34` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.35` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.35 — Organization tabs and an Overview.
+
+- An organization's page has a **tab bar** like a workspace's: **Overview** (`/orgs/<id>`), **Workspaces** (`/orgs/<id>/workspaces`: the list and the archive import) and **Administration** (`/orgs/<id>/administration`: name, members, templates and invitations; owners and administrators only, anyone else is shown the Overview).
+- The **Overview** shows five totals (workspaces, people, evidence, memory cards, active tasks), bar charts of how evidence, memory and open tasks divide between the workspaces, a 30-day activity chart and activity by workspace, and a table with a row for each workspace that opens it. It counts only the workspaces you can open; activity is shown only for workspaces you administer (and the activity charts are left out when that is none).
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.34 — Aligned cards, side tooltips.
 

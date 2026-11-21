@@ -340,6 +340,31 @@ export interface SharedWorkspace {
   role: WorkspaceRole;
 }
 
+/** One workspace's row in an organization's Overview. */
+export interface OrganizationOverviewWorkspace {
+  workspace_id: string;
+  name: string;
+  artifact_count: number;
+  memory_card_count: number;
+  /** Tasks that are open or in progress. */
+  active_task_count: number;
+  /** Events in the last 30 days; `null` when the person does not administer the workspace. */
+  activity_count: number | null;
+}
+
+/** An organization's Overview: totals and rows for the workspaces of it the person can open. */
+export interface OrganizationOverview {
+  organization_id: string;
+  member_count: number;
+  workspace_count: number;
+  artifact_count: number;
+  memory_card_count: number;
+  active_task_count: number;
+  /** Events a day for the last 30 days, oldest first; empty when the person administers none of the workspaces. */
+  activity_by_day: WorkspaceMetricBreakdown[];
+  workspaces: OrganizationOverviewWorkspace[];
+}
+
 export interface WorkspaceMetricBreakdown {
   label: string;
   value: number;

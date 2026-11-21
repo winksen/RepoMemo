@@ -1,4 +1,4 @@
-import { SYSTEM_SECTIONS, WORKSPACE_SECTIONS, type SystemSection, type WorkspaceSection } from "./constants";
+import { ORGANIZATION_SECTIONS, SYSTEM_SECTIONS, WORKSPACE_SECTIONS, type OrganizationSection, type SystemSection, type WorkspaceSection } from "./constants";
 
 
 
@@ -48,7 +48,7 @@ export function navigate(to: string, replace = false) {
 export type Route =
   | { name: "dashboard" }
   | { name: "orgs" }
-  | { name: "organization"; organizationId: string }
+  | { name: "organization"; organizationId: string; section: OrganizationSection }
   | { name: "new-organization" }
   | { name: "profile" }
   | { name: "notifications" }
@@ -77,8 +77,11 @@ export function parseRoute(pathname: string): Route {
     return { name: "not-found", workspaceId: null };
   }
   if (first === "orgs") {
-    if (parts.length !== 2) return { name: "not-found", workspaceId: null };
-    return second === "new" ? { name: "new-organization" } : { name: "organization", organizationId: second };
+    if (parts.length === 2) return second === "new" ? { name: "new-organization" } : { name: "organization", organizationId: second, section: "overview" };
+    if (parts.length === 3 && second !== "new" && (ORGANIZATION_SECTIONS as readonly string[]).includes(third)) {
+      return { name: "organization", organizationId: second, section: third as OrganizationSection };
+    }
+    return { name: "not-found", workspaceId: null };
   }
   if (first === "system") {
     if (parts.length === 2 && (SYSTEM_SECTIONS as readonly string[]).includes(second)) {
@@ -111,7 +114,7 @@ export function routePath(route: Exclude<Route, { name: "not-found" }>): string 
   switch (route.name) {
     case "dashboard": return "/dashboard";
     case "orgs": return "/orgs";
-    case "organization": return organizationPath(route.organizationId);
+    case "organization": return organizationPath(route.organizationId, route.section);
     case "new-organization": return "/orgs/new";
     case "profile": return "/profile";
     case "notifications": return "/notifications";
@@ -122,9 +125,9 @@ export function routePath(route: Exclude<Route, { name: "not-found" }>): string 
   }
 }
 
-/** The address of an organization's page. */
-export function organizationPath(organizationId: string): string {
-  return `/orgs/${encodeURIComponent(organizationId)}`;
+/** The address of an organization's page; its Overview is the organization's address itself. */
+export function organizationPath(organizationId: string, section: OrganizationSection = "overview"): string {
+  return `/orgs/${encodeURIComponent(organizationId)}${section === "overview" ? "" : `/${section}`}`;
 }
 
 /**

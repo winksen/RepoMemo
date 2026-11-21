@@ -77,6 +77,11 @@ export type PageState = "restoring" | "unauthenticated" | "ready" | "error";
 
 export type WorkspaceSection = "overview" | "evidence" | "documents" | "repositories" | "retrieval" | "map" | "health" | "review" | "memory" | "tasks" | "people" | "settings";
 
+/** The tabs of an organization's page (`/orgs/<id>`, `/orgs/<id>/workspaces`, `/orgs/<id>/administration`). */
+export type OrganizationSection = "overview" | "workspaces" | "administration";
+
+export const ORGANIZATION_SECTIONS: OrganizationSection[] = ["overview", "workspaces", "administration"];
+
 export type ArtifactViewMode = "grid" | "list";
 
 export type OrganizationNavigation = {

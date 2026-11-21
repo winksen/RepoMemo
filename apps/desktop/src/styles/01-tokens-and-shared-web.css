@@ -860,3 +860,8 @@ input[type="file"] {
 .shared-org-card-spaces > span { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 8px; overflow: hidden; color: var(--color-text-muted); background: var(--color-surface-2); border-radius: 999px; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .shared-org-card-arrow { position: absolute; right: 18px; bottom: 18px; color: var(--color-text-subtle); transition: transform 140ms var(--ease-control); }
 .rm-button.shared-org-card:hover .shared-org-card-arrow { transform: translateX(3px); }
+
+.shared-organization-overview { display: grid; gap: 22px; margin-top: 18px; }
+.shared-organization-overview-table { display: grid; gap: 12px; }
+.rm-button.shared-link-button { min-height: 0; padding: 0; color: var(--color-text); background: transparent; border: 0; font: inherit; font-weight: 650; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.rm-button.shared-link-button:hover:not(:disabled) { background: transparent; border-color: transparent; }
