@@ -51,7 +51,7 @@ export function useSharedTheme(): [Theme, () => void] {
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const [theme, toggleTheme] = useSharedTheme();
   const next = theme === "dark" ? "light" : "dark";
-  return <IconButton className={`shared-theme-toggle ${className}`.trim()} label={`Switch to ${next} mode`} onClick={toggleTheme} pressed={theme === "dark"} size="sm">
+  return <IconButton className={`shared-theme-toggle ${className}`.trim()} label={`Switch to ${next} mode`} onClick={toggleTheme} size="sm">
     {theme === "dark" ? <Sun size={ICON_SIZE.md} /> : <Moon size={ICON_SIZE.md} />}
   </IconButton>;
 }
@@ -81,6 +81,7 @@ function LayoutFrame({ chatsOnly = false, session, sidebar, signOut, onNavigate,
 }) {
   // On a narrow screen the rail folds away behind a button so the page starts at the top; wide screens always show it.
   const [railOpen, setRailOpen] = useState(false);
+  const onCairn = window.location.pathname === "/cairn" || window.location.pathname.startsWith("/cairn/");
   // From a workspace page Cairn starts its next chat in that workspace.
   function openCairn() {
     const route = parseRoute(window.location.pathname);
@@ -96,7 +97,7 @@ function LayoutFrame({ chatsOnly = false, session, sidebar, signOut, onNavigate,
           <div className="shared-account-controls">
             <CreateMenu canCreateOrganization={session.can_create_organizations !== false} defaultOrganizationId={defaultOrganizationId} />
             <ThemeToggle />
-            <IconButton className="shared-assistant-link" label={ASSISTANT_NAME} onClick={openCairn} pressed={window.location.pathname === "/cairn" || window.location.pathname.startsWith("/cairn/")} size="sm"><CairnIcon size={ICON_SIZE.md} /></IconButton>
+            <IconButton aria-current={onCairn ? "page" : undefined} className="shared-assistant-link" label={ASSISTANT_NAME} onClick={openCairn} size="sm"><CairnIcon size={ICON_SIZE.md} weight={onCairn ? "fill" : "regular"} /></IconButton>
             <IconButton className="shared-palette-link" label="Open command palette" onClick={openCommandPalette} size="sm"><Search size={ICON_SIZE.md} /></IconButton>
             <IconButton className="shared-notifications-link" label="Notifications" onClick={() => onNavigate("/notifications")} size="sm"><Bell size={ICON_SIZE.md} /></IconButton>
             <Button className="shared-profile-link" onClick={() => onNavigate("/profile")} type="button" variant="secondary"><UserCircle size={ICON_SIZE.md} /> <span className="shared-button-label">Profile</span></Button>

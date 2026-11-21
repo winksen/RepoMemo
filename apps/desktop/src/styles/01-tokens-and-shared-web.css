@@ -931,7 +931,6 @@ input[type="file"] {
 .shared-assistant-page-workspace { min-width: 240px; }
 .shared-assistant-page-body { display: flex; flex: 1; justify-content: center; min-height: 0; padding-bottom: 12px; }
 .shared-assistant-page-body > .shared-assistant { width: 100%; max-width: none; padding: 0; }
-.shared-assistant-link[aria-pressed="true"] { border-color: var(--color-border-strong); background: var(--color-surface-3); }
 
 /* On the assistant page the chat takes the workspace's colour (V0.8.47): the greys of the dock become the accent, which the page
    sets from the workspace's main colour (the app's own when it has none). The dock beside a workspace page is unchanged. */
@@ -1001,13 +1000,12 @@ input[type="file"] {
 .shared-assistant-page .shared-assistant-thread:has(.shared-assistant-welcome) { align-content: center; }
 
 /* A workspace as a card in its organization's Workspaces tab (V0.8.58): the organization card's layout, in the workspace's color. */
-.shared-workspace-card .shared-org-card-mark { color: var(--color-on-accent); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 80%, white), color-mix(in srgb, var(--color-accent) 80%, black)); }
+.shared-workspace-card .shared-org-card-mark { color: var(--color-text); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 22%, var(--color-surface-3)), color-mix(in srgb, var(--color-accent) 30%, var(--color-surface-2))); }
 .rm-button.shared-workspace-card { min-height: 180px; }
 .shared-workspace-card .shared-org-card-description { -webkit-line-clamp: 1; }
-.shared-workspace-card .shared-org-card-arrow { color: var(--color-accent-text); }
+.shared-workspace-card .shared-org-card-arrow { color: var(--color-text-subtle); }
 
-/* In the sidebar a workspace's chip is a quiet grey tinted with its color, and takes the full color when the workspace is the current one (V0.8.59).
+/* In the sidebar a workspace's chip is a quiet grey tinted with its color, current or not (V0.8.59, V0.8.60).
    The organization's icon beside the name is at full contrast. */
 .rm-button.shared-rail-workspace .shared-rail-chip { color: var(--color-text); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 22%, var(--color-surface-3)), color-mix(in srgb, var(--color-accent) 30%, var(--color-surface-2))); transition: background 160ms var(--ease-control), color 160ms var(--ease-control); }
-.rm-button.shared-rail-workspace.active .shared-rail-chip { color: var(--color-on-accent); background: linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 80%, white), color-mix(in srgb, var(--color-accent) 80%, black)); }
 .rm-button.shared-rail-workspace .shared-rail-sub svg { color: var(--color-text); }

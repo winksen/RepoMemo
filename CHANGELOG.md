@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.60 (2026-11-21)
+
+A quiet current workspace, and a calmer top bar.
+
+### Changed
+- **Sidebar.** The current workspace's chip no longer turns to the full color; it stays the quiet grey tinted with the workspace's color like the other chips. The current row is still marked by its fill and its filled icon.
+- **Workspace cards.** In an organization's Workspaces tab the card's mark is the same quiet grey tinted with the workspace's color, with the icon in the normal text color, and the arrow is grey.
+- **Top bar.** The theme toggle no longer shows a grey fill while dark mode is on. The **CAIRN** button no longer takes a grey outlined fill when its page is open: its icon is drawn filled and the button is marked as the current page for assistive technology.
+- CSS and markup only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.59 (2026-11-21)
 
 Quiet sidebar chips.

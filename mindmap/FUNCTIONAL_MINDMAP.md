@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.59` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.60` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.60 — A quiet current workspace, a calmer top bar.
+
+- **Sidebar.** The current workspace's chip no longer turns to the full color: it stays the quiet grey tinted with the workspace's color, like the others. The current row is still marked by its fill and its filled icon.
+- **Workspace cards.** In an organization's Workspaces tab the card's mark has the same quiet grey tinted with the workspace's color, with the icon in the normal text color; its arrow is grey.
+- **Top bar.** The dark-mode toggle no longer has a grey fill while dark mode is on, and the **CAIRN** button no longer takes a grey, outlined fill when its page is open: its icon is drawn filled instead.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.59 — Quiet sidebar chips.
 
