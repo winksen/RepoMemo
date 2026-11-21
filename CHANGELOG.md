@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.29 (2026-11-21)
+
+A grey current item in the sidebar.
+
+### Changed
+- The current workspace, **Organizations** and **System** items are a grey fill with dark, bold text instead of the accent colour with white text (V0.8.22). Keyboard focus there stays a grey ring.
+- CSS only: no route, API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.28 (2026-11-21)
 
 Sidebar and navbar details.
