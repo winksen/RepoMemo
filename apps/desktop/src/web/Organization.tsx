@@ -120,7 +120,7 @@ export function OrganizationRail({
   if (!workspaces) return <div className="shared-rail-navigation" />;
   const entries = workspaces.map((workspace) => {
     const organization = organizations.find((entry) => entry.id === workspace.organization_id);
-    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, subtitle: organization?.name, colorProps: workspaceColorProps(workspaceColorKey(workspace.workspace)), icon: <span className="shared-rail-chip"><WorkspaceIcon size={22} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
+    return { id: workspace.workspace.id, name: workspace.workspace.name, title: organization ? `${organization.name} / ${workspace.workspace.name}` : workspace.workspace.name, subtitle: organization ? <><Building size={12} /><span>{organization.name}</span></> : undefined, colorProps: workspaceColorProps(workspaceColorKey(workspace.workspace)), icon: <span className="shared-rail-chip"><WorkspaceIcon size={22} workspace={workspace.workspace} /></span>, onSelect: () => navigate(workspaceHomePath(workspace.workspace.id)) };
   });
   return <div className="shared-rail-navigation">
     <RailSection label="Workspaces" name="workspaces">
@@ -132,7 +132,7 @@ export function OrganizationRail({
 /** A titled part of the rail. */
 function RailSection({ children, label, name }: { children: ReactNode; label: string; name: string }) {
   return <section aria-label={label} className={`shared-rail-${name}`}>
-    <p className="shared-eyebrow">{label}</p>
+    <p className="shared-eyebrow shared-rail-title">{label}</p>
     <div>{children}</div>
   </section>;
 }
@@ -140,7 +140,7 @@ function RailSection({ children, label, name }: { children: ReactNode; label: st
 /** Lists longer than this fold behind a *Show more* button; the current item always stays visible. */
 const RAIL_LIST_LIMIT = 10;
 
-function RailList({ activeId, items }: { activeId?: string; items: { id: string; name: string; title: string; subtitle?: string; colorProps?: ReturnType<typeof workspaceColorProps>; icon: ReactNode; onSelect: () => void }[] }) {
+function RailList({ activeId, items }: { activeId?: string; items: { id: string; name: string; title: string; subtitle?: ReactNode; colorProps?: ReturnType<typeof workspaceColorProps>; icon: ReactNode; onSelect: () => void }[] }) {
   const [expanded, setExpanded] = useState(false);
   const folded = items.length > RAIL_LIST_LIMIT && !expanded;
   let visible = folded ? items.slice(0, RAIL_LIST_LIMIT) : items;

@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.8.45 (2026-11-21)
+
+Sidebar title, organization mark and white icons.
+
+### Changed
+- **Organization mark.** Under each workspace in the sidebar, the organization's name has a small organization mark before it.
+- **Title.** *WORKSPACES* is plain grey instead of blue, larger, in the page-title face and in capitals, and starts at the left edge of the icon chips.
+- **White icons in dark mode.** The icons on the workspace colors, and the text of buttons that carry them, are white in the dark theme as in the light one. The dark shades are deep enough for white (4.8:1 or better) and stay 3:1 clear of the dark surface; the light-theme shades are slightly deeper (6.5:1 or better with white). The default color is unchanged.
+- CSS, markup and the color table only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run, and the look was not seen. The contrast test was updated and not executed; its ratios were also computed by hand.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.8.44 (2026-11-21)
 
 A subtler current item in the sidebar.

@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.8.44` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.8.45` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.8.45 — Sidebar title, organization mark, white icons.
+
+- Under each workspace in the sidebar, the organization's name now has a small organization mark before it.
+- The **WORKSPACES** title is plain grey (not blue), larger, in the page-title face, in capitals, and starts at the left edge of the icon chips.
+- In the **dark theme the icons on the workspace colors are white**, as in the light theme: the dark shades of the colors are deep enough for white (4.8:1 or better), and the light-theme shades are a little deeper than before (6.5:1 or better). Buttons that carry the workspace color use white text in both themes too.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.8.44 — A subtler current item.
 

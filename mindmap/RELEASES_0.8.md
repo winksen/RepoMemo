@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.8 → 0.9 (proposed)
 
-> **Current:** `V0.8.44` (2026-11-21)
+> **Current:** `V0.8.45` (2026-11-21)
 
 > **Theme:** Connected teams and community knowledge · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md) · [Gap audit](ROADMAP.md#gap-audit-of-2026-11-04)
 
@@ -64,6 +64,7 @@
 | **V0.8.42** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Chips, tabs and focus | Give the sidebar icon chips squarer corners and a gradient between two shades of the color, make the active tab's line thicker, and make keyboard focus a grey a step stronger than hover | The chips are gradient tiles with small corners, the active tab line is 4 px, and a focused tab or sidebar item is greyer than a hovered one |
 | **V0.8.43** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Tab line and sidebar | Round the line under the active tab and slide it between tabs with an ease-in-out animation, keep the sidebar icons light on their chips, and show the current workspace as a grey fill again | The line has rounded ends and glides to the new tab, the chip icons never flash dark, and the current workspace row is a contrasting grey |
 | **V0.8.44** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Current sidebar item | Show the current sidebar item one level off the hover fill: a level darker in the light theme and a level lighter in the dark theme | The current workspace, Organizations and System items are just distinguishable from hover, in both themes |
+| **V0.8.45** | 🧪 2026-11-21 | AM. Interface enhancements | 🔧 | Sidebar title, organization mark and white icons | Show a small organization mark before the organization under each workspace, make the Workspaces title a plain grey capitals heading in the page-title face aligned with the icon chips, and put white icons on the workspace colors in both themes | The title is uppercase and aligned, each row shows the organization with its mark, and the chip icons and colored buttons are white in dark mode with their contrast checked |
 
 ## Verification and handoff
 

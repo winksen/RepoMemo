@@ -915,7 +915,10 @@ input[type="file"] {
 .shared-home-rail .rm-button:not(.active):focus-visible { color: var(--color-text); background: var(--color-surface-3); }
 .rm-button.shared-rail-workspace .shared-rail-text { display: grid; flex: 1; gap: 2px; min-width: 0; }
 .rm-button.shared-rail-workspace .shared-rail-name { color: inherit; font-size: 14px; font-weight: 700; line-height: 1.3; }
-.rm-button.shared-rail-workspace .shared-rail-sub { color: var(--color-text-subtle); font-size: 12px; font-weight: 500; line-height: 1.3; }
+.rm-button.shared-rail-workspace .shared-rail-sub { display: flex; align-items: center; gap: 5px; color: var(--color-text-subtle); font-size: 12px; font-weight: 500; line-height: 1.3; }
+.rm-button.shared-rail-workspace .shared-rail-sub svg { flex: 0 0 auto; }
+/* The rail's title: the page-title face, capitals, plain grey, and in line with the icon chips below it (the rows' 10px of padding). */
+.shared-home-rail .shared-rail-title { padding-left: 10px; color: var(--color-text); font-family: var(--font-display); font-size: 20px; font-weight: 400; letter-spacing: 0.04em; line-height: 1.2; text-transform: uppercase; }
 /* The current item is one step off the hover fill: a level darker in the light theme, a level lighter in the dark one (--color-surface-3 against --color-surface-2). The workspace chip keeps its colour and its icon is always light on it. */
 .rm-button.shared-rail-workspace.active,
 .rm-button.shared-rail-workspace.active:hover:not(:disabled) { color: var(--color-text); background: var(--color-surface-3); }

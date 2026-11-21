@@ -31,13 +31,15 @@ afterEach(cleanup);
 it("keeps every colour readable in both themes", () => {
   expect(WORKSPACE_COLORS.length).toBeGreaterThanOrEqual(6);
   for (const { key, light, dark } of WORKSPACE_COLORS) {
-    // The light theme takes the darker variant: its label and the text on the page read on white and on its own soft background.
+    // The light theme takes the deeper variant: its label and the text on the page read on white and on its own soft background.
     expect(contrast(light.on, light.accent), `${key} label on accent (light)`).toBeGreaterThanOrEqual(4.5);
     expect(contrast(light.on, light.hover), `${key} label on hover (light)`).toBeGreaterThanOrEqual(4.5);
     expect(contrast(light.text, LIGHT_SURFACE), `${key} text (light)`).toBeGreaterThanOrEqual(4.5);
     expect(contrast(light.text, light.soft), `${key} text on soft (light)`).toBeGreaterThanOrEqual(4.5);
     // The dark theme takes the lighter variant, which must stand out from the dark surface.
-    expect(contrast(dark.accent, DARK_SURFACE), `${key} accent on surface (dark)`).toBeGreaterThanOrEqual(4.5);
+    // White icons and labels sit on the colour in both themes, so the dark variant is deep enough for white (4.5:1) and still clear of the dark surface (3:1, as a graphic needs).
+    expect(dark.on, `${key} label (dark)`).toBe("#ffffff");
+    expect(contrast(dark.accent, DARK_SURFACE), `${key} accent on surface (dark)`).toBeGreaterThanOrEqual(3);
     expect(contrast(dark.on, dark.accent), `${key} label on accent (dark)`).toBeGreaterThanOrEqual(4.5);
     expect(contrast(dark.on, dark.hover), `${key} label on hover (dark)`).toBeGreaterThanOrEqual(4.5);
     expect(contrast(dark.text, DARK_SURFACE), `${key} text (dark)`).toBeGreaterThanOrEqual(4.5);
