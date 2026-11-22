@@ -492,6 +492,7 @@ body.shared-dock-resizing { cursor: col-resize; user-select: none; }
 .shared-assistant-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .shared-assistant-proposal > small { color: var(--color-text-subtle); font-size: 12px; }
 .shared-assistant-proposal-dismissed { opacity: 0.7; }
+.rm-action-heading { padding: 6px 10px 2px; color: var(--color-text-subtle); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 .shared-assistant-memories { display: grid; gap: 8px; max-width: 72ch; margin: 0; padding: 0; list-style: none; }
 .shared-assistant-memories li { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--color-border-strong); border-radius: 12px; }
 .shared-assistant-memories p { margin: 0; color: var(--color-text-muted); font-size: 13px; overflow-wrap: anywhere; }

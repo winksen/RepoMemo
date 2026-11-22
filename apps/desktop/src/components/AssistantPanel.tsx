@@ -64,6 +64,16 @@ const STATUS_CHOICES = [
   { id: "active", say: "active", label: "Active" },
 ];
 
+/** The jobs by kind (V0.9.32), each kind in the order its first job appears, and the jobs of a kind in the order given. */
+function capabilityGroups<T extends { group?: string }>(capabilities: T[]): Array<[string, T[]]> {
+  const groups = new Map<string, T[]>();
+  for (const capability of capabilities) {
+    const group = capability.group || "Actions";
+    groups.set(group, [...(groups.get(group) ?? []), capability]);
+  }
+  return [...groups.entries()];
+}
+
 const LAST_CHAT_PREFIX = "repomemo.assistant.last-chat.";
 
 function rememberChat(workspaceId: string, conversationId: string | null) {
@@ -498,12 +508,15 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
                 {canUpload ? <MenuPrimitive.Item className="rm-action-item" disabled={isBusy || isLoadingChat} onSelect={() => fileInput.current?.click()} title="Upload files into this workspace. They are indexed, so I can search and answer from them.">
                   <Paperclip size={ICON_SIZE.md} /><span>Attach files</span>
                 </MenuPrimitive.Item> : null}
-                {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
-                  const Icon = CAPABILITY_ICONS[capability.id];
-                  return <MenuPrimitive.Item className="rm-action-item" disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onSelect={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`}>
-                    <Icon size={ICON_SIZE.md} weight={selected === capability.id ? "fill" : "regular"} /><span>{capability.label}</span>
-                  </MenuPrimitive.Item>;
-                })}
+                {capabilityGroups(orderCapabilities(capabilities?.capabilities ?? [], template?.assistant)).map(([group, members]) => <MenuPrimitive.Group key={group}>
+                  <MenuPrimitive.Label className="rm-action-heading">{group}</MenuPrimitive.Label>
+                  {members.map((capability) => {
+                    const Icon = CAPABILITY_ICONS[capability.id];
+                    return <MenuPrimitive.Item className="rm-action-item" disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onSelect={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`}>
+                      <Icon size={ICON_SIZE.md} weight={selected === capability.id ? "fill" : "regular"} /><span>{capability.label}</span>
+                    </MenuPrimitive.Item>;
+                  })}
+                </MenuPrimitive.Group>)}
               </MenuPrimitive.Content>
             </MenuPrimitive.Portal>
           </MenuPrimitive.Root>

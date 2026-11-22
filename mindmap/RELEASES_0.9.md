@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.31` (2026-11-21)
+> **Current:** `V0.9.32` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -53,6 +53,7 @@
 | **V0.9.29** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Memory recall | Let CAIRN search the memory cards, or list the newest, and show them in the chat, falling back to the files when memory has nothing | "What do we know about retries" shows the matching cards with their sources and review flags, "list the memory cards" shows the newest, with no card and a provider it says so and answers from the files, and the lookup needs no AI |
 | **V0.9.30** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Manage memory | Let CAIRN propose changing, adding to, renaming or deleting a memory card, found by title, with the revision it started from, and run it as the person when they confirm | "Update the memory card X: ..." shows the card before and after, Confirm saves a new revision as the person and is refused if the card changed since, rename and append work, delete says it cannot be restored, several matches are listed and a viewer is offered none |
 | **V0.9.31** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Create notes | Let CAIRN propose creating a note from a sentence or from its last answer with sources, in a named folder, and store it as the person, indexed, when they confirm | "Create a note titled X: ..." and "save that as a note" each show the note and its folder, Confirm stores an indexed note as the person, a missing or ambiguous folder is answered, an empty case makes no note and a viewer is offered none |
+| **V0.9.32** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Job catalog | Group CAIRN's jobs into Find, Understand and Change and mark the ones that change the workspace, from one source used by the menu, the greeting and the viewer rule | The + menu and "what can you do" show the jobs under Find, Understand and Change, every job has a kind, the Change jobs are exactly the write jobs, and a viewer is offered none of them |
 | **V0.9.33** | 🔜 | AM. Public readiness | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
 | **V0.9.34** | 🔜 | AM. Public readiness | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
 | **V0.9.35** | 🔜 | AM. Public readiness | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |

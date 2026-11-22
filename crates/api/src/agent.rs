@@ -226,6 +226,26 @@ pub fn capability_needs_write(capability: AgentCapability) -> bool {
     )
 }
 
+/// The kind of job a capability is, to group them in the menu and in what CAIRN says it can do (V0.9.32): the jobs that look
+/// things up, the jobs that read and write about what is there, and the jobs that change the workspace once confirmed.
+pub fn capability_group(capability: AgentCapability) -> &'static str {
+    match capability {
+        AgentCapability::FindFiles
+        | AgentCapability::FindSymbol
+        | AgentCapability::SearchContent
+        | AgentCapability::RecallMemory => "Find",
+        AgentCapability::SummarizeFile
+        | AgentCapability::AskQuestion
+        | AgentCapability::WorkspaceOverview
+        | AgentCapability::SummarizeChat
+        | AgentCapability::AnalyzeFiles => "Understand",
+        AgentCapability::SaveMemory
+        | AgentCapability::ManageFiles
+        | AgentCapability::ManageMemory
+        | AgentCapability::CreateNote => "Change",
+    }
+}
+
 pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
     [
         (
@@ -329,6 +349,8 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             placeholder: placeholder.to_owned(),
             requires_ai,
             available: !requires_ai || ai_available,
+            group: capability_group(id).to_owned(),
+            writes: capability_needs_write(id),
         },
     )
     .collect()
@@ -1940,6 +1962,22 @@ mod tests {
         assert!(CAIRN_VOICE.contains("Never talk about \"the user\""));
         assert!(ask_system(None).contains(CAIRN_VOICE));
         assert!(!CAIRN_VOICE.contains("insufficient"), "the voice only words an answer");
+    }
+
+    /// V0.9.32: every job is in a group, and the jobs that change the workspace are exactly the ones a viewer is not offered.
+    #[test]
+    fn every_job_has_a_group_and_the_changing_ones_are_the_write_jobs() {
+        let infos = agent_capabilities(true);
+        for info in &infos {
+            assert!(
+                matches!(info.group.as_str(), "Find" | "Understand" | "Change"),
+                "{} has no group",
+                info.label
+            );
+            assert_eq!(info.writes, info.group == "Change", "{}", info.label);
+            assert_eq!(info.writes, capability_needs_write(info.id), "{}", info.label);
+        }
+        assert!(infos.iter().filter(|info| info.group == "Change").count() >= 4);
     }
 
     #[test]

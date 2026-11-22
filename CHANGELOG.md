@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.32 (2026-11-21)
+
+CAIRN's jobs are grouped by what they do.
+
+### Changed
+- **A catalog of jobs.** Each job CAIRN offers now says which kind it is (*Find*, *Understand* or *Change*) and whether it changes the workspace (*writes*). The two come from one place in the core, so the menu, the greeting and the rule that a viewer is not offered a changing job cannot disagree, and a new job has to say where it belongs.
+- **The + menu by kind.** On Cairn's page the menu lists the jobs under *Find* (files, symbols, content, memory), *Understand* (ask, summarize, overview, summarize chat, analyze files) and *Change* (manage files, create note, save and manage memory), in the order a template sets within each kind.
+- **What CAIRN says it can do.** *What can you do* and the greeting list the thirteen jobs under the same three headings, each with something to type, instead of one long list.
+- The guide's description of the chat is rewritten around the three kinds. The API's capabilities answer gains the two fields; clients that do not know them ignore them. No setting or migration changes.
+
+### Checks
+- Unit tests that every job has a group and that the Change jobs are exactly the write jobs, and that the greeting lists each job under its heading; compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run: the grouped menu was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.31 (2026-11-21)
 
 CAIRN creates notes, which become evidence.

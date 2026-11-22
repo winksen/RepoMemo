@@ -379,22 +379,36 @@ fn example(capability: AgentCapability) -> &'static str {
 /// The jobs CAIRN can do, as a Markdown list read from the capability list, each with something to type. Jobs that need an AI
 /// provider say so when none is enabled.
 fn jobs_markdown(context: &ChatterContext) -> String {
-    let mut lines = agent_capabilities(context.ai_available)
-        .into_iter()
-        .map(|info| {
+    let infos = agent_capabilities(context.ai_available);
+    let mut groups: Vec<String> = Vec::new();
+    for info in &infos {
+        if !groups.contains(&info.group) {
+            groups.push(info.group.clone());
+        }
+    }
+    // The jobs by kind: what looks things up, what reads and writes about them, and what changes the workspace.
+    let mut lines = Vec::new();
+    for group in groups {
+        lines.push(format!("**{group}**"));
+        lines.push(String::new());
+        for info in infos.iter().filter(|info| info.group == group) {
             let needs = if info.available {
                 String::new()
             } else {
                 " (needs an AI provider, and none is enabled here)".to_owned()
             };
-            format!(
+            lines.push(format!(
                 "- **{}**: {}{needs} Try `{}`.",
                 info.label,
                 info.description,
                 example(info.id)
-            )
-        })
-        .collect::<Vec<_>>();
+            ));
+        }
+        lines.push(String::new());
+    }
+    if lines.last().is_some_and(String::is_empty) {
+        lines.pop();
+    }
     if !context.ai_available {
         lines.push(String::new());
         lines.push("No AI provider is enabled for this workspace, so for now I can find files and symbols and search their content. An administrator can enable one in Settings.".to_owned());
@@ -532,6 +546,37 @@ mod tests {
         ] {
             assert_eq!(recognise_chatter(message), None, "{message}");
         }
+    }
+
+    #[test]
+    fn the_jobs_are_listed_by_kind_with_every_job_under_its_kind() {
+        let shown = chatter_reply(
+            recognise_chatter("what can you do").unwrap(),
+            &ChatterContext {
+                ai_available: true,
+                workspace: None,
+                ..Default::default()
+            },
+        )
+        .reply_markdown;
+        let find = shown.find("**Find**").expect("a Find heading");
+        let understand = shown.find("**Understand**").expect("an Understand heading");
+        let change = shown.find("**Change**").expect("a Change heading");
+        assert!(find < understand && understand < change, "{shown}");
+        for (label, heading) in [
+            ("Find files", find),
+            ("Analyze files", understand),
+            ("Manage files", change),
+        ] {
+            let at = shown
+                .find(&format!("**{label}**"))
+                .unwrap_or_else(|| panic!("{label} is listed"));
+            assert!(at > heading, "{label} is under its heading");
+        }
+        assert!(
+            shown.find("**Recall memory**").unwrap() < understand,
+            "recalling memory is a Find job"
+        );
     }
 
     #[test]

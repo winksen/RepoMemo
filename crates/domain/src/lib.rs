@@ -2907,6 +2907,12 @@ pub struct AgentCapabilityInfo {
     pub requires_ai: bool,
     /// False when the capability needs AI and no text provider is enabled.
     pub available: bool,
+    /// The kind of job, to group them (V0.9.32): `Find`, `Understand` or `Change`.
+    #[serde(default)]
+    pub group: String,
+    /// Whether the job changes the workspace once the person confirms it (V0.9.32); a viewer is not offered it.
+    #[serde(default)]
+    pub writes: bool,
 }
 
 /// What CAIRN offers to do for the person, which it does only when they confirm (V0.9.10).

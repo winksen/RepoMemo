@@ -2546,6 +2546,10 @@ export interface AgentCapabilityInfo {
   requires_ai: boolean;
   /** False when the capability needs AI and no text provider is enabled. */
   available: boolean;
+  /** The kind of job, to group them (V0.9.32): `Find`, `Understand` or `Change`. */
+  group: string;
+  /** Whether the job changes the workspace once the person confirms it (V0.9.32); a viewer is not offered it. */
+  writes: boolean;
 }
 
 /** What CAIRN offers to do for the person, which it does only when they confirm (V0.9.10). */
