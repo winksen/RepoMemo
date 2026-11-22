@@ -2917,6 +2917,8 @@ pub enum AgentProposalKind {
     TrashFiles,
     /// Store a chat's summary as a note, which is indexed like any other (V0.9.14).
     SaveSummary,
+    /// Change the evidence state of files: verified, needs review, outdated or active (V0.9.28).
+    SetStatus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -13,9 +13,48 @@ use super::{clean_subject, reply};
 /// What a request to manage a file asks for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum FileCommand {
-    Move { file: String, folder: String },
-    Rename { file: String, title: String },
-    Trash { file: String },
+    Move {
+        file: String,
+        folder: String,
+    },
+    Rename {
+        file: String,
+        title: String,
+    },
+    Trash {
+        file: String,
+    },
+    /// Change the evidence state of files (V0.9.28): `status` is the id the lifecycle uses.
+    SetStatus {
+        file: String,
+        status: &'static str,
+    },
+}
+
+/// The evidence state a request names ("verified", "needs review", "outdated", "active"), as the id the lifecycle uses.
+pub(crate) fn status_from(words: &str) -> Option<&'static str> {
+    let words = words
+        .trim()
+        .trim_end_matches(|c: char| c == '.' || c == '!' || c.is_whitespace())
+        .to_lowercase()
+        .replace('_', " ");
+    match words.as_str() {
+        "verified" | "verified evidence" | "confirmed" | "checked" => Some("verified"),
+        "outdated" | "stale" | "obsolete" | "out of date" => Some("outdated"),
+        "needs review" | "needing review" | "to review" | "to be reviewed" | "needs a review" => Some("needs_review"),
+        "active" | "current" | "up to date" => Some("active"),
+        _ => None,
+    }
+}
+
+/// How a state is said in a sentence.
+fn status_label(status: &str) -> &'static str {
+    match status {
+        "verified" => "verified",
+        "outdated" => "outdated",
+        "needs_review" => "needing review",
+        _ => "active",
+    }
 }
 
 const TOP_LEVEL: &[&str] = &[
@@ -64,10 +103,12 @@ fn unquote(text: &str) -> String {
 /// Recognises "move X to Y", "rename X to Y" and "delete X" as a request about a file. A request that does not speak of a file
 /// is left to the other jobs, so "remove duplicates from the list" never becomes a deletion.
 pub(crate) fn file_command(text: &str, lower: &str) -> Option<FileCommand> {
-    let (verb, rest_start) = ["rename ", "move ", "delete ", "trash ", "remove ", "discard "]
-        .iter()
-        .find(|verb| lower.starts_with(**verb))
-        .map(|verb| (verb.trim(), verb.len()))?;
+    let (verb, rest_start) = [
+        "rename ", "move ", "delete ", "trash ", "remove ", "discard ", "mark ", "set ",
+    ]
+    .iter()
+    .find(|verb| lower.starts_with(**verb))
+    .map(|verb| (verb.trim(), verb.len()))?;
     let rest = &text[rest_start..];
     let lower_rest = &lower[rest_start..];
     match verb {
@@ -77,6 +118,17 @@ pub(crate) fn file_command(text: &str, lower: &str) -> Option<FileCommand> {
             let title = unquote(&rest[at + 4..]);
             (!file.is_empty() && !title.is_empty() && mentions_a_file(text))
                 .then_some(FileCommand::Rename { file, title })
+        }
+        // "mark the word documents as outdated", "set the selected files to verified" (V0.9.28).
+        "mark" | "set" => {
+            let at = last_separator(lower_rest, if verb == "mark" { "as" } else { "to" })?;
+            let file = clean_subject(&rest[..at]);
+            let status = status_from(&rest[at + 4..])?;
+            (!file.is_empty()
+                && (mentions_a_file(text)
+                    || is_set_reference(&file)
+                    || super::filters::parse_filter(&file).is_structured()))
+            .then_some(FileCommand::SetStatus { file, status })
         }
         "move" => {
             let at = last_separator(lower_rest, "into")
@@ -320,6 +372,41 @@ pub(crate) fn trash_reply(files: Vec<ArtifactSummary>) -> AgentReply {
     )
 }
 
+/// The proposal to change the evidence state of files.
+pub(crate) fn status_reply(files: Vec<ArtifactSummary>, status: &str) -> AgentReply {
+    let what = named(&files);
+    let state = status_label(status);
+    let detail = match files.as_slice() {
+        [one] => format!(
+            "Mark **{}** (`{}`) as **{state}**. The state shows in the evidence list, and its review note and owner stay as they are.",
+            one.title, one.path
+        ),
+        _ => format!(
+            "Mark {what} as **{state}**:\n{}\n\nThe state shows in the evidence list, and each file's review note and owner stay as they are.",
+            listing(&files)
+        ),
+    };
+    let payload = json!({
+        "action": "lifecycle",
+        "artifact_ids": files.iter().map(|file| file.id.clone()).collect::<Vec<_>>(),
+        "status": status,
+        "status_label": state,
+        "count": files.len(),
+        "title": title_of_set(&files),
+    });
+    let title = if files.len() == 1 {
+        "Change the file's state"
+    } else {
+        "Change the files' state"
+    };
+    let proposal = proposal(AgentProposalKind::SetStatus, title, detail, payload);
+    proposed(
+        format!("I can mark {what} as **{state}**. Nothing changes until you confirm below."),
+        proposal,
+        files,
+    )
+}
+
 /// What CAIRN says to a request about files it cannot act on: how to word one.
 pub(crate) fn files_help() -> AgentReply {
     reply("I can move, rename or trash one file at a time, and only after you confirm. Try `move retry-policy.md to Runbooks`, `rename the deploy runbook to Release runbook` or `delete the file old-notes.md`.")
@@ -486,6 +573,66 @@ mod tests {
                 "Archive".into()
             ])
         );
+    }
+
+    #[test]
+    fn a_state_change_is_read_with_its_state_and_needs_a_file_or_a_selection() {
+        assert_eq!(
+            command("mark the word documents as outdated"),
+            Some(FileCommand::SetStatus {
+                file: "word".into(),
+                status: "outdated"
+            })
+        );
+        assert_eq!(
+            command("Mark the selected files as needs review"),
+            Some(FileCommand::SetStatus {
+                file: "selected".into(),
+                status: "needs_review"
+            })
+        );
+        assert_eq!(
+            command("mark them as verified"),
+            Some(FileCommand::SetStatus {
+                file: "them".into(),
+                status: "verified"
+            })
+        );
+        assert_eq!(
+            command("set the pdfs to stale"),
+            Some(FileCommand::SetStatus {
+                file: "pdfs".into(),
+                status: "outdated"
+            })
+        );
+        for message in [
+            "mark my calendar as busy",
+            "mark the files as done",
+            "set up the files to run",
+            "mark it as outdated",
+        ] {
+            assert_eq!(command(message), None, "{message}");
+        }
+        assert_eq!(status_from("Out of date."), Some("outdated"));
+        assert_eq!(status_from("needs_review"), Some("needs_review"));
+        assert_eq!(status_from("fine"), None);
+    }
+
+    #[test]
+    fn a_state_change_is_one_proposal_over_the_files_with_the_lifecycle_payload() {
+        let files = vec![file("a.md"), file("b.md")];
+        let answer = status_reply(files, "needs_review");
+        let proposal = &answer.proposals[0];
+        assert_eq!(proposal.kind, AgentProposalKind::SetStatus);
+        assert_eq!(proposal.payload["action"], "lifecycle");
+        assert_eq!(proposal.payload["status"], "needs_review");
+        assert_eq!(proposal.payload["count"], 2);
+        assert!(
+            proposal.detail.starts_with("Mark **2 files** as **needing review**:"),
+            "{}",
+            proposal.detail
+        );
+        assert!(answer.reply_markdown.contains("Nothing changes until you confirm"));
     }
 
     #[test]

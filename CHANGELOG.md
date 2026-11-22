@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.28 (2026-11-21)
+
+CAIRN sets the evidence state of a set of files.
+
+### Changed
+- **Mark files as verified, outdated or needing review.** With files selected in a list, **Mark as…** opens a choice of state (verified, needs review, outdated, active); or say it: *mark the Word documents as outdated*, *mark the selected files as needs review*, *mark them as verified*, *set the pdfs to stale*. CAIRN proposes one change for the whole set, listing the files, and nothing happens until you confirm.
+- **Same path as by hand.** Confirming runs the ordinary bulk-files handler (its lifecycle action) as you, so each file keeps its review note and owner, a file that cannot be changed is the answer, and the activity feed records the change under your name.
+- **Only a real state.** The words after *as* or *to* must be a state CAIRN knows (verified, outdated or stale, needs review, active or current), so *mark my calendar as busy* and *set up the files to run* are not read as file commands. A kind of file is enough to say which files (*the pdfs*); a bare *it* is not.
+- It is part of the *Manage files* job, so a viewer is not offered it. No API route, setting or migration changes.
+
+### Checks
+- Unit tests for the wordings, the states and the proposal; compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run: the Mark as dialog was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.27 (2026-11-21)
 
 CAIRN analyzes a set of files together.

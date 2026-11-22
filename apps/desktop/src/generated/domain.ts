@@ -2551,7 +2551,8 @@ export type AgentProposalKind =
   | "move_files"
   | "rename_file"
   | "trash_files"
-  | "save_summary";
+  | "save_summary"
+  | "set_status";
 
 export type AgentProposalState =
   | "pending"

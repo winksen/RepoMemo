@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.27` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.28` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.28 — CAIRN sets the evidence state of a set of files.
+
+- **Evidence state in bulk.** *Mark as…* on a selection, or *mark the Word documents as outdated* / *mark them as verified*: CAIRN proposes the new state for the whole set and you confirm. Review notes and owners stay.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.27 — CAIRN analyzes a set of files together.
 

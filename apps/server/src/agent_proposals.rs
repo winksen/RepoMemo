@@ -68,7 +68,7 @@ async fn apply(
             .await?;
             Ok(format!("Saved the memory card “{}”.", card.title))
         }
-        AgentProposalKind::MoveFiles | AgentProposalKind::TrashFiles => {
+        AgentProposalKind::MoveFiles | AgentProposalKind::TrashFiles | AgentProposalKind::SetStatus => {
             let body: BulkArtifactsRequest = serde_json::from_value(proposal.payload.clone())
                 .map_err(|_| ApiError::bad_request("This proposal can no longer be applied."))?;
             let Json(done) = artifacts::bulk_artifacts(
@@ -91,6 +91,12 @@ async fn apply(
                 .unwrap_or(1)
                 > 1;
             let subject = if several { title } else { format!("“{title}”") };
+            if proposal.kind == AgentProposalKind::SetStatus {
+                return Ok(format!(
+                    "Marked {subject} as {}.",
+                    payload_text(proposal, "status_label")
+                ));
+            }
             Ok(if proposal.kind == AgentProposalKind::TrashFiles {
                 format!(
                     "Moved {subject} to the trash. The workspace's trash can restore {}.",

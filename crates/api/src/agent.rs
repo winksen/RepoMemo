@@ -21,7 +21,8 @@ mod filters;
 use filters::{parse_filter, FileFilter};
 mod files;
 use files::{
-    choose_folder, file_command, files_help, is_set_reference, move_reply, rename_reply, trash_reply, FolderChoice,
+    choose_folder, file_command, files_help, is_set_reference, move_reply, rename_reply, status_reply, trash_reply,
+    FolderChoice,
 };
 mod proposals;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};
@@ -269,7 +270,7 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
         (
             AgentCapability::ManageFiles,
             "Manage files",
-            "Move a file to a folder, rename it or send it to the trash. I do it only when you confirm.",
+            "Move files to a folder, rename one, send them to the trash or mark them verified, outdated or needing review. I do it only when you confirm.",
             "For example: move retry-policy.md to Runbooks",
             false,
         ),
@@ -746,7 +747,8 @@ impl RepoMemoCore {
         let wanted = match &command {
             files::FileCommand::Move { file, .. }
             | files::FileCommand::Rename { file, .. }
-            | files::FileCommand::Trash { file } => file.clone(),
+            | files::FileCommand::Trash { file }
+            | files::FileCommand::SetStatus { file, .. } => file.clone(),
         };
         let renaming = matches!(command, files::FileCommand::Rename { .. });
         if renaming && (is_set_reference(&wanted) || parse_filter(&wanted).is_structured()) {
@@ -767,6 +769,7 @@ impl RepoMemoCore {
                 rename_reply(targets.into_iter().next().expect("a file was found"), &title)
             }
             files::FileCommand::Trash { .. } => trash_reply(targets),
+            files::FileCommand::SetStatus { status, .. } => status_reply(targets, status),
             files::FileCommand::Move { folder, .. } => {
                 let folders = self.storage.list_folders(&request.workspace_id).await?;
                 match choose_folder(&folder, &folders) {

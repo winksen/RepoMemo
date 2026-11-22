@@ -53,6 +53,14 @@ const CAPABILITY_ICONS: Record<AgentCapability, typeof Search> = {
   analyze_files: Brain,
 };
 
+/** The evidence states a selection can be given: the id, how it is said to CAIRN and how it is labelled. */
+const STATUS_CHOICES = [
+  { id: "verified", say: "verified", label: "Verified" },
+  { id: "needs_review", say: "needs review", label: "Needs review" },
+  { id: "outdated", say: "outdated", label: "Outdated" },
+  { id: "active", say: "active", label: "Active" },
+];
+
 const LAST_CHAT_PREFIX = "repomemo.assistant.last-chat.";
 
 function rememberChat(workspaceId: string, conversationId: string | null) {
@@ -122,6 +130,9 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   const [selection, setSelection] = useState<Record<string, string[]>>({});
   const [moveFor, setMoveFor] = useState<string | null>(null);
   const [moveFolder, setMoveFolder] = useState("");
+  // The turn whose selection is being given a state, and the state chosen (V0.9.28).
+  const [statusFor, setStatusFor] = useState<string | null>(null);
+  const [statusChoice, setStatusChoice] = useState("verified");
   const fileInput = useRef<HTMLInputElement>(null);
   const [showChats, setShowChats] = useState(false);
   // Bumped whenever the visible chat changes, so a reply that arrives after
@@ -294,9 +305,13 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   }
 
   /** Acts on the files selected in a reply's list: the message names them by id, and CAIRN proposes the change for the person to confirm. */
-  function actOnSelection(turnKey: string, action: "move" | "trash") {
+  function actOnSelection(turnKey: string, action: "move" | "trash" | "status") {
     const ids = selection[turnKey] ?? [];
     if (!ids.length) return;
+    if (action === "status") {
+      setStatusFor(turnKey);
+      return;
+    }
     if (action === "move") {
       setMoveFolder("");
       setMoveFor(turnKey);
@@ -304,6 +319,15 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     }
     send({ message: "Trash the selected files", capability: "manage_files", artifact_ids: ids }, `Move ${ids.length} ${ids.length === 1 ? "file" : "files"} to the trash`);
     setSelection((current) => ({ ...current, [turnKey]: [] }));
+  }
+
+  function submitStatus() {
+    const ids = statusFor ? selection[statusFor] ?? [] : [];
+    if (!statusFor || !ids.length) return;
+    const words = STATUS_CHOICES.find((choice) => choice.id === statusChoice)?.say ?? statusChoice;
+    send({ message: `Mark the selected files as ${words}`, capability: "manage_files", artifact_ids: ids }, `Mark ${ids.length} ${ids.length === 1 ? "file" : "files"} as ${words}`);
+    setSelection((current) => ({ ...current, [statusFor]: [] }));
+    setStatusFor(null);
   }
 
   function submitMove() {
@@ -375,9 +399,18 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     </Dialog>
     : null;
 
+  const statusDialog = statusFor
+    ? <Dialog description="The state shows in the evidence list. You confirm the change before anything happens." footer={<><DialogCancel onClick={() => setStatusFor(null)} /><Button type="submit" variant="main">Propose the change</Button></>} onClose={() => setStatusFor(null)} onSubmit={submitStatus} open title={`Mark ${(selection[statusFor] ?? []).length} ${(selection[statusFor] ?? []).length === 1 ? "file" : "files"}`}>
+      <fieldset className="shared-assistant-status-choices">
+        {STATUS_CHOICES.map((choice) => <label key={choice.id}><input checked={statusChoice === choice.id} name="evidence-state" onChange={() => setStatusChoice(choice.id)} type="radio" /> {choice.label}</label>)}
+      </fieldset>
+    </Dialog>
+    : null;
+
   return <section className="shared-assistant" aria-label={`${ASSISTANT_NAME}, the workspace assistant`}>
     {dialog}
     {moveDialog}
+    {statusDialog}
     {optionsHost ? createPortal(<ChatOptions capabilities={capabilities} conversation={activeConversation} onDelete={() => activeConversation && setChatDialog({ kind: "delete", conversation: activeConversation })} onOpenArtifact={onOpenArtifact} onRename={() => { if (activeConversation) { setRenameValue(activeConversation.title); setChatDialog({ kind: "rename", conversation: activeConversation }); } }} replies={turns.map((turn) => turn.reply)} />, optionsHost) : null}
     {hideChatList ? null : <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
@@ -520,7 +553,7 @@ function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string |
   </aside>;
 }
 
-function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnSelection, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnSelection: (action: "move" | "trash") => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
+function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnSelection, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnSelection: (action: "move" | "trash" | "status") => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
   const note = routingNote(reply, capabilities);
   const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.
@@ -539,6 +572,7 @@ function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, i
         {selection.length ? <>
           <span>{selection.length} selected</span>
           <Button disabled={isBusy} onClick={() => onActOnSelection("move")} type="button" variant="secondary">Move to…</Button>
+          <Button disabled={isBusy} onClick={() => onActOnSelection("status")} type="button" variant="secondary">Mark as…</Button>
           <Button disabled={isBusy} onClick={() => onActOnSelection("trash")} type="button" variant="secondary">Move to trash</Button>
         </> : null}
       </> : null}
