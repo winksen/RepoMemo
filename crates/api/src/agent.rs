@@ -19,6 +19,7 @@ mod chatter;
 mod evidence;
 mod filters;
 mod memory;
+mod notes;
 use filters::{parse_filter, FileFilter};
 mod files;
 use files::{
@@ -218,7 +219,10 @@ pub fn attachment_reply(file: ArtifactSummary) -> AgentReply {
 pub fn capability_needs_write(capability: AgentCapability) -> bool {
     matches!(
         capability,
-        AgentCapability::SaveMemory | AgentCapability::ManageFiles | AgentCapability::ManageMemory
+        AgentCapability::SaveMemory
+            | AgentCapability::ManageFiles
+            | AgentCapability::ManageMemory
+            | AgentCapability::CreateNote
     )
 }
 
@@ -306,6 +310,13 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             "Manage memory",
             "Change, add to, rename or delete a memory card. I do it only when you confirm.",
             "For example: rename the memory card “Retry policy” to Backoff policy",
+            false,
+        ),
+        (
+            AgentCapability::CreateNote,
+            "Create note",
+            "Write a note into the workspace from a sentence you give, or from my last answer with its sources. It is indexed like any file, and I create it only when you confirm.",
+            "For example: create a note titled Pager rota: Alice is on call in March",
             false,
         ),
     ]
@@ -407,6 +418,7 @@ impl RepoMemoCore {
                     | AgentCapability::AnalyzeFiles
                     | AgentCapability::RecallMemory
                     | AgentCapability::ManageMemory
+                    | AgentCapability::CreateNote
             ) {
                 message.to_owned()
             } else {
@@ -465,6 +477,7 @@ impl RepoMemoCore {
                 AgentCapability::AnalyzeFiles => self.agent_analyze_files(&request, &subject).await,
                 AgentCapability::RecallMemory => self.agent_recall_memory(&request, &subject, &history).await,
                 AgentCapability::ManageMemory => self.agent_manage_memory(&request, &subject).await,
+                AgentCapability::CreateNote => self.agent_create_note(&request, &subject).await,
             }
         };
         // Provider and indexing problems are part of the conversation, not a
@@ -497,7 +510,7 @@ impl RepoMemoCore {
         let raw = provider
             .generate(GenerateRequest {
                 system: Some("You classify requests. You reply with JSON only.".to_owned()),
-                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- analyze_files: analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for\n- recall_memory: look in the team's saved memory cards, such as what was decided about a topic, or list them\n- manage_memory: change, add to, rename or delete a named memory card\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
+                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- analyze_files: analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for\n- recall_memory: look in the team's saved memory cards, such as what was decided about a topic, or list them\n- manage_memory: change, add to, rename or delete a named memory card\n- create_note: write a new note into the workspace from a sentence or from the last answer\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
                 context: message.to_owned(),
                 options: json!({ "temperature": 0.0 }),
             })
@@ -635,6 +648,47 @@ impl RepoMemoCore {
             description: file.title.clone(),
             files: vec![file],
         }))
+    }
+
+    /// Creating a note (V0.9.31): from a sentence the person wrote, or from the last answer with its sources, in the folder
+    /// named if one is. CAIRN proposes it and the person confirms.
+    async fn agent_create_note(&self, request: &AgentRequest, subject: &str) -> Result<AgentReply> {
+        let lower = subject.to_ascii_lowercase();
+        let asked = notes::note_request(subject, &lower).unwrap_or_else(|| notes::NoteRequest {
+            title: None,
+            text: subject.trim().to_owned(),
+            folder: None,
+        });
+        let folder = match &asked.folder {
+            None => None,
+            Some(wanted) => {
+                let folders = self.storage.list_folders(&request.workspace_id).await?;
+                match choose_folder(wanted, &folders) {
+                    FolderChoice::One(found) => Some((found.id, found.path)),
+                    FolderChoice::TopLevel => None,
+                    FolderChoice::Many(names) => {
+                        return Ok(reply(format!(
+                            "Several folders match “{wanted}”: {}. Say which one by its full path.",
+                            names.join(", ")
+                        )))
+                    }
+                    FolderChoice::Missing(names) if names.is_empty() => {
+                        return Ok(reply("This workspace has no folders yet, so the note would go at the top level. Leave the folder out, or create it in Evidence first."))
+                    }
+                    FolderChoice::Missing(names) => {
+                        return Ok(reply(format!(
+                            "I can't find a folder named “{wanted}”. The folders here are: {}.",
+                            names.join(", ")
+                        )))
+                    }
+                }
+            }
+        };
+        Ok(notes::note_reply(
+            &asked,
+            &request.exchanges,
+            folder.as_ref().map(|(id, path)| (id.as_str(), path.as_str())),
+        ))
     }
 
     /// Changing the memory (V0.9.30): CAIRN finds the card by its title and proposes the change, which carries the revision it
@@ -1613,6 +1667,10 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     // ASCII lowercasing keeps byte offsets aligned with `text`.
     let lower = text.to_ascii_lowercase();
 
+    // "Create a note titled X: ...", "save that as a note in the Y folder" (V0.9.31).
+    if notes::note_request(text, &lower).is_some() {
+        return Some((AgentCapability::CreateNote, text.trim().to_owned()));
+    }
     // "Update the memory card X: ...", "rename the memory card X to Y", "delete the memory card X" (V0.9.30).
     if memory::memory_command(text, &lower).is_some() {
         return Some((AgentCapability::ManageMemory, text.trim().to_owned()));
@@ -1758,6 +1816,7 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
         "analyze_files" => AgentCapability::AnalyzeFiles,
         "recall_memory" => AgentCapability::RecallMemory,
         "manage_memory" => AgentCapability::ManageMemory,
+        "create_note" => AgentCapability::CreateNote,
         _ => return None,
     };
     let subject = value

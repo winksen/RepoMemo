@@ -372,6 +372,7 @@ fn example(capability: AgentCapability) -> &'static str {
         AgentCapability::AnalyzeFiles => "analyze the Word documents",
         AgentCapability::RecallMemory => "what do we know about retries",
         AgentCapability::ManageMemory => "rename the memory card “Retry policy” to Backoff policy",
+        AgentCapability::CreateNote => "create a note titled Pager rota: Alice is on call in March",
     }
 }
 

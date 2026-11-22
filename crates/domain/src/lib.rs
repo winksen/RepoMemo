@@ -2894,6 +2894,8 @@ pub enum AgentCapability {
     RecallMemory,
     /// Changes, adds to, renames or deletes a memory card, after the person confirms (V0.9.30).
     ManageMemory,
+    /// Creates a note from a sentence or from the last answer, after the person confirms (V0.9.31).
+    CreateNote,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2927,6 +2929,8 @@ pub enum AgentProposalKind {
     UpdateMemory,
     /// Delete a memory card (V0.9.30).
     DeleteMemory,
+    /// Create a note, indexed like any file (V0.9.31).
+    SaveNote,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

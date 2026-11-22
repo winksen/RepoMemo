@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.31 (2026-11-21)
+
+CAIRN creates notes, which become evidence.
+
+### Changed
+- **New job: Create note** (create_note). *Create a note titled Pager rota: Alice is on call in March*, *add a note in the Runbooks folder: Deploys need approval from two people*, *write a note called Standup* and, after an answer, *save that as a note* (also *make a note*, *take a note*, *save this as a note in the Decisions folder*) propose a note. The text follows a colon; a title is named with *titled*, *called* or *named*; a folder with *in the X folder* or *in folder X*. It needs no AI.
+- **From a sentence or from the last answer.** A note is made from the sentence given, as written, or from CAIRN's last answer with a *Sources* list of the files that answer cited. When the last answer found nothing, or there is none, CAIRN says what to write instead of making an empty note. Without a title it names the note after the sentence or the question.
+- **Evidence like any file.** The card shows the title, the folder and the text before anything is stored. Confirming calls the ordinary create-note handler as you, so the role check, the storage quota and the queue that indexes it apply; CAIRN and search find the note later and it can be cited. The folder is found by path or name as when moving files (several or none are answered, not guessed), and the card says everyone who can read the workspace can read the note.
+- It is a write job, so a viewer is not offered it. No API route, setting or migration changes.
+
+### Checks
+- Unit tests for the wordings, the title, folder and text, the proposals and the near misses; compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.30 (2026-11-21)
 
 CAIRN changes and deletes memory cards when you confirm.

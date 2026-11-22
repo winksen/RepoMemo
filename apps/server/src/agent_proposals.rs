@@ -109,7 +109,7 @@ async fn apply(
                 format!("Moved {subject} to {}.", payload_text(proposal, "folder_name"))
             })
         }
-        AgentProposalKind::SaveSummary => {
+        AgentProposalKind::SaveSummary | AgentProposalKind::SaveNote => {
             // The same handler as a note written by hand: its role check, its quota and the queue that indexes it.
             let body: CreateTextArtifactRequest = serde_json::from_value(proposal.payload.clone())
                 .map_err(|_| ApiError::bad_request("This proposal can no longer be applied."))?;
@@ -121,7 +121,7 @@ async fn apply(
             )
             .await?;
             Ok(format!(
-                "Saved the summary as the note “{}”. It is being indexed, so CAIRN and search can find it soon.",
+                "Saved the note “{}”. It is being indexed, so CAIRN and search can find it soon.",
                 note.summary.title
             ))
         }

@@ -53,6 +53,7 @@ const CAPABILITY_ICONS: Record<AgentCapability, typeof Search> = {
   analyze_files: Brain,
   recall_memory: Notebook,
   manage_memory: Notebook,
+  create_note: FileText,
 };
 
 /** The evidence states a selection can be given: the id, how it is said to CAIRN and how it is labelled. */
