@@ -51,15 +51,9 @@ export function WorkspaceCustomization({ accessToken, onSaved, workspace }: {
     <section className="shared-settings-group">
       <PanelHeading icon={PaletteIcon} title="Customization" />
       <p className="shared-muted-copy">Choose how this workspace looks. Everyone in the organization sees the icon and the color.</p>
-      <div className="shared-customization-block">
-        <strong>Icon</strong>
-        <span className="shared-muted-copy">Stands for the workspace in the dashboard, the workspace lists and the sidebar.</span>
-        <WorkspaceIconPicker disabled={pending !== null} onChange={(key) => void chooseIcon(key)} value={currentIcon} />
-      </div>
-      <div className="shared-customization-block">
-        <strong>Main color</strong>
-        <span className="shared-muted-copy">Colors the tabs and highlights of this workspace. Each color has a darker shade for the light theme and a lighter one for the dark theme, so it reads well on both.</span>
-        <WorkspaceColorPicker disabled={pending !== null} onChange={(key) => void chooseColor(key)} value={currentColor} />
+      <div className="shared-new-workspace-look">
+        <div><strong>Icon</strong><WorkspaceIconPicker disabled={pending !== null} onChange={(key) => void chooseIcon(key)} value={currentIcon} /></div>
+        <div><strong>Main color</strong><WorkspaceColorPicker disabled={pending !== null} onChange={(key) => void chooseColor(key)} value={currentColor} /></div>
       </div>
     </section>
   );

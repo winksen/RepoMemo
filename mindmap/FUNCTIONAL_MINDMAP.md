@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.16` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.17 — A tidier workspace Settings page.
+
+- The **Administrative workspace controls** note and the lines around it are gone.
+- **Icon** and **Main color** sit side by side, followed by the **template cards** in one row, as in the New workspace dialog.
+- **Template cards** have the thick border of the other controls, take the workspace's color on hover, and are **filled with it** when chosen (also in the New workspace and New organization dialogs).
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.16 — A workspace's tabs stay in their safe zone.
 

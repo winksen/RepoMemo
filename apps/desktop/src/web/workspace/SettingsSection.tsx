@@ -94,7 +94,6 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
   return (
           <section className="shared-settings-section">
             {canManageMembers ? <>
-              <div className="shared-settings-policy"><Settings size={ICON_SIZE.lg} /><div><strong>Administrative workspace controls</strong><span>Changes are enforced by the shared API. Administrators can manage people and integrations; owner-only workspace actions are explicitly marked.</span></div></div>
               <WorkspaceCustomization accessToken={accessToken} onSaved={onWorkspaceUpdated} workspace={workspace.workspace} />
               <TemplateSettings accessToken={accessToken} key={`template-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="text" workspaceId={workspace.workspace.id} />

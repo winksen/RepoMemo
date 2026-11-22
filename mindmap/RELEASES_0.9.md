@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.16` (2026-11-21)
+> **Current:** `V0.9.17` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -51,6 +51,7 @@
 | **V0.9.27** | 🔜 | AM. Public readiness | 📘 | Release candidate | Freeze the final candidate and repeat affected checks on its exact commit | Documentation, release notes, migrations, CI and manual records name the same candidate; a subsequent code change invalidates affected sign-offs |
 | **V0.9.15** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Borderless bar controls | Draw the top bar's buttons and search bar without a border and with one shared fill, showing a blue border only on hover | The bar's buttons and search bar share a fill, have no border, and get a blue border on hover or while their dropdown is open |
 | **V0.9.16** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Tabs stay in their safe zone | When a workspace's tabs do not fit the row, keep the open tab and the first ones that fit and put the rest behind the More menu | A narrow window or a template with many sections no longer runs tabs off the edge; the rest are in More |
+| **V0.9.17** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Workspace settings look | Remove the administrative note and its lines, put the icon and color side by side above the template cards, and draw the cards with a thick border, the workspace color on hover and filled with it when chosen | Settings reads like the New workspace dialog, and the chosen template is easy to see |
 
 ## Verification and handoff
 

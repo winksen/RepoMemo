@@ -311,3 +311,17 @@ th > .rm-badge,
 .shared-organization-profile-icon { display: grid; gap: 8px; }
 .shared-organization-profile-icon > strong { font-size: 13px; }
 .shared-org-card-description { display: -webkit-box; max-width: 100%; margin-top: -2px; overflow: hidden; color: var(--color-text-muted); font-size: 13px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+/* Template cards (V0.9.17): the thick border of the other controls, the workspace's color on hover, and the card filled with it when chosen. */
+.rm-template-option { border: 2px solid var(--color-border); transition: border-color 110ms var(--ease-control), background 110ms var(--ease-control); }
+.rm-template-option:hover { background: var(--color-surface); border-color: var(--color-accent); }
+.rm-template-option:has(.rm-template-radio:checked), .rm-template-option:has(.rm-template-radio:checked):hover { color: var(--color-on-accent); background: var(--color-accent); border-color: var(--color-accent); }
+.rm-template-option:has(.rm-template-radio:checked) .rm-template-text span { color: var(--color-on-accent); opacity: 0.85; }
+.rm-template-option:has(.rm-template-radio:checked) .rm-template-check { color: var(--color-accent); }
+.rm-template-picker:disabled .rm-template-option:hover { border-color: var(--color-border); }
+/* In Settings the icon and color sit side by side and the template cards follow in one row, as in the New workspace dialog. */
+.shared-settings-section .rm-template-options { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.shared-settings-section .rm-template-art { max-width: 140px; }
+.shared-settings-section .rm-template-art-box { padding: 6px; }
+@media (max-width: 1000px) { .shared-settings-section .rm-template-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .shared-settings-section .rm-template-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
