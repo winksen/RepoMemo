@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Rows as LayoutList } from "@phosphor-icons/react";
 import { saveSharedWorkspaceTemplate } from "../lib/sharedApi";
 import type { WorkspaceTemplateView } from "../types";
@@ -36,7 +36,10 @@ export function TemplateSettings({ accessToken, embedded = false, workspaceId }:
   const [detail] = useTemplateDetail(accessToken, chosenId, comparing);
   const [base] = useTemplateDetail(accessToken, currentId, Boolean(current));
   if (!current) return null;
+  // While the button closes it keeps the name it had, instead of changing under the person's eyes.
+  const useName = useRef("");
   const chosenName = catalogue.find((template) => template.id === chosenId)?.name ?? chosenId;
+  if (comparing) useName.current = chosenName;
   const adjusted = current.overrides !== null && typeof current.overrides === "object" && Object.keys(current.overrides as object).length > 0;
 
   async function save(templateId: string, overrides: Record<string, unknown> | undefined, done: string) {
@@ -65,9 +68,9 @@ export function TemplateSettings({ accessToken, embedded = false, workspaceId }:
         ? <div className="shared-part-heading"><h3 className="shared-part-title">Template</h3>{current.source === "fallback" ? null : <span>Version {current.template.version}</span>}</div>
         : <PanelHeading description={current.source === "fallback" ? undefined : `Version ${current.template.version}`} icon={LayoutList} title="Template" />}
       {current.source === "fallback" ? <p className="shared-muted-copy">{current.reason} General is in use until a template is chosen.</p> : null}
-      <TemplatePicker disabled={busy} name={`settings-template-${workspaceId}`} onChange={setChoice} templates={catalogue} value={chosenId} activeId={currentId} />
+      <TemplatePicker disabled={busy} name={`settings-template-${workspaceId}`} onChange={setChoice} templates={catalogue} value={chosenId} activeId={currentId} hideLegend={embedded} />
       <Collapse open={comparing || current.source !== "workspace"}>
-        <Button busy={busy} disabled={busy || (comparing && !detail)} onClick={() => void apply()} type="button" variant="main">Use {chosenName}</Button>
+        <Button busy={busy} disabled={busy || (comparing && !detail)} onClick={() => void apply()} type="button" variant="main">Use {useName.current}</Button>
       </Collapse>
       <Collapse open={current.source === "workspace" && !comparing && Boolean(base)}>
         {current.source === "workspace" && base ? <Adjustments

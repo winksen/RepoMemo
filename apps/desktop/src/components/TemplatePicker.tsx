@@ -8,10 +8,12 @@ import { TemplateArt } from "./TemplateArt";
  * Which template a new workspace starts with: a card for each, with a drawing of what it is for, its name and a line about it.
  * It shows nothing while the server offers only `general`, so a server with no other template looks as it did.
  */
-export function TemplatePicker({ activeId, disabled = false, name, onChange, templates, value }: {
+export function TemplatePicker({ activeId, disabled = false, hideLegend = false, name, onChange, templates, value }: {
   /** The template the workspace uses now; its card is tagged *Active now*. */
   activeId?: string;
   disabled?: boolean;
+  /** Keeps the group's name for screen readers only, when a title above already says it. */
+  hideLegend?: boolean;
   /** Distinguishes the radio group when two pickers are on a page. */
   name: string;
   onChange: (templateId: string) => void;
@@ -21,14 +23,14 @@ export function TemplatePicker({ activeId, disabled = false, name, onChange, tem
   if (templates.length < 2) return null;
   return (
     <fieldset className="rm-template-picker" disabled={disabled}>
-      <legend>Template</legend>
+      <legend className={hideLegend ? "sr-only" : undefined}>Template</legend>
       <div className="rm-template-options">
         {templates.map((template) => (
           <label className="rm-template-option" key={template.id}>
             <input checked={value === template.id} className="rm-template-radio" name={name} onChange={() => onChange(template.id)} type="radio" value={template.id} />
             <span className="rm-template-art-box"><TemplateArt id={template.id} /></span>
             <CheckCircle aria-hidden="true" className="rm-template-check" size={ICON_SIZE.lg} weight="fill" />
-            <span className="rm-template-text"><strong>{template.name}{activeId === template.id ? <> <Badge className="rm-template-active">Active now</Badge></> : null}{template.custom ? <> <Badge>Custom</Badge></> : null}</strong><span>{template.summary}</span></span>
+            <span className="rm-template-text"><strong>{template.name}{template.custom ? <> <Badge>Custom</Badge></> : null}</strong><span>{template.summary}</span>{activeId === template.id ? <Badge className="rm-template-active">Active now</Badge> : null}</span>
           </label>
         ))}
       </div>

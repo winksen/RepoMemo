@@ -2,7 +2,15 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.20` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.21` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.21 — Template choice polish.
+
+- The **Use** button and the adjustments **ease in and out** (one smooth curve) and the button keeps its name while it closes.
+- The **Active now** tag sits **under the card's description** on a fill lighter than the card.
+- The **Template** title is shown once (the cards' own label is for screen readers only).
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.20 — Customization refinements.
 
