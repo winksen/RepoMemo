@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 
 use crate::RepoMemoCore;
 
+mod chat_summary;
 mod chatter;
 mod evidence;
 mod files;
@@ -265,6 +266,13 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             "For example: move retry-policy.md to Runbooks",
             false,
         ),
+        (
+            AgentCapability::SummarizeChat,
+            "Summarize chat",
+            "Summarize this whole conversation: what was asked, found and left open.",
+            "No input needed",
+            true,
+        ),
     ]
     .into_iter()
     .map(
@@ -312,7 +320,10 @@ pub fn agent_conversation_title(label: &str) -> String {
 fn requires_ai(capability: AgentCapability) -> bool {
     matches!(
         capability,
-        AgentCapability::SummarizeFile | AgentCapability::AskQuestion | AgentCapability::WorkspaceOverview
+        AgentCapability::SummarizeFile
+            | AgentCapability::AskQuestion
+            | AgentCapability::WorkspaceOverview
+            | AgentCapability::SummarizeChat
     )
 }
 
@@ -409,6 +420,7 @@ impl RepoMemoCore {
                 AgentCapability::WorkspaceOverview => self.agent_overview(&request).await,
                 AgentCapability::SaveMemory => Ok(self.agent_save_memory(&request, &subject)),
                 AgentCapability::ManageFiles => self.agent_manage_files(&request, &subject).await,
+                AgentCapability::SummarizeChat => self.agent_summarize_chat(&request).await,
             }
         };
         // Provider and indexing problems are part of the conversation, not a
@@ -441,7 +453,7 @@ impl RepoMemoCore {
         let raw = provider
             .generate(GenerateRequest {
                 system: Some("You classify requests. You reply with JSON only.".to_owned()),
-                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
+                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
                 context: message.to_owned(),
                 options: json!({ "temperature": 0.0 }),
             })
@@ -475,6 +487,40 @@ impl RepoMemoCore {
             workspace: name.map(|name| WorkspaceBrief { name, files }),
             suggestions,
         }
+    }
+
+    /// Summarizing the whole chat (V0.9.13): the conversation as stored, not the few turns that fit CAIRN's memory.
+    async fn agent_summarize_chat(&self, request: &AgentRequest) -> Result<AgentReply> {
+        if request.exchanges.is_empty() {
+            return Ok(reply(
+                "There is nothing to summarize yet: this chat has no earlier messages. Ask me something first.",
+            ));
+        }
+        let provider_id = request.provider_id.clone().unwrap_or_default();
+        let settings = self.storage.get_provider_settings(&provider_id).await?;
+        if !settings.enabled || settings.workspace_id.as_deref() != Some(request.workspace_id.as_str()) {
+            repomemo_domain::bail_invalid!("The selected provider is not enabled for this workspace.");
+        }
+        let provider = provider_from_settings(settings)?;
+        let (conversation, cut) = chat_summary::transcript(&request.exchanges);
+        let summary = provider
+            .generate(GenerateRequest {
+                system: Some(format!("{} {}", cairn_persona(), chat_summary::CHAT_SUMMARY_RULES)),
+                prompt: "Summarize this conversation.".to_owned(),
+                context: conversation,
+                options: json!({ "temperature": 0.2 }),
+            })
+            .await?;
+        let mut result = reply(summary.trim().to_owned());
+        result.generated = true;
+        result.context_turns = request.exchanges.len() as i64;
+        result.citations = chat_summary::sources(&request.exchanges);
+        if cut {
+            result
+                .warnings
+                .push("This chat is long, so the summary is based on its most recent messages.".to_owned());
+        }
+        Ok(result)
     }
 
     /// Moving, renaming or trashing one file (V0.9.11): CAIRN finds the file, and the folder for a move, and proposes the
@@ -1116,6 +1162,10 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     // ASCII lowercasing keeps byte offsets aligned with `text`.
     let lower = text.to_ascii_lowercase();
 
+    // "Summarize this chat" must be seen before "summarize" is taken for a request about a file (V0.9.13).
+    if chat_summary::chat_summary_request(&lower) {
+        return Some((AgentCapability::SummarizeChat, String::new()));
+    }
     // "Move X to Y", "rename X to Y", "delete the file X" (V0.9.11).
     if file_command(text, &lower).is_some() {
         return Some((AgentCapability::ManageFiles, text.trim().to_owned()));
@@ -1241,6 +1291,7 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
         "workspace_overview" => AgentCapability::WorkspaceOverview,
         "save_memory" => AgentCapability::SaveMemory,
         "manage_files" => AgentCapability::ManageFiles,
+        "summarize_chat" => AgentCapability::SummarizeChat,
         _ => return None,
     };
     let subject = value

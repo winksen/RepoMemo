@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.13 — CAIRN summarizes the whole chat.
+
+- **Summarize chat.** "Summarize this chat" (or *+ › Summarize chat*) writes a short summary of the whole conversation: what it was about, findings, decisions or actions, files discussed and open questions, from what was said only. A very long chat is summarized from its newest messages. It needs an AI provider.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.12 — Files uploaded in the chat are indexed.
 

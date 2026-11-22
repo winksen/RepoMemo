@@ -2531,7 +2531,8 @@ export type AgentCapability =
   | "ask_question"
   | "workspace_overview"
   | "save_memory"
-  | "manage_files";
+  | "manage_files"
+  | "summarize_chat";
 
 export interface AgentCapabilityInfo {
   id: AgentCapability;

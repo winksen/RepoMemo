@@ -49,6 +49,7 @@ const CAPABILITY_ICONS: Record<AgentCapability, typeof Search> = {
   workspace_overview: Dashboard,
   save_memory: BookmarkSimple,
   manage_files: FolderSimple,
+  summarize_chat: History,
 };
 
 const LAST_CHAT_PREFIX = "repomemo.assistant.last-chat.";
@@ -160,7 +161,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     ready: Boolean(capabilities) && !isBusy && !isLoadingChat,
     handle: (queued) => {
       const label = queued.message.trim() || (queued.capability ? capabilityLabel(capabilities, queued.capability) : "");
-      if (queued.capability === "workspace_overview" || (queued.message.trim() && label)) {
+      if (queued.capability === "workspace_overview" || queued.capability === "summarize_chat" || (queued.message.trim() && label)) {
         send({ message: queued.message.trim(), capability: queued.capability }, label);
         setSelected(null);
       } else if (queued.capability) {
@@ -249,8 +250,8 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   }
 
   function choose(capability: AgentCapability) {
-    if (capability === "workspace_overview") {
-      send({ message: "", capability }, "Workspace overview");
+    if (capability === "workspace_overview" || capability === "summarize_chat") {
+      send({ message: "", capability }, capabilityLabel(capabilities, capability));
       setSelected(null);
       return;
     }

@@ -2886,6 +2886,8 @@ pub enum AgentCapability {
     SaveMemory,
     /// Moves a file to a folder, renames it or sends it to the trash, after the person confirms (V0.9.11).
     ManageFiles,
+    /// Summarizes the whole conversation (V0.9.13).
+    SummarizeChat,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

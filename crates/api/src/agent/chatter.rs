@@ -368,6 +368,7 @@ fn example(capability: AgentCapability) -> &'static str {
         AgentCapability::WorkspaceOverview => "give me a workspace overview",
         AgentCapability::SaveMemory => "save that as a memory",
         AgentCapability::ManageFiles => "move retry-policy.md to Runbooks",
+        AgentCapability::SummarizeChat => "summarize this chat",
     }
 }
 

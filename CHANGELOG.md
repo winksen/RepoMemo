@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.13 (2026-11-21)
+
+CAIRN summarizes the whole chat.
+
+### Changed
+- **New job: Summarize chat** (`summarize_chat`). *Summarize this chat*, *recap our conversation*, *resume the conversation*, *chat summary* and similar wordings, or **+ › Summarize chat**, make the AI write a short summary of the conversation: one sentence on what it was about, then *Findings*, *Decisions or actions*, *Files discussed* (exact names) and *Open questions*, leaving out a heading with nothing under it. It needs an AI provider.
+- **The whole chat.** CAIRN's short memory keeps only the latest turns, so the server now gives the core every earlier exchange in full and the summary reads all of them (each answer cut to 1,200 characters). A chat too long for one request is summarized from its most recent messages, and a warning says so.
+- **Only what was said.** The prompt allows no facts beyond the conversation. The summary shows as *What CAIRN read* the sources the conversation drew on (each passage once, up to twenty), and is labelled AI-generated.
+- **Recognised first.** The router sees these wordings before *summarize* is taken for a request about a file, so *summarize this chat* no longer asks which file; *summarize the thread pool settings*, *summarize this file* and *how do I resume a paused job* are unaffected.
+- An empty chat says there is nothing to summarize and calls no AI. No API route, setting or migration changes.
+
+### Checks
+- Unit tests for the wordings (and near misses), the transcript cut and the sources; compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run: a real summary was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.12 (2026-11-21)
 
 Files uploaded in the chat are indexed.

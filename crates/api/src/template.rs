@@ -840,6 +840,7 @@ mod tests {
             AgentCapability::WorkspaceOverview => "workspace_overview",
             AgentCapability::SaveMemory => "save_memory",
             AgentCapability::ManageFiles => "manage_files",
+            AgentCapability::SummarizeChat => "summarize_chat",
         };
         let every = [
             AgentCapability::FindFiles,
@@ -850,6 +851,7 @@ mod tests {
             AgentCapability::WorkspaceOverview,
             AgentCapability::SaveMemory,
             AgentCapability::ManageFiles,
+            AgentCapability::SummarizeChat,
         ];
         let named: Vec<&str> = every.iter().map(id).collect();
         assert_eq!(named, repomemo_templates::CAPABILITIES);
