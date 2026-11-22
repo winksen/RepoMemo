@@ -3,7 +3,7 @@ import { SafeMarkdown } from "./SafeMarkdown";
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BookmarkSimple, Brain, FolderSimple, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
+import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
 import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";
@@ -51,6 +51,7 @@ const CAPABILITY_ICONS: Record<AgentCapability, typeof Search> = {
   manage_files: FolderSimple,
   summarize_chat: History,
   analyze_files: Brain,
+  recall_memory: Notebook,
 };
 
 /** The evidence states a selection can be given: the id, how it is said to CAIRN and how it is labelled. */
@@ -583,6 +584,11 @@ function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, i
       {offerSummary ? <Button disabled={isBusy || !file.indexed_at} onClick={() => onSummarize(file.id, file.title)} title={file.indexed_at ? `Summarize ${file.title}` : "This file is not indexed yet"} type="button" variant="secondary">Summarize</Button> : null}
     </li>)}</ul> : null}
     {reply.matches.length ? <div className="shared-search-results">{reply.matches.map((match) => <article key={match.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(match.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{match.title}</strong><span>{match.source_name}</span></span><p>{match.snippet}</p><span className="shared-search-result-path">{match.path}{match.start_line ? ` · line ${match.start_line}` : ""}</span></Button></article>)}</div> : null}
+    {(reply.memory_cards ?? []).length ? <ul className="shared-assistant-memories">{(reply.memory_cards ?? []).map((card) => <li key={card.id}>
+      <strong>{card.title}</strong>{card.needs_review ? <span className="shared-assistant-memory-flag">Needs review</span> : null}
+      <p>{card.body_excerpt}</p>
+      <small>{card.source} · {card.evidence_count} {card.evidence_count === 1 ? "source" : "sources"} · updated {formatRecentTime(card.updated_at)}</small>
+    </li>)}</ul> : null}
     {(reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
     {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
   </div>;

@@ -492,6 +492,11 @@ body.shared-dock-resizing { cursor: col-resize; user-select: none; }
 .shared-assistant-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .shared-assistant-proposal > small { color: var(--color-text-subtle); font-size: 12px; }
 .shared-assistant-proposal-dismissed { opacity: 0.7; }
+.shared-assistant-memories { display: grid; gap: 8px; max-width: 72ch; margin: 0; padding: 0; list-style: none; }
+.shared-assistant-memories li { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--color-border-strong); border-radius: 12px; }
+.shared-assistant-memories p { margin: 0; color: var(--color-text-muted); font-size: 13px; overflow-wrap: anywhere; }
+.shared-assistant-memories small { color: var(--color-text-subtle); font-size: 12px; }
+.shared-assistant-memory-flag { justify-self: start; padding: 1px 8px; border: 1px solid var(--color-border-strong); border-radius: 999px; font-size: 11px; }
 .shared-assistant-selectbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 13px; }
 .shared-assistant-status-choices { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
 .shared-assistant-status-choices label { display: flex; align-items: center; gap: 8px; font-size: 14px; }

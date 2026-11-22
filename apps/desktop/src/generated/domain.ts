@@ -2533,7 +2533,8 @@ export type AgentCapability =
   | "save_memory"
   | "manage_files"
   | "summarize_chat"
-  | "analyze_files";
+  | "analyze_files"
+  | "recall_memory";
 
 export interface AgentCapabilityInfo {
   id: AgentCapability;
@@ -2707,6 +2708,8 @@ export interface AgentReply {
    * the person selects from and what the next job can work on.
    */
   file_set: AgentFileSet | null;
+  /** The memory cards a reply found (V0.9.29), shown in the chat with what each cites. */
+  memory_cards: MemoryCardSummary[];
 }
 
 /** The files a reply found, said in words and by id. */

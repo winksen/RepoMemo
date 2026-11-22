@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.28` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.29` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.29 — CAIRN recalls what the team has kept in memory.
+
+- **Recall memory.** *What do we know about retries*, *what did we decide about the pager policy*, *search memory for X*, *list the memory cards*: CAIRN shows the matching cards in the chat with their text, sources and a Needs review flag. With none and an AI provider, it answers from the files instead and says so.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.28 — CAIRN sets the evidence state of a set of files.
 

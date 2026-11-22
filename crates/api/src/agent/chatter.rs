@@ -370,6 +370,7 @@ fn example(capability: AgentCapability) -> &'static str {
         AgentCapability::ManageFiles => "move retry-policy.md to Runbooks",
         AgentCapability::SummarizeChat => "summarize this chat",
         AgentCapability::AnalyzeFiles => "analyze the Word documents",
+        AgentCapability::RecallMemory => "what do we know about retries",
     }
 }
 

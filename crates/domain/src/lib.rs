@@ -2890,6 +2890,8 @@ pub enum AgentCapability {
     SummarizeChat,
     /// Reads several files together, as a kind, a folder or a selection, and writes one analysis (V0.9.27).
     AnalyzeFiles,
+    /// Searches the workspace's memory cards and shows them (V0.9.29).
+    RecallMemory,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3086,6 +3088,9 @@ pub struct AgentReply {
     /// the person selects from and what the next job can work on.
     #[serde(default)]
     pub file_set: Option<AgentFileSet>,
+    /// The memory cards a reply found (V0.9.29), shown in the chat with what each cites.
+    #[serde(default)]
+    pub memory_cards: Vec<MemoryCardSummary>,
 }
 
 /// The files a reply found, said in words and by id.

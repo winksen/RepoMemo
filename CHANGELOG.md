@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.29 (2026-11-21)
+
+CAIRN recalls what the team has kept in memory.
+
+### Changed
+- **New job: Recall memory** (recall_memory). *What do we know about retries*, *what did we decide about the pager policy*, *do we have a memory about backups*, *search memory for deploy approval*, *find memory cards about onboarding*, *recall the SQLite decision* search the workspace's memory cards; *list the memory cards*, *show me the memory cards* and *what's in memory* show the newest. It needs no AI.
+- **Shown in the chat.** Each card (up to ten, with the total said) appears with its title, its text, its source, how many sources it cites, when it was updated and a *Needs review* flag when the evidence it cites has changed, gone or been retired. The *+* menu has the job too.
+- **Memory before files.** *What do we know about X* is a question the team may already have answered. When no card matches and an AI provider is enabled, CAIRN says there is no memory card about it and answers from the files instead (Ask, with its sources); when the person picked the job explicitly, or there is no provider, it only says there is none.
+- No API route, setting or migration changes; the AI quota is not counted for the lookup itself.
+
+### Checks
+- Unit tests for the wordings, the lists and the requests that must not match; compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run: the cards in the chat were not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.28 (2026-11-21)
 
 CAIRN sets the evidence state of a set of files.

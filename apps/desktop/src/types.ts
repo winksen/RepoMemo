@@ -610,6 +610,8 @@ export interface AgentReply {
   proposals?: AgentProposal[];
   /** Every file the reply found, by id, to select from (V0.9.26); `files` holds the first of them. */
   file_set?: AgentFileSet | null;
+  /** The memory cards a reply found (V0.9.29). */
+  memory_cards?: MemoryCardSummary[];
 }
 
 export interface MemoryCard {

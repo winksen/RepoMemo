@@ -18,6 +18,7 @@ mod chat_summary;
 mod chatter;
 mod evidence;
 mod filters;
+mod memory;
 use filters::{parse_filter, FileFilter};
 mod files;
 use files::{
@@ -33,6 +34,8 @@ const MAX_MESSAGE_CHARS: usize = 2_000;
 const FILE_RESULT_LIMIT: usize = 50;
 /// The most files a set holds, and a proposal acts on, at once: what the server's bulk file action accepts.
 const SET_LIMIT: usize = 200;
+/// The most memory cards a reply shows.
+const MEMORY_CARDS_SHOWN: usize = 10;
 const FILE_CHOICE_LIMIT: usize = 8;
 const SEARCH_RESULT_LIMIT: i64 = 10;
 /// Earlier turns that go with a question: the newest ones that fit this many
@@ -288,6 +291,13 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             "Which files, and what to look for? For example: the pdfs in Finance for payment terms",
             true,
         ),
+        (
+            AgentCapability::RecallMemory,
+            "Recall memory",
+            "Search the team's memory cards, or list the newest, and show what each says and cites.",
+            "What to look for in memory? Leave it empty to list the newest cards",
+            false,
+        ),
     ]
     .into_iter()
     .map(
@@ -385,6 +395,7 @@ impl RepoMemoCore {
                     | AgentCapability::SaveMemory
                     | AgentCapability::ManageFiles
                     | AgentCapability::AnalyzeFiles
+                    | AgentCapability::RecallMemory
             ) {
                 message.to_owned()
             } else {
@@ -441,6 +452,7 @@ impl RepoMemoCore {
                 AgentCapability::ManageFiles => self.agent_manage_files(&request, &subject).await,
                 AgentCapability::SummarizeChat => self.agent_summarize_chat(&request).await,
                 AgentCapability::AnalyzeFiles => self.agent_analyze_files(&request, &subject).await,
+                AgentCapability::RecallMemory => self.agent_recall_memory(&request, &subject, &history).await,
             }
         };
         // Provider and indexing problems are part of the conversation, not a
@@ -473,7 +485,7 @@ impl RepoMemoCore {
         let raw = provider
             .generate(GenerateRequest {
                 system: Some("You classify requests. You reply with JSON only.".to_owned()),
-                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- analyze_files: analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
+                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- analyze_files: analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for\n- recall_memory: look in the team's saved memory cards, such as what was decided about a topic, or list them\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
                 context: message.to_owned(),
                 options: json!({ "temperature": 0.0 }),
             })
@@ -611,6 +623,54 @@ impl RepoMemoCore {
             description: file.title.clone(),
             files: vec![file],
         }))
+    }
+
+    /// Recalling memory cards (V0.9.29): the newest when no words are given, else those the words find. With none found and an
+    /// AI provider, a request that was not explicitly for memory is answered from the files instead, and says so.
+    async fn agent_recall_memory(
+        &self,
+        request: &AgentRequest,
+        subject: &str,
+        history: &[AgentHistoryTurn],
+    ) -> Result<AgentReply> {
+        let lower = subject.to_ascii_lowercase();
+        let query = memory::recall_request(subject, &lower).unwrap_or_else(|| clean_subject(subject));
+        let found = if query.is_empty() {
+            self.list_memory_cards(request.workspace_id.clone()).await?
+        } else {
+            self.search_memory_cards(request.workspace_id.clone(), query.clone())
+                .await?
+        };
+        if found.is_empty() {
+            if !query.is_empty() && request.capability.is_none() && request.provider_id.is_some() {
+                let mut answered = self.agent_ask(request, subject.trim(), history).await?;
+                answered.reply_markdown = format!(
+                    "There is no memory card about “{query}”, so here is what the files say.\n\n{}",
+                    answered.reply_markdown
+                );
+                return Ok(answered);
+            }
+            return Ok(reply(if query.is_empty() {
+                "This workspace has no memory cards yet. After an answer, say `save that as a memory` to make one."
+                    .to_owned()
+            } else {
+                format!("There is no memory card about “{query}”.")
+            }));
+        }
+        let total = found.len();
+        let mut result = reply(if query.is_empty() {
+            format!(
+                "The newest of the workspace's {total} memory {}:",
+                plural(total, "card", "cards")
+            )
+        } else {
+            format!(
+                "I found {total} memory {} about “{query}”:",
+                plural(total, "card", "cards")
+            )
+        });
+        result.memory_cards = found.into_iter().take(MEMORY_CARDS_SHOWN).collect();
+        Ok(result)
     }
 
     /// Analyzing several files together (V0.9.27): notes on each file's indexed text for what was asked, then one analysis over
@@ -1242,6 +1302,7 @@ fn reply(markdown: impl Into<String>) -> AgentReply {
         context_turns: 0,
         proposals: Vec::new(),
         file_set: None,
+        memory_cards: Vec::new(),
     }
 }
 
@@ -1481,6 +1542,10 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     // ASCII lowercasing keeps byte offsets aligned with `text`.
     let lower = text.to_ascii_lowercase();
 
+    // "What do we know about X", "search memory for X", "list the memory cards" (V0.9.29).
+    if memory::recall_request(text, &lower).is_some() {
+        return Some((AgentCapability::RecallMemory, text.trim().to_owned()));
+    }
     // "Summarize this chat" must be seen before "summarize" is taken for a request about a file (V0.9.13).
     if chat_summary::chat_summary_request(&lower) {
         return Some((AgentCapability::SummarizeChat, String::new()));
@@ -1616,6 +1681,7 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
         "manage_files" => AgentCapability::ManageFiles,
         "summarize_chat" => AgentCapability::SummarizeChat,
         "analyze_files" => AgentCapability::AnalyzeFiles,
+        "recall_memory" => AgentCapability::RecallMemory,
         _ => return None,
     };
     let subject = value
