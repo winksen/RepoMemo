@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.12 (2026-11-21)
+
+Files uploaded in the chat are indexed.
+
+### Changed
+- **Attach files.** On Cairn's page, **+ › Attach files** uploads one or several files into the workspace. Each goes through the ordinary upload (the same types and size limit, the same role check and quota, and the same queue that indexes it), so nothing about uploading is different; the message box waits until they are done and a file that fails is reported in a toast without stopping the others.
+- **CAIRN records it.** Each file appears in the chat as *Uploaded <name>*, with CAIRN's reply *I added <name> to the workspace* and a link to the file. While it is still being indexed, the reply says so and how to ask about it (*summarize <name>*, or a question in a moment); once indexed, it says it can be asked about now. The chat is named after the first upload if it started the chat.
+- **Who.** The item is offered to people who may change the workspace (a viewer cannot upload), as the *Manage files* and *Save as memory* jobs are.
+- **API.** `POST /v1/workspaces/{workspace_id}/agent/attachments` (artifact id and optional chat) records the turn; it checks the chat is the caller's and the file is in the workspace. It does not upload anything itself.
+- Cairn's page only for now: the dock's message box has no attach item. No migration.
+
+### Checks
+- A unit test for the reply (indexing and indexed); compiled and linted for the core and the server, typecheck passes; not run. Nothing was built or run: an upload from the chat was not tried.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.11 (2026-11-21)
 
 CAIRN moves, renames and trashes files when you confirm.

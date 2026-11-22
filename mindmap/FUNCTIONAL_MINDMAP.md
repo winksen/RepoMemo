@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.11` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.12` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.12 — Files uploaded in the chat are indexed.
+
+- **Attach files.** *+ › Attach files* on Cairn's page uploads files into the workspace, indexed like any upload; CAIRN records each in the chat, with a link and when it can be searched, answered from and summarized. Offered to people who may change the workspace.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.11 — CAIRN moves, renames and trashes files when you confirm.
 

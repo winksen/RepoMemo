@@ -305,6 +305,26 @@ mod tests {
         }
     }
 
+    /// V0.9.12: an uploaded file is recorded as CAIRN having it, with when it can be asked about.
+    #[test]
+    fn an_uploaded_file_is_recorded_and_says_when_it_can_be_asked_about() {
+        let waiting = crate::agent::attachment_reply(file("report.pdf"));
+        assert!(waiting
+            .reply_markdown
+            .starts_with("I added **report.pdf** to the workspace."));
+        assert!(
+            waiting.reply_markdown.contains("being indexed")
+                && waiting.reply_markdown.contains("`summarize report.pdf`")
+        );
+        assert_eq!(waiting.files.len(), 1);
+        assert_eq!(waiting.routing, AgentRouting::Rules);
+
+        let mut done = file("report.pdf");
+        done.indexed_at = Some("2026-11-22T10:00:00Z".to_owned());
+        let ready = crate::agent::attachment_reply(done);
+        assert!(ready.reply_markdown.contains("already indexed") && !ready.reply_markdown.contains("being indexed"));
+    }
+
     #[test]
     fn move_rename_and_trash_requests_are_read() {
         assert_eq!(

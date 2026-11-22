@@ -9,7 +9,8 @@ use axum::{
     Json,
 };
 use repomemo_api::{
-    agent_capabilities, agent_conversation_title, agent_turn_label, capability_needs_write, HISTORY_MAX_TURNS,
+    agent_capabilities, agent_conversation_title, agent_turn_label, attachment_reply, capability_needs_write,
+    HISTORY_MAX_TURNS,
 };
 use repomemo_domain::{
     AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail, AgentExchange, AgentHistoryFile,
@@ -39,6 +40,13 @@ pub(crate) struct AgentMessageRequest {
     capability: Option<AgentCapability>,
     artifact_id: Option<String>,
     /// Continue this conversation; a new one is started when omitted.
+    conversation_id: Option<String>,
+}
+
+/// A file the person uploaded in the chat, which the upload route has already stored (V0.9.12).
+#[derive(Debug, Deserialize)]
+pub(crate) struct AgentAttachmentRequest {
+    artifact_id: String,
     conversation_id: Option<String>,
 }
 
@@ -202,6 +210,62 @@ pub(crate) async fn send_agent_message(
         )
         .await;
     }
+    Ok(Json(AgentTurnResponse {
+        conversation: owned_conversation(&state, &subject, &conversation_id).await?,
+        turn,
+    }))
+}
+
+/// Records an uploaded file as a turn of the chat. The upload itself (its role check, its quota, its indexing) is the upload
+/// route's; this adds what the chat shows: that CAIRN has the file and when it can be asked about.
+pub(crate) async fn attach_agent_file(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+    Json(request): Json<AgentAttachmentRequest>,
+) -> Result<Json<AgentTurnResponse>, ApiError> {
+    require_workspace_read(&state, &subject, &workspace_id).await?;
+    let existing = match request.conversation_id.as_deref() {
+        Some(conversation_id) => {
+            let conversation = owned_conversation(&state, &subject, conversation_id).await?;
+            if conversation.workspace_id != workspace_id {
+                return Err(conversation_not_found());
+            }
+            Some(conversation)
+        }
+        None => None,
+    };
+    let file = state
+        .storage
+        .get_artifact_summary(&request.artifact_id)
+        .await
+        .map_err(|_| ApiError::not_found("That file was not found."))?;
+    if file.workspace_id != workspace_id {
+        return Err(ApiError::not_found("That file was not found."));
+    }
+    let label = format!("Uploaded {}", file.title);
+    let message = AgentMessage {
+        message: label.clone(),
+        capability: None,
+        artifact_id: Some(file.id.clone()),
+    };
+    let reply = attachment_reply(file);
+    let conversation_id = match existing {
+        Some(conversation) => conversation.id,
+        None => {
+            state
+                .storage
+                .create_agent_conversation(&workspace_id, &subject.user_id, &agent_conversation_title(&label))
+                .await
+                .map_err(map_storage_error)?
+                .id
+        }
+    };
+    let turn = state
+        .storage
+        .append_agent_turn(&conversation_id, &label, &message, &reply)
+        .await
+        .map_err(map_storage_error)?;
     Ok(Json(AgentTurnResponse {
         conversation: owned_conversation(&state, &subject, &conversation_id).await?,
         turn,

@@ -750,6 +750,14 @@ export function sendSharedAgentMessage(accessToken: string, workspaceId: string,
   }, accessToken);
 }
 
+/** Records a file uploaded in the chat as a turn, once the upload has stored it (V0.9.12). */
+export function attachSharedAgentFile(accessToken: string, workspaceId: string, artifactId: string, conversationId?: string): Promise<AgentTurnResponse> {
+  return request<AgentTurnResponse>(`/v1/workspaces/${workspaceId}/agent/attachments`, {
+    method: "POST",
+    body: JSON.stringify({ artifact_id: artifactId, conversation_id: conversationId }),
+  }, accessToken);
+}
+
 /** Confirms what CAIRN proposed: the action runs as the person, and the turn comes back with its outcome (V0.9.10). */
 export function confirmSharedAgentProposal(accessToken: string, turnId: string, proposalId: string): Promise<AgentTurn> {
   return request<AgentTurn>(`/v1/agent/turns/${turnId}/proposals/${proposalId}/confirm`, { method: "POST", body: "{}" }, accessToken);

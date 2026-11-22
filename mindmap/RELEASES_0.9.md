@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.11` (2026-11-21)
+> **Current:** `V0.9.12` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -33,6 +33,7 @@
 | **V0.9.9** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | What CAIRN read | Head the list under a chat answer What CAIRN read in place of Evidence used | The list under an answer in CAIRN's chat and its full-list dialog read What CAIRN read, and other pages keep Evidence used |
 | **V0.9.10** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Proposals and save as memory | Let CAIRN propose an action that the person confirms, and use it to save the last answer, or a stated sentence, as a memory card that cites its evidence | "Save that as a memory" shows a card with the title, text and evidence, Confirm saves it as the person and records the outcome in the chat, Dismiss changes nothing, a second confirmation is refused and a viewer is offered none |
 | **V0.9.11** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Manage files | Let CAIRN propose moving a file to a folder, renaming it or moving it to the trash, one file at a time, and run it as the person when they confirm | "Move a.md to Runbooks" shows a card naming the file and the folder, Confirm moves it and records the outcome, several matching files or folders are listed instead of guessed, delete goes to the restorable trash and messages that are not about a file are left alone |
+| **V0.9.12** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Uploads in the chat | Let a person attach files in the chat, uploaded and indexed by the ordinary upload and recorded in the chat as CAIRN having them | + › Attach files uploads the chosen files, each shows in the chat as uploaded with a link and when it can be asked about, a failing file is reported without stopping the rest, and a viewer is not offered it |
 | **V0.9.15** | 🔜 | AM. Public readiness | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
 | **V0.9.16** | 🔜 | AM. Public readiness | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
 | **V0.9.17** | 🔜 | AM. Public readiness | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |

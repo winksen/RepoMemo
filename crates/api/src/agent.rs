@@ -185,6 +185,23 @@ const WORKSPACE_REFERENCES: &[&str] = &[
     "everything",
 ];
 
+/// CAIRN's reply to a file the person uploaded in the chat (V0.9.12): the file is stored and queued for indexing by the upload
+/// itself, so this only says so, and says when it can be asked about.
+pub fn attachment_reply(file: ArtifactSummary) -> AgentReply {
+    let state = if file.indexed_at.is_some() {
+        "It is already indexed, so you can ask me about it now.".to_owned()
+    } else {
+        format!(
+            "It is being indexed. Once that is done I can search it, answer from it and summarize it: ask me about it in a moment, or say `summarize {}`.",
+            file.title
+        )
+    };
+    let mut answer = reply(format!("I added **{}** to the workspace. {state}", file.title));
+    answer.routing = AgentRouting::Rules;
+    answer.files = vec![file];
+    answer
+}
+
 /// Whether a job changes the workspace once the person confirms it, so a viewer cannot be offered it (V0.9.10).
 pub fn capability_needs_write(capability: AgentCapability) -> bool {
     matches!(capability, AgentCapability::SaveMemory | AgentCapability::ManageFiles)

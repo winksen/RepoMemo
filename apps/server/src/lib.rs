@@ -911,6 +911,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(agent::send_agent_message),
         )
         .route(
+            "/v1/workspaces/{workspace_id}/agent/attachments",
+            post(agent::attach_agent_file),
+        )
+        .route(
             "/v1/workspaces/{workspace_id}/agent/conversations",
             get(agent::list_agent_conversations),
         )

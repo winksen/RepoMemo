@@ -3,8 +3,8 @@ import { SafeMarkdown } from "./SafeMarkdown";
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BookmarkSimple, Brain, FolderSimple, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
-import { confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
+import { BookmarkSimple, Brain, FolderSimple, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
+import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
@@ -114,6 +114,9 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   const [isSavingChat, setIsSavingChat] = useState(false);
   // The proposal being confirmed or dismissed (turn and proposal ids), so its buttons wait.
   const [deciding, setDeciding] = useState<string | null>(null);
+  // Files being uploaded into the chat (V0.9.12); the message box waits for them.
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [showChats, setShowChats] = useState(false);
   // Bumped whenever the visible chat changes, so a reply that arrives after
   // the user moved on is not written into the wrong thread.
@@ -121,7 +124,9 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   const pendingCounter = useRef(0);
   const threadEnd = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
-  const isBusy = turns.some((turn) => turn.status === "pending");
+  const isBusy = turns.some((turn) => turn.status === "pending") || isUploading;
+  // Whoever may change the workspace may upload into it; the server says so through the jobs it offers.
+  const canUpload = capabilities?.capabilities.some((capability) => capability.id === "manage_files" && capability.available) ?? false;
   const selectedInfo = capabilities?.capabilities.find((capability) => capability.id === selected) ?? null;
   const canSummarize = capabilities?.capabilities.some((capability) => capability.id === "summarize_file" && capability.available) ?? false;
   const activeConversation = conversations.find((conversation) => conversation.id === activeId) ?? null;
@@ -253,6 +258,35 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     input.current?.focus();
   }
 
+  /** Uploads files into the workspace from the chat: each is stored and indexed by the upload, and CAIRN records it as a message. */
+  async function uploadFiles(files: File[]) {
+    if (!files.length || isBusy || isLoadingChat) return;
+    const token = view.current;
+    setIsUploading(true);
+    let conversationId = activeId;
+    try {
+      for (const file of files) {
+        try {
+          const artifact = await uploadSharedArtifact(accessToken, workspaceId, file);
+          const { conversation, turn: saved } = await attachSharedAgentFile(accessToken, workspaceId, artifact.id, conversationId ?? undefined);
+          upsertConversation(conversation);
+          if (token !== view.current) return;
+          if (!conversationId) {
+            conversationId = conversation.id;
+            setActiveId(conversation.id);
+            rememberChat(workspaceId, conversation.id);
+            onChatChange?.(conversation.id);
+          }
+          setTurns((current) => [...current, storedTurn(saved)]);
+        } catch (error) {
+          showToast("error", apiMessage(error, `${file.name} could not be uploaded.`));
+        }
+      }
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
   function summarize(artifactId: string, title: string) {
     send({ message: title, capability: "summarize_file", artifact_id: artifactId }, `Summarize ${title}`);
   }
@@ -356,6 +390,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
         {!draft.trim() && !turns.length && suggestedQuestions(template?.assistant).length ? <div aria-label="Suggested questions" className="shared-assistant-suggestions" role="group">
           {suggestedQuestions(template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
         </div> : null}
+        <input aria-label="Attach files" className="shared-upload-native-input" hidden multiple onChange={(event) => { const chosen = Array.from(event.target.files ?? []); event.target.value = ""; void uploadFiles(chosen); }} ref={fileInput} type="file" />
         <div className="shared-assistant-box">
           <MenuPrimitive.Root>
             <MenuPrimitive.Trigger asChild>
@@ -363,6 +398,9 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
             </MenuPrimitive.Trigger>
             <MenuPrimitive.Portal>
               <MenuPrimitive.Content align="start" aria-label={`${ASSISTANT_NAME} actions`} className="rm-action-menu" side="top" sideOffset={8}>
+                {canUpload ? <MenuPrimitive.Item className="rm-action-item" disabled={isBusy || isLoadingChat} onSelect={() => fileInput.current?.click()} title="Upload files into this workspace. They are indexed, so I can search and answer from them.">
+                  <Paperclip size={ICON_SIZE.md} /><span>Attach files</span>
+                </MenuPrimitive.Item> : null}
                 {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
                   const Icon = CAPABILITY_ICONS[capability.id];
                   return <MenuPrimitive.Item className="rm-action-item" disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onSelect={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`}>

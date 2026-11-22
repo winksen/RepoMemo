@@ -239,6 +239,7 @@
 | POST | `/v1/workspaces/{workspace_id}/health/actions` | auth | require_workspace_admin | HealthActionRequest | HealthActionResult |
 | GET | `/v1/workspaces/{workspace_id}/agent/capabilities` | auth | require_workspace_read | — | AgentCapabilitiesResponse (capabilities, provider_name, model) |
 | POST | `/v1/workspaces/{workspace_id}/agent/messages` | auth | require_workspace_read, consume_ai_quota | AgentMessageRequest | AgentTurnResponse |
+| POST | `/v1/workspaces/{workspace_id}/agent/attachments` | auth | require_workspace_read (the upload route did the write check) | AgentAttachmentRequest (artifact_id, conversation_id) | AgentTurnResponse |
 | GET | `/v1/workspaces/{workspace_id}/agent/conversations` | auth | require_workspace_read | — | Vec<AgentConversation |
 | GET | `/v1/agent/conversations/{conversation_id}` | auth | require_workspace_read | — | AgentConversationDetail |
 | POST | `/v1/agent/turns/{turn_id}/proposals/{proposal_id}/confirm` | auth | the caller's own conversation, require_workspace_write | — | AgentTurn (the proposal applied, with its outcome) |
