@@ -17,7 +17,7 @@ export function WorkspaceMoreMenu({ items }: { items: MoreMenuItem[] }) {
   return (
     <MenuPrimitive.Root>
       <MenuPrimitive.Trigger asChild>
-        <Button type="button" variant="secondary"><span className="shared-workspace-tab-label">More<ChevronDown size={ICON_SIZE.sm} /></span></Button>
+        <Button data-tab-key="__more" type="button" variant="secondary"><span className="shared-workspace-tab-label">More<ChevronDown size={ICON_SIZE.sm} /></span></Button>
       </MenuPrimitive.Trigger>
       <MenuPrimitive.Portal>
         <MenuPrimitive.Content align="start" aria-label="More sections" className="rm-action-menu" sideOffset={4}>

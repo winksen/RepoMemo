@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.15` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.16` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.16 — A workspace's tabs stay in their safe zone.
+
+- **Tabs that do not fit** (a narrow window, a template with many sections) no longer run off the edge: the row keeps the **open tab** and as many of the first tabs as fit, and the rest are listed in the **More** menu, ahead of the sections the template already keeps there. The row follows the window as it is resized.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.15 — Borderless top bar controls.
 

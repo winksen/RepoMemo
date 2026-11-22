@@ -22,6 +22,7 @@ import { OrganizationIcon, organizationIconKey } from "./organizationIcons";
 import { useTabIndicator } from "./tabIndicator";
 import { WorkspaceMoreMenu } from "../components/WorkspaceMoreMenu";
 import { arrangeSections } from "./templateSections";
+import { useOverflowTabs } from "./tabOverflow";
 import { useReviewQueue, useTemplate } from "./workspace/data";
 import { ADMIN_WORKSPACE_SECTIONS, type WorkspaceSection } from "./constants";
 import { apiMessage } from "./format";
@@ -204,18 +205,22 @@ export function WorkspaceTopbar({
     const Icon = TABS[section].icon;
     return <Icon size={ICON_SIZE.md} weight={filled ? "fill" : "regular"} />;
   };
+  // The tabs that do not fit stay inside the row's safe zone: they join the template's *More* menu instead of running off the edge.
+  const visibleTabs = useOverflowTabs(tabsRef, tabs, activeSection, more.length > 0);
+  const shownTabs = visibleTabs ? tabs.filter((section) => visibleTabs.has(section)) : tabs;
+  const moreSections = [...(visibleTabs ? tabs.filter((section) => !visibleTabs.has(section)) : []), ...more];
   const workspaceTab = (section: WorkspaceSection) => {
     const label = nameOf(section);
     const isAdminOnly = ADMIN_WORKSPACE_SECTIONS.has(section);
     const isActive = activeSection === section;
     const icon = sectionIcon(section, isActive);
-    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" key={section} title={label !== TABS[section].label ? TABS[section].label : undefined} variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}{section === "review" && waiting > 0 ? <span className="shared-workspace-tab-count">{waiting}<span className="sr-only"> waiting</span></span> : null}</span></Button>;
+    return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} data-tab-key={section} disabled={!onNavigate} onClick={() => onNavigate?.(section)} type="button" key={section} title={label !== TABS[section].label ? TABS[section].label : undefined} variant="secondary">{icon}<span className="shared-workspace-tab-label">{label}{isAdminOnly ? <span className="shared-workspace-tab-restricted">Admin</span> : null}{section === "review" && waiting > 0 ? <span className="shared-workspace-tab-count">{waiting}<span className="sr-only"> waiting</span></span> : null}</span></Button>;
   };
 
   return <nav aria-label="Workspace sections" className="shared-workspace-topbar">
     <div className="shared-workspace-tabs" ref={tabsRef}>
-      {tabs.map(workspaceTab)}
-      {onNavigate ? <WorkspaceMoreMenu items={more.map((section) => ({ icon: sectionIcon(section), label: section === "review" && waiting > 0 ? `${nameOf(section)} (${waiting})` : nameOf(section), onSelect: () => onNavigate(section), section }))} /> : null}
+      {shownTabs.map(workspaceTab)}
+      {onNavigate ? <WorkspaceMoreMenu items={moreSections.map((section) => ({ icon: sectionIcon(section), label: section === "review" && waiting > 0 ? `${nameOf(section)} (${waiting})` : nameOf(section), onSelect: () => onNavigate(section), section }))} /> : null}
       {indicator}
     </div>
   </nav>;

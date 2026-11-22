@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.16 (2026-11-21)
+
+A workspace's tabs stay in their safe zone.
+
+### Changed
+- When the tabs do not fit the row (a narrow window, a template with many sections), the row keeps the open tab and as many of the first tabs as fit; the rest are listed in the **More** menu, before the sections the template already keeps there. The row adjusts as the window is resized.
+- Client only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen. A new test of the fitting rule was not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.15 (2026-11-21)
 
 Borderless top bar controls.
