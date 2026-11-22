@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Rows as LayoutList } from "@phosphor-icons/react";
-import { downloadSharedWorkspaceTemplateFile, saveSharedWorkspaceTemplate } from "../lib/sharedApi";
-import { saveBlob } from "../lib/saveBlob";
+import { saveSharedWorkspaceTemplate } from "../lib/sharedApi";
 import type { WorkspaceTemplateView } from "../types";
 import { ADMIN_WORKSPACE_SECTIONS, WORKSPACE_SECTIONS, type WorkspaceSection } from "../web/constants";
 import { apiMessage } from "../web/format";
@@ -13,7 +12,6 @@ import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { useConfirm } from "./ui/confirm-dialog";
 import { Dropdown } from "./ui/dropdown";
-import { Input } from "./ui/input";
 import { PanelHeading } from "./ui/panel-heading";
 import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
@@ -66,7 +64,6 @@ export function TemplateSettings({ accessToken, embedded = false, workspaceId }:
       {embedded
         ? <div className="shared-part-heading"><h3 className="shared-part-title">Template</h3>{current.source === "fallback" ? null : <span>Version {current.template.version}</span>}</div>
         : <PanelHeading description={current.source === "fallback" ? undefined : `Version ${current.template.version}`} icon={LayoutList} title="Template" />}
-      <p className="shared-muted-copy">A template decides which parts of RepoMemo come first in this workspace and what they are called. It never changes who can see or do anything.</p>
       {current.source === "fallback" ? <p className="shared-muted-copy">{current.reason} General is in use until a template is chosen.</p> : null}
       <TemplatePicker disabled={busy} name={`settings-template-${workspaceId}`} onChange={setChoice} templates={catalogue} value={chosenId} activeId={currentId} />
       <Collapse open={comparing || current.source !== "workspace"}>
@@ -83,40 +80,7 @@ export function TemplateSettings({ accessToken, embedded = false, workspaceId }:
         onSave={(overrides) => void save(currentId, overrides, Object.keys(overrides).length ? "The adjustments were saved." : "No adjustment differs from the template.")}
       /> : null}
       </Collapse>
-      <ExportTemplate accessToken={accessToken} current={current} key={current.template.id} workspaceId={workspaceId} />
     </section>
-  );
-}
-
-/** Downloads the workspace's setup as a template file: the template in use with its adjustments, nothing of the workspace's content. */
-function ExportTemplate({ accessToken, current, workspaceId }: { accessToken: string; current: WorkspaceTemplateView; workspaceId: string }) {
-  const [id, setId] = useState(`${current.template.id}-custom`.slice(0, 40));
-  const [name, setName] = useState(`${current.template.name} (custom)`.slice(0, 40));
-  const [busy, setBusy] = useState(false);
-  async function download() {
-    setBusy(true);
-    try {
-      const { blob, filename } = await downloadSharedWorkspaceTemplateFile(accessToken, workspaceId, { id: id.trim(), name: name.trim() });
-      if (await saveBlob(blob, filename)) showToast("success", `${filename} was downloaded. Put it in the folder REPOMEMO_TEMPLATES_DIR names on a server and restart it.`);
-    } catch (requestError) {
-      showToast("error", apiMessage(requestError, "The template file could not be downloaded."));
-    } finally { setBusy(false); }
-  }
-  return (
-    <fieldset className="rm-template-adjust" disabled={busy}>
-      <legend>Download as template file</legend>
-      <p className="shared-muted-copy">The template this workspace uses, with the adjustments saved on it, as a file another server can load from its templates folder. Nothing from the workspace's content is in it: no files, people or settings.</p>
-      <label className="rm-template-adjust-field">Id of the new template
-        <Input autoComplete="off" onChange={(event) => setId(event.target.value)} spellCheck={false} value={id} />
-        <small>2 to 40 characters: a–z, 0–9 and -. It cannot be an id this server already has.</small>
-      </label>
-      <label className="rm-template-adjust-field">Name
-        <Input autoComplete="off" maxLength={40} onChange={(event) => setName(event.target.value)} value={name} />
-      </label>
-      <div className="rm-template-adjust-actions">
-        <Button busy={busy} disabled={busy || !id.trim() || !name.trim()} onClick={() => void download()} type="button" variant="secondary">Download as template file</Button>
-      </div>
-    </fieldset>
   );
 }
 

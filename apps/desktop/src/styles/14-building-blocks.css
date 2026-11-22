@@ -333,3 +333,8 @@ th > .rm-badge,
 .rm-template-active { margin-left: 4px; font-size: 11px; vertical-align: middle; }
 .shared-color-swatch[data-default="true"] { color: #fff; background: #8a8a8a; }
 :root[data-theme="dark"] .shared-color-swatch[data-default="true"] { color: #fff; background: #6b6b6b; }
+
+/* V0.9.20: the default color is the app's own blue; the chosen icon is filled with the workspace's color, like the chosen template. */
+.shared-color-swatch[data-default="true"] { color: #fff; background: hsl(233 84% 44%); }
+:root[data-theme="dark"] .shared-color-swatch[data-default="true"] { color: #fff; background: hsl(230 82% 62%); }
+.shared-icon-picker .rm-button.rm-icon-button[aria-pressed="true"], .shared-icon-picker .rm-button.rm-icon-button[aria-pressed="true"]:hover:not(:disabled) { color: var(--color-on-accent); background: var(--color-accent); border-color: var(--color-accent); }

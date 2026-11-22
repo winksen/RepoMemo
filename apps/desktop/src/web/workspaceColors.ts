@@ -9,10 +9,9 @@ export interface ColorTones { accent: string; hover: string; soft: string; text:
  * so that it reads well on both themes: a deeper one for the light theme (white on it at 6.5:1 or better) and a
  * lighter one for the dark theme (white on it too, at 4.8:1 or better, and clear of the dark surface at 3:1). White
  * icons and labels sit on the colour in both themes; the `text` tone is for coloured text on the page. The default
- * (no colour) is the app's own indigo.
+ * (no colour) is the app's own blue, so the palette has no blue of its own.
  */
 export const WORKSPACE_COLORS: { key: string; label: string; light: ColorTones; dark: ColorTones }[] = [
-  { key: "blue", label: "Blue", light: { accent: "#0c5bb6", hover: "#094890", soft: "#f0f7ff", text: "#094890", on: "#ffffff" }, dark: { accent: "#076ee4", hover: "#0664d0", soft: "#14273d", text: "#76aeef", on: "#ffffff" } },
   { key: "teal", label: "Teal", light: { accent: "#0c6a60", hover: "#08453f", soft: "#f0fffd", text: "#08453f", on: "#ffffff" }, dark: { accent: "#0a8074", hover: "#086d63", soft: "#143d39", text: "#27ddcb", on: "#ffffff" } },
   { key: "green", label: "Green", light: { accent: "#126836", hover: "#0c4524", soft: "#f0fff6", text: "#0c4524", on: "#ffffff" }, dark: { accent: "#128241", hover: "#0f7038", soft: "#143d25", text: "#3ad47a", on: "#ffffff" } },
   { key: "orange", label: "Orange", light: { accent: "#9b4308", hover: "#743206", soft: "#fff6f0", text: "#743206", on: "#ffffff" }, dark: { accent: "#be4e04", hover: "#aa4603", soft: "#3d2514", text: "#ed8e50", on: "#ffffff" } },

@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from "react";
+import { Palette as PaletteIcon } from "@phosphor-icons/react";
 import { saveSharedWorkspaceColor, saveSharedWorkspaceIcon } from "../lib/sharedApi";
 import { workspaceIconKey } from "../web/workspaceIcons";
 import { workspaceColorKey } from "../web/workspaceColors";
@@ -50,7 +51,7 @@ export function WorkspaceCustomization({ accessToken, children, onSaved, workspa
 
   return (
     <section className="shared-settings-panel">
-      <PanelHeading title="Customization" />
+      <PanelHeading icon={PaletteIcon} title="Customization" />
       <p className="shared-muted-copy">Choose how this workspace looks. Everyone in the organization sees the icon and the color.</p>
       <div className="shared-new-workspace-look">
         <div><h3 className="shared-part-title">Icon</h3><WorkspaceIconPicker disabled={pending !== null} onChange={(key) => void chooseIcon(key)} value={currentIcon} /></div>

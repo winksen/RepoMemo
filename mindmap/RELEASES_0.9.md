@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.19` (2026-11-21)
+> **Current:** `V0.9.20` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -54,6 +54,7 @@
 | **V0.9.17** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Workspace settings look | Remove the administrative note and its lines, put the icon and color side by side above the template cards, and draw the cards with a thick border, the workspace color on hover and filled with it when chosen | Settings reads like the New workspace dialog, and the chosen template is easy to see |
 | **V0.9.18** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Template choice in Settings | Show the template in use as Active now, open and close the Use button and adjustments smoothly, drop the detailed preview and draw the default color as plain grey | Choosing a template no longer snaps the page, the template in use is tagged, and the default color is grey |
 | **V0.9.19** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Customization section | Gather the icon, color and template choices in one Customization section on a greyer background, with a big title and a plain text title for each part | The look and template choices form one grey section with plain part titles |
+| **V0.9.20** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Customization refinements | Give the Customization title its icon, fill the chosen icon with the workspace color, make the app's blue the default color (and drop the separate blue), remove the template download and the template's texts | The Customization section is simpler and the default color is the blue it really uses |
 
 ## Verification and handoff
 
