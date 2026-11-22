@@ -5,9 +5,10 @@ import { saveBlob } from "../lib/saveBlob";
 import type { WorkspaceTemplateView } from "../types";
 import { ADMIN_WORKSPACE_SECTIONS, WORKSPACE_SECTIONS, type WorkspaceSection } from "../web/constants";
 import { apiMessage } from "../web/format";
-import { adjustmentsFrom, previewLines, questionsFromText, SECTION_NAMES } from "../web/templatePreview";
+import { adjustmentsFrom, questionsFromText, SECTION_NAMES } from "../web/templatePreview";
 import { useTemplate, useTemplateCatalogue, useTemplateDetail } from "../web/workspace/data";
 import { TemplatePicker } from "./TemplatePicker";
+import { Collapse } from "./ui/collapse";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { useConfirm } from "./ui/confirm-dialog";
@@ -37,7 +38,6 @@ export function TemplateSettings({ accessToken, workspaceId }: { accessToken: st
   const [detail] = useTemplateDetail(accessToken, chosenId, comparing);
   const [base] = useTemplateDetail(accessToken, currentId, Boolean(current));
   if (!current) return null;
-  const preview = comparing ? detail : current;
   const chosenName = catalogue.find((template) => template.id === chosenId)?.name ?? chosenId;
   const adjusted = current.overrides !== null && typeof current.overrides === "object" && Object.keys(current.overrides as object).length > 0;
 
@@ -66,12 +66,12 @@ export function TemplateSettings({ accessToken, workspaceId }: { accessToken: st
       <PanelHeading description={current.source === "fallback" ? undefined : `Version ${current.template.version}`} icon={LayoutList} title="Template" />
       <p className="shared-muted-copy">A template decides which parts of RepoMemo come first in this workspace and what they are called. It never changes who can see or do anything.</p>
       {current.source === "fallback" ? <p className="shared-muted-copy">{current.reason} General is in use until a template is chosen.</p> : null}
-      <TemplatePicker disabled={busy} name={`settings-template-${workspaceId}`} onChange={setChoice} templates={catalogue} value={chosenId} />
-      {preview ? <dl aria-label={`What the ${chosenName} template arranges`} className="rm-template-preview">
-        {previewLines(preview).map((line) => <div key={line.label}><dt>{line.label}</dt><dd>{line.text}</dd></div>)}
-      </dl> : null}
-      {comparing || current.source !== "workspace" ? <Button busy={busy} disabled={busy || (comparing && !detail)} onClick={() => void apply()} type="button" variant="main">Use {chosenName}</Button> : null}
-      {current.source === "workspace" && !comparing && base ? <Adjustments
+      <TemplatePicker disabled={busy} name={`settings-template-${workspaceId}`} onChange={setChoice} templates={catalogue} value={chosenId} activeId={currentId} />
+      <Collapse open={comparing || current.source !== "workspace"}>
+        <Button busy={busy} disabled={busy || (comparing && !detail)} onClick={() => void apply()} type="button" variant="main">Use {chosenName}</Button>
+      </Collapse>
+      <Collapse open={current.source === "workspace" && !comparing && Boolean(base)}>
+        {current.source === "workspace" && base ? <Adjustments
         adjusted={adjusted}
         base={base}
         busy={busy}
@@ -80,6 +80,7 @@ export function TemplateSettings({ accessToken, workspaceId }: { accessToken: st
         onReset={() => void save(currentId, {}, "The adjustments were removed; the template's own values are back.")}
         onSave={(overrides) => void save(currentId, overrides, Object.keys(overrides).length ? "The adjustments were saved." : "No adjustment differs from the template.")}
       /> : null}
+      </Collapse>
       <ExportTemplate accessToken={accessToken} current={current} key={current.template.id} workspaceId={workspaceId} />
     </section>
   );

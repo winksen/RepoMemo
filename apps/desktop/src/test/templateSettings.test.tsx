@@ -124,20 +124,18 @@ describe("Settings › Template", () => {
     expect(container.childElementCount).toBe(0);
   });
 
-  it("shows the template in use with its preview and offers no change while nothing else is chosen", () => {
+  it("shows the template in use, tagged Active now, and offers no change while nothing else is chosen", () => {
     const { container } = show(current());
     expect(screen.getByRole("heading", { name: /Template/ })).toBeTruthy();
     expect((screen.getByRole("radio", { name: /Operations and incidents/ }) as HTMLInputElement).checked).toBe(true);
-    const preview = container.querySelector("dl");
-    expect(preview?.getAttribute("aria-label")).toBe("What the Operations and incidents template arranges");
-    expect(preview?.textContent).toContain("Tasks → Actions");
+    expect(screen.getByText("Active now")).toBeTruthy();
+    expect(container.querySelector("dl")).toBeNull();
     expect(screen.queryByRole("button", { name: /^Use / })).toBeNull();
   });
 
   it("previews another template when it is picked and changes only after the person confirms", async () => {
     show(current());
     fireEvent.click(screen.getByRole("radio", { name: /Knowledge base/ }));
-    expect(screen.getByText("Library", { exact: false })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Use Knowledge base" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/Nothing stored is moved, created or deleted/)).toBeTruthy();

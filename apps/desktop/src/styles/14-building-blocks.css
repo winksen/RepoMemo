@@ -325,3 +325,11 @@ th > .rm-badge,
 .shared-settings-section .rm-template-art-box { padding: 6px; }
 @media (max-width: 1000px) { .shared-settings-section .rm-template-options { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .shared-settings-section .rm-template-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Template choice without snapping (V0.9.18): what appears or goes when another card is chosen opens and closes smoothly; the card of the template in use is tagged; the default color is plain grey. */
+.rm-collapse { display: grid; grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows 240ms var(--ease-control), opacity 180ms var(--ease-control), margin-top 240ms var(--ease-control); }
+.rm-collapse > div { min-height: 0; overflow: hidden; }
+.rm-collapse[data-open="false"] { grid-template-rows: 0fr; margin-top: -12px; opacity: 0; pointer-events: none; }
+.rm-template-active { margin-left: 4px; font-size: 11px; vertical-align: middle; }
+.shared-color-swatch[data-default="true"] { color: #fff; background: #8a8a8a; }
+:root[data-theme="dark"] .shared-color-swatch[data-default="true"] { color: #fff; background: #6b6b6b; }

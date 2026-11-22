@@ -2,7 +2,16 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.17` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.18` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.18 — Choosing a template in Settings.
+
+- The card of the template **in use** carries an **Active now** tag.
+- The detailed preview under the cards (tabs, cards, health checks…) is **removed**; it will be reworked later.
+- Choosing another card no longer snaps the page: the **Use** button and the *Adjust this workspace* block open and close smoothly.
+- The **Default** color swatch is plain **grey** instead of showing the current accent.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.17 — A tidier workspace Settings page.
 
