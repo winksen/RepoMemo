@@ -16,6 +16,8 @@ use crate::RepoMemoCore;
 mod chat_summary;
 mod chatter;
 mod evidence;
+mod filters;
+use filters::{parse_filter, FileFilter};
 mod files;
 use files::{choose_folder, file_command, files_help, move_reply, rename_reply, trash_reply, FolderChoice};
 mod proposals;
@@ -645,6 +647,11 @@ impl RepoMemoCore {
                 "Which file are you looking for? Give a name, part of a path, or an extension like `.pdf`.",
             ));
         }
+        // A kind of file or a folder ("the Word documents", "pdfs in Finance") is a filter, not a piece of a name (V0.9.25).
+        let filter = parse_filter(subject);
+        if filter.is_structured() {
+            return self.agent_find_by_filter(workspace_id, &filter).await;
+        }
         let matches = self.match_files(workspace_id, subject).await?;
         if matches.is_empty() {
             // Nothing is named like that, but the words may appear inside files.
@@ -676,6 +683,80 @@ impl RepoMemoCore {
             .take(FILE_RESULT_LIMIT)
             .map(|file| file.artifact)
             .collect();
+        Ok(result)
+    }
+
+    /// The files a filter means: of the kind named (by extension), in the folder named and with the words in the name. A folder
+    /// that cannot be told is answered with what to say instead.
+    async fn filter_files(
+        &self,
+        workspace_id: &str,
+        filter: &FileFilter,
+    ) -> Result<std::result::Result<Vec<ArtifactSummary>, String>> {
+        let in_folder = match &filter.folder {
+            None => None,
+            Some(wanted) => {
+                let folders = self.storage.list_folders(workspace_id).await?;
+                match choose_folder(wanted, &folders) {
+                    FolderChoice::One(found) => {
+                        let (_, ids) = self.storage.folder_subtree(&found.id).await?;
+                        Some(ids.into_iter().collect::<std::collections::HashSet<_>>())
+                    }
+                    FolderChoice::Many(names) => {
+                        return Ok(Err(format!(
+                            "Several folders match “{wanted}”: {}. Say which one by its full path.",
+                            names.join(", ")
+                        )))
+                    }
+                    FolderChoice::Missing(names) if names.is_empty() => {
+                        return Ok(Err("This workspace has no folders yet.".to_owned()))
+                    }
+                    FolderChoice::Missing(names) => {
+                        return Ok(Err(format!(
+                            "I can't find a folder named “{wanted}”. The folders here are: {}.",
+                            names.join(", ")
+                        )))
+                    }
+                    FolderChoice::TopLevel => {
+                        return Ok(Err(
+                            "Name a folder to look in; I cannot list only the top level.".to_owned()
+                        ))
+                    }
+                }
+            }
+        };
+        let mut files = self
+            .storage
+            .list_artifacts(workspace_id)
+            .await?
+            .into_iter()
+            .filter(|file| filter.keeps_kind(file) && filter.keeps_name(file))
+            .filter(|file| in_folder.as_ref().is_none_or(|ids| ids.contains(&file.id)))
+            .collect::<Vec<_>>();
+        files.sort_by_key(|file| file.path.to_lowercase());
+        Ok(Ok(files))
+    }
+
+    /// "The Word documents", "pdfs in the Finance folder": every file the filter means, said in words.
+    async fn agent_find_by_filter(&self, workspace_id: &str, filter: &FileFilter) -> Result<AgentReply> {
+        let files = match self.filter_files(workspace_id, filter).await? {
+            Ok(files) => files,
+            Err(problem) => return Ok(reply(problem)),
+        };
+        if files.is_empty() {
+            return Ok(reply(format!("There are no {} in this workspace.", filter.describe())));
+        }
+        let total = files.len();
+        let mut result = reply(format!(
+            "Found {total} {}.{}",
+            filter.describe(),
+            if total > FILE_RESULT_LIMIT {
+                format!(" Showing the first {FILE_RESULT_LIMIT}.")
+            } else {
+                String::new()
+            }
+        ));
+        result.files = files.into_iter().take(FILE_RESULT_LIMIT).collect();
         Ok(result)
     }
 

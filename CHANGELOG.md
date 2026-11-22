@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.25 (2026-11-21)
+
+A kind of file is a filter, not a piece of a name.
+
+### Changed
+- **Fix.** Asking for *the Word documents* listed `wordle.png`, `passwordPolicy.ts` and `PasswordInputField.tsx`, because a kind word was matched as a piece of any file's name or path. A kind (Word, spreadsheet, presentation, PDF, image, Markdown, text, code, JSON, YAML, email, OneNote) is now matched by the file's extension only.
+- **A filter, not a string.** Finding files now reads the request as a filter: the kinds, a folder (*in the Finance folder*, *in folder Runbooks*, a path such as *Design / Assets*) and the words the name must contain. They combine (*pdfs about invoices in the Finance folder*). A folder is found by path, name or part of a name; several or none are answered with what to say, as when moving a file. Words that only ask for files (*all*, *only*, *the*, *documents*, *workspace*) are dropped.
+- **Said back.** The reply names what it looked for (*Found 9 Word documents.*, *There are no PDFs in the folder Finance.*), so a wrong reading is visible.
+- **Names stay names.** *the file named Word counter* and a quoted name keep every word as part of the name, so a kind word inside a title still finds it. Requests with no kind or folder behave as before, including the fall back to indexed content.
+- The pilot rows were renumbered to follow the track (V0.9.33 to V0.9.45); V0.9.15 to V0.9.24 are interface commits of the same track.
+- No API, setting or migration changes.
+
+### Checks
+- Unit tests for the kinds, folders, names and the extension filter (including the three files of the bug); compiled and linted, not run. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.24 (2026-11-21)
 
 No manual tab adjustments.
@@ -2211,7 +2229,7 @@ Make the upload version check part of its write and name the unchecked mode in t
 - **A stale upload can no longer pass the check and then overwrite a newer one.** `POST /v1/artifacts/{id}/versions` compared `X-RepoMemo-Expected-Updated-At` with the file as read just before the write, so a change that landed in between was overwritten. The comparison is now part of the update statement itself: of two uploads that started from the same state, exactly one is stored and the other gets `409`. The earlier comparison stays as a quick refusal.
 
 ### Changed
-- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.25 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
+- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.43 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
 - No route, setting or migration changes.
 
 ### Checks

@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.9.24` (2026-11-21) · **Next:** the maintainer's test run and the 0.8 exit-journey sheet, then the 0.9 line. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.9.25` (2026-11-21) · **Next:** the maintainer's test run and the 0.8 exit-journey sheet, then the 0.9 line. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `RM-V0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -1820,7 +1820,7 @@ The documentation sequence is deliberately after the feature and interface track
 | G24 | Revision history has no limits | `memory_revision` and the approval status load a card's whole history to find one revision, and the revision list has no paging or retention rule | V0.6.19 |
 | G25 | 0.6 panels have no web tests | `MemoryHistoryPanel`, `MemoryApprovalPanel`, `ReviewOwnershipPanel`, `MemoryChangesPanel` and `MyWorkPanel` have none; their routes have server tests | V0.6.20 |
 | G26 | Localization has no row | The readiness report says localization infrastructure matters, but no row covers it, the client has no i18n library and about 60 `toLocale*` calls are spread across its files | V0.6.27 |
-| G27 | No security review is planned before V0.9.23 (done for 0.6 at V0.6.29) | The last is the [identity review](security/2026-10-29-identity-review.md). 0.6 adds cross-workspace My work, revisions and approvals; 0.8 adds outbound delivery and anonymous reading | V0.6.29, V0.8.15 |
+| G27 | No security review is planned before V0.9.41 (done for 0.6 at V0.6.29) | The last is the [identity review](security/2026-10-29-identity-review.md). 0.6 adds cross-workspace My work, revisions and approvals; 0.8 adds outbound delivery and anonymous reading | V0.6.29, V0.8.15 |
 
 **Renumbered (all unshipped):** V0.6.11 → V0.6.15, V0.6.12 → V0.6.21, V0.6.13 → V0.6.22, V0.6.14 → V0.6.23, V0.6.15 → V0.6.24, V0.6.16 → V0.6.25, V0.6.17 → V0.6.26, V0.6.18 → V0.6.28, V0.6.19 → V0.6.30, and V0.8.15–V0.8.19 each moved up by one. The [readiness report](analysis/2026-10-29-team-readiness.md) keeps its original numbers as a dated record.
 
@@ -1832,7 +1832,7 @@ The documentation sequence is deliberately after the feature and interface track
 - **V0.7.3 Task details:** builds on the existing `GET /v1/tasks/{id}`.
 - **V0.8.4 Outbound events:** the existing webhooks only receive calls, so outbound delivery is new work.
 - **V0.8.13 AI administration:** [`budget.rs`](../crates/api/src/budget.rs) counts only calls the server makes on its own, in memory, and starts again at midnight UTC and after a restart. A predictable spending limit needs stored counts.
-- **V0.9.25 Support contract:** the compatibility promise names the write-precondition rule from V0.6.18.
+- **V0.9.43 Support contract:** the compatibility promise names the write-precondition rule from V0.6.18.
 
 **Decisions for the maintainer:**
 
@@ -1841,7 +1841,7 @@ The documentation sequence is deliberately after the feature and interface track
 | Local OCR (V0.6.22) | Record the deferral (taken at V0.6.22) | No pilot owner exists, which the scope control requires before implementation |
 | Release tag format (V0.6.17) | `vX.Y.Z` | The workflows and their version check already expect it; the `RM-V` tags stay as history |
 | A "built, not validated" status (V0.6.16) | Adopt it and relabel rows with pending live evidence | ✅ currently covers both committed code and accepted releases |
-| API writes with no version (V0.6.18) | Keep the unchecked mode and name it in the API guide until the V0.9.25 promise (taken at V0.6.18) | Pre-1.0 releases may still change the API, and an overwrite is a deliberate choice the client can state |
+| API writes with no version (V0.6.18) | Keep the unchecked mode and name it in the API guide until the V0.9.43 promise (taken at V0.6.18) | Pre-1.0 releases may still change the API, and an overwrite is a deliberate choice the client can state |
 | Localization (V0.6.27) | Keep the groundwork and ship no translation | Strings get harder to move as 0.7 adds screens; if declined, move the row to [Later](#-later-after-the-04x-line) |
 
 ### The 0.6.x line: trusted knowledge in daily work
@@ -1999,7 +1999,7 @@ The documentation sequence is deliberately after the feature and interface track
 
 ### The 0.9.x line: pilot proof and public release candidate
 
-> **Index:** [every 0.9 release](RELEASES_0.9.md) · **Track:** AN. CAIRN agent (V0.9.0 to V0.9.14, shipped as built) then AM. Public readiness (renumbered V0.9.15 to V0.9.27) · **Report gaps:** G01, G13–G15
+> **Index:** [every 0.9 release](RELEASES_0.9.md) · **Track:** AN. CAIRN agent (V0.9.0 to V0.9.32, shipped as built) then AM. Public readiness (renumbered V0.9.33 to V0.9.45) · **Report gaps:** G01, G13–G15
 
 **Entry:** Required 0.5–0.8 outcomes are implemented; conditional deferrals and supported integrations/platforms are explicit. This line freezes features and closes observed failures.
 
@@ -2032,19 +2032,20 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.9.22** 🧪 2026-11-21 | 🔧 | Template adjustments simplified | Keep the Use button visible (grey and disabled for the template in use), title Adjust this workspace like the other parts, explain the pages kept under More, and remove the suggested questions field | — | The Use button never vanishes, and the adjustments are shorter and clearer |
 | **V0.9.23** 🧪 2026-11-21 | 🔧 | Customization pickers | Make the Customization icon solid and bigger, name the button Use this template, enlarge the icon and color pickers with no border until hover, draw colors as rounded squares and remove the line above the adjustments | — | The pickers are larger and cleaner and the section has no stray line |
 | **V0.9.24** 🧪 2026-11-21 | 🔧 | No manual tab adjustments | Remove the Adjust this workspace section so the tabs and More menu follow the template and the width of the row, and make the Use this template button small and left-aligned | — | Settings has no tab adjustments, and workspaces open on Overview |
-| **V0.9.15** 🔜 | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | G15 | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
-| **V0.9.16** 🔜 | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | G08, G15 | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
-| **V0.9.17** 🔜 | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | G14 | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |
-| **V0.9.18** 🔜 | 📘 | Adoption guides | Publish task-based guides and realistic sample data for the four pilot audiences | G04, G14 | A new reader can find setup, first value, migration, guest access and troubleshooting from the README; no invented customer or performance claims appear |
-| **V0.9.19** 🔜 | 📘 | Observed usability | Record pilots performing activation, retrieval, review, project handoff and admin offboarding | G13, G15 | Success, time, assistance and failures are recorded against the proposed thresholds; every blocking finding has an owner and a required fix before the candidate |
-| **V0.9.20** 🔜 | 🔧 | Inclusive use | Close observed keyboard, screen-reader, zoom and narrow-screen blockers in the core journeys | G13 | The affected journeys are rerun with recorded devices/themes; fixes are split into additional numbered commits if they are independent |
-| **V0.9.21** 🔜 | 📘 | Supported capacity | Measure concurrent search, indexing, projects and sync on representative pilot data | G15 | The support envelope records hardware, dataset, concurrency, p95, disk and saturation behavior; unmeasured targets are labelled and overload is recoverable |
-| **V0.9.22** 🔜 | 🔧 | Upgrade and recovery | Exercise supported-version upgrades, backup/restore and complete archive round trips | G01, G15 | The exact candidate preserves identity, citations and new entities; recovery point/time and supported rollback procedure are demonstrated on a clean host |
-| **V0.9.23** 🔜 | 🔒 | Release assurance | Review access, integrations, public sharing, AI boundaries and dependency/image findings | G01, G02, G10, G12 | No open high/medium finding, unauthorized disclosure or data-loss defect remains; negative integration and publication cases have regression evidence |
-| **V0.9.24** 🔜 | 📘 | Distribution rehearsal | Validate downloadable candidate images/installers and signatures for each claimed platform | G01 | A clean machine installs, upgrades and removes the real artifacts; digests, SBOM, provenance, signing and update behavior are recorded where claimed |
-| **V0.9.25** 🔜 | 📘 | Support contract | Publish supported versions/platforms, upgrade policy, backup expectations and support/incident routes | G14, G15 | A new operator knows what is supported and how to recover or report a problem; API/archive compatibility commitments, the write-precondition rule (V0.6.18) and deprecation policy are explicit |
-| **V0.9.26** 🔜 | 📘 | Pilot acceptance | Review week-two usage and the full readiness matrix, then close observed product blockers | G15 | All required report gates pass with linked evidence; unresolved failures produce focused pre-1.0 fix rows rather than an assumed waiver |
-| **V0.9.27** 🔜 | 📘 | Release candidate | Freeze the final candidate and repeat affected checks on its exact commit | G01, G13–G15 | Documentation, release notes, migrations, CI and manual records name the same candidate; a subsequent code change invalidates affected sign-offs |
+| **V0.9.25** 🧪 2026-11-21 | 🐞 | File kinds and folders as filters | Read a request for files as a filter of kinds, folder and name, matching a kind by extension only, and say what was looked for | — | "The Word documents" lists only .doc and .docx files, a folder and a name narrow it, the reply says what it looked for and a request that names a file keeps its words as the name |
+| **V0.9.33** 🔜 | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | G15 | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
+| **V0.9.34** 🔜 | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | G08, G15 | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
+| **V0.9.35** 🔜 | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | G14 | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |
+| **V0.9.36** 🔜 | 📘 | Adoption guides | Publish task-based guides and realistic sample data for the four pilot audiences | G04, G14 | A new reader can find setup, first value, migration, guest access and troubleshooting from the README; no invented customer or performance claims appear |
+| **V0.9.37** 🔜 | 📘 | Observed usability | Record pilots performing activation, retrieval, review, project handoff and admin offboarding | G13, G15 | Success, time, assistance and failures are recorded against the proposed thresholds; every blocking finding has an owner and a required fix before the candidate |
+| **V0.9.38** 🔜 | 🔧 | Inclusive use | Close observed keyboard, screen-reader, zoom and narrow-screen blockers in the core journeys | G13 | The affected journeys are rerun with recorded devices/themes; fixes are split into additional numbered commits if they are independent |
+| **V0.9.39** 🔜 | 📘 | Supported capacity | Measure concurrent search, indexing, projects and sync on representative pilot data | G15 | The support envelope records hardware, dataset, concurrency, p95, disk and saturation behavior; unmeasured targets are labelled and overload is recoverable |
+| **V0.9.40** 🔜 | 🔧 | Upgrade and recovery | Exercise supported-version upgrades, backup/restore and complete archive round trips | G01, G15 | The exact candidate preserves identity, citations and new entities; recovery point/time and supported rollback procedure are demonstrated on a clean host |
+| **V0.9.41** 🔜 | 🔒 | Release assurance | Review access, integrations, public sharing, AI boundaries and dependency/image findings | G01, G02, G10, G12 | No open high/medium finding, unauthorized disclosure or data-loss defect remains; negative integration and publication cases have regression evidence |
+| **V0.9.42** 🔜 | 📘 | Distribution rehearsal | Validate downloadable candidate images/installers and signatures for each claimed platform | G01 | A clean machine installs, upgrades and removes the real artifacts; digests, SBOM, provenance, signing and update behavior are recorded where claimed |
+| **V0.9.43** 🔜 | 📘 | Support contract | Publish supported versions/platforms, upgrade policy, backup expectations and support/incident routes | G14, G15 | A new operator knows what is supported and how to recover or report a problem; API/archive compatibility commitments, the write-precondition rule (V0.6.18) and deprecation policy are explicit |
+| **V0.9.44** 🔜 | 📘 | Pilot acceptance | Review week-two usage and the full readiness matrix, then close observed product blockers | G15 | All required report gates pass with linked evidence; unresolved failures produce focused pre-1.0 fix rows rather than an assumed waiver |
+| **V0.9.45** 🔜 | 📘 | Release candidate | Freeze the final candidate and repeat affected checks on its exact commit | G01, G13–G15 | Documentation, release notes, migrations, CI and manual records name the same candidate; a subsequent code change invalidates affected sign-offs |
 
 ### V1.0.0: first public stable release
 
