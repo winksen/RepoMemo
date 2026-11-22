@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.11 (2026-11-21)
+
+CAIRN moves, renames and trashes files when you confirm.
+
+### Changed
+- **New job: Manage files** (`manage_files`). *Move retry-policy.md to Runbooks*, *rename the deploy runbook file to Release runbook* and *delete the file old-notes.md* (also *trash* and *remove*) are read, the file and the folder are found, and CAIRN proposes the change in a card with its detail. **Confirm** runs it as the person; **Dismiss** changes nothing. No AI is needed.
+- **One file, clearly.** CAIRN handles one file at a time, and only when it is clear which one is meant (a single match, or an exact name). With several candidates it lists them and waits; with none it says so. A folder is found by its path (*Runbooks / Payments*), its name or part of it; several folders are listed, a missing one gets the list of the folders there, and *top level* or *root* moves a file out of any folder.
+- **Only when it is about a file.** The message must speak of a file (the word *file*, *document*, *note* or *folder*, or a name with an extension). *remove duplicates from the list*, *rename the variable to count* and *remove x from the Runbooks folder* are not read as file commands.
+- **The trash is the safety net.** Deleting moves the file to the workspace's trash, which can restore it; there is no permanent delete from the chat. A repository file cannot be changed here, as elsewhere, and the reason is shown when it fails.
+- **Same checks as by hand.** Confirming calls the bulk-files handler (move, delete) or the rename handler as the person, so the role, the workspace and the repository-file checks and the activity feed apply unchanged. Like *Save as memory*, the job is unavailable to a viewer.
+- No API route, setting or migration changes beyond V0.9.10's.
+
+### Checks
+- Unit tests for reading the requests (and the ones that must not match), finding folders and building each proposal; compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.10 (2026-11-21)
 
 CAIRN proposes, you confirm: saving a memory card.

@@ -92,7 +92,13 @@ async fn assistant_routes_messages_and_works_without_ai() {
         .collect::<Vec<_>>();
     assert_eq!(
         available,
-        ["find_files", "find_symbol", "search_content", "save_memory"]
+        [
+            "find_files",
+            "find_symbol",
+            "search_content",
+            "save_memory",
+            "manage_files"
+        ]
     );
 
     let send = |body: Value| {

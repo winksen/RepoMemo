@@ -2884,6 +2884,8 @@ pub enum AgentCapability {
     WorkspaceOverview,
     /// Turns an earlier answer, or a sentence the person writes, into a memory card after they confirm (V0.9.10).
     SaveMemory,
+    /// Moves a file to a folder, renames it or sends it to the trash, after the person confirms (V0.9.11).
+    ManageFiles,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2903,6 +2905,12 @@ pub struct AgentCapabilityInfo {
 pub enum AgentProposalKind {
     /// Save a memory card, with the evidence it cites.
     SaveMemory,
+    /// Move a file to a folder, or to the top level.
+    MoveFiles,
+    /// Give a file a new title.
+    RenameFile,
+    /// Move a file to the workspace's trash, which can restore it.
+    TrashFiles,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

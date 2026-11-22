@@ -15,6 +15,8 @@ use crate::RepoMemoCore;
 
 mod chatter;
 mod evidence;
+mod files;
+use files::{choose_folder, file_command, files_help, move_reply, rename_reply, trash_reply, FolderChoice};
 mod proposals;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};
 use evidence::{evidence_for, next_steps, says_insufficient};
@@ -185,7 +187,7 @@ const WORKSPACE_REFERENCES: &[&str] = &[
 
 /// Whether a job changes the workspace once the person confirms it, so a viewer cannot be offered it (V0.9.10).
 pub fn capability_needs_write(capability: AgentCapability) -> bool {
-    matches!(capability, AgentCapability::SaveMemory)
+    matches!(capability, AgentCapability::SaveMemory | AgentCapability::ManageFiles)
 }
 
 pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
@@ -237,6 +239,13 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             "Save as memory",
             "Turn my last answer, or a sentence you write, into a memory card that cites its evidence. I save it only when you confirm.",
             "What should I remember? Leave it empty to save my last answer",
+            false,
+        ),
+        (
+            AgentCapability::ManageFiles,
+            "Manage files",
+            "Move a file to a folder, rename it or send it to the trash. I do it only when you confirm.",
+            "For example: move retry-policy.md to Runbooks",
             false,
         ),
     ]
@@ -326,7 +335,10 @@ impl RepoMemoCore {
             request.artifact_id = Some(file.id);
             Some((AgentCapability::SummarizeFile, AgentRouting::Rules, file.title))
         } else if let Some(capability) = request.capability {
-            let subject = if matches!(capability, AgentCapability::AskQuestion | AgentCapability::SaveMemory) {
+            let subject = if matches!(
+                capability,
+                AgentCapability::AskQuestion | AgentCapability::SaveMemory | AgentCapability::ManageFiles
+            ) {
                 message.to_owned()
             } else {
                 clean_subject(message)
@@ -379,6 +391,7 @@ impl RepoMemoCore {
                 AgentCapability::AskQuestion => self.agent_ask(&request, &subject, &history).await,
                 AgentCapability::WorkspaceOverview => self.agent_overview(&request).await,
                 AgentCapability::SaveMemory => Ok(self.agent_save_memory(&request, &subject)),
+                AgentCapability::ManageFiles => self.agent_manage_files(&request, &subject).await,
             }
         };
         // Provider and indexing problems are part of the conversation, not a
@@ -445,6 +458,60 @@ impl RepoMemoCore {
             workspace: name.map(|name| WorkspaceBrief { name, files }),
             suggestions,
         }
+    }
+
+    /// Moving, renaming or trashing one file (V0.9.11): CAIRN finds the file, and the folder for a move, and proposes the
+    /// change. It acts only when the file is clearly the one meant; with several candidates it lists them and waits.
+    async fn agent_manage_files(&self, request: &AgentRequest, text: &str) -> Result<AgentReply> {
+        let Some(command) = file_command(text, &text.to_ascii_lowercase()) else {
+            return Ok(files_help());
+        };
+        let wanted = match &command {
+            files::FileCommand::Move { file, .. }
+            | files::FileCommand::Rename { file, .. }
+            | files::FileCommand::Trash { file } => file.clone(),
+        };
+        let mut matches = self.match_files(&request.workspace_id, &wanted).await?;
+        if matches.is_empty() {
+            return Ok(reply(format!(
+                "No file name or path matches “{wanted}”. Use Find files to look it up first."
+            )));
+        }
+        let clear = matches.len() == 1 || (matches[0].exact && !matches[1].exact);
+        if !clear {
+            let mut several = reply(format!(
+                "Several files match “{wanted}”. Say which one with more of its name or its path, and I will propose the change."
+            ));
+            several.files = matches
+                .into_iter()
+                .take(FILE_CHOICE_LIMIT)
+                .map(|file| file.artifact)
+                .collect();
+            return Ok(several);
+        }
+        let file = matches.swap_remove(0).artifact;
+        Ok(match command {
+            files::FileCommand::Rename { title, .. } => rename_reply(file, &title),
+            files::FileCommand::Trash { .. } => trash_reply(file),
+            files::FileCommand::Move { folder, .. } => {
+                let folders = self.storage.list_folders(&request.workspace_id).await?;
+                match choose_folder(&folder, &folders) {
+                    FolderChoice::TopLevel => move_reply(file, None),
+                    FolderChoice::One(found) => move_reply(file, Some(&found)),
+                    FolderChoice::Many(names) => reply(format!(
+                        "Several folders match “{folder}”: {}. Say which one by its full path.",
+                        names.join(", ")
+                    )),
+                    FolderChoice::Missing(names) if names.is_empty() => {
+                        reply("This workspace has no folders yet. Create one in Evidence, then ask me again.")
+                    }
+                    FolderChoice::Missing(names) => reply(format!(
+                        "I can't find a folder named “{folder}”. The folders here are: {}.",
+                        names.join(", ")
+                    )),
+                }
+            }
+        })
     }
 
     /// Saving a memory card (V0.9.10): CAIRN proposes it and the person confirms. What it saves is a sentence the person wrote,
@@ -1032,6 +1099,10 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     // ASCII lowercasing keeps byte offsets aligned with `text`.
     let lower = text.to_ascii_lowercase();
 
+    // "Move X to Y", "rename X to Y", "delete the file X" (V0.9.11).
+    if file_command(text, &lower).is_some() {
+        return Some((AgentCapability::ManageFiles, text.trim().to_owned()));
+    }
     // "Save that as a memory", "remember this: ..." (V0.9.10).
     if save_memory_request(text, &lower).is_some() {
         return Some((AgentCapability::SaveMemory, text.trim().to_owned()));
@@ -1152,6 +1223,7 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
         "ask_question" => AgentCapability::AskQuestion,
         "workspace_overview" => AgentCapability::WorkspaceOverview,
         "save_memory" => AgentCapability::SaveMemory,
+        "manage_files" => AgentCapability::ManageFiles,
         _ => return None,
     };
     let subject = value

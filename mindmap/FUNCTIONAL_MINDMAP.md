@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.10` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.11` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.11 — CAIRN moves, renames and trashes files when you confirm.
+
+- **Manage files.** *Move a.md to Runbooks*, *rename the deploy runbook file to Release runbook*, *delete the file old-notes.md*: CAIRN finds the file (and the folder) and proposes the change; Confirm does it as you. One file at a time, only when it is clear which; delete goes to the trash, which can restore it.
+- It is not offered to a viewer, and it ignores messages that are not about a file.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.10 — CAIRN proposes, you confirm: saving a memory card.
 

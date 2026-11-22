@@ -2530,7 +2530,8 @@ export type AgentCapability =
   | "summarize_file"
   | "ask_question"
   | "workspace_overview"
-  | "save_memory";
+  | "save_memory"
+  | "manage_files";
 
 export interface AgentCapabilityInfo {
   id: AgentCapability;
@@ -2544,7 +2545,10 @@ export interface AgentCapabilityInfo {
 
 /** What CAIRN offers to do for the person, which it does only when they confirm (V0.9.10). */
 export type AgentProposalKind =
-  | "save_memory";
+  | "save_memory"
+  | "move_files"
+  | "rename_file"
+  | "trash_files";
 
 export type AgentProposalState =
   | "pending"

@@ -6,7 +6,7 @@ use crate::TemplateIssue;
 
 /// The jobs the workspace assistant can do, by the id the API uses (`AgentCapability` in the domain crate; a test in
 /// the api crate matches on every one, so this list cannot fall behind).
-pub const CAPABILITIES: [&str; 7] = [
+pub const CAPABILITIES: [&str; 8] = [
     "find_files",
     "find_symbol",
     "search_content",
@@ -14,6 +14,7 @@ pub const CAPABILITIES: [&str; 7] = [
     "ask_question",
     "workspace_overview",
     "save_memory",
+    "manage_files",
 ];
 
 /// How many suggested questions a template may give, and how long each may be, in characters.

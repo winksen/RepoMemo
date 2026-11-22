@@ -11,8 +11,9 @@ use axum::{
 use repomemo_domain::{AgentProposal, AgentProposalKind, AgentProposalState, AgentTurn};
 
 use crate::{
-    map_storage_error, requests::CreateMemoryCardBody, require_workspace_write, retrieval, ApiError, AppState,
-    AuthenticatedSubject,
+    artifacts, map_storage_error,
+    requests::{BulkArtifactsRequest, CreateMemoryCardBody, UpdateArtifactRequest},
+    require_workspace_write, retrieval, ApiError, AppState, AuthenticatedSubject,
 };
 
 /// The caller's turn with the conversation it belongs to checked: someone else's is reported as missing.
@@ -67,7 +68,58 @@ async fn apply(
             .await?;
             Ok(format!("Saved the memory card “{}”.", card.title))
         }
+        AgentProposalKind::MoveFiles | AgentProposalKind::TrashFiles => {
+            let body: BulkArtifactsRequest = serde_json::from_value(proposal.payload.clone())
+                .map_err(|_| ApiError::bad_request("This proposal can no longer be applied."))?;
+            let Json(done) = artifacts::bulk_artifacts(
+                subject.clone(),
+                State(state.clone()),
+                Path(workspace_id.to_owned()),
+                Json(body),
+            )
+            .await?;
+            // The files are handled one by one; a file that could not be (a repository file, one already gone) is the answer.
+            if let Some(failure) = done.failed.first() {
+                return Err(ApiError::bad_request(failure.message.clone()));
+            }
+            let title = payload_text(proposal, "title");
+            Ok(if proposal.kind == AgentProposalKind::TrashFiles {
+                format!("Moved “{title}” to the trash. The workspace's trash can restore it.")
+            } else {
+                format!("Moved “{title}” to {}.", payload_text(proposal, "folder_name"))
+            })
+        }
+        AgentProposalKind::RenameFile => {
+            let artifact_id = payload_text(proposal, "artifact_id");
+            let title = payload_text(proposal, "title");
+            let current = state
+                .storage
+                .get_artifact_summary(&artifact_id)
+                .await
+                .map_err(|_| ApiError::not_found("That file was not found."))?;
+            if current.workspace_id != workspace_id {
+                return Err(ApiError::not_found("That file was not found."));
+            }
+            let _ = artifacts::update_artifact(
+                subject.clone(),
+                State(state.clone()),
+                Path(artifact_id),
+                Json(UpdateArtifactRequest { title: title.clone() }),
+            )
+            .await?;
+            Ok(format!("Renamed “{}” to “{title}”.", payload_text(proposal, "was")))
+        }
     }
+}
+
+/// A text the proposal's payload carries, or nothing.
+fn payload_text(proposal: &AgentProposal, key: &str) -> String {
+    proposal
+        .payload
+        .get(key)
+        .and_then(|value| value.as_str())
+        .unwrap_or_default()
+        .to_owned()
 }
 
 pub(crate) async fn confirm_agent_proposal(
