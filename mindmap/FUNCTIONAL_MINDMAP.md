@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.15` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.15 — Borderless top bar controls.
+
+- **Top bar.** The buttons (create, theme, notifications, CAIRN and its menu) and the search bar have **no border** and the **same fill**; a **blue border** appears only on hover or while the button's dropdown is open (CAIRN's button and menu light up together).
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.14 — A chat's summary can be saved back as an indexed note.
 

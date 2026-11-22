@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.14` (2026-11-21)
+> **Current:** `V0.9.15` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -49,6 +49,7 @@
 | **V0.9.25** | 🔜 | AM. Public readiness | 📘 | Support contract | Publish supported versions/platforms, upgrade policy, backup expectations and support/incident routes | A new operator knows what is supported and how to recover or report a problem; API/archive compatibility commitments, the write-precondition rule (V0.6.18) and deprecation policy are explicit |
 | **V0.9.26** | 🔜 | AM. Public readiness | 📘 | Pilot acceptance | Review week-two usage and the full readiness matrix, then close observed product blockers | All required report gates pass with linked evidence; unresolved failures produce focused pre-1.0 fix rows rather than an assumed waiver |
 | **V0.9.27** | 🔜 | AM. Public readiness | 📘 | Release candidate | Freeze the final candidate and repeat affected checks on its exact commit | Documentation, release notes, migrations, CI and manual records name the same candidate; a subsequent code change invalidates affected sign-offs |
+| **V0.9.15** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Borderless bar controls | Draw the top bar's buttons and search bar without a border and with one shared fill, showing a blue border only on hover | The bar's buttons and search bar share a fill, have no border, and get a blue border on hover or while their dropdown is open |
 
 ## Verification and handoff
 

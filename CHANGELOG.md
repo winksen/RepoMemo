@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.15 (2026-11-21)
+
+Borderless top bar controls.
+
+### Changed
+- **Top bar.** The buttons and the search bar have no border and share one fill; a blue border shows only on hover or while a button's dropdown is open. CAIRN's button and its menu light up together.
+- CSS only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.14 (2026-11-21)
 
 A chat's summary can be saved back as an indexed note.
