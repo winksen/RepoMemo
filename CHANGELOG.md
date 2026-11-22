@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.10 (2026-11-21)
+
+CAIRN proposes, you confirm: saving a memory card.
+
+### Changed
+- **Proposals.** A reply from CAIRN can now carry an action it proposes (`proposals`: a title, what exactly would change, and a state of *pending*, *applied* or *dismissed*). Nothing happens until the person presses **Confirm**; **Dismiss** leaves everything as it was. The action then runs on the server as that person, through the same handler they would call themselves, so the role check, quotas and the activity feed apply unchanged and CAIRN gains no way to change the workspace that its user does not have. The outcome is written into the stored reply, so a reload shows what was done and a second confirmation is refused.
+- **New job: Save as memory** (`save_memory`). *Save that as a memory*, *remember this*, *add this to memory* and similar phrases propose a memory card made from CAIRN's last answer, with the evidence that answer cited; *remember this: Deploys need approval* saves the sentence as written. The card shows its title, its text and what it cites before anything is saved. It needs no AI. It is in the *+* menu and the greeting's list, and a template can order it.
+- **Roles.** A viewer cannot change the workspace, so the job shows as unavailable to a viewer and a proposal is not offered to one.
+- **API.** `POST /v1/agent/turns/{turn_id}/proposals/{proposal_id}/confirm` and `.../dismiss` return the turn. The server now also gives the core every earlier exchange in full (`exchanges`), for jobs that act on an earlier answer.
+- The 0.9 pilot rows were renumbered by five more (the first is now V0.9.15) for the CAIRN track's five new releases.
+- No migration: the proposals live in the stored reply.
+
+### Checks
+- Unit tests for the phrases, the proposal and its edge cases; compiled and linted for the core and the server, typecheck and the generated types pass; not run. `styles:check` and `templates:check` fail on problems that were there before. Nothing was built or run: the card and the confirmation were not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.9 (2026-11-21)
 
 Evidence reads as what CAIRN read.
@@ -25,7 +43,7 @@ The markers in an answer match the evidence beside it.
 ### Changed
 - **Fix to V0.9.4.** Since an answer shows only the passages it cites, the page numbers that evidence 1, 2, 3 in the order shown, while the answer still said, for example, *[3]* and *[1]*. A marker and the row it points to could name different passages. CAIRN now renumbers the markers in the answer to the evidence shown: the passage cited first becomes *[1]*, the next *[2]*, and so on, in every common shape (`[3]`, `[1][3]`, `[1, 3]`).
 - **Only what matches.** A number that names no cited passage, and brackets that are not markers (a link such as `[text](url)`, `[x]`), are left as they were. An answer that cites nothing is not changed.
-- The 0.9 pilot rows were renumbered once more, by one (the first is now V0.9.10), to make room for the CAIRN track's tenth release.
+- The 0.9 pilot rows were renumbered once more, by one (the first is now V0.9.15), to make room for the CAIRN track's tenth release.
 - No API, setting or migration changes.
 
 ### Checks
@@ -1965,7 +1983,7 @@ Make the upload version check part of its write and name the unchecked mode in t
 - **A stale upload can no longer pass the check and then overwrite a newer one.** `POST /v1/artifacts/{id}/versions` compared `X-RepoMemo-Expected-Updated-At` with the file as read just before the write, so a change that landed in between was overwritten. The comparison is now part of the update statement itself: of two uploads that started from the same state, exactly one is stored and the other gets `409`. The earlier comparison stays as a quick refusal.
 
 ### Changed
-- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.20 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
+- **Decision: an unchecked mode stays for now, and the guide says so.** A request that sends no `expected_revision` (memory card update) or no `X-RepoMemo-Expected-Updated-At` (new file version) still writes unchecked. [The API guide](docs/API.md) now describes both preconditions, states that this mode overwrites whatever is there, and says it is kept until the V0.9.25 compatibility promise, which will state whether it stays. Refusing such requests now would break scripts and the desktop confirm action before the API promise exists.
 - No route, setting or migration changes.
 
 ### Checks

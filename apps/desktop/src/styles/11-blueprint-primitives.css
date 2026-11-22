@@ -486,6 +486,12 @@ body.shared-dock-resizing { cursor: col-resize; user-select: none; }
 .shared-assistant-reply-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; color: var(--color-text-subtle); font-size: 12px; }
 .shared-assistant-reply-meta span { display: inline-flex; align-items: center; gap: 6px; }
 .shared-assistant-generated { padding: 2px 8px; border: 1px solid var(--color-border-strong); border-radius: 999px; }
+.shared-assistant-proposal { display: grid; gap: 8px; max-width: 72ch; padding: 12px 14px; border: 1px solid var(--color-border-strong); border-radius: 12px; }
+.shared-assistant-proposal > strong { font-size: 13px; }
+.shared-assistant-proposal .shared-markdown { color: var(--color-text-muted); font-size: 13px; }
+.shared-assistant-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.shared-assistant-proposal > small { color: var(--color-text-subtle); font-size: 12px; }
+.shared-assistant-proposal-dismissed { opacity: 0.7; }
 .shared-assistant-files { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .shared-assistant-files li { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .shared-assistant .rm-button.shared-assistant-file { flex: 1; justify-content: flex-start; min-width: 0; padding: 9px 12px; font-weight: 400; text-align: left; }

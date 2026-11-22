@@ -15,8 +15,10 @@ use crate::RepoMemoCore;
 
 mod chatter;
 mod evidence;
+mod proposals;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};
 use evidence::{evidence_for, next_steps, says_insufficient};
+use proposals::{save_memory_reply, save_memory_request};
 
 const MAX_MESSAGE_CHARS: usize = 2_000;
 const FILE_RESULT_LIMIT: usize = 20;
@@ -181,6 +183,11 @@ const WORKSPACE_REFERENCES: &[&str] = &[
     "everything",
 ];
 
+/// Whether a job changes the workspace once the person confirms it, so a viewer cannot be offered it (V0.9.10).
+pub fn capability_needs_write(capability: AgentCapability) -> bool {
+    matches!(capability, AgentCapability::SaveMemory)
+}
+
 pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
     [
         (
@@ -224,6 +231,13 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             "Brief the whole workspace from indexed excerpts.",
             "No input needed",
             true,
+        ),
+        (
+            AgentCapability::SaveMemory,
+            "Save as memory",
+            "Turn my last answer, or a sentence you write, into a memory card that cites its evidence. I save it only when you confirm.",
+            "What should I remember? Leave it empty to save my last answer",
+            false,
         ),
     ]
     .into_iter()
@@ -312,7 +326,7 @@ impl RepoMemoCore {
             request.artifact_id = Some(file.id);
             Some((AgentCapability::SummarizeFile, AgentRouting::Rules, file.title))
         } else if let Some(capability) = request.capability {
-            let subject = if capability == AgentCapability::AskQuestion {
+            let subject = if matches!(capability, AgentCapability::AskQuestion | AgentCapability::SaveMemory) {
                 message.to_owned()
             } else {
                 clean_subject(message)
@@ -364,6 +378,7 @@ impl RepoMemoCore {
                 AgentCapability::SummarizeFile => self.agent_summarize(&request, &subject).await,
                 AgentCapability::AskQuestion => self.agent_ask(&request, &subject, &history).await,
                 AgentCapability::WorkspaceOverview => self.agent_overview(&request).await,
+                AgentCapability::SaveMemory => Ok(self.agent_save_memory(&request, &subject)),
             }
         };
         // Provider and indexing problems are part of the conversation, not a
@@ -396,7 +411,7 @@ impl RepoMemoCore {
         let raw = provider
             .generate(GenerateRequest {
                 system: Some("You classify requests. You reply with JSON only.".to_owned()),
-                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
+                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
                 context: message.to_owned(),
                 options: json!({ "temperature": 0.0 }),
             })
@@ -430,6 +445,19 @@ impl RepoMemoCore {
             workspace: name.map(|name| WorkspaceBrief { name, files }),
             suggestions,
         }
+    }
+
+    /// Saving a memory card (V0.9.10): CAIRN proposes it and the person confirms. What it saves is a sentence the person wrote,
+    /// else the last answer with the evidence it cited.
+    fn agent_save_memory(&self, request: &AgentRequest, subject: &str) -> AgentReply {
+        let lower = subject.to_ascii_lowercase();
+        let statement = save_memory_request(subject, &lower).unwrap_or_else(|| subject.trim().to_owned());
+        let statement = if statement.chars().count() >= 8 {
+            statement
+        } else {
+            String::new()
+        };
+        save_memory_reply(&statement, &request.exchanges)
     }
 
     /// CAIRN's reply to a message that asks for none of its jobs. With a provider the AI answers as CAIRN from the persona and the
@@ -774,6 +802,7 @@ fn reply(markdown: impl Into<String>) -> AgentReply {
         citations: Vec::new(),
         warnings: Vec::new(),
         context_turns: 0,
+        proposals: Vec::new(),
     }
 }
 
@@ -1003,6 +1032,11 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     // ASCII lowercasing keeps byte offsets aligned with `text`.
     let lower = text.to_ascii_lowercase();
 
+    // "Save that as a memory", "remember this: ..." (V0.9.10).
+    if save_memory_request(text, &lower).is_some() {
+        return Some((AgentCapability::SaveMemory, text.trim().to_owned()));
+    }
+
     if let Some(rest) = after_phrase(text, &lower, SUMMARY_TRIGGERS, false) {
         let mut subject = clean_subject(rest);
         if matches!(subject.to_ascii_lowercase().as_str(), "this" | "that" | "it") {
@@ -1117,6 +1151,7 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
         "summarize_file" => AgentCapability::SummarizeFile,
         "ask_question" => AgentCapability::AskQuestion,
         "workspace_overview" => AgentCapability::WorkspaceOverview,
+        "save_memory" => AgentCapability::SaveMemory,
         _ => return None,
     };
     let subject = value

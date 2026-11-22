@@ -366,6 +366,7 @@ fn example(capability: AgentCapability) -> &'static str {
         AgentCapability::SummarizeFile => "summarize README.md",
         AgentCapability::AskQuestion => "how does authentication work?",
         AgentCapability::WorkspaceOverview => "give me a workspace overview",
+        AgentCapability::SaveMemory => "save that as a memory",
     }
 }
 

@@ -3,6 +3,7 @@
 mod access;
 mod access_control;
 mod agent;
+mod agent_proposals;
 mod ai;
 mod ai_access;
 mod ai_admin;
@@ -912,6 +913,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/agent/conversations",
             get(agent::list_agent_conversations),
+        )
+        .route(
+            "/v1/agent/turns/{turn_id}/proposals/{proposal_id}/confirm",
+            post(agent_proposals::confirm_agent_proposal),
+        )
+        .route(
+            "/v1/agent/turns/{turn_id}/proposals/{proposal_id}/dismiss",
+            post(agent_proposals::dismiss_agent_proposal),
         )
         .route(
             "/v1/agent/conversations/{conversation_id}",

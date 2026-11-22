@@ -408,6 +408,26 @@ impl StorageEngine {
         rows.into_iter().map(AgentTurn::try_from).collect()
     }
 
+    /// One stored exchange.
+    pub async fn get_agent_turn(&self, turn_id: &str) -> Result<AgentTurn> {
+        let row = sqlx::query_as::<_, AgentTurnRow>("SELECT id, conversation_id, position, label, request_json, reply_json, created_at FROM assistant_turns WHERE id = ?1")
+            .bind(turn_id)
+            .fetch_optional(self.reader())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("The assistant's message was not found."))?;
+        AgentTurn::try_from(row)
+    }
+
+    /// Replaces the reply kept for an exchange, as when a proposal in it was confirmed or dismissed (V0.9.10).
+    pub async fn update_agent_turn_reply(&self, turn_id: &str, reply: &AgentReply) -> Result<()> {
+        sqlx::query("UPDATE assistant_turns SET reply_json = ?2 WHERE id = ?1")
+            .bind(turn_id)
+            .bind(serde_json::to_string(reply)?)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Stores a finished exchange at the end of the conversation and marks the
     /// conversation as recently used.
     pub async fn append_agent_turn(

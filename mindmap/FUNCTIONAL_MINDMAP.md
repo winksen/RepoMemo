@@ -2,7 +2,14 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.9` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.10` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.10 — CAIRN proposes, you confirm: saving a memory card.
+
+- **CAIRN proposes, you confirm.** A reply can carry an action in a card with *Confirm* and *Dismiss*. Nothing changes until you confirm, and the action runs as you, with your permissions.
+- **Save as memory.** *Save that as a memory* or *remember this: ...* shows the memory card CAIRN would save (title, text, the evidence it cites). Confirm saves it. A viewer is not offered it.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.9 — Evidence reads as what CAIRN read.
 

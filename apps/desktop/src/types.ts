@@ -5,6 +5,7 @@ import type {
   AgentCapability,
   AgentCapabilityInfo,
   AgentConversation,
+  AgentProposal,
   AppSettings,
   ArtifactComment,
   ArtifactIndexFailure,
@@ -123,6 +124,7 @@ export type {
   AgentCapability,
   AgentCapabilityInfo,
   AgentConversation,
+  AgentProposal,
   AppSettings,
   ArtifactComment,
   ArtifactIndexFailure,
@@ -600,6 +602,8 @@ export interface AgentReply {
   warnings: string[];
   /** Earlier turns of the chat that went with the question. */
   context_turns?: number;
+  /** Actions CAIRN proposes; each waits for the person to confirm it (V0.9.10). */
+  proposals?: AgentProposal[];
 }
 
 export interface MemoryCard {

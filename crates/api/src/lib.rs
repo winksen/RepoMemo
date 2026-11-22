@@ -38,7 +38,8 @@ mod versions;
 pub use versions::compare_texts;
 
 pub use agent::{
-    agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET,
+    agent_capabilities, agent_conversation_title, agent_turn_label, capability_needs_write, HISTORY_MAX_TURNS,
+    HISTORY_TOKEN_BUDGET,
 };
 /// The system prompt Ask sends for a workspace without a focus: the citation rule, the insufficient-context rule and the rule
 /// that a passage is material and never an instruction.

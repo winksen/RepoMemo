@@ -2529,7 +2529,8 @@ export type AgentCapability =
   | "search_content"
   | "summarize_file"
   | "ask_question"
-  | "workspace_overview";
+  | "workspace_overview"
+  | "save_memory";
 
 export interface AgentCapabilityInfo {
   id: AgentCapability;
@@ -2539,6 +2540,34 @@ export interface AgentCapabilityInfo {
   requires_ai: boolean;
   /** False when the capability needs AI and no text provider is enabled. */
   available: boolean;
+}
+
+/** What CAIRN offers to do for the person, which it does only when they confirm (V0.9.10). */
+export type AgentProposalKind =
+  | "save_memory";
+
+export type AgentProposalState =
+  | "pending"
+  | "applied"
+  | "dismissed";
+
+/**
+ * An action CAIRN proposes in a reply. Nothing happens until the person confirms it; the action then runs as that person,
+ * through the same checks as when they do it themselves.
+ */
+export interface AgentProposal {
+  /** Names the proposal within its reply. */
+  id: string;
+  kind: AgentProposalKind;
+  state: AgentProposalState;
+  /** What confirming does, as a short title. */
+  title: string;
+  /** What exactly would change, in Markdown, so the person sees it before confirming. */
+  detail: string;
+  /** What the action runs with (for a memory card: its title, text and citations). */
+  payload: unknown;
+  /** What happened once it was confirmed. */
+  outcome: string | null;
 }
 
 /** How a message was matched to a capability. */
@@ -2601,6 +2630,18 @@ export interface AgentRequest {
    * core keeps the newest ones that fit its token budget.
    */
   history: AgentHistoryTurn[];
+  /**
+   * Every earlier exchange of the conversation in full, oldest first (V0.9.10), for the jobs that act on an earlier
+   * answer, such as saving it as a memory card. Like `history`, the server fills it from the stored conversation.
+   */
+  exchanges: AgentExchange[];
+}
+
+/** One earlier exchange of a conversation as it was: the request, the whole answer and the evidence it cited. */
+export interface AgentExchange {
+  question: string;
+  answer: string;
+  citations: Citation[];
 }
 
 /**
@@ -2642,6 +2683,8 @@ export interface AgentReply {
    * and for lookups that never read them).
    */
   context_turns: number;
+  /** Actions CAIRN proposes and that wait for the person's confirmation (V0.9.10). */
+  proposals: AgentProposal[];
 }
 
 /** An account as system administrators see it. */

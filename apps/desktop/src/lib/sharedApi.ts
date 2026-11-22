@@ -21,6 +21,7 @@ import type {
   AgentConversation,
   AgentConversationDetail,
   AgentMessage,
+  AgentTurn,
   AgentTurnResponse,
   AskAnswer,
   KnowledgeMap,
@@ -747,6 +748,15 @@ export function sendSharedAgentMessage(accessToken: string, workspaceId: string,
     method: "POST",
     body: JSON.stringify({ ...message, conversation_id: conversationId }),
   }, accessToken);
+}
+
+/** Confirms what CAIRN proposed: the action runs as the person, and the turn comes back with its outcome (V0.9.10). */
+export function confirmSharedAgentProposal(accessToken: string, turnId: string, proposalId: string): Promise<AgentTurn> {
+  return request<AgentTurn>(`/v1/agent/turns/${turnId}/proposals/${proposalId}/confirm`, { method: "POST", body: "{}" }, accessToken);
+}
+
+export function dismissSharedAgentProposal(accessToken: string, turnId: string, proposalId: string): Promise<AgentTurn> {
+  return request<AgentTurn>(`/v1/agent/turns/${turnId}/proposals/${proposalId}/dismiss`, { method: "POST", body: "{}" }, accessToken);
 }
 
 export function listSharedAgentConversations(accessToken: string, workspaceId: string): Promise<AgentConversation[]> {

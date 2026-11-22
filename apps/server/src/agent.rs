@@ -8,10 +8,12 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use repomemo_api::{agent_capabilities, agent_conversation_title, agent_turn_label, HISTORY_MAX_TURNS};
+use repomemo_api::{
+    agent_capabilities, agent_conversation_title, agent_turn_label, capability_needs_write, HISTORY_MAX_TURNS,
+};
 use repomemo_domain::{
-    AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail, AgentHistoryFile,
-    AgentHistoryTurn, AgentMessage, AgentRequest, AgentTurn, ProviderSettings,
+    AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail, AgentExchange, AgentHistoryFile,
+    AgentHistoryTurn, AgentMessage, AgentRequest, AgentTurn, ProviderSettings, WorkspaceRole,
 };
 use serde::{Deserialize, Serialize};
 
@@ -63,7 +65,15 @@ pub(crate) async fn list_agent_capabilities(
         Some(provider) if ai_access::role_may_use_ai(&state, &workspace_id, &role).await? => Some(provider),
         _ => None,
     };
-    let capabilities = agent_capabilities(provider.is_some());
+    let mut capabilities = agent_capabilities(provider.is_some());
+    // A viewer cannot change the workspace, so what would change it is not offered (V0.9.10).
+    if matches!(role, WorkspaceRole::Viewer) {
+        for info in &mut capabilities {
+            if capability_needs_write(info.id) {
+                info.available = false;
+            }
+        }
+    }
     let (provider_name, model) = match provider {
         Some(provider) => (
             Some(provider.name),
@@ -102,16 +112,16 @@ pub(crate) async fn send_agent_message(
     };
     // What goes with the question comes from the stored conversation, never
     // from the request, so a client cannot make the assistant "remember" text.
-    let history = match &existing {
+    let (history, exchanges) = match &existing {
         Some(conversation) => {
             let turns = state
                 .storage
                 .list_agent_turns(&conversation.id)
                 .await
                 .map_err(map_storage_error)?;
-            history_of(&turns)
+            (history_of(&turns), exchanges_of(&turns))
         }
-        None => Vec::new(),
+        None => (Vec::new(), Vec::new()),
     };
     let provider = text_provider(&state, &workspace_id).await?;
     let (provider_id, ai_unavailable_reason) = match provider {
@@ -136,7 +146,7 @@ pub(crate) async fn send_agent_message(
         }
         None => (None, None),
     };
-    let reply = state
+    let mut reply = state
         .core
         .run_agent(AgentRequest {
             workspace_id: workspace_id.clone(),
@@ -146,9 +156,17 @@ pub(crate) async fn send_agent_message(
             provider_id,
             ai_unavailable_reason,
             history,
+            exchanges,
         })
         .await
         .map_err(map_core_error)?;
+    // A viewer is not offered what would change the workspace (V0.9.10).
+    if matches!(role, WorkspaceRole::Viewer) && !reply.proposals.is_empty() {
+        reply.proposals.clear();
+        reply
+            .warnings
+            .push("Your role in this workspace cannot change it, so I cannot offer to do that.".to_owned());
+    }
 
     // The conversation is only created once there is a reply to keep, so a
     // rejected first message leaves no empty chat behind.
@@ -288,6 +306,18 @@ fn history_of(turns: &[AgentTurn]) -> Vec<AgentHistoryTurn> {
                 answer: turn.reply.reply_markdown.clone(),
                 files,
             }
+        })
+        .collect()
+}
+
+/// Every earlier exchange in full, for the jobs that act on an earlier answer (V0.9.10).
+fn exchanges_of(turns: &[AgentTurn]) -> Vec<AgentExchange> {
+    turns
+        .iter()
+        .map(|turn| AgentExchange {
+            question: turn.label.clone(),
+            answer: turn.reply.reply_markdown.clone(),
+            citations: turn.reply.citations.clone(),
         })
         .collect()
 }

@@ -3,9 +3,9 @@ import { SafeMarkdown } from "./SafeMarkdown";
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Brain, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
-import { deleteSharedAgentConversation, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
-import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentReply, AgentTurn } from "../types";
+import { BookmarkSimple, Brain, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
+import { confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage } from "../lib/sharedApi";
+import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentTurn } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
@@ -47,6 +47,7 @@ const CAPABILITY_ICONS: Record<AgentCapability, typeof Search> = {
   summarize_file: FileText,
   ask_question: Question,
   workspace_overview: Dashboard,
+  save_memory: BookmarkSimple,
 };
 
 const LAST_CHAT_PREFIX = "repomemo.assistant.last-chat.";
@@ -110,6 +111,8 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   const [chatDialog, setChatDialog] = useState<ChatDialog | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [isSavingChat, setIsSavingChat] = useState(false);
+  // The proposal being confirmed or dismissed (turn and proposal ids), so its buttons wait.
+  const [deciding, setDeciding] = useState<string | null>(null);
   const [showChats, setShowChats] = useState(false);
   // Bumped whenever the visible chat changes, so a reply that arrives after
   // the user moved on is not written into the wrong thread.
@@ -253,6 +256,20 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     send({ message: title, capability: "summarize_file", artifact_id: artifactId }, `Summarize ${title}`);
   }
 
+  /** Confirms or dismisses what CAIRN proposed. The action runs on the server as the person; the turn comes back with its outcome. */
+  async function decide(turnId: string, proposal: AgentProposal, action: "confirm" | "dismiss") {
+    setDeciding(`${turnId}/${proposal.id}`);
+    try {
+      const saved = await (action === "confirm" ? confirmSharedAgentProposal : dismissSharedAgentProposal)(accessToken, turnId, proposal.id);
+      setTurns((current) => current.map((entry) => entry.key === turnId ? storedTurn(saved) : entry));
+      if (action === "confirm") showToast("success", saved.reply.proposals?.find((entry) => entry.id === proposal.id)?.outcome ?? "Done.");
+    } catch (error) {
+      showToast("error", apiMessage(error, action === "confirm" ? "That could not be done." : "That could not be dismissed."));
+    } finally {
+      setDeciding(null);
+    }
+  }
+
   async function renameChat(conversation: AgentConversation) {
     setIsSavingChat(true);
     try {
@@ -320,7 +337,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
           {turn.status === "pending" ? <LoadingState label="Working on it" /> : null}
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
-          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} isBusy={isBusy} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} /> : null}
+          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} deciding={deciding} isBusy={isBusy} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
         </article>) : variant === "page"
           ? <div className="shared-assistant-welcome">
             <CairnIcon size={56} weight="fill" />
@@ -416,7 +433,20 @@ function Evidence({ accessToken, citations, isQuestion, onOpenArtifact }: { acce
   </div>;
 }
 
-function Reply({ accessToken, canSummarize, capabilities, isBusy, onOpenArtifact, onSummarize, reply }: { accessToken: string; canSummarize: boolean; capabilities: AgentCapabilities | null; isBusy: boolean; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply }) {
+/** What CAIRN proposes to do: shown before anything happens, with the person's *Confirm* and *Dismiss*, and afterwards with what was done. */
+function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string | null; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; proposal: AgentProposal; turnId: string }) {
+  const waiting = deciding === `${turnId}/${proposal.id}`;
+  return <aside aria-label={proposal.title} className={`shared-assistant-proposal shared-assistant-proposal-${proposal.state}`}>
+    <strong>{proposal.title}</strong>
+    <div className="shared-markdown"><SafeMarkdown>{proposal.detail}</SafeMarkdown></div>
+    {proposal.state === "pending" ? <div className="shared-assistant-proposal-actions">
+      <Button busy={waiting} disabled={deciding !== null} onClick={() => onDecide(proposal, "confirm")} type="button" variant="main">Confirm</Button>
+      <Button disabled={deciding !== null} onClick={() => onDecide(proposal, "dismiss")} type="button" variant="secondary">Dismiss</Button>
+    </div> : <small>{proposal.state === "applied" ? proposal.outcome ?? "Done." : "Dismissed. Nothing was changed."}</small>}
+  </aside>;
+}
+
+function Reply({ accessToken, canSummarize, capabilities, deciding, isBusy, onDecide, onOpenArtifact, onSummarize, reply, turnId }: { accessToken: string; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
   const note = routingNote(reply, capabilities);
   const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.
@@ -433,6 +463,7 @@ function Reply({ accessToken, canSummarize, capabilities, isBusy, onOpenArtifact
       {offerSummary ? <Button disabled={isBusy || !file.indexed_at} onClick={() => onSummarize(file.id, file.title)} title={file.indexed_at ? `Summarize ${file.title}` : "This file is not indexed yet"} type="button" variant="secondary">Summarize</Button> : null}
     </li>)}</ul> : null}
     {reply.matches.length ? <div className="shared-search-results">{reply.matches.map((match) => <article key={match.chunk_id}><Button className="shared-search-result" onClick={() => onOpenArtifact(match.artifact_id)} type="button" variant="secondary"><span className="shared-search-result-heading"><strong>{match.title}</strong><span>{match.source_name}</span></span><p>{match.snippet}</p><span className="shared-search-result-path">{match.path}{match.start_line ? ` · line ${match.start_line}` : ""}</span></Button></article>)}</div> : null}
+    {(reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
     {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
   </div>;
 }

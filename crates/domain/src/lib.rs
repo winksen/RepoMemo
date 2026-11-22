@@ -2882,6 +2882,8 @@ pub enum AgentCapability {
     SummarizeFile,
     AskQuestion,
     WorkspaceOverview,
+    /// Turns an earlier answer, or a sentence the person writes, into a memory card after they confirm (V0.9.10).
+    SaveMemory,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2893,6 +2895,41 @@ pub struct AgentCapabilityInfo {
     pub requires_ai: bool,
     /// False when the capability needs AI and no text provider is enabled.
     pub available: bool,
+}
+
+/// What CAIRN offers to do for the person, which it does only when they confirm (V0.9.10).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentProposalKind {
+    /// Save a memory card, with the evidence it cites.
+    SaveMemory,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentProposalState {
+    Pending,
+    Applied,
+    Dismissed,
+}
+
+/// An action CAIRN proposes in a reply. Nothing happens until the person confirms it; the action then runs as that person,
+/// through the same checks as when they do it themselves.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentProposal {
+    /// Names the proposal within its reply.
+    pub id: String,
+    pub kind: AgentProposalKind,
+    pub state: AgentProposalState,
+    /// What confirming does, as a short title.
+    pub title: String,
+    /// What exactly would change, in Markdown, so the person sees it before confirming.
+    pub detail: String,
+    /// What the action runs with (for a memory card: its title, text and citations).
+    pub payload: Value,
+    /// What happened once it was confirmed.
+    #[serde(default)]
+    pub outcome: Option<String>,
 }
 
 /// How a message was matched to a capability.
@@ -2965,6 +3002,19 @@ pub struct AgentRequest {
     /// core keeps the newest ones that fit its token budget.
     #[serde(default)]
     pub history: Vec<AgentHistoryTurn>,
+    /// Every earlier exchange of the conversation in full, oldest first (V0.9.10), for the jobs that act on an earlier
+    /// answer, such as saving it as a memory card. Like `history`, the server fills it from the stored conversation.
+    #[serde(default)]
+    pub exchanges: Vec<AgentExchange>,
+}
+
+/// One earlier exchange of a conversation as it was: the request, the whole answer and the evidence it cited.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentExchange {
+    pub question: String,
+    pub answer: String,
+    #[serde(default)]
+    pub citations: Vec<Citation>,
 }
 
 /// One earlier exchange as the assistant is reminded of it: what was asked,
@@ -3003,6 +3053,9 @@ pub struct AgentReply {
     /// and for lookups that never read them).
     #[serde(default)]
     pub context_turns: i64,
+    /// Actions CAIRN proposes and that wait for the person's confirmation (V0.9.10).
+    #[serde(default)]
+    pub proposals: Vec<AgentProposal>,
 }
 
 /// An account as system administrators see it.
