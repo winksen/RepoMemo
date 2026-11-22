@@ -2549,7 +2549,8 @@ export type AgentProposalKind =
   | "save_memory"
   | "move_files"
   | "rename_file"
-  | "trash_files";
+  | "trash_files"
+  | "save_summary";
 
 export type AgentProposalState =
   | "pending"

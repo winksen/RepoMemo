@@ -515,6 +515,12 @@ impl RepoMemoCore {
         result.generated = true;
         result.context_turns = request.exchanges.len() as i64;
         result.citations = chat_summary::sources(&request.exchanges);
+        // Keeping it as a note is offered, never done (V0.9.14).
+        result.proposals = vec![chat_summary::save_proposal(
+            &request.exchanges,
+            &result.reply_markdown,
+            &result.citations,
+        )];
         if cut {
             result
                 .warnings

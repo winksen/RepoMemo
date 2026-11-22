@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.13` (2026-11-21)
+> **Current:** `V0.9.14` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -35,6 +35,7 @@
 | **V0.9.11** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Manage files | Let CAIRN propose moving a file to a folder, renaming it or moving it to the trash, one file at a time, and run it as the person when they confirm | "Move a.md to Runbooks" shows a card naming the file and the folder, Confirm moves it and records the outcome, several matching files or folders are listed instead of guessed, delete goes to the restorable trash and messages that are not about a file are left alone |
 | **V0.9.12** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Uploads in the chat | Let a person attach files in the chat, uploaded and indexed by the ordinary upload and recorded in the chat as CAIRN having them | + › Attach files uploads the chosen files, each shows in the chat as uploaded with a link and when it can be asked about, a failing file is reported without stopping the rest, and a viewer is not offered it |
 | **V0.9.13** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Summarize chat | Summarize the whole conversation with the AI: what was asked, found, decided and left open, from the full chat and only what it says | "Summarize this chat" returns a structured summary of every message with the sources the chat used, a long chat is summarized from its newest messages with a warning, an empty chat calls no AI and a request about a file is not taken for it |
+| **V0.9.14** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Chat summary as an indexed note | Offer to store a chat's summary as a note with its sources, run through the ordinary create-note handler so it is indexed and searchable | Under a chat summary a card names the note and says who can read it, Confirm stores an indexed note as the person with a Sources list and the outcome says it is being indexed, Dismiss changes nothing and a viewer is not offered it |
 | **V0.9.15** | 🔜 | AM. Public readiness | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
 | **V0.9.16** | 🔜 | AM. Public readiness | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
 | **V0.9.17** | 🔜 | AM. Public readiness | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |

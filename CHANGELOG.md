@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.14 (2026-11-21)
+
+A chat's summary can be saved back as an indexed note.
+
+### Changed
+- **Save the summary as a note.** Under a chat summary (V0.9.13), CAIRN now proposes to store it in the workspace. The card shows the note's name (*Chat summary: <the question the chat began with>*) and says what it means: the note is indexed like any note, so CAIRN and search can find it later; the chat stays private to its person, but the note can be read by everyone who can read the workspace. **Confirm** stores it; **Dismiss** does nothing.
+- **With its sources.** The note holds the summary and a *Sources* list of the files the chat drew on (name, path and lines), so it says where its words came from.
+- **Same path as a note written by hand.** Confirming calls the create-note handler as the person, so the role check, the storage quota and the queue that indexes it apply unchanged, and the activity feed records the person. The outcome says it is being indexed.
+- **Writers only.** A viewer gets the summary but is not offered the note (a warning says so).
+- No API route, setting or migration changes.
+
+### Checks
+- A unit test for the note's title, text and card; compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run: the note and its indexing were not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.13 (2026-11-21)
 
 CAIRN summarizes the whole chat.

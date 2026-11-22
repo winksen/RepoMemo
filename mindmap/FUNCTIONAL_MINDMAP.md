@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.13` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.14` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.14 — A chat's summary can be saved back as an indexed note.
+
+- **Summary back into the index.** Under a chat summary, *Save the summary as a note* stores it in the workspace with the files it drew on; it is indexed like any note, so CAIRN and search find it later. The chat stays private; the note is readable by everyone who can read the workspace, and the card says so first.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.13 — CAIRN summarizes the whole chat.
 

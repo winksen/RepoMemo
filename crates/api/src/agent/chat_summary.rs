@@ -2,9 +2,10 @@
 //! just the turns that fit its short memory, and writes a short summary of what was asked, found and left open. The summary
 //! rests on the conversation alone: it adds no facts of its own and cites the same files the conversation did.
 
-use repomemo_domain::{AgentExchange, Citation};
+use repomemo_domain::{AgentExchange, AgentProposal, AgentProposalKind, AgentProposalState, Citation};
+use serde_json::json;
 
-use super::contains_phrase;
+use super::{contains_phrase, shorten};
 
 const SUMMARY_VERBS: &[&str] = &["summarize", "summarise", "recap", "resume", "sum up"];
 const CHAT_WORDS: &[&str] = &["chat", "conversation", "discussion"];
@@ -115,6 +116,55 @@ pub(crate) fn sources(exchanges: &[AgentExchange]) -> Vec<Citation> {
     found
 }
 
+/// The title of the note a summary is saved as: after the question the chat began with.
+fn note_title(exchanges: &[AgentExchange]) -> String {
+    let first = exchanges.first().map_or("", |exchange| exchange.question.trim());
+    let first = first.trim_end_matches(|c: char| c == '?' || c == '.' || c == ':' || c.is_whitespace());
+    if first.is_empty() {
+        "Chat summary".to_owned()
+    } else {
+        format!("Chat summary: {}", shorten(first, 60))
+    }
+}
+
+/// The note's text: the summary, then the files the chat drew on, so the note says where its words came from.
+fn note_content(summary: &str, sources: &[Citation]) -> String {
+    let mut content = summary.trim().to_owned();
+    if !sources.is_empty() {
+        content.push_str("\n\n## Sources\n");
+        for source in sources {
+            let lines = match (source.start_line, source.end_line) {
+                (Some(start), Some(end)) if end > start => format!(", lines {start}-{end}"),
+                (Some(start), _) => format!(", line {start}"),
+                _ => String::new(),
+            };
+            content.push_str(&format!("- {} ({}{lines})\n", source.title, source.path));
+        }
+    }
+    content
+}
+
+/// The proposal to keep a chat's summary in the workspace as an indexed note (V0.9.14). The chat itself is private to its person;
+/// the note is not, which the proposal says before anything is stored.
+pub(crate) fn save_proposal(exchanges: &[AgentExchange], summary: &str, sources: &[Citation]) -> AgentProposal {
+    let title = note_title(exchanges);
+    AgentProposal {
+        id: "1".to_owned(),
+        kind: AgentProposalKind::SaveSummary,
+        state: AgentProposalState::Pending,
+        title: "Save the summary as a note".to_owned(),
+        detail: format!(
+            "Store this summary as a note named **{title}**. It is indexed like any note, so CAIRN and search can find it later. The chat stays private to you; the note can be read by everyone who can read this workspace."
+        ),
+        payload: json!({
+            "title": title,
+            "content": note_content(summary, sources),
+            "language": "Note",
+        }),
+        outcome: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,6 +257,34 @@ mod tests {
             .map(|citation| format!("{}:{}", citation.artifact_id, citation.chunk_id.clone().unwrap()))
             .collect::<Vec<_>>();
         assert_eq!(ids, ["retry.md:c1", "deploy.md:c2", "retry.md:c3"]);
+    }
+
+    #[test]
+    fn the_summary_is_offered_as_a_note_that_names_its_sources_and_says_who_can_read_it() {
+        let exchanges = vec![
+            exchange("How does the retry backoff work?", "They back off."),
+            exchange("And timeouts?", "Thirty seconds."),
+        ];
+        let proposal = save_proposal(
+            &exchanges,
+            "  The chat covered retries.  ",
+            &[cited("retry.md", "c1", 3), cited("deploy.md", "c2", 9)],
+        );
+        assert_eq!(proposal.kind, AgentProposalKind::SaveSummary);
+        assert_eq!(proposal.state, AgentProposalState::Pending);
+        assert_eq!(
+            proposal.payload["title"],
+            "Chat summary: How does the retry backoff work"
+        );
+        assert_eq!(proposal.payload["language"], "Note");
+        let content = proposal.payload["content"].as_str().unwrap();
+        assert!(content.starts_with("The chat covered retries.\n\n## Sources\n- retry.md (docs/retry.md, lines 3-8)\n- deploy.md (docs/deploy.md, lines 9-14)"), "{content}");
+        assert!(
+            proposal.detail.contains("stays private to you")
+                && proposal.detail.contains("everyone who can read this workspace")
+        );
+        assert_eq!(save_proposal(&[], "x", &[]).payload["title"], "Chat summary");
+        assert_eq!(save_proposal(&[], "x", &[]).payload["content"], "x");
     }
 
     #[test]

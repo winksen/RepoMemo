@@ -12,7 +12,7 @@ use repomemo_domain::{AgentProposal, AgentProposalKind, AgentProposalState, Agen
 
 use crate::{
     artifacts, map_storage_error,
-    requests::{BulkArtifactsRequest, CreateMemoryCardBody, UpdateArtifactRequest},
+    requests::{BulkArtifactsRequest, CreateMemoryCardBody, CreateTextArtifactRequest, UpdateArtifactRequest},
     require_workspace_write, retrieval, ApiError, AppState, AuthenticatedSubject,
 };
 
@@ -88,6 +88,22 @@ async fn apply(
             } else {
                 format!("Moved “{title}” to {}.", payload_text(proposal, "folder_name"))
             })
+        }
+        AgentProposalKind::SaveSummary => {
+            // The same handler as a note written by hand: its role check, its quota and the queue that indexes it.
+            let body: CreateTextArtifactRequest = serde_json::from_value(proposal.payload.clone())
+                .map_err(|_| ApiError::bad_request("This proposal can no longer be applied."))?;
+            let (_, Json(note)) = artifacts::create_text_artifact(
+                subject.clone(),
+                State(state.clone()),
+                Path(workspace_id.to_owned()),
+                Json(body),
+            )
+            .await?;
+            Ok(format!(
+                "Saved the summary as the note “{}”. It is being indexed, so CAIRN and search can find it soon.",
+                note.summary.title
+            ))
         }
         AgentProposalKind::RenameFile => {
             let artifact_id = payload_text(proposal, "artifact_id");

@@ -2913,6 +2913,8 @@ pub enum AgentProposalKind {
     RenameFile,
     /// Move a file to the workspace's trash, which can restore it.
     TrashFiles,
+    /// Store a chat's summary as a note, which is indexed like any other (V0.9.14).
+    SaveSummary,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
