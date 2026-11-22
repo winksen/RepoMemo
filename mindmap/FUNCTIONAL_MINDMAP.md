@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.29` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.30` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.30 — CAIRN changes and deletes memory cards when you confirm.
+
+- **Changing memory.** *Update…* and *Delete* on a recalled card, or say *update the memory card “X”: …*, *append to the memory card X: …*, *rename the memory card X to Y*, *delete the memory card X*. CAIRN shows the card before and after and you confirm; a change is a new revision, refused if someone else saved the card meanwhile; a deleted card cannot be restored.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.29 — CAIRN recalls what the team has kept in memory.
 

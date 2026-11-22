@@ -2534,7 +2534,8 @@ export type AgentCapability =
   | "manage_files"
   | "summarize_chat"
   | "analyze_files"
-  | "recall_memory";
+  | "recall_memory"
+  | "manage_memory";
 
 export interface AgentCapabilityInfo {
   id: AgentCapability;
@@ -2553,7 +2554,9 @@ export type AgentProposalKind =
   | "rename_file"
   | "trash_files"
   | "save_summary"
-  | "set_status";
+  | "set_status"
+  | "update_memory"
+  | "delete_memory";
 
 export type AgentProposalState =
   | "pending"

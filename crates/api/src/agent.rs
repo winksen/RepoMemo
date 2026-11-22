@@ -216,7 +216,10 @@ pub fn attachment_reply(file: ArtifactSummary) -> AgentReply {
 
 /// Whether a job changes the workspace once the person confirms it, so a viewer cannot be offered it (V0.9.10).
 pub fn capability_needs_write(capability: AgentCapability) -> bool {
-    matches!(capability, AgentCapability::SaveMemory | AgentCapability::ManageFiles)
+    matches!(
+        capability,
+        AgentCapability::SaveMemory | AgentCapability::ManageFiles | AgentCapability::ManageMemory
+    )
 }
 
 pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
@@ -296,6 +299,13 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             "Recall memory",
             "Search the team's memory cards, or list the newest, and show what each says and cites.",
             "What to look for in memory? Leave it empty to list the newest cards",
+            false,
+        ),
+        (
+            AgentCapability::ManageMemory,
+            "Manage memory",
+            "Change, add to, rename or delete a memory card. I do it only when you confirm.",
+            "For example: rename the memory card “Retry policy” to Backoff policy",
             false,
         ),
     ]
@@ -396,6 +406,7 @@ impl RepoMemoCore {
                     | AgentCapability::ManageFiles
                     | AgentCapability::AnalyzeFiles
                     | AgentCapability::RecallMemory
+                    | AgentCapability::ManageMemory
             ) {
                 message.to_owned()
             } else {
@@ -453,6 +464,7 @@ impl RepoMemoCore {
                 AgentCapability::SummarizeChat => self.agent_summarize_chat(&request).await,
                 AgentCapability::AnalyzeFiles => self.agent_analyze_files(&request, &subject).await,
                 AgentCapability::RecallMemory => self.agent_recall_memory(&request, &subject, &history).await,
+                AgentCapability::ManageMemory => self.agent_manage_memory(&request, &subject).await,
             }
         };
         // Provider and indexing problems are part of the conversation, not a
@@ -485,7 +497,7 @@ impl RepoMemoCore {
         let raw = provider
             .generate(GenerateRequest {
                 system: Some("You classify requests. You reply with JSON only.".to_owned()),
-                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- analyze_files: analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for\n- recall_memory: look in the team's saved memory cards, such as what was decided about a topic, or list them\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
+                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- analyze_files: analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for\n- recall_memory: look in the team's saved memory cards, such as what was decided about a topic, or list them\n- manage_memory: change, add to, rename or delete a named memory card\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
                 context: message.to_owned(),
                 options: json!({ "temperature": 0.0 }),
             })
@@ -623,6 +635,65 @@ impl RepoMemoCore {
             description: file.title.clone(),
             files: vec![file],
         }))
+    }
+
+    /// Changing the memory (V0.9.30): CAIRN finds the card by its title and proposes the change, which carries the revision it
+    /// started from; nothing changes until the person confirms.
+    async fn agent_manage_memory(&self, request: &AgentRequest, text: &str) -> Result<AgentReply> {
+        let Some(command) = memory::memory_command(text, &text.to_ascii_lowercase()) else {
+            return Ok(reply("I can change, add to, rename or delete a memory card, after you confirm. Try `update the memory card “Retry policy”: Retries wait twice as long`, `rename the memory card “Retry policy” to Backoff policy` or `delete the memory card “Old note”`."));
+        };
+        let name = match &command {
+            memory::MemoryCommand::Replace { card, .. }
+            | memory::MemoryCommand::Append { card, .. }
+            | memory::MemoryCommand::Rename { card, .. }
+            | memory::MemoryCommand::Delete { card } => card.clone(),
+        };
+        let wanted = name.to_lowercase();
+        let mut candidates = self
+            .search_memory_cards(request.workspace_id.clone(), name.clone())
+            .await?;
+        if candidates.is_empty() {
+            candidates = self
+                .list_memory_cards(request.workspace_id.clone())
+                .await?
+                .into_iter()
+                .filter(|card| card.title.to_lowercase().contains(&wanted))
+                .collect();
+        }
+        let chosen = match candidates.iter().position(|card| card.title.to_lowercase() == wanted) {
+            Some(exact) => exact,
+            None if candidates.len() == 1 => 0,
+            None if candidates.is_empty() => {
+                return Ok(reply(format!(
+                    "No memory card matches “{name}”. Ask me to list the memory cards to see their titles."
+                )))
+            }
+            None => {
+                let mut several = reply(format!(
+                    "Several memory cards match “{name}”. Say which one by its full title."
+                ));
+                several.memory_cards = candidates.into_iter().take(MEMORY_CARDS_SHOWN).collect();
+                return Ok(several);
+            }
+        };
+        let card = self.get_memory_card(candidates[chosen].id.clone()).await?;
+        if card.card.workspace_id != request.workspace_id {
+            return Ok(reply(format!("No memory card matches “{name}”.")));
+        }
+        Ok(match command {
+            memory::MemoryCommand::Replace { text, .. } => {
+                memory::update_reply(&card, None, Some(text), "Replace the text of")
+            }
+            memory::MemoryCommand::Append { text, .. } => memory::update_reply(
+                &card,
+                None,
+                Some(memory::appended(&card.card.body_markdown, &text)),
+                "Add a paragraph to",
+            ),
+            memory::MemoryCommand::Rename { title, .. } => memory::update_reply(&card, Some(&title), None, "Rename"),
+            memory::MemoryCommand::Delete { .. } => memory::delete_reply(&card),
+        })
     }
 
     /// Recalling memory cards (V0.9.29): the newest when no words are given, else those the words find. With none found and an
@@ -1542,6 +1613,10 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     // ASCII lowercasing keeps byte offsets aligned with `text`.
     let lower = text.to_ascii_lowercase();
 
+    // "Update the memory card X: ...", "rename the memory card X to Y", "delete the memory card X" (V0.9.30).
+    if memory::memory_command(text, &lower).is_some() {
+        return Some((AgentCapability::ManageMemory, text.trim().to_owned()));
+    }
     // "What do we know about X", "search memory for X", "list the memory cards" (V0.9.29).
     if memory::recall_request(text, &lower).is_some() {
         return Some((AgentCapability::RecallMemory, text.trim().to_owned()));
@@ -1682,6 +1757,7 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
         "summarize_chat" => AgentCapability::SummarizeChat,
         "analyze_files" => AgentCapability::AnalyzeFiles,
         "recall_memory" => AgentCapability::RecallMemory,
+        "manage_memory" => AgentCapability::ManageMemory,
         _ => return None,
     };
     let subject = value

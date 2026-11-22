@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
 import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
-import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentTurn } from "../types";
+import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentTurn, MemoryCardSummary } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
@@ -52,6 +52,7 @@ const CAPABILITY_ICONS: Record<AgentCapability, typeof Search> = {
   summarize_chat: History,
   analyze_files: Brain,
   recall_memory: Notebook,
+  manage_memory: Notebook,
 };
 
 /** The evidence states a selection can be given: the id, how it is said to CAIRN and how it is labelled. */
@@ -134,6 +135,9 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   // The turn whose selection is being given a state, and the state chosen (V0.9.28).
   const [statusFor, setStatusFor] = useState<string | null>(null);
   const [statusChoice, setStatusChoice] = useState("verified");
+  // The memory card being rewritten from a recalled list, and the text written for it (V0.9.30).
+  const [editCard, setEditCard] = useState<MemoryCardSummary | null>(null);
+  const [editText, setEditText] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const [showChats, setShowChats] = useState(false);
   // Bumped whenever the visible chat changes, so a reply that arrives after
@@ -322,6 +326,22 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     setSelection((current) => ({ ...current, [turnKey]: [] }));
   }
 
+  function actOnCard(card: MemoryCardSummary, action: "update" | "delete") {
+    if (action === "update") {
+      setEditText("");
+      setEditCard(card);
+      return;
+    }
+    send({ message: `Delete the memory card “${card.title}”`, capability: "manage_memory" }, `Delete the memory card “${card.title}”`);
+  }
+
+  function submitCardEdit() {
+    const text = editText.trim();
+    if (!editCard || text.length < 8) return;
+    send({ message: `Update the memory card “${editCard.title}”: ${text}`, capability: "manage_memory" }, `Update the memory card “${editCard.title}”`);
+    setEditCard(null);
+  }
+
   function submitStatus() {
     const ids = statusFor ? selection[statusFor] ?? [] : [];
     if (!statusFor || !ids.length) return;
@@ -400,6 +420,12 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     </Dialog>
     : null;
 
+  const cardDialog = editCard
+    ? <Dialog description="Write the card's new text. You see it next to the old one and confirm before anything changes." footer={<><DialogCancel onClick={() => setEditCard(null)} /><Button disabled={editText.trim().length < 8} type="submit" variant="main">Propose the change</Button></>} onClose={() => setEditCard(null)} onSubmit={submitCardEdit} open title={`Change “${editCard.title}”`}>
+      <Field label="New text" required><Textarea onChange={(event) => setEditText(event.target.value)} rows={6} value={editText} /></Field>
+    </Dialog>
+    : null;
+
   const statusDialog = statusFor
     ? <Dialog description="The state shows in the evidence list. You confirm the change before anything happens." footer={<><DialogCancel onClick={() => setStatusFor(null)} /><Button type="submit" variant="main">Propose the change</Button></>} onClose={() => setStatusFor(null)} onSubmit={submitStatus} open title={`Mark ${(selection[statusFor] ?? []).length} ${(selection[statusFor] ?? []).length === 1 ? "file" : "files"}`}>
       <fieldset className="shared-assistant-status-choices">
@@ -412,6 +438,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     {dialog}
     {moveDialog}
     {statusDialog}
+    {cardDialog}
     {optionsHost ? createPortal(<ChatOptions capabilities={capabilities} conversation={activeConversation} onDelete={() => activeConversation && setChatDialog({ kind: "delete", conversation: activeConversation })} onOpenArtifact={onOpenArtifact} onRename={() => { if (activeConversation) { setRenameValue(activeConversation.title); setChatDialog({ kind: "rename", conversation: activeConversation }); } }} replies={turns.map((turn) => turn.reply)} />, optionsHost) : null}
     {hideChatList ? null : <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
@@ -441,7 +468,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
           {turn.status === "pending" ? <LoadingState label="Working on it" /> : null}
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
-          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} canManage={canUpload} deciding={deciding} isBusy={isBusy} onActOnSelection={(action) => actOnSelection(turn.key, action)} onSelection={(ids) => setSelection((current) => ({ ...current, [turn.key]: ids }))} selection={selection[turn.key] ?? []} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
+          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} canManage={canUpload} deciding={deciding} isBusy={isBusy} onActOnCard={actOnCard} onActOnSelection={(action) => actOnSelection(turn.key, action)} onSelection={(ids) => setSelection((current) => ({ ...current, [turn.key]: ids }))} selection={selection[turn.key] ?? []} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
         </article>) : variant === "page"
           ? <div className="shared-assistant-welcome">
             <CairnIcon size={56} weight="fill" />
@@ -554,7 +581,7 @@ function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string |
   </aside>;
 }
 
-function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnSelection, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnSelection: (action: "move" | "trash" | "status") => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
+function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnCard, onActOnSelection, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnCard: (card: MemoryCardSummary, action: "update" | "delete") => void; onActOnSelection: (action: "move" | "trash" | "status") => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
   const note = routingNote(reply, capabilities);
   const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.
@@ -588,6 +615,10 @@ function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, i
       <strong>{card.title}</strong>{card.needs_review ? <span className="shared-assistant-memory-flag">Needs review</span> : null}
       <p>{card.body_excerpt}</p>
       <small>{card.source} · {card.evidence_count} {card.evidence_count === 1 ? "source" : "sources"} · updated {formatRecentTime(card.updated_at)}</small>
+      {canManage ? <div className="shared-assistant-proposal-actions">
+        <Button disabled={isBusy} onClick={() => onActOnCard(card, "update")} type="button" variant="secondary">Update…</Button>
+        <Button disabled={isBusy} onClick={() => onActOnCard(card, "delete")} type="button" variant="secondary">Delete</Button>
+      </div> : null}
     </li>)}</ul> : null}
     {(reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
     {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}

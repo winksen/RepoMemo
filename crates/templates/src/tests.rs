@@ -910,7 +910,7 @@ fn the_assistant_keeps_its_usual_buttons_and_suggests_nothing_unless_a_template_
     assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
     assert!(!serde_json::to_string(&general()).unwrap().contains("assistant"));
     assert!(!serde_json::to_string(&general()).unwrap().contains("retrieval"));
-    assert_eq!(CAPABILITIES.len(), 11);
+    assert_eq!(CAPABILITIES.len(), 12);
 }
 
 #[test]

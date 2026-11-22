@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.30 (2026-11-21)
+
+CAIRN changes and deletes memory cards when you confirm.
+
+### Changed
+- **New job: Manage memory** (manage_memory). *Update the memory card “Retry policy”: Retries wait twice as long*, *append to the memory card Pager policy: Escalate after 15 minutes*, *rename the memory card Retry policy to Backoff policy* and *delete the memory card “Old note”* (also *remove*, *forget*; *change*, *edit*, *rewrite*, *revise*, *correct*) are read. A card name in quotes may contain a colon; the words must say *memory card*, so *update the readme to say hello* and *remove the memory leak from the code* are not taken.
+- **From a recalled list.** Each card CAIRN recalls (V0.9.29) has **Update…**, which asks for the new text, and **Delete**, for people who may change the workspace. Both send the request to CAIRN, which proposes the change.
+- **Shown before, confirmed after.** CAIRN finds the card by its title (several matches are listed, none is guessed; with none it says so) and the card shows the title and the text before and after. Confirming saves it as you through the ordinary update handler, as a new revision that can be restored, keeping the evidence the card cites.
+- **Not over someone else's save.** The proposal carries the revision it started from, so if the card was saved by someone else since, the change is refused with that handler's message instead of overwriting it. Deleting runs the delete handler as you; a deleted card cannot be restored, which the card says.
+- **Writers only, and this workspace only.** A viewer is not offered the job, and a card from another workspace is refused.
+- No API route, setting or migration changes.
+
+### Checks
+- Unit tests for the wordings and the requests that must not match, and for the proposals (revision, before and after, deletion); compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run: the Update dialog was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.29 (2026-11-21)
 
 CAIRN recalls what the team has kept in memory.

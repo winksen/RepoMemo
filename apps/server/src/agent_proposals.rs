@@ -11,8 +11,11 @@ use axum::{
 use repomemo_domain::{AgentProposal, AgentProposalKind, AgentProposalState, AgentTurn};
 
 use crate::{
-    artifacts, map_storage_error,
-    requests::{BulkArtifactsRequest, CreateMemoryCardBody, CreateTextArtifactRequest, UpdateArtifactRequest},
+    artifacts, map_core_error, map_storage_error,
+    requests::{
+        BulkArtifactsRequest, CreateMemoryCardBody, CreateTextArtifactRequest, UpdateArtifactRequest,
+        UpdateMemoryCardBody,
+    },
     require_workspace_write, retrieval, ApiError, AppState, AuthenticatedSubject,
 };
 
@@ -121,6 +124,28 @@ async fn apply(
                 "Saved the summary as the note “{}”. It is being indexed, so CAIRN and search can find it soon.",
                 note.summary.title
             ))
+        }
+        AgentProposalKind::UpdateMemory | AgentProposalKind::DeleteMemory => {
+            let card_id = payload_text(proposal, "card_id");
+            // The card must be in this chat's workspace; the handler then checks the person's role there.
+            let card = state
+                .core
+                .get_memory_card(card_id.clone())
+                .await
+                .map_err(map_core_error)?;
+            if card.card.workspace_id != workspace_id {
+                return Err(ApiError::not_found("That memory card was not found."));
+            }
+            if proposal.kind == AgentProposalKind::DeleteMemory {
+                retrieval::delete_memory_card(subject.clone(), State(state.clone()), Path(card_id)).await?;
+                return Ok(format!("Deleted the memory card “{}”.", card.card.title));
+            }
+            // The revision it started from goes along, so a card saved by someone else since is not overwritten.
+            let body: UpdateMemoryCardBody = serde_json::from_value(proposal.payload.clone())
+                .map_err(|_| ApiError::bad_request("This proposal can no longer be applied."))?;
+            let saved =
+                retrieval::update_memory_card(subject.clone(), State(state.clone()), Path(card_id), Json(body)).await?;
+            Ok(format!("Changed the memory card “{}”.", saved.0.title))
         }
         AgentProposalKind::RenameFile => {
             let artifact_id = payload_text(proposal, "artifact_id");

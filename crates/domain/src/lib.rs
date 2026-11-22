@@ -2892,6 +2892,8 @@ pub enum AgentCapability {
     AnalyzeFiles,
     /// Searches the workspace's memory cards and shows them (V0.9.29).
     RecallMemory,
+    /// Changes, adds to, renames or deletes a memory card, after the person confirms (V0.9.30).
+    ManageMemory,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2921,6 +2923,10 @@ pub enum AgentProposalKind {
     SaveSummary,
     /// Change the evidence state of files: verified, needs review, outdated or active (V0.9.28).
     SetStatus,
+    /// Change a memory card's title or text (V0.9.30).
+    UpdateMemory,
+    /// Delete a memory card (V0.9.30).
+    DeleteMemory,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
