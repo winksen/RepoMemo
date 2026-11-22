@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.24 (2026-11-21)
+
+No manual tab adjustments.
+
+### Removed
+- *Adjust this workspace* in Settings (opens-on page, pages under More, suggested questions, reset). Tabs and More follow the template and the width of the row; a workspace always opens on Overview.
+
+### Changed
+- *Use this template* is a small button on the left.
+- Client only: the server and its API are unchanged; adjustments already saved are still honoured by the server.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen. Updated tests were not executed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.23 (2026-11-21)
 
 Customization pickers.

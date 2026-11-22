@@ -358,3 +358,6 @@ th > .rm-badge,
 .shared-color-swatch[aria-pressed="true"]:hover:not(:disabled) { border-color: var(--color-accent); }
 .shared-settings-panel .rm-template-adjust, .rm-template-adjust { margin-top: 4px; padding-top: 0; border-top: 0; }
 @media (max-width: 720px) { .shared-icon-picker { grid-template-columns: repeat(auto-fill, 40px); } }
+
+/* V0.9.24: the Use button is small and on the left. */
+.rm-template-use { justify-self: start; width: auto; min-height: 36px; padding-inline: 16px; }

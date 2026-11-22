@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.23` (2026-11-21)
+> **Current:** `V0.9.24` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -58,6 +58,7 @@
 | **V0.9.21** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Template choice polish | Ease the Use button and the adjustments in and out, move the Active now tag under the card's description on a lighter fill, and show the Template title once | Choosing a template is smoother and the Active now tag reads clearly |
 | **V0.9.22** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Template adjustments simplified | Keep the Use button visible (grey and disabled for the template in use), title Adjust this workspace like the other parts, explain the pages kept under More, and remove the suggested questions field | The Use button never vanishes, and the adjustments are shorter and clearer |
 | **V0.9.23** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Customization pickers | Make the Customization icon solid and bigger, name the button Use this template, enlarge the icon and color pickers with no border until hover, draw colors as rounded squares and remove the line above the adjustments | The pickers are larger and cleaner and the section has no stray line |
+| **V0.9.24** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | No manual tab adjustments | Remove the Adjust this workspace section so the tabs and More menu follow the template and the width of the row, and make the Use this template button small and left-aligned | Settings has no tab adjustments, and workspaces open on Overview |
 
 ## Verification and handoff
 

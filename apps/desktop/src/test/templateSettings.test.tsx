@@ -153,42 +153,18 @@ describe("Settings › Template", () => {
     expect(saveSharedWorkspaceTemplate).not.toHaveBeenCalled();
   });
 
-  it("saves only the adjustments that differ from the template, and says so when none does", async () => {
-    show(current());
-    fireEvent.click(screen.getByRole("button", { name: "Save adjustments" }));
-    await waitFor(() => expect(saveSharedWorkspaceTemplate).toHaveBeenCalledWith("t", "w1", "operations", {}));
-    expect(showToast).toHaveBeenCalledWith("success", "No adjustment differs from the template.");
-
-    vi.mocked(saveSharedWorkspaceTemplate).mockClear();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Actions" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save adjustments" }));
-    await waitFor(() => expect(saveSharedWorkspaceTemplate).toHaveBeenCalledWith("t", "w1", "operations", { more: ["map", "tasks"] }));
-    expect(showToast).toHaveBeenCalledWith("success", "The adjustments were saved.");
-  });
-
-  it("resets to the template's own values only when something was adjusted", async () => {
-    const { unmount } = show(current());
-    expect((screen.getByRole("button", { name: "Reset to template" }) as HTMLButtonElement).disabled).toBe(true);
-    unmount();
-    show(current({ landing: "memory" }));
-    const reset = screen.getByRole("button", { name: "Reset to template" }) as HTMLButtonElement;
-    expect(reset.disabled).toBe(false);
-    fireEvent.click(reset);
-    await waitFor(() => expect(saveSharedWorkspaceTemplate).toHaveBeenCalledWith("t", "w1", "operations", {}));
-    expect(showToast).toHaveBeenCalledWith("success", "The adjustments were removed; the template's own values are back.");
-  });
-
   it("explains why General is in use when the chosen template cannot be used, and offers the others", () => {
     show({ ...current(), source: "fallback", reason: "The template ghost is not available on this server.", chosen_id: "ghost" });
     expect(screen.getByText(/The template ghost is not available on this server/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Save adjustments" })).toBeNull();
     expect(screen.getAllByRole("radio")).toHaveLength(3);
   });
 
   it("shows the error as a toast and keeps what was shown when the server refuses", async () => {
     vi.mocked(saveSharedWorkspaceTemplate).mockRejectedValue(new Error("Only administrators may do that."));
-    show(current({ landing: "memory" }));
-    fireEvent.click(screen.getByRole("button", { name: "Reset to template" }));
+    show(current());
+    fireEvent.click(screen.getByRole("radio", { name: /Knowledge base/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Use this template" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Change template" }));
     await waitFor(() => expect(showToast).toHaveBeenCalledWith("error", "Only administrators may do that."));
     expect(setCurrent).not.toHaveBeenCalled();
   });
