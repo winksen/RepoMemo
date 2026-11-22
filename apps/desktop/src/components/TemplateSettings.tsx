@@ -1,10 +1,10 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Rows as LayoutList } from "@phosphor-icons/react";
 import { saveSharedWorkspaceTemplate } from "../lib/sharedApi";
 import type { WorkspaceTemplateView } from "../types";
 import { ADMIN_WORKSPACE_SECTIONS, WORKSPACE_SECTIONS, type WorkspaceSection } from "../web/constants";
 import { apiMessage } from "../web/format";
-import { adjustmentsFrom, questionsFromText, SECTION_NAMES } from "../web/templatePreview";
+import { adjustmentsFrom, SECTION_NAMES } from "../web/templatePreview";
 import { useTemplate, useTemplateCatalogue, useTemplateDetail } from "../web/workspace/data";
 import { TemplatePicker } from "./TemplatePicker";
 import { Collapse } from "./ui/collapse";
@@ -13,10 +13,7 @@ import { Checkbox } from "./ui/checkbox";
 import { useConfirm } from "./ui/confirm-dialog";
 import { Dropdown } from "./ui/dropdown";
 import { PanelHeading } from "./ui/panel-heading";
-import { Textarea } from "./ui/textarea";
 import { showToast } from "./ui/toast";
-
-const MAX_QUESTIONS = 6;
 
 /**
  * Settings › Template (V0.2.177), for owners and administrators: which template the workspace uses, a preview of what
@@ -36,10 +33,7 @@ export function TemplateSettings({ accessToken, embedded = false, workspaceId }:
   const [detail] = useTemplateDetail(accessToken, chosenId, comparing);
   const [base] = useTemplateDetail(accessToken, currentId, Boolean(current));
   if (!current) return null;
-  // While the button closes it keeps the name it had, instead of changing under the person's eyes.
-  const useName = useRef("");
   const chosenName = catalogue.find((template) => template.id === chosenId)?.name ?? chosenId;
-  if (comparing) useName.current = chosenName;
   const adjusted = current.overrides !== null && typeof current.overrides === "object" && Object.keys(current.overrides as object).length > 0;
 
   async function save(templateId: string, overrides: Record<string, unknown> | undefined, done: string) {
@@ -69,9 +63,11 @@ export function TemplateSettings({ accessToken, embedded = false, workspaceId }:
         : <PanelHeading description={current.source === "fallback" ? undefined : `Version ${current.template.version}`} icon={LayoutList} title="Template" />}
       {current.source === "fallback" ? <p className="shared-muted-copy">{current.reason} General is in use until a template is chosen.</p> : null}
       <TemplatePicker disabled={busy} name={`settings-template-${workspaceId}`} onChange={setChoice} templates={catalogue} value={chosenId} activeId={currentId} hideLegend={embedded} />
-      <Collapse open={comparing || current.source !== "workspace"}>
-        <Button busy={busy} disabled={busy || (comparing && !detail)} onClick={() => void apply()} type="button" variant="main">Use {useName.current}</Button>
-      </Collapse>
+      {(() => {
+        // Nothing to apply while the template in use is the one chosen: the button stays, grey and disabled.
+        const applicable = comparing || current.source !== "workspace";
+        return <Button busy={busy} className="rm-template-use" disabled={busy || !applicable || (comparing && !detail)} onClick={() => void apply()} type="button" variant={applicable ? "main" : "secondary"}>Use {chosenName}</Button>;
+      })()}
       <Collapse open={current.source === "workspace" && !comparing && Boolean(base)}>
         {current.source === "workspace" && base ? <Adjustments
         adjusted={adjusted}
@@ -97,27 +93,21 @@ function Adjustments({ adjusted, base, busy, current, onReset, onSave }: {
 }) {
   const [landing, setLanding] = useState(current.sections.landing);
   const [more, setMore] = useState<string[]>(current.sections.more);
-  const [questions, setQuestions] = useState(current.assistant.suggestions.join("\n"));
   const name = (section: WorkspaceSection) => current.labels.sections[section] ?? SECTION_NAMES[section];
-  const typed = questionsFromText(questions);
-  const tooMany = typed.length > MAX_QUESTIONS;
   const toggle = (section: string, keep: boolean) => setMore((list) => keep ? [...list.filter((entry) => entry !== section), section] : list.filter((entry) => entry !== section));
   return (
     <fieldset className="rm-template-adjust" disabled={busy}>
-      <legend>Adjust this workspace</legend>
+      <h3 className="shared-part-title">Adjust this workspace</h3>
       <p className="shared-muted-copy">Only what you change here is saved on top of the template; everything else keeps following it.</p>
       <label className="rm-template-adjust-field">Opens on
         <Dropdown aria-label="The section the workspace opens on" onValueChange={setLanding} options={WORKSPACE_SECTIONS.filter((section) => !ADMIN_WORKSPACE_SECTIONS.has(section)).map((section) => ({ label: name(section), value: section }))} value={landing} />
       </label>
+      <p className="shared-muted-copy">Tick the pages that should leave the row of tabs and sit under <strong>More</strong> instead.</p>
       <div aria-label="Sections kept under More" className="rm-template-adjust-more" role="group">
         {WORKSPACE_SECTIONS.map((section) => <Checkbox checked={more.includes(section)} key={section} label={name(section)} onCheckedChange={(keep) => toggle(section, keep)} />)}
       </div>
-      <label className="rm-template-adjust-field">Suggested questions, one on each line
-        <Textarea aria-invalid={tooMany || undefined} onChange={(event) => setQuestions(event.target.value)} rows={4} value={questions} />
-        <small>{tooMany ? `Keep it to ${MAX_QUESTIONS} questions.` : `${typed.length} of ${MAX_QUESTIONS}`}</small>
-      </label>
       <div className="rm-template-adjust-actions">
-        <Button busy={busy} disabled={busy || tooMany} onClick={() => onSave(adjustmentsFrom(base, { landing, more, suggestions: typed }))} type="button" variant="main">Save adjustments</Button>
+        <Button busy={busy} disabled={busy} onClick={() => onSave(adjustmentsFrom(base, { landing, more, suggestions: current.assistant.suggestions }))} type="button" variant="main">Save adjustments</Button>
         <Button disabled={busy || !adjusted} onClick={onReset} type="button" variant="secondary">Reset to template</Button>
       </div>
     </fieldset>

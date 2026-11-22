@@ -127,7 +127,7 @@ describe("Settings › Template", () => {
     expect((screen.getByRole("radio", { name: /Operations and incidents/ }) as HTMLInputElement).checked).toBe(true);
     expect(screen.getByText("Active now")).toBeTruthy();
     expect(container.querySelector("dl")).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Use / })).toBeNull();
+    expect((screen.getByRole("button", { name: /^Use Operations/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("previews another template when it is picked and changes only after the person confirms", async () => {
@@ -160,18 +160,10 @@ describe("Settings › Template", () => {
     expect(showToast).toHaveBeenCalledWith("success", "No adjustment differs from the template.");
 
     vi.mocked(saveSharedWorkspaceTemplate).mockClear();
-    fireEvent.change(screen.getByRole("textbox", { name: /Suggested questions/ }), { target: { value: "Who owns the pager?\nWho is on call?" } });
     fireEvent.click(screen.getByRole("checkbox", { name: "Actions" }));
     fireEvent.click(screen.getByRole("button", { name: "Save adjustments" }));
-    await waitFor(() => expect(saveSharedWorkspaceTemplate).toHaveBeenCalledWith("t", "w1", "operations", { more: ["map", "tasks"], suggestions: ["Who owns the pager?", "Who is on call?"] }));
+    await waitFor(() => expect(saveSharedWorkspaceTemplate).toHaveBeenCalledWith("t", "w1", "operations", { more: ["map", "tasks"] }));
     expect(showToast).toHaveBeenCalledWith("success", "The adjustments were saved.");
-  });
-
-  it("refuses more than six questions before asking the server", () => {
-    show(current());
-    fireEvent.change(screen.getByRole("textbox", { name: /Suggested questions/ }), { target: { value: "1\n2\n3\n4\n5\n6\n7" } });
-    expect((screen.getByRole("button", { name: "Save adjustments" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("Keep it to 6 questions.")).toBeTruthy();
   });
 
   it("resets to the template's own values only when something was adjusted", async () => {

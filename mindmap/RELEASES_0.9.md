@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.21` (2026-11-21)
+> **Current:** `V0.9.22` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -56,6 +56,7 @@
 | **V0.9.19** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Customization section | Gather the icon, color and template choices in one Customization section on a greyer background, with a big title and a plain text title for each part | The look and template choices form one grey section with plain part titles |
 | **V0.9.20** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Customization refinements | Give the Customization title its icon, fill the chosen icon with the workspace color, make the app's blue the default color (and drop the separate blue), remove the template download and the template's texts | The Customization section is simpler and the default color is the blue it really uses |
 | **V0.9.21** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Template choice polish | Ease the Use button and the adjustments in and out, move the Active now tag under the card's description on a lighter fill, and show the Template title once | Choosing a template is smoother and the Active now tag reads clearly |
+| **V0.9.22** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | Template adjustments simplified | Keep the Use button visible (grey and disabled for the template in use), title Adjust this workspace like the other parts, explain the pages kept under More, and remove the suggested questions field | The Use button never vanishes, and the adjustments are shorter and clearer |
 
 ## Verification and handoff
 

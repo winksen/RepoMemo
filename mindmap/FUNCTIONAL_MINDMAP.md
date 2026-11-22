@@ -2,7 +2,16 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.21` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.22` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.22 — Template adjustments simplified.
+
+- The **Use** button stays when the template in use is chosen: it is **grey and disabled**.
+- **Adjust this workspace** is titled like the other parts of Customization.
+- The page checkboxes say what they do: *Tick the pages that should leave the row of tabs and sit under More instead.*
+- The **Suggested questions** field is removed from the adjustments; questions already saved are kept as they are.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.21 — Template choice polish.
 
