@@ -170,6 +170,7 @@ mod tests {
                     last_changed_at: None,
                 })
                 .collect(),
+            file_ids: Vec::new(),
         }
     }
 

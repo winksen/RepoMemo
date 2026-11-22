@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.25` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.26` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.26 — CAIRN works on sets of files, not one at a time.
+
+- **Working on many files.** A list of found files has tick boxes and *Select all*; *Move to…* and *Move to trash* act on the selection with one proposal you confirm. Or say it: *move all the Word documents to Contracts*, *trash the pdfs in the Archive folder*, *move them to Runbooks*. At most 200 files at once; the trash restores them.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.25 — A kind of file is a filter, not a piece of a name.
 

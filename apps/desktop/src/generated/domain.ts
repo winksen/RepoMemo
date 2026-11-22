@@ -2588,6 +2588,8 @@ export interface AgentMessage {
   message: string;
   capability: AgentCapability | null;
   artifact_id: string | null;
+  /** Files the person selected in an earlier reply and the message is about (V0.9.26). */
+  artifact_ids: string[];
 }
 
 /** A saved assistant chat. Only the user who started it can see it. */
@@ -2637,6 +2639,11 @@ export interface AgentRequest {
    */
   history: AgentHistoryTurn[];
   /**
+   * The files the message is about, as the person selected them (V0.9.26). Like everything the client sends, they are
+   * checked against the workspace before they are used.
+   */
+  artifact_ids: string[];
+  /**
    * Every earlier exchange of the conversation in full, oldest first (V0.9.10), for the jobs that act on an earlier
    * answer, such as saving it as a memory card. Like `history`, the server fills it from the stored conversation.
    */
@@ -2648,6 +2655,8 @@ export interface AgentExchange {
   question: string;
   answer: string;
   citations: Citation[];
+  /** The files that answer listed (V0.9.26), so "move them to Runbooks" can mean them. */
+  file_ids: string[];
 }
 
 /**
@@ -2691,6 +2700,20 @@ export interface AgentReply {
   context_turns: number;
   /** Actions CAIRN proposes and that wait for the person's confirmation (V0.9.10). */
   proposals: AgentProposal[];
+  /**
+   * The whole set of files a reply found, when it found some (V0.9.26): `files` shows the first of them, and the set is what
+   * the person selects from and what the next job can work on.
+   */
+  file_set: AgentFileSet | null;
+}
+
+/** The files a reply found, said in words and by id. */
+export interface AgentFileSet {
+  /** What they are, as the filter reads ("Word documents in the folder Finance"). */
+  description: string;
+  /** How many there are, which may be more than `ids` holds. */
+  total: number;
+  ids: string[];
 }
 
 /** An account as system administrators see it. */

@@ -5,6 +5,7 @@ import type {
   AgentCapability,
   AgentCapabilityInfo,
   AgentConversation,
+  AgentFileSet,
   AgentProposal,
   AppSettings,
   ArtifactComment,
@@ -124,6 +125,7 @@ export type {
   AgentCapability,
   AgentCapabilityInfo,
   AgentConversation,
+  AgentFileSet,
   AgentProposal,
   AppSettings,
   ArtifactComment,
@@ -568,6 +570,8 @@ export interface AgentMessage {
   message: string;
   capability?: AgentCapability | null;
   artifact_id?: string | null;
+  /** Files selected in an earlier reply that the message is about (V0.9.26). */
+  artifact_ids?: string[];
 }
 
 export interface AgentTurn {
@@ -604,6 +608,8 @@ export interface AgentReply {
   context_turns?: number;
   /** Actions CAIRN proposes; each waits for the person to confirm it (V0.9.10). */
   proposals?: AgentProposal[];
+  /** Every file the reply found, by id, to select from (V0.9.26); `files` holds the first of them. */
+  file_set?: AgentFileSet | null;
 }
 
 export interface MemoryCard {

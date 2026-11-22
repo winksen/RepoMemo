@@ -117,6 +117,10 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   const [deciding, setDeciding] = useState<string | null>(null);
   // Files being uploaded into the chat (V0.9.12); the message box waits for them.
   const [isUploading, setIsUploading] = useState(false);
+  // The files selected in each reply's list, by turn (V0.9.26), and the turn whose selection is being moved.
+  const [selection, setSelection] = useState<Record<string, string[]>>({});
+  const [moveFor, setMoveFor] = useState<string | null>(null);
+  const [moveFolder, setMoveFolder] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const [showChats, setShowChats] = useState(false);
   // Bumped whenever the visible chat changes, so a reply that arrives after
@@ -288,6 +292,28 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     }
   }
 
+  /** Acts on the files selected in a reply's list: the message names them by id, and CAIRN proposes the change for the person to confirm. */
+  function actOnSelection(turnKey: string, action: "move" | "trash") {
+    const ids = selection[turnKey] ?? [];
+    if (!ids.length) return;
+    if (action === "move") {
+      setMoveFolder("");
+      setMoveFor(turnKey);
+      return;
+    }
+    send({ message: "Trash the selected files", capability: "manage_files", artifact_ids: ids }, `Move ${ids.length} ${ids.length === 1 ? "file" : "files"} to the trash`);
+    setSelection((current) => ({ ...current, [turnKey]: [] }));
+  }
+
+  function submitMove() {
+    const ids = moveFor ? selection[moveFor] ?? [] : [];
+    const folder = moveFolder.trim();
+    if (!moveFor || !ids.length || !folder) return;
+    send({ message: `Move the selected files to ${folder}`, capability: "manage_files", artifact_ids: ids }, `Move ${ids.length} ${ids.length === 1 ? "file" : "files"} to ${folder}`);
+    setSelection((current) => ({ ...current, [moveFor]: [] }));
+    setMoveFor(null);
+  }
+
   function summarize(artifactId: string, title: string) {
     send({ message: title, capability: "summarize_file", artifact_id: artifactId }, `Summarize ${title}`);
   }
@@ -342,8 +368,15 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
       ? <Dialog description={<>Delete <strong>{chatDialog.conversation.title}</strong> and its {chatDialog.conversation.turn_count} {chatDialog.conversation.turn_count === 1 ? "message" : "messages"}? This cannot be undone.</>} footer={<><DialogCancel onClick={() => setChatDialog(null)} /><Button busy={isSavingChat} onClick={() => void deleteChat(chatDialog.conversation)} variant="danger">Delete chat</Button></>} onClose={() => setChatDialog(null)} open title="Delete chat" />
       : null;
 
+  const moveDialog = moveFor
+    ? <Dialog description="Name the folder, or its path (Runbooks / Payments). You confirm the move before anything changes." footer={<><DialogCancel onClick={() => setMoveFor(null)} /><Button disabled={!moveFolder.trim()} type="submit" variant="main">Propose the move</Button></>} onClose={() => setMoveFor(null)} onSubmit={submitMove} open title={`Move ${(selection[moveFor] ?? []).length} ${(selection[moveFor] ?? []).length === 1 ? "file" : "files"}`}>
+      <Field label="Folder" required><Input maxLength={200} onChange={(event) => setMoveFolder(event.target.value)} placeholder="Runbooks, or top level" value={moveFolder} /></Field>
+    </Dialog>
+    : null;
+
   return <section className="shared-assistant" aria-label={`${ASSISTANT_NAME}, the workspace assistant`}>
     {dialog}
+    {moveDialog}
     {optionsHost ? createPortal(<ChatOptions capabilities={capabilities} conversation={activeConversation} onDelete={() => activeConversation && setChatDialog({ kind: "delete", conversation: activeConversation })} onOpenArtifact={onOpenArtifact} onRename={() => { if (activeConversation) { setRenameValue(activeConversation.title); setChatDialog({ kind: "rename", conversation: activeConversation }); } }} replies={turns.map((turn) => turn.reply)} />, optionsHost) : null}
     {hideChatList ? null : <div className="shared-assistant-toolbar">
       <strong title={activeConversation?.title ?? "New chat"}>{activeConversation?.title ?? "New chat"}</strong>
@@ -373,7 +406,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
           {turn.status === "pending" ? <LoadingState label="Working on it" /> : null}
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
-          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} deciding={deciding} isBusy={isBusy} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
+          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} canManage={canUpload} deciding={deciding} isBusy={isBusy} onActOnSelection={(action) => actOnSelection(turn.key, action)} onSelection={(ids) => setSelection((current) => ({ ...current, [turn.key]: ids }))} selection={selection[turn.key] ?? []} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
         </article>) : variant === "page"
           ? <div className="shared-assistant-welcome">
             <CairnIcon size={56} weight="fill" />
@@ -486,7 +519,7 @@ function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string |
   </aside>;
 }
 
-function Reply({ accessToken, canSummarize, capabilities, deciding, isBusy, onDecide, onOpenArtifact, onSummarize, reply, turnId }: { accessToken: string; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
+function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnSelection, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnSelection: (action: "move" | "trash") => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
   const note = routingNote(reply, capabilities);
   const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.
@@ -498,7 +531,19 @@ function Reply({ accessToken, canSummarize, capabilities, deciding, isBusy, onDe
     </div>
     <div className="shared-markdown"><SafeMarkdown>{reply.reply_markdown}</SafeMarkdown></div>
     {reply.warnings.length ? <div className="shared-ai-overview-warning">{reply.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}
+    {reply.file_set && reply.file_set.ids.length > 1 ? <div className="shared-assistant-selectbar">
+      <span>{reply.file_set.description}: {reply.file_set.total}{reply.file_set.total > reply.files.length ? ` (showing ${reply.files.length})` : ""}</span>
+      {canManage ? <>
+        <Button disabled={isBusy} onClick={() => onSelection(selection.length === reply.file_set!.ids.length ? [] : reply.file_set!.ids)} type="button" variant="secondary">{selection.length === reply.file_set.ids.length ? "Clear selection" : `Select all ${reply.file_set.ids.length}`}</Button>
+        {selection.length ? <>
+          <span>{selection.length} selected</span>
+          <Button disabled={isBusy} onClick={() => onActOnSelection("move")} type="button" variant="secondary">Move to…</Button>
+          <Button disabled={isBusy} onClick={() => onActOnSelection("trash")} type="button" variant="secondary">Move to trash</Button>
+        </> : null}
+      </> : null}
+    </div> : null}
     {reply.files.length ? <ul className="shared-assistant-files">{reply.files.map((file) => <li key={file.id}>
+      {reply.file_set && reply.file_set.ids.length > 1 && canManage ? <input aria-label={`Select ${file.title}`} checked={selection.includes(file.id)} className="shared-assistant-select" disabled={isBusy} onChange={(event) => onSelection(event.target.checked ? [...selection, file.id] : selection.filter((id) => id !== file.id))} type="checkbox" /> : null}
       <Button className="shared-assistant-file" onClick={() => onOpenArtifact(file.id)} type="button" variant="secondary"><FileText size={ICON_SIZE.md} /><span><strong>{file.title}</strong><small>{file.path}</small></span></Button>
       {offerSummary ? <Button disabled={isBusy || !file.indexed_at} onClick={() => onSummarize(file.id, file.title)} title={file.indexed_at ? `Summarize ${file.title}` : "This file is not indexed yet"} type="button" variant="secondary">Summarize</Button> : null}
     </li>)}</ul> : null}

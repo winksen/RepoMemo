@@ -82,11 +82,22 @@ async fn apply(
             if let Some(failure) = done.failed.first() {
                 return Err(ApiError::bad_request(failure.message.clone()));
             }
+            // One file is named; several are counted.
             let title = payload_text(proposal, "title");
+            let several = proposal
+                .payload
+                .get("count")
+                .and_then(|count| count.as_u64())
+                .unwrap_or(1)
+                > 1;
+            let subject = if several { title } else { format!("“{title}”") };
             Ok(if proposal.kind == AgentProposalKind::TrashFiles {
-                format!("Moved “{title}” to the trash. The workspace's trash can restore it.")
+                format!(
+                    "Moved {subject} to the trash. The workspace's trash can restore {}.",
+                    if several { "them" } else { "it" }
+                )
             } else {
-                format!("Moved “{title}” to {}.", payload_text(proposal, "folder_name"))
+                format!("Moved {subject} to {}.", payload_text(proposal, "folder_name"))
             })
         }
         AgentProposalKind::SaveSummary => {

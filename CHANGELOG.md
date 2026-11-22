@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.26 (2026-11-21)
+
+CAIRN works on sets of files, not one at a time.
+
+### Changed
+- **A list is a set.** When CAIRN finds files, the reply now carries the whole set by id (up to 200) with a description (*Word documents in the folder Finance: 14*), and shows the first fifty as rows instead of twenty. The list gains a tick box on each row, **Select all**, and, once something is selected, **Move to…** and **Move to trash**. The tick boxes are offered to people who may change the workspace.
+- **Many files, one proposal.** *Move to…* asks for a folder (a name, a path or *top level*) and *Move to trash* asks nothing; each sends the selection to CAIRN, which proposes one change for the whole set: the card lists the files (ten, then *…and N more*), and nothing happens until you confirm. Confirming runs the ordinary bulk-files handler as you, so a file that cannot be changed (a repository file, one already gone) is the answer instead of a silent skip. The trash can restore the files.
+- **By words too.** *Move all the Word documents to Contracts*, *trash the pdfs in the Archive folder* and, after a list, *move them to Runbooks* or *move these files to Runbooks* are read: the files are those selected, or those the last reply listed, or the kind and folder named (V0.9.25), or one file by name as before. Renaming stays one file at a time, and a request that names no files in view says which to give.
+- **Safe by construction.** Ids from the client are intersected with the workspace's own files, so another workspace's ids name nothing. At most 200 files are acted on at once, and more is refused with what to narrow by.
+- **API.** A message may carry artifact_ids (the selection); a reply may carry file_set; the server hands the core the files each earlier reply listed so *them* means them. No migration.
+
+### Checks
+- Unit tests for pointing at files in view and for one proposal over many files (listing, count, payload); compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run: the tick boxes and the bar were not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.25 (2026-11-21)
 
 A kind of file is a filter, not a piece of a name.

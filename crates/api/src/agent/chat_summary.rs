@@ -174,6 +174,7 @@ mod tests {
             question: question.to_owned(),
             answer: answer.to_owned(),
             citations: Vec::new(),
+            file_ids: Vec::new(),
         }
     }
 

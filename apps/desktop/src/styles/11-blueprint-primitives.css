@@ -492,6 +492,8 @@ body.shared-dock-resizing { cursor: col-resize; user-select: none; }
 .shared-assistant-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .shared-assistant-proposal > small { color: var(--color-text-subtle); font-size: 12px; }
 .shared-assistant-proposal-dismissed { opacity: 0.7; }
+.shared-assistant-selectbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--color-text-muted); font-size: 13px; }
+.shared-assistant-select { flex: none; width: 16px; height: 16px; accent-color: var(--color-text); }
 .shared-assistant-files { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .shared-assistant-files li { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .shared-assistant .rm-button.shared-assistant-file { flex: 1; justify-content: flex-start; min-width: 0; padding: 9px 12px; font-weight: 400; text-align: left; }

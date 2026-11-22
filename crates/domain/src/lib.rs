@@ -2964,6 +2964,9 @@ pub struct AgentMessage {
     pub message: String,
     pub capability: Option<AgentCapability>,
     pub artifact_id: Option<String>,
+    /// Files the person selected in an earlier reply and the message is about (V0.9.26).
+    #[serde(default)]
+    pub artifact_ids: Vec<String>,
 }
 
 /// A saved assistant chat. Only the user who started it can see it.
@@ -3014,6 +3017,10 @@ pub struct AgentRequest {
     /// core keeps the newest ones that fit its token budget.
     #[serde(default)]
     pub history: Vec<AgentHistoryTurn>,
+    /// The files the message is about, as the person selected them (V0.9.26). Like everything the client sends, they are
+    /// checked against the workspace before they are used.
+    #[serde(default)]
+    pub artifact_ids: Vec<String>,
     /// Every earlier exchange of the conversation in full, oldest first (V0.9.10), for the jobs that act on an earlier
     /// answer, such as saving it as a memory card. Like `history`, the server fills it from the stored conversation.
     #[serde(default)]
@@ -3027,6 +3034,9 @@ pub struct AgentExchange {
     pub answer: String,
     #[serde(default)]
     pub citations: Vec<Citation>,
+    /// The files that answer listed (V0.9.26), so "move them to Runbooks" can mean them.
+    #[serde(default)]
+    pub file_ids: Vec<String>,
 }
 
 /// One earlier exchange as the assistant is reminded of it: what was asked,
@@ -3068,6 +3078,20 @@ pub struct AgentReply {
     /// Actions CAIRN proposes and that wait for the person's confirmation (V0.9.10).
     #[serde(default)]
     pub proposals: Vec<AgentProposal>,
+    /// The whole set of files a reply found, when it found some (V0.9.26): `files` shows the first of them, and the set is what
+    /// the person selects from and what the next job can work on.
+    #[serde(default)]
+    pub file_set: Option<AgentFileSet>,
+}
+
+/// The files a reply found, said in words and by id.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentFileSet {
+    /// What they are, as the filter reads ("Word documents in the folder Finance").
+    pub description: String,
+    /// How many there are, which may be more than `ids` holds.
+    pub total: i64,
+    pub ids: Vec<String>,
 }
 
 /// An account as system administrators see it.

@@ -6,8 +6,8 @@
 use anyhow::Result;
 use repomemo_ai::{provider_from_settings, AiProvider, GenerateRequest};
 use repomemo_domain::{
-    AgentCapability, AgentCapabilityInfo, AgentHistoryFile, AgentHistoryTurn, AgentMessage, AgentReply, AgentRequest,
-    AgentRouting, ArtifactSummary, AskRequest, SearchRequest,
+    AgentCapability, AgentCapabilityInfo, AgentFileSet, AgentHistoryFile, AgentHistoryTurn, AgentMessage, AgentReply,
+    AgentRequest, AgentRouting, ArtifactSummary, AskRequest, SearchRequest,
 };
 use serde_json::{json, Value};
 
@@ -19,14 +19,18 @@ mod evidence;
 mod filters;
 use filters::{parse_filter, FileFilter};
 mod files;
-use files::{choose_folder, file_command, files_help, move_reply, rename_reply, trash_reply, FolderChoice};
+use files::{
+    choose_folder, file_command, files_help, is_set_reference, move_reply, rename_reply, trash_reply, FolderChoice,
+};
 mod proposals;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};
 use evidence::{evidence_for, next_steps, says_insufficient};
 use proposals::{save_memory_reply, save_memory_request};
 
 const MAX_MESSAGE_CHARS: usize = 2_000;
-const FILE_RESULT_LIMIT: usize = 20;
+const FILE_RESULT_LIMIT: usize = 50;
+/// The most files a set holds, and a proposal acts on, at once: what the server's bulk file action accepts.
+const SET_LIMIT: usize = 200;
 const FILE_CHOICE_LIMIT: usize = 8;
 const SEARCH_RESULT_LIMIT: i64 = 10;
 /// Earlier turns that go with a question: the newest ones that fit this many
@@ -542,33 +546,74 @@ impl RepoMemoCore {
             | files::FileCommand::Rename { file, .. }
             | files::FileCommand::Trash { file } => file.clone(),
         };
-        let mut matches = self.match_files(&request.workspace_id, &wanted).await?;
-        if matches.is_empty() {
+        let renaming = matches!(command, files::FileCommand::Rename { .. });
+        let filter = parse_filter(&wanted);
+        // The files meant: those in view (selected, or just listed), a kind or folder of files, or one file by its name (V0.9.26).
+        let targets: Vec<ArtifactSummary> = if is_set_reference(&wanted) || filter.is_structured() {
+            if renaming {
+                return Ok(reply("I rename one file at a time. Name the file to rename."));
+            }
+            if is_set_reference(&wanted) {
+                let ids = if request.artifact_ids.is_empty() {
+                    request
+                        .exchanges
+                        .last()
+                        .map(|last| last.file_ids.clone())
+                        .unwrap_or_default()
+                } else {
+                    request.artifact_ids.clone()
+                };
+                let found = self.files_by_ids(&request.workspace_id, &ids).await?;
+                if found.is_empty() {
+                    return Ok(reply("I am not sure which files you mean. Select files in a list above, or say which: for example `move the Word documents to Contracts`."));
+                }
+                found
+            } else {
+                match self.filter_files(&request.workspace_id, &filter).await? {
+                    Ok(found) if found.is_empty() => {
+                        return Ok(reply(format!("There are no {} in this workspace.", filter.describe())))
+                    }
+                    Ok(found) => found,
+                    Err(problem) => return Ok(reply(problem)),
+                }
+            }
+        } else {
+            let mut matches = self.match_files(&request.workspace_id, &wanted).await?;
+            if matches.is_empty() {
+                return Ok(reply(format!(
+                    "No file name or path matches “{wanted}”. Use Find files to look it up first."
+                )));
+            }
+            let clear = matches.len() == 1 || (matches[0].exact && !matches[1].exact);
+            if !clear {
+                let mut several = reply(format!(
+                    "Several files match “{wanted}”. Say which one with more of its name or its path, and I will propose the change."
+                ));
+                several.files = matches
+                    .into_iter()
+                    .take(FILE_CHOICE_LIMIT)
+                    .map(|file| file.artifact)
+                    .collect();
+                return Ok(several);
+            }
+            vec![matches.swap_remove(0).artifact]
+        };
+        if targets.len() > SET_LIMIT {
             return Ok(reply(format!(
-                "No file name or path matches “{wanted}”. Use Find files to look it up first."
+                "That is {} files, and I act on at most {SET_LIMIT} at a time. Narrow it by kind or folder.",
+                targets.len()
             )));
         }
-        let clear = matches.len() == 1 || (matches[0].exact && !matches[1].exact);
-        if !clear {
-            let mut several = reply(format!(
-                "Several files match “{wanted}”. Say which one with more of its name or its path, and I will propose the change."
-            ));
-            several.files = matches
-                .into_iter()
-                .take(FILE_CHOICE_LIMIT)
-                .map(|file| file.artifact)
-                .collect();
-            return Ok(several);
-        }
-        let file = matches.swap_remove(0).artifact;
         Ok(match command {
-            files::FileCommand::Rename { title, .. } => rename_reply(file, &title),
-            files::FileCommand::Trash { .. } => trash_reply(file),
+            files::FileCommand::Rename { title, .. } => {
+                rename_reply(targets.into_iter().next().expect("a file was found"), &title)
+            }
+            files::FileCommand::Trash { .. } => trash_reply(targets),
             files::FileCommand::Move { folder, .. } => {
                 let folders = self.storage.list_folders(&request.workspace_id).await?;
                 match choose_folder(&folder, &folders) {
-                    FolderChoice::TopLevel => move_reply(file, None),
-                    FolderChoice::One(found) => move_reply(file, Some(&found)),
+                    FolderChoice::TopLevel => move_reply(targets, None),
+                    FolderChoice::One(found) => move_reply(targets, Some(&found)),
                     FolderChoice::Many(names) => reply(format!(
                         "Several folders match “{folder}”: {}. Say which one by its full path.",
                         names.join(", ")
@@ -678,11 +723,8 @@ impl RepoMemoCore {
                 String::new()
             }
         ));
-        result.files = matches
-            .into_iter()
-            .take(FILE_RESULT_LIMIT)
-            .map(|file| file.artifact)
-            .collect();
+        let found = matches.into_iter().map(|file| file.artifact).collect::<Vec<_>>();
+        with_file_set(&mut result, format!("files named like “{subject}”"), found);
         Ok(result)
     }
 
@@ -756,8 +798,20 @@ impl RepoMemoCore {
                 String::new()
             }
         ));
-        result.files = files.into_iter().take(FILE_RESULT_LIMIT).collect();
+        with_file_set(&mut result, filter.describe(), files);
         Ok(result)
+    }
+
+    /// The workspace's files with these ids. Ids from a client name nothing in other workspaces and nothing that is gone.
+    async fn files_by_ids(&self, workspace_id: &str, ids: &[String]) -> Result<Vec<ArtifactSummary>> {
+        let wanted = ids.iter().map(String::as_str).collect::<std::collections::HashSet<_>>();
+        Ok(self
+            .storage
+            .list_artifacts(workspace_id)
+            .await?
+            .into_iter()
+            .filter(|file| wanted.contains(file.id.as_str()))
+            .collect())
     }
 
     async fn agent_find_symbol(&self, workspace_id: &str, subject: &str) -> Result<AgentReply> {
@@ -1020,7 +1074,18 @@ fn reply(markdown: impl Into<String>) -> AgentReply {
         warnings: Vec::new(),
         context_turns: 0,
         proposals: Vec::new(),
+        file_set: None,
     }
+}
+
+/// Gives a reply the files it found: the first as rows, and the whole set (up to the limit) by id, so they can be selected.
+fn with_file_set(result: &mut AgentReply, description: String, files: Vec<ArtifactSummary>) {
+    result.file_set = Some(AgentFileSet {
+        description,
+        total: files.len() as i64,
+        ids: files.iter().take(SET_LIMIT).map(|file| file.id.clone()).collect(),
+    });
+    result.files = files.into_iter().take(FILE_RESULT_LIMIT).collect();
 }
 
 fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
@@ -1636,6 +1701,7 @@ mod tests {
             message: message.to_owned(),
             capability,
             artifact_id: artifact.map(str::to_owned),
+            artifact_ids: Vec::new(),
         };
         assert_eq!(agent_turn_label(&picked(None, "  find readme ", None)), "find readme");
         assert_eq!(

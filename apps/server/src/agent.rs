@@ -39,6 +39,9 @@ pub(crate) struct AgentMessageRequest {
     message: String,
     capability: Option<AgentCapability>,
     artifact_id: Option<String>,
+    /// Files selected in an earlier reply that the message is about (V0.9.26).
+    #[serde(default)]
+    artifact_ids: Vec<String>,
     /// Continue this conversation; a new one is started when omitted.
     conversation_id: Option<String>,
 }
@@ -117,6 +120,7 @@ pub(crate) async fn send_agent_message(
         message: request.message,
         capability: request.capability,
         artifact_id: request.artifact_id,
+        artifact_ids: request.artifact_ids,
     };
     // What goes with the question comes from the stored conversation, never
     // from the request, so a client cannot make the assistant "remember" text.
@@ -161,6 +165,7 @@ pub(crate) async fn send_agent_message(
             message: message.message.clone(),
             capability: message.capability,
             artifact_id: message.artifact_id.clone(),
+            artifact_ids: message.artifact_ids.clone(),
             provider_id,
             ai_unavailable_reason,
             history,
@@ -248,6 +253,7 @@ pub(crate) async fn attach_agent_file(
         message: label.clone(),
         capability: None,
         artifact_id: Some(file.id.clone()),
+        artifact_ids: Vec::new(),
     };
     let reply = attachment_reply(file);
     let conversation_id = match existing {
@@ -382,6 +388,10 @@ fn exchanges_of(turns: &[AgentTurn]) -> Vec<AgentExchange> {
             question: turn.label.clone(),
             answer: turn.reply.reply_markdown.clone(),
             citations: turn.reply.citations.clone(),
+            file_ids: turn.reply.file_set.as_ref().map_or_else(
+                || turn.reply.files.iter().map(|file| file.id.clone()).collect(),
+                |set| set.ids.clone(),
+            ),
         })
         .collect()
 }

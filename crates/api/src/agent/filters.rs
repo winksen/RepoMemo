@@ -9,7 +9,6 @@ use super::words_of;
 
 /// A kind of file: the words people use for it and the extensions it has.
 pub(crate) struct FileKind {
-    pub label: &'static str,
     pub plural: &'static str,
     words: &'static [&'static str],
     pub extensions: &'static [&'static str],
@@ -17,31 +16,26 @@ pub(crate) struct FileKind {
 
 pub(crate) const KINDS: &[FileKind] = &[
     FileKind {
-        label: "Word document",
         plural: "Word documents",
         words: &["word", "docx"],
         extensions: &[".doc", ".docx", ".dotx"],
     },
     FileKind {
-        label: "spreadsheet",
         plural: "spreadsheets",
         words: &["excel", "spreadsheet", "xlsx", "xls", "csv"],
         extensions: &[".xls", ".xlsx", ".xlsm", ".csv"],
     },
     FileKind {
-        label: "presentation",
         plural: "presentations",
         words: &["powerpoint", "presentation", "slide", "deck", "pptx", "ppt"],
         extensions: &[".ppt", ".pptx"],
     },
     FileKind {
-        label: "PDF",
         plural: "PDFs",
         words: &["pdf"],
         extensions: &[".pdf"],
     },
     FileKind {
-        label: "image",
         plural: "images",
         words: &[
             "image",
@@ -57,19 +51,16 @@ pub(crate) const KINDS: &[FileKind] = &[
         extensions: &[".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"],
     },
     FileKind {
-        label: "Markdown file",
         plural: "Markdown files",
         words: &["markdown", "md"],
         extensions: &[".md", ".mdx"],
     },
     FileKind {
-        label: "text file",
         plural: "text files",
         words: &["txt"],
         extensions: &[".txt"],
     },
     FileKind {
-        label: "code file",
         plural: "code files",
         words: &["code", "source", "script"],
         extensions: &[
@@ -78,25 +69,21 @@ pub(crate) const KINDS: &[FileKind] = &[
         ],
     },
     FileKind {
-        label: "JSON file",
         plural: "JSON files",
         words: &["json"],
         extensions: &[".json"],
     },
     FileKind {
-        label: "YAML file",
         plural: "YAML files",
         words: &["yaml", "yml"],
         extensions: &[".yaml", ".yml"],
     },
     FileKind {
-        label: "email",
         plural: "emails",
         words: &["email", "mail", "outlook"],
         extensions: &[".msg", ".eml"],
     },
     FileKind {
-        label: "OneNote file",
         plural: "OneNote files",
         words: &["onenote"],
         extensions: &[".one"],
@@ -338,7 +325,7 @@ mod tests {
     }
 
     fn labels(filter: &FileFilter) -> Vec<&'static str> {
-        filter.kinds.iter().map(|&index| KINDS[index].label).collect()
+        filter.kinds.iter().map(|&index| KINDS[index].plural).collect()
     }
 
     #[test]
@@ -351,12 +338,12 @@ mod tests {
             "docx files",
         ] {
             let filter = parse_filter(subject);
-            assert_eq!(labels(&filter), ["Word document"], "{subject}");
+            assert_eq!(labels(&filter), ["Word documents"], "{subject}");
             assert_eq!(filter.name, "", "{subject}");
             assert_eq!(filter.folder, None, "{subject}");
         }
-        assert_eq!(labels(&parse_filter("pdfs and spreadsheets")), ["PDF", "spreadsheet"]);
-        assert_eq!(labels(&parse_filter(".pdf")), ["PDF"]);
+        assert_eq!(labels(&parse_filter("pdfs and spreadsheets")), ["PDFs", "spreadsheets"]);
+        assert_eq!(labels(&parse_filter(".pdf")), ["PDFs"]);
     }
 
     /// The bug that listed wordle.png and passwordPolicy.ts for "the word documents".
@@ -383,7 +370,7 @@ mod tests {
     #[test]
     fn a_name_and_a_folder_are_read_beside_the_kind() {
         let filter = parse_filter("pdfs about invoices in the Finance folder");
-        assert_eq!(labels(&filter), ["PDF"]);
+        assert_eq!(labels(&filter), ["PDFs"]);
         assert_eq!(filter.name, "invoices");
         assert_eq!(filter.folder.as_deref(), Some("Finance"));
         assert_eq!(

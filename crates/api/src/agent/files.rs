@@ -34,7 +34,7 @@ const TOP_LEVEL: &[&str] = &[
 /// Whether the message talks about a file: it says so, or names one by its extension ("retry-policy.md").
 fn mentions_a_file(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
-    ["file", "document", "note", "folder"].iter().any(|word| {
+    ["file", "document", "note", "folder", "selected"].iter().any(|word| {
         lower
             .split(|c: char| !c.is_alphanumeric())
             .any(|part| part == *word || part == format!("{word}s"))
@@ -183,38 +183,87 @@ fn proposal(kind: AgentProposalKind, title: &str, detail: String, payload: serde
     }
 }
 
-fn proposed(markdown: String, proposal: AgentProposal, file: ArtifactSummary) -> AgentReply {
+fn proposed(markdown: String, proposal: AgentProposal, files: Vec<ArtifactSummary>) -> AgentReply {
     let mut answer = reply(markdown);
     answer.routing = AgentRouting::Rules;
-    answer.files = vec![file];
+    answer.files = files.into_iter().take(PROPOSAL_FILES_SHOWN).collect();
     answer.proposals = vec![proposal];
     answer
 }
 
-/// The proposal to move one file to a folder, or to the top level when `folder` is `None`.
-pub(crate) fn move_reply(file: ArtifactSummary, folder: Option<&FolderPath>) -> AgentReply {
+/// How many files of a set a proposal shows as rows; the card lists the rest by count.
+const PROPOSAL_FILES_SHOWN: usize = 10;
+
+/// Whether the words that name the files point at files already in view: the ones the person selected, or those a reply listed.
+pub(crate) fn is_set_reference(wanted: &str) -> bool {
+    wanted
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|word| matches!(word, "selected" | "these" | "those" | "them" | "above" | "previous"))
+}
+
+/// One file by name, or several as a count: "**a.md**" or "**12 files**".
+fn named(files: &[ArtifactSummary]) -> String {
+    match files {
+        [one] => format!("**{}**", one.title),
+        many => format!("**{} files**", many.len()),
+    }
+}
+
+/// The files of a proposal, one line each, up to ten and then the number left.
+fn listing(files: &[ArtifactSummary]) -> String {
+    let mut lines = files
+        .iter()
+        .take(PROPOSAL_FILES_SHOWN)
+        .map(|file| format!("- **{}** (`{}`)", file.title, file.path))
+        .collect::<Vec<_>>();
+    if files.len() > PROPOSAL_FILES_SHOWN {
+        lines.push(format!("- …and {} more", files.len() - PROPOSAL_FILES_SHOWN));
+    }
+    lines.join("\n")
+}
+
+fn title_of_set(files: &[ArtifactSummary]) -> String {
+    match files {
+        [one] => one.title.clone(),
+        many => format!("{} files", many.len()),
+    }
+}
+
+/// The proposal to move files to a folder, or to the top level when `folder` is `None`.
+pub(crate) fn move_reply(files: Vec<ArtifactSummary>, folder: Option<&FolderPath>) -> AgentReply {
     let target = folder.map_or("the top level".to_owned(), |folder| {
         format!("the folder **{}**", folder.path)
     });
-    let detail = format!(
-        "Move **{}** (`{}`) to {target}. The file keeps its identity, so everything that cites it stays attached.",
-        file.title, file.path
-    );
+    let what = named(&files);
+    let detail = match files.as_slice() {
+        [one] => format!(
+            "Move **{}** (`{}`) to {target}. The file keeps its identity, so everything that cites it stays attached.",
+            one.title, one.path
+        ),
+        _ => format!(
+            "Move {what} to {target}:\n{}\n\nThe files keep their identity, so everything that cites them stays attached.",
+            listing(&files)
+        ),
+    };
     let payload = json!({
         "action": "move",
-        "artifact_ids": [file.id],
+        "artifact_ids": files.iter().map(|file| file.id.clone()).collect::<Vec<_>>(),
+        "count": files.len(),
         "folder_id": folder.map(|folder| folder.id.clone()),
         "folder_name": folder.map_or("the top level".to_owned(), |folder| folder.path.clone()),
-        "title": file.title,
+        "title": title_of_set(&files),
     });
-    let proposal = proposal(AgentProposalKind::MoveFiles, "Move the file", detail, payload);
+    let title = if files.len() == 1 {
+        "Move the file"
+    } else {
+        "Move the files"
+    };
+    let proposal = proposal(AgentProposalKind::MoveFiles, title, detail, payload);
     proposed(
-        format!(
-            "I can move **{}** to {target}. Nothing moves until you confirm below.",
-            file.title
-        ),
+        format!("I can move {what} to {target}. Nothing moves until you confirm below."),
         proposal,
-        file,
+        files,
     )
 }
 
@@ -235,30 +284,39 @@ pub(crate) fn rename_reply(file: ArtifactSummary, title: &str) -> AgentReply {
             file.title
         ),
         proposal,
-        file,
+        vec![file],
     )
 }
 
-/// The proposal to move one file to the trash.
-pub(crate) fn trash_reply(file: ArtifactSummary) -> AgentReply {
-    let detail = format!(
-        "Move **{}** (`{}`) to the trash. It is no longer searched or cited while it is there, and the workspace's trash can restore it.",
-        file.title, file.path
-    );
-    let payload = json!({ "action": "delete", "artifact_ids": [file.id], "title": file.title });
-    let proposal = proposal(
-        AgentProposalKind::TrashFiles,
-        "Move the file to the trash",
-        detail,
-        payload,
-    );
-    proposed(
-        format!(
-            "I can move **{}** to the trash. Nothing is removed until you confirm below.",
-            file.title
+/// The proposal to move files to the trash.
+pub(crate) fn trash_reply(files: Vec<ArtifactSummary>) -> AgentReply {
+    let what = named(&files);
+    let detail = match files.as_slice() {
+        [one] => format!(
+            "Move **{}** (`{}`) to the trash. It is no longer searched or cited while it is there, and the workspace's trash can restore it.",
+            one.title, one.path
         ),
+        _ => format!(
+            "Move {what} to the trash:\n{}\n\nThey are no longer searched or cited while they are there, and the workspace's trash can restore them.",
+            listing(&files)
+        ),
+    };
+    let payload = json!({
+        "action": "delete",
+        "artifact_ids": files.iter().map(|file| file.id.clone()).collect::<Vec<_>>(),
+        "count": files.len(),
+        "title": title_of_set(&files),
+    });
+    let title = if files.len() == 1 {
+        "Move the file to the trash"
+    } else {
+        "Move the files to the trash"
+    };
+    let proposal = proposal(AgentProposalKind::TrashFiles, title, detail, payload);
+    proposed(
+        format!("I can move {what} to the trash. Nothing is removed until you confirm below."),
         proposal,
-        file,
+        files,
     )
 }
 
@@ -431,9 +489,50 @@ mod tests {
     }
 
     #[test]
+    fn files_in_view_are_pointed_at_by_selected_these_or_them() {
+        for wanted in ["selected", "these", "all of them", "those files", "the files above"] {
+            assert!(is_set_reference(wanted), "{wanted}");
+        }
+        for wanted in ["retry-policy.md", "deploy runbook", "word", "the theme file"] {
+            assert!(!is_set_reference(wanted), "{wanted}");
+        }
+    }
+
+    #[test]
+    fn many_files_make_one_proposal_that_lists_them_and_counts_the_rest() {
+        let files = (0..14).map(|n| file(&format!("f{n}.md"))).collect::<Vec<_>>();
+        let moved = move_reply(
+            files.clone(),
+            Some(&FolderPath {
+                id: "9".into(),
+                path: "Runbooks".into(),
+            }),
+        );
+        let proposal = &moved.proposals[0];
+        assert_eq!(proposal.payload["artifact_ids"].as_array().unwrap().len(), 14);
+        assert_eq!(proposal.payload["count"], 14);
+        assert_eq!(proposal.payload["title"], "14 files");
+        assert!(
+            proposal
+                .detail
+                .starts_with("Move **14 files** to the folder **Runbooks**:"),
+            "{}",
+            proposal.detail
+        );
+        assert!(proposal.detail.contains("- …and 4 more"));
+        assert!(moved.reply_markdown.contains("I can move **14 files**"));
+        assert_eq!(moved.files.len(), PROPOSAL_FILES_SHOWN);
+
+        let trashed = trash_reply(files);
+        assert_eq!(trashed.proposals[0].payload["action"], "delete");
+        assert!(trashed.proposals[0].detail.contains("trash can restore them"));
+        assert_eq!(trashed.proposals[0].title, "Move the files to the trash");
+    }
+
+    #[test]
     fn each_request_becomes_one_proposal_for_one_file() {
         let moved = move_reply(
-            file("a.md"),
+            vec![file("a.md")],
             Some(&FolderPath {
                 id: "9".into(),
                 path: "Runbooks".into(),
@@ -445,7 +544,7 @@ mod tests {
         assert_eq!(moved.proposals[0].payload["action"], "move");
         assert!(moved.reply_markdown.contains("Nothing moves until you confirm"));
 
-        let top = move_reply(file("a.md"), None);
+        let top = move_reply(vec![file("a.md")], None);
         assert!(top.proposals[0].payload["folder_id"].is_null());
 
         let renamed = rename_reply(file("a.md"), "b.md");
@@ -453,7 +552,7 @@ mod tests {
         assert_eq!(renamed.proposals[0].payload["title"], "b.md");
         assert!(rename_reply(file("a.md"), "a.md").proposals.is_empty());
 
-        let trashed = trash_reply(file("a.md"));
+        let trashed = trash_reply(vec![file("a.md")]);
         assert_eq!(trashed.proposals[0].kind, AgentProposalKind::TrashFiles);
         assert_eq!(trashed.proposals[0].payload["action"], "delete");
         assert!(trashed.proposals[0].detail.contains("trash can restore it"));
