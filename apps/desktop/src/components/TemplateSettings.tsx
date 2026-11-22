@@ -66,7 +66,7 @@ export function TemplateSettings({ accessToken, embedded = false, workspaceId }:
       {(() => {
         // Nothing to apply while the template in use is the one chosen: the button stays, grey and disabled.
         const applicable = comparing || current.source !== "workspace";
-        return <Button busy={busy} className="rm-template-use" disabled={busy || !applicable || (comparing && !detail)} onClick={() => void apply()} type="button" variant={applicable ? "main" : "secondary"}>Use {chosenName}</Button>;
+        return <Button busy={busy} className="rm-template-use" disabled={busy || !applicable || (comparing && !detail)} onClick={() => void apply()} type="button" variant={applicable ? "main" : "secondary"}>Use this template</Button>;
       })()}
       <Collapse open={current.source === "workspace" && !comparing && Boolean(base)}>
         {current.source === "workspace" && base ? <Adjustments

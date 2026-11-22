@@ -344,3 +344,17 @@ th > .rm-badge,
 .rm-collapse > div { padding: 2px; margin: -2px; }
 .rm-template-text .rm-template-active { justify-self: start; margin: 6px 0 0; padding: 2px 8px; color: var(--color-text); background: var(--color-surface-3); border: 0; border-radius: 6px; font-size: 11px; font-weight: 700; }
 .rm-template-option:has(.rm-template-radio:checked) .rm-template-text .rm-template-active { color: var(--color-on-accent); background: rgba(255, 255, 255, 0.22); }
+
+/* V0.9.23: bigger icon and color pickers with no border until hover (then the accent), the colors as rounded squares, no line above the adjustments. */
+.shared-icon-picker { grid-template-columns: repeat(10, 40px); gap: 8px; }
+.shared-icon-picker-organization { grid-template-columns: repeat(7, 40px); }
+.shared-icon-picker .rm-button.rm-icon-button { width: 40px; height: 40px; min-width: 40px; min-height: 40px; border: 2px solid transparent; border-radius: 10px; transition: border-color 110ms var(--ease-control); }
+.shared-icon-picker .rm-button.rm-icon-button svg { width: 20px; height: 20px; }
+.shared-icon-picker .rm-button.rm-icon-button:hover:not(:disabled) { border-color: var(--color-accent); }
+.shared-color-picker { gap: 10px; }
+.shared-color-swatch { width: 36px; height: 36px; border: 2px solid transparent; border-radius: 10px; }
+.shared-color-swatch:hover:not(:disabled) { border-color: var(--color-accent); transform: none; }
+.shared-color-swatch[aria-pressed="true"] { border-color: transparent; }
+.shared-color-swatch[aria-pressed="true"]:hover:not(:disabled) { border-color: var(--color-accent); }
+.shared-settings-panel .rm-template-adjust, .rm-template-adjust { margin-top: 4px; padding-top: 0; border-top: 0; }
+@media (max-width: 720px) { .shared-icon-picker { grid-template-columns: repeat(auto-fill, 40px); } }

@@ -2,7 +2,16 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.22` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.23` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.23 — Customization pickers.
+
+- The **Customization** icon is solid and bigger.
+- The button is simply **Use this template**.
+- The **icon** and **color** pickers are larger and have **no border** until hover, when the accent border shows; colors are **rounded squares**, not circles.
+- The line above *Adjust this workspace* is gone.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.22 — Template adjustments simplified.
 

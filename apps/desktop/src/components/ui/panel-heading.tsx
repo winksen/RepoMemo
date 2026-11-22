@@ -11,6 +11,9 @@ export interface PanelHeadingProps {
   description?: ReactNode;
   /** An icon component; it is drawn at the heading's size. */
   icon?: IconComponent;
+  /** The icon's weight (`fill` for a solid icon) and size in pixels, when the heading wants more than the usual outline. */
+  iconWeight?: "regular" | "fill";
+  iconSize?: number;
   /** The id of the heading element, for `aria-labelledby`. */
   id?: string;
   /** 2 for a panel, 3 for a part of a panel. The page itself has the h1. */
@@ -19,12 +22,12 @@ export interface PanelHeadingProps {
 }
 
 /** The heading of a panel: an icon, the title, an optional muted note and optional actions. */
-export function PanelHeading({ actions, className, description, icon: Icon, id, level = 2, title }: PanelHeadingProps) {
+export function PanelHeading({ actions, className, description, icon: Icon, iconSize, iconWeight, id, level = 2, title }: PanelHeadingProps) {
   const Heading = level === 3 ? "h3" : "h2";
   return (
     <div className={cn("rm-panel-heading", className)}>
       <div>
-        {Icon ? <Icon size={level === 3 ? ICON_SIZE.md : ICON_SIZE.lg} /> : null}
+        {Icon ? <Icon size={iconSize ?? (level === 3 ? ICON_SIZE.md : ICON_SIZE.lg)} weight={iconWeight} /> : null}
         <Heading id={id}>{title}</Heading>
       </div>
       {description !== undefined && description !== null && description !== false ? <span className="rm-panel-heading-description">{description}</span> : null}

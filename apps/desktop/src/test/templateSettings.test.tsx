@@ -127,13 +127,13 @@ describe("Settings › Template", () => {
     expect((screen.getByRole("radio", { name: /Operations and incidents/ }) as HTMLInputElement).checked).toBe(true);
     expect(screen.getByText("Active now")).toBeTruthy();
     expect(container.querySelector("dl")).toBeNull();
-    expect((screen.getByRole("button", { name: /^Use Operations/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Use this template" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("previews another template when it is picked and changes only after the person confirms", async () => {
     show(current());
     fireEvent.click(screen.getByRole("radio", { name: /Knowledge base/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Use Knowledge base" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use this template" }));
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/Nothing stored is moved, created or deleted/)).toBeTruthy();
     expect(saveSharedWorkspaceTemplate).not.toHaveBeenCalled();
@@ -146,7 +146,7 @@ describe("Settings › Template", () => {
   it("saves nothing when the change is cancelled", async () => {
     show(current());
     fireEvent.click(screen.getByRole("radio", { name: /Knowledge base/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Use Knowledge base" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use this template" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());

@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.23 (2026-11-21)
+
+Customization pickers.
+
+### Changed
+- The Customization icon is solid and bigger; the button reads *Use this template*.
+- Icon and color pickers are larger, with no border until hover; colors are rounded squares.
+- The line above *Adjust this workspace* is removed.
+- Client only: no API, setting or migration changes.
+
+### Checks
+- Typecheck passes. Nothing was built or run; the look was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.22 (2026-11-21)
 
 Template adjustments simplified.
