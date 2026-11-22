@@ -147,18 +147,22 @@ fn note_content(summary: &str, sources: &[Citation]) -> String {
 /// The proposal to keep a chat's summary in the workspace as an indexed note (V0.9.14). The chat itself is private to its person;
 /// the note is not, which the proposal says before anything is stored.
 pub(crate) fn save_proposal(exchanges: &[AgentExchange], summary: &str, sources: &[Citation]) -> AgentProposal {
-    let title = note_title(exchanges);
+    note_proposal(note_title(exchanges), summary, sources, "summary")
+}
+
+/// The proposal to keep a text CAIRN wrote (`what`: a summary, an analysis) as an indexed note with its sources.
+pub(crate) fn note_proposal(title: String, text: &str, sources: &[Citation], what: &str) -> AgentProposal {
     AgentProposal {
         id: "1".to_owned(),
         kind: AgentProposalKind::SaveSummary,
         state: AgentProposalState::Pending,
-        title: "Save the summary as a note".to_owned(),
+        title: format!("Save the {what} as a note"),
         detail: format!(
-            "Store this summary as a note named **{title}**. It is indexed like any note, so CAIRN and search can find it later. The chat stays private to you; the note can be read by everyone who can read this workspace."
+            "Store this {what} as a note named **{title}**. It is indexed like any note, so CAIRN and search can find it later. The chat stays private to you; the note can be read by everyone who can read this workspace."
         ),
         payload: json!({
             "title": title,
-            "content": note_content(summary, sources),
+            "content": note_content(text, sources),
             "language": "Note",
         }),
         outcome: None,

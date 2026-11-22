@@ -32,7 +32,7 @@ const TOP_LEVEL: &[&str] = &[
 ];
 
 /// Whether the message talks about a file: it says so, or names one by its extension ("retry-policy.md").
-fn mentions_a_file(text: &str) -> bool {
+pub(crate) fn mentions_a_file(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
     ["file", "document", "note", "folder", "selected"].iter().any(|word| {
         lower

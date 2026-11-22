@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 
 use crate::RepoMemoCore;
 
+mod analyze;
 mod chat_summary;
 mod chatter;
 mod evidence;
@@ -279,6 +280,13 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             "No input needed",
             true,
         ),
+        (
+            AgentCapability::AnalyzeFiles,
+            "Analyze files",
+            "Read several files together, such as all the Word documents or the files you selected, and write one analysis, for a question if you give one.",
+            "Which files, and what to look for? For example: the pdfs in Finance for payment terms",
+            true,
+        ),
     ]
     .into_iter()
     .map(
@@ -330,6 +338,7 @@ fn requires_ai(capability: AgentCapability) -> bool {
             | AgentCapability::AskQuestion
             | AgentCapability::WorkspaceOverview
             | AgentCapability::SummarizeChat
+            | AgentCapability::AnalyzeFiles
     )
 }
 
@@ -371,7 +380,10 @@ impl RepoMemoCore {
         } else if let Some(capability) = request.capability {
             let subject = if matches!(
                 capability,
-                AgentCapability::AskQuestion | AgentCapability::SaveMemory | AgentCapability::ManageFiles
+                AgentCapability::AskQuestion
+                    | AgentCapability::SaveMemory
+                    | AgentCapability::ManageFiles
+                    | AgentCapability::AnalyzeFiles
             ) {
                 message.to_owned()
             } else {
@@ -427,6 +439,7 @@ impl RepoMemoCore {
                 AgentCapability::SaveMemory => Ok(self.agent_save_memory(&request, &subject)),
                 AgentCapability::ManageFiles => self.agent_manage_files(&request, &subject).await,
                 AgentCapability::SummarizeChat => self.agent_summarize_chat(&request).await,
+                AgentCapability::AnalyzeFiles => self.agent_analyze_files(&request, &subject).await,
             }
         };
         // Provider and indexing problems are part of the conversation, not a
@@ -459,7 +472,7 @@ impl RepoMemoCore {
         let raw = provider
             .generate(GenerateRequest {
                 system: Some("You classify requests. You reply with JSON only.".to_owned()),
-                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
+                prompt: "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:\n- find_files: locate files by name, path or type\n- find_symbol: locate where a function, class or method is defined in code\n- search_content: find passages inside files that mention some words\n- summarize_file: summarize one named file\n- ask_question: answer a question using the workspace content\n- workspace_overview: describe the whole workspace\n- save_memory: save the last answer, or a fact the user states, as a memory card\n- manage_files: move a named file to a folder, rename it, or move it to the trash\n- summarize_chat: summarize this whole conversation\n- analyze_files: analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for\n- none: anything else, such as chit-chat, writing or editing code, or actions on files\nReply with JSON only, no prose: {\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}. The user's message is the context below.".to_owned(),
                 context: message.to_owned(),
                 options: json!({ "temperature": 0.0 }),
             })
@@ -535,6 +548,195 @@ impl RepoMemoCore {
         Ok(result)
     }
 
+    /// The files a request means (V0.9.26): those in view (selected, or just listed), a kind or folder of files, or one file by its
+    /// name. When it cannot tell, the answer is what to say to CAIRN.
+    async fn resolve_files(
+        &self,
+        request: &AgentRequest,
+        wanted: &str,
+    ) -> Result<std::result::Result<ResolvedFiles, AgentReply>> {
+        let filter = parse_filter(wanted);
+        if is_set_reference(wanted) {
+            let ids = if request.artifact_ids.is_empty() {
+                request
+                    .exchanges
+                    .last()
+                    .map(|last| last.file_ids.clone())
+                    .unwrap_or_default()
+            } else {
+                request.artifact_ids.clone()
+            };
+            let files = self.files_by_ids(&request.workspace_id, &ids).await?;
+            if files.is_empty() {
+                return Ok(Err(reply("I am not sure which files you mean. Select files in a list above, or say which: for example `move the Word documents to Contracts`.")));
+            }
+            return Ok(Ok(ResolvedFiles {
+                files,
+                description: "the selected files".to_owned(),
+            }));
+        }
+        if filter.is_structured() {
+            return Ok(match self.filter_files(&request.workspace_id, &filter).await? {
+                Ok(files) if files.is_empty() => {
+                    Err(reply(format!("There are no {} in this workspace.", filter.describe())))
+                }
+                Ok(files) => Ok(ResolvedFiles {
+                    files,
+                    description: filter.describe(),
+                }),
+                Err(problem) => Err(reply(problem)),
+            });
+        }
+        let mut matches = self.match_files(&request.workspace_id, wanted).await?;
+        if matches.is_empty() {
+            return Ok(Err(reply(format!(
+                "No file name or path matches “{wanted}”. Use Find files to look it up first."
+            ))));
+        }
+        let clear = matches.len() == 1 || (matches[0].exact && !matches[1].exact);
+        if !clear {
+            let mut several = reply(format!(
+                "Several files match “{wanted}”. Say which one with more of its name or its path, and I will propose the change."
+            ));
+            several.files = matches
+                .into_iter()
+                .take(FILE_CHOICE_LIMIT)
+                .map(|file| file.artifact)
+                .collect();
+            return Ok(Err(several));
+        }
+        let file = matches.swap_remove(0).artifact;
+        Ok(Ok(ResolvedFiles {
+            description: file.title.clone(),
+            files: vec![file],
+        }))
+    }
+
+    /// Analyzing several files together (V0.9.27): notes on each file's indexed text for what was asked, then one analysis over
+    /// the notes. At most `analyze::MAX_FILES` are read; a file with no indexed text is named as not read.
+    async fn agent_analyze_files(&self, request: &AgentRequest, text: &str) -> Result<AgentReply> {
+        let lower = text.to_ascii_lowercase();
+        let asked = analyze::analyze_request(text, &lower).unwrap_or_else(|| analyze::split_request(text));
+        let wanted = if !asked.files.is_empty() {
+            asked.files.clone()
+        } else if !request.artifact_ids.is_empty() {
+            "selected".to_owned()
+        } else {
+            return Ok(reply("Which files should I analyze? Name a kind or a folder, such as `the Word documents` or `the pdfs in Finance`, or select files in a list first."));
+        };
+        let resolved = match self.resolve_files(request, &wanted).await? {
+            Ok(resolved) => resolved,
+            Err(answer) => return Ok(answer),
+        };
+        let provider_id = request.provider_id.clone().unwrap_or_default();
+        let settings = self.storage.get_provider_settings(&provider_id).await?;
+        if !settings.enabled || settings.workspace_id.as_deref() != Some(request.workspace_id.as_str()) {
+            repomemo_domain::bail_invalid!("The selected provider is not enabled for this workspace.");
+        }
+        let provider = provider_from_settings(settings)?;
+        let total = resolved.files.len();
+        let focus = asked.focus.clone();
+        let question = if focus.is_empty() {
+            String::new()
+        } else {
+            format!(" Question: {focus}")
+        };
+        let mut notes: Vec<(ArtifactSummary, String, repomemo_domain::Citation)> = Vec::new();
+        let mut skipped: Vec<String> = Vec::new();
+        for file in resolved.files.iter().take(analyze::MAX_FILES) {
+            let detail = self.storage.get_artifact(&file.id).await?;
+            let sections = detail
+                .chunks
+                .iter()
+                .map(
+                    |chunk| match chunk.heading_path.as_deref().filter(|heading| !heading.is_empty()) {
+                        Some(heading) => format!("{heading}\n{}", chunk.text),
+                        None => chunk.text.clone(),
+                    },
+                )
+                .collect::<Vec<_>>();
+            let Some(first) = detail.chunks.first() else {
+                skipped.push(file.title.clone());
+                continue;
+            };
+            let written = provider
+                .generate(GenerateRequest {
+                    system: Some(format!("{} {}", cairn_persona(), analyze::NOTES_RULES)),
+                    prompt: format!("Take notes on the file '{}'.{question}", file.title),
+                    context: analyze::sample(&sections, analyze::PER_FILE_CHARS),
+                    options: json!({ "temperature": 0.1 }),
+                })
+                .await?;
+            let cite = repomemo_domain::Citation {
+                artifact_id: file.id.clone(),
+                chunk_id: Some(first.id.clone()),
+                title: file.title.clone(),
+                path: file.path.clone(),
+                start_line: first.start_line,
+                end_line: first.end_line,
+                confidence: None,
+                commit: None,
+                last_author: None,
+                last_changed_at: None,
+            };
+            notes.push((file.clone(), written.trim().to_owned(), cite));
+        }
+        if notes.is_empty() {
+            let mut none = reply(format!(
+                "I could not read any of those files yet: {}. A file is read once it is indexed and has text; try again in a moment.",
+                skipped.join(", ")
+            ));
+            with_file_set(&mut none, resolved.description, resolved.files);
+            return Ok(none);
+        }
+        let context = notes
+            .iter()
+            .map(|(file, text, _)| format!("## {} ({})\n{text}", file.title, file.path))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let prompt = if focus.is_empty() {
+            "Analyze these files together.".to_owned()
+        } else {
+            format!("Analyze these files for: {focus}")
+        };
+        let analysis = provider
+            .generate(GenerateRequest {
+                system: Some(format!("{} {}", cairn_persona(), analyze::ANALYSIS_RULES)),
+                prompt,
+                context,
+                options: json!({ "temperature": 0.2 }),
+            })
+            .await?;
+        let mut result = reply(analysis.trim().to_owned());
+        result.generated = true;
+        result.citations = notes.iter().map(|(_, _, cite)| cite.clone()).collect();
+        let title = if focus.is_empty() {
+            format!("Analysis: {}", resolved.description)
+        } else {
+            format!("Analysis: {} for {focus}", resolved.description)
+        };
+        result.proposals = vec![chat_summary::note_proposal(
+            shorten(&title, 90),
+            &result.reply_markdown,
+            &result.citations,
+            "analysis",
+        )];
+        if total > analyze::MAX_FILES {
+            result.warnings.push(format!(
+                "I read the first {} of {total} files. Narrow the request, by a folder or a name, to cover the rest.",
+                analyze::MAX_FILES
+            ));
+        }
+        if !skipped.is_empty() {
+            result.warnings.push(format!(
+                "Not read, because they are not indexed yet or have no text: {}.",
+                skipped.join(", ")
+            ));
+        }
+        with_file_set(&mut result, resolved.description, resolved.files);
+        Ok(result)
+    }
+
     /// Moving, renaming or trashing one file (V0.9.11): CAIRN finds the file, and the folder for a move, and proposes the
     /// change. It acts only when the file is clearly the one meant; with several candidates it lists them and waits.
     async fn agent_manage_files(&self, request: &AgentRequest, text: &str) -> Result<AgentReply> {
@@ -547,56 +749,12 @@ impl RepoMemoCore {
             | files::FileCommand::Trash { file } => file.clone(),
         };
         let renaming = matches!(command, files::FileCommand::Rename { .. });
-        let filter = parse_filter(&wanted);
-        // The files meant: those in view (selected, or just listed), a kind or folder of files, or one file by its name (V0.9.26).
-        let targets: Vec<ArtifactSummary> = if is_set_reference(&wanted) || filter.is_structured() {
-            if renaming {
-                return Ok(reply("I rename one file at a time. Name the file to rename."));
-            }
-            if is_set_reference(&wanted) {
-                let ids = if request.artifact_ids.is_empty() {
-                    request
-                        .exchanges
-                        .last()
-                        .map(|last| last.file_ids.clone())
-                        .unwrap_or_default()
-                } else {
-                    request.artifact_ids.clone()
-                };
-                let found = self.files_by_ids(&request.workspace_id, &ids).await?;
-                if found.is_empty() {
-                    return Ok(reply("I am not sure which files you mean. Select files in a list above, or say which: for example `move the Word documents to Contracts`."));
-                }
-                found
-            } else {
-                match self.filter_files(&request.workspace_id, &filter).await? {
-                    Ok(found) if found.is_empty() => {
-                        return Ok(reply(format!("There are no {} in this workspace.", filter.describe())))
-                    }
-                    Ok(found) => found,
-                    Err(problem) => return Ok(reply(problem)),
-                }
-            }
-        } else {
-            let mut matches = self.match_files(&request.workspace_id, &wanted).await?;
-            if matches.is_empty() {
-                return Ok(reply(format!(
-                    "No file name or path matches “{wanted}”. Use Find files to look it up first."
-                )));
-            }
-            let clear = matches.len() == 1 || (matches[0].exact && !matches[1].exact);
-            if !clear {
-                let mut several = reply(format!(
-                    "Several files match “{wanted}”. Say which one with more of its name or its path, and I will propose the change."
-                ));
-                several.files = matches
-                    .into_iter()
-                    .take(FILE_CHOICE_LIMIT)
-                    .map(|file| file.artifact)
-                    .collect();
-                return Ok(several);
-            }
-            vec![matches.swap_remove(0).artifact]
+        if renaming && (is_set_reference(&wanted) || parse_filter(&wanted).is_structured()) {
+            return Ok(reply("I rename one file at a time. Name the file to rename."));
+        }
+        let targets = match self.resolve_files(request, &wanted).await? {
+            Ok(resolved) => resolved.files,
+            Err(answer) => return Ok(answer),
         };
         if targets.len() > SET_LIMIT {
             return Ok(reply(format!(
@@ -1042,6 +1200,12 @@ impl RepoMemoCore {
     }
 }
 
+/// The files a request means, and how to say them ("Word documents", "the selected files").
+struct ResolvedFiles {
+    files: Vec<ArtifactSummary>,
+    description: String,
+}
+
 struct FileMatch {
     exact: bool,
     artifact: ArtifactSummary,
@@ -1318,6 +1482,10 @@ pub(crate) fn route_by_rules(message: &str) -> Option<(AgentCapability, String)>
     if chat_summary::chat_summary_request(&lower) {
         return Some((AgentCapability::SummarizeChat, String::new()));
     }
+    // "Analyze the Word documents", "review the selected files for risks" (V0.9.27).
+    if analyze::analyze_request(text, &lower).is_some() {
+        return Some((AgentCapability::AnalyzeFiles, text.trim().to_owned()));
+    }
     // "Move X to Y", "rename X to Y", "delete the file X" (V0.9.11).
     if file_command(text, &lower).is_some() {
         return Some((AgentCapability::ManageFiles, text.trim().to_owned()));
@@ -1444,6 +1612,7 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
         "save_memory" => AgentCapability::SaveMemory,
         "manage_files" => AgentCapability::ManageFiles,
         "summarize_chat" => AgentCapability::SummarizeChat,
+        "analyze_files" => AgentCapability::AnalyzeFiles,
         _ => return None,
     };
     let subject = value

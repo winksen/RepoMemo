@@ -50,6 +50,7 @@ const CAPABILITY_ICONS: Record<AgentCapability, typeof Search> = {
   save_memory: BookmarkSimple,
   manage_files: FolderSimple,
   summarize_chat: History,
+  analyze_files: Brain,
 };
 
 const LAST_CHAT_PREFIX = "repomemo.assistant.last-chat.";

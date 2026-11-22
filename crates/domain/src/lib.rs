@@ -2888,6 +2888,8 @@ pub enum AgentCapability {
     ManageFiles,
     /// Summarizes the whole conversation (V0.9.13).
     SummarizeChat,
+    /// Reads several files together, as a kind, a folder or a selection, and writes one analysis (V0.9.27).
+    AnalyzeFiles,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

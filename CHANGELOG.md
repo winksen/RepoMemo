@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.27 (2026-11-21)
+
+CAIRN analyzes a set of files together.
+
+### Changed
+- **New job: Analyze files** (analyze_files). *Analyze only the word documents in the workspace*, *review the pdfs in the Finance folder for payment terms*, *go through all the markdown files* and, with files selected in a list, *analyze the selected files and find the owners* are read: a verb, the files (a kind, a folder, the selection, or those just listed) and, after *for*, *to find*, *focusing on*, *looking for* or *and find*, what to look for. A verb alone (*review the design*, *read me the retry policy*) is not read as files. The AI router can pick the job too, and it is in the *+* menu. It needs an AI provider.
+- **How it reads.** For each file, CAIRN takes the indexed text (a long file is sampled evenly through its length, not cut at the start) and has the AI take notes on it for the question; then one more call writes the analysis over the notes: an overview, a section per theme with files named exactly, where they agree or differ, and which have nothing on the question. The prompts allow nothing that is not in the text.
+- **Honest about limits.** At most eight files are read in one analysis (each is a call to the AI), and a warning says when there were more and how to narrow it. A file that is not indexed yet or has no text is named as not read instead of guessed at; if none can be read, nothing is written. The files found stay a set below the analysis, so they can be selected and moved or trashed next.
+- **What it read.** The analysis shows one source per file read, as *What CAIRN read*, and offers *Save the analysis as a note*: the same indexed note as a chat summary, with a Sources list, readable by everyone who can read the workspace, which the card says first.
+- **One resolver.** Finding the files a request means (selection, last list, kind and folder filter, one named file) is now one function shared by file management and analysis.
+- No API route, setting or migration changes. The AI quota counts the request once, not each file read.
+
+### Checks
+- Unit tests for reading the request with its question, the near misses and the even sampling of a long file; compiled and linted for the core and the server, typecheck and the generated types pass; not run. Nothing was built or run: a real analysis was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.26 (2026-11-21)
 
 CAIRN works on sets of files, not one at a time.

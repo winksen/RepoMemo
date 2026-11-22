@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 1.0 (proposed)
 
-> **Current:** `V0.9.26` (2026-11-21)
+> **Current:** `V0.9.27` (2026-11-21)
 
 > **Theme:** Pilot proof and public release candidate · **Baseline:** V0.4.104 · **Related:** [Roadmap](ROADMAP.md#proposed-path-to-10-team-readiness) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
@@ -48,6 +48,7 @@
 | **V0.9.24** | 🧪 2026-11-21 | AN. CAIRN agent | 🔧 | No manual tab adjustments | Remove the Adjust this workspace section so the tabs and More menu follow the template and the width of the row, and make the Use this template button small and left-aligned | Settings has no tab adjustments, and workspaces open on Overview |
 | **V0.9.25** | 🧪 2026-11-21 | AN. CAIRN agent | 🐞 | File kinds and folders as filters | Read a request for files as a filter of kinds, folder and name, matching a kind by extension only, and say what was looked for | "The Word documents" lists only .doc and .docx files, a folder and a name narrow it, the reply says what it looked for and a request that names a file keeps its words as the name |
 | **V0.9.26** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | File sets and bulk file actions | Make the files CAIRN finds a set that can be selected, and move or trash the whole set with one confirmed proposal, by clicks or by words | A list shows tick boxes, Select all, Move to… and Move to trash, one proposal lists the many files and counts the rest, "move them to Runbooks" means the last list, more than 200 is refused and other workspaces' ids name nothing |
+| **V0.9.27** | 🧪 2026-11-21 | AN. CAIRN agent | ✨ | Analyze files | Analyze a set of files together with the AI, by kind, folder or selection and for an optional question, reading each file and writing one analysis with sources | "Analyze only the Word documents" reads those files only, notes each and writes one analysis that names them and cites what it read, a long file is sampled through its length, more than eight files or unread files are said so and the analysis can be saved as a note |
 | **V0.9.33** | 🔜 | AM. Public readiness | 📘 | Pilot protocol | Freeze the public promise and recruit three different team pilots plus one community maintainer group | Participants, workloads, consent, two-week observation plan and the report thresholds are recorded; unavailable participants are marked pending rather than simulated |
 | **V0.9.34** | 🔜 | AM. Public readiness | ✨ | Product evidence | Add administrator-controlled local aggregate activation, search-feedback and review metrics | No query body or per-person productivity ranking is collected by default; retention and opt-out are explicit and counts can be reconciled with pilot tasks |
 | **V0.9.35** | 🔜 | AM. Public readiness | 📘 | Public repository | Add root license, contribution, security-reporting and community conduct documents with issue templates | License text matches declared licensing, contribution steps are reproducible and a real private reporting contact is supplied by the maintainer |
