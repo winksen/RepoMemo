@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Palette as PaletteIcon } from "@phosphor-icons/react";
+import { type ReactNode, useState } from "react";
 import { saveSharedWorkspaceColor, saveSharedWorkspaceIcon } from "../lib/sharedApi";
 import { workspaceIconKey } from "../web/workspaceIcons";
 import { workspaceColorKey } from "../web/workspaceColors";
@@ -13,7 +12,9 @@ import { showToast } from "./ui/toast";
  * How a workspace looks: the icon it shows in lists and menus, and the main colour of its tabs and highlights.
  * Shown to owners and administrators; each choice is saved at once. Everyone who opens the workspace sees both.
  */
-export function WorkspaceCustomization({ accessToken, onSaved, workspace }: {
+export function WorkspaceCustomization({ accessToken, children, onSaved, workspace }: {
+  /** The other parts of the section, such as the template choice. */
+  children?: ReactNode;
   accessToken: string;
   /** Called with the workspace as it is now, so lists and the open page show the change. */
   onSaved: (workspace: Workspace) => void;
@@ -48,13 +49,14 @@ export function WorkspaceCustomization({ accessToken, onSaved, workspace }: {
   }
 
   return (
-    <section className="shared-settings-group">
-      <PanelHeading icon={PaletteIcon} title="Customization" />
+    <section className="shared-settings-panel">
+      <PanelHeading title="Customization" />
       <p className="shared-muted-copy">Choose how this workspace looks. Everyone in the organization sees the icon and the color.</p>
       <div className="shared-new-workspace-look">
-        <div><strong>Icon</strong><WorkspaceIconPicker disabled={pending !== null} onChange={(key) => void chooseIcon(key)} value={currentIcon} /></div>
-        <div><strong>Main color</strong><WorkspaceColorPicker disabled={pending !== null} onChange={(key) => void chooseColor(key)} value={currentColor} /></div>
+        <div><h3 className="shared-part-title">Icon</h3><WorkspaceIconPicker disabled={pending !== null} onChange={(key) => void chooseIcon(key)} value={currentIcon} /></div>
+        <div><h3 className="shared-part-title">Main color</h3><WorkspaceColorPicker disabled={pending !== null} onChange={(key) => void chooseColor(key)} value={currentColor} /></div>
       </div>
+      {children}
     </section>
   );
 }

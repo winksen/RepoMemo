@@ -26,7 +26,7 @@ const MAX_QUESTIONS = 6;
  * More, the suggested questions) and a reset to the template's own values. Choosing or adjusting a template never
  * moves, creates or deletes evidence, and it changes nothing about who may do what.
  */
-export function TemplateSettings({ accessToken, workspaceId }: { accessToken: string; workspaceId: string }) {
+export function TemplateSettings({ accessToken, embedded = false, workspaceId }: { accessToken: string; /** Drawn as a part of the Customization section: a plain title, no panel of its own. */ embedded?: boolean; workspaceId: string }) {
   const confirm = useConfirm();
   const [current, setCurrent] = useTemplate(accessToken, workspaceId);
   const [catalogue] = useTemplateCatalogue(accessToken);
@@ -62,8 +62,10 @@ export function TemplateSettings({ accessToken, workspaceId }: { accessToken: st
   }
 
   return (
-    <section className="shared-settings-group">
-      <PanelHeading description={current.source === "fallback" ? undefined : `Version ${current.template.version}`} icon={LayoutList} title="Template" />
+    <section className={embedded ? "shared-settings-group shared-settings-part" : "shared-settings-group"}>
+      {embedded
+        ? <div className="shared-part-heading"><h3 className="shared-part-title">Template</h3>{current.source === "fallback" ? null : <span>Version {current.template.version}</span>}</div>
+        : <PanelHeading description={current.source === "fallback" ? undefined : `Version ${current.template.version}`} icon={LayoutList} title="Template" />}
       <p className="shared-muted-copy">A template decides which parts of RepoMemo come first in this workspace and what they are called. It never changes who can see or do anything.</p>
       {current.source === "fallback" ? <p className="shared-muted-copy">{current.reason} General is in use until a template is chosen.</p> : null}
       <TemplatePicker disabled={busy} name={`settings-template-${workspaceId}`} onChange={setChoice} templates={catalogue} value={chosenId} activeId={currentId} />

@@ -1135,3 +1135,14 @@ input[type="file"] {
 .shared-home-header .shared-cairn-main[aria-current="page"] { background: var(--color-surface); }
 .shared-home-header .shared-search-bar kbd { background: var(--color-surface-2); border-color: transparent; }
 .shared-home-header .shared-header-actions [data-state="open"], .shared-home-header .shared-header-actions [aria-expanded="true"], .shared-home-header .shared-cairn-split:has([data-state="open"]) .shared-cairn-main { border-color: var(--color-accent); }
+
+/* The Customization section (V0.9.19): one panel on a greyer level, a big title, and a plain text title for each part (icon, color, template). */
+.shared-settings-panel { display: grid; gap: 20px; padding: 22px; background: var(--color-surface-3); border-radius: 16px; }
+.shared-settings-panel > .rm-panel-heading { margin: 0; }
+.shared-settings-panel > .rm-panel-heading h2 { font-size: 22px; }
+.shared-settings-panel > .shared-muted-copy { max-width: 72ch; margin: -12px 0 0; }
+.shared-part-title { margin: 0; font-size: 14px; font-weight: 700; }
+.shared-part-heading { display: flex; align-items: baseline; gap: 10px; }
+.shared-part-heading > span { color: var(--color-text-subtle); font-size: 12px; }
+.shared-settings-part { padding-top: 6px; }
+.shared-settings-panel .rm-template-adjust { border-top-color: var(--color-border-strong); }

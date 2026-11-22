@@ -94,8 +94,9 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
   return (
           <section className="shared-settings-section">
             {canManageMembers ? <>
-              <WorkspaceCustomization accessToken={accessToken} onSaved={onWorkspaceUpdated} workspace={workspace.workspace} />
-              <TemplateSettings accessToken={accessToken} key={`template-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
+              <WorkspaceCustomization accessToken={accessToken} onSaved={onWorkspaceUpdated} workspace={workspace.workspace}>
+                <TemplateSettings accessToken={accessToken} embedded key={`template-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
+              </WorkspaceCustomization>
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="text" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="vision" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="embedding" status={embeddingStatus} workspaceId={workspace.workspace.id} />
