@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.35 (2026-11-23)
+
+Providers can carry tool calls, and each text provider records what its model can do.
+
+### Changed
+- **Tool calls in a chat.** A chat request can list tools (name, description, JSON Schema of the arguments) and a response can return tool calls, on Ollama and OpenRouter. Arguments that arrive as a JSON string are parsed; a call and its result go back to the model as an assistant message and a tool message in each provider's own shape. Plain requests, and every existing prompt, are unchanged.
+- **A JSON protocol for models without native tools.** The model is told to reply with exactly one object, `{"tool": ..., "arguments": ...}` or `{"answer": ...}`. A reply that cannot be read is sent back once with what was wrong; a second unreadable reply ends the turn with an error the loop recognises, so it can finish with a partial answer.
+- **Model traits.** *Test connection* on a text provider now asks the model to call a tiny tool (answered with a tool call: **native**; a valid reply on the JSON protocol: **json**; otherwise **none**) and reads the context size from OpenRouter's model list or Ollama's `/api/show` (8,192 when the provider does not say). The result is kept in the provider's settings and added to the test message.
+- **Settings › AI.** The text provider form shows **Tool calling** and **Context size (tokens)**. An administrator can set either; what is set by hand is kept and a later test does not overwrite it. The providers list answer gains `tool_mode` and `context_tokens`, and saving a provider accepts them; clients that do not know them ignore them.
+- Nothing uses the traits yet: answers, summaries and CAIRN behave as before. No migration; the traits live in the provider's existing settings.
+
+### Checks
+- Unit tests for the request and response shapes of both providers with tools, a native call, a JSON call, an invalid then valid reply, two invalid replies, the three outcomes of detection, the context sizes, and the rules for saving traits; formatted and linted for the AI, core and server crates, typecheck and the generated types pass; tests not run. Nothing was built or run: no real model was asked to call a tool, and the new fields were not seen in Settings.
+
+### Upgrading
+- Nothing to do. Run *Test connection* on the text provider once to fill the traits.
+
 ## V0.9.34 (2026-11-23)
 
 Providers take a conversation with roles and report the tokens they used.

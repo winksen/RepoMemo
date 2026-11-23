@@ -1097,6 +1097,13 @@ pub struct SharedAiProviderSettings {
     pub enabled: bool,
     /// `text` (answers, summaries, embeddings) or `vision` (image to text).
     pub purpose: String,
+    /// How the model takes tools: `native`, `json` or `none`. Filled by *Test connection*, or set by
+    /// an administrator; empty until one of them has.
+    #[serde(default)]
+    pub tool_mode: Option<String>,
+    /// The model's context window in tokens, from the same two sources.
+    #[serde(default)]
+    pub context_tokens: Option<u32>,
 }
 
 /// A rendered-for-reading view of an uploaded business document.

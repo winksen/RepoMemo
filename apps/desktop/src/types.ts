@@ -438,6 +438,10 @@ export interface SharedAiProviderSettings {
   model: string | null;
   enabled: boolean;
   purpose: "text" | "vision" | "embedding";
+  /** How the model takes tools; set by Test connection or an administrator. */
+  tool_mode?: "native" | "json" | "none" | null;
+  /** The model's context window in tokens. */
+  context_tokens?: number | null;
 }
 
 export interface FileLink {

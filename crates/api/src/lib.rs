@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use repomemo_ai::{provider_from_settings, validate_settings, AiProvider, GenerateRequest, ImageAnalysisRequest};
+use repomemo_ai::{
+    detect_model_traits, provider_from_settings, validate_settings, AiProvider, GenerateRequest, ImageAnalysisRequest,
+    ModelTraits,
+};
 use repomemo_domain::{
     AgentHistoryTurn, AppSettings, ArtifactDetail, ArtifactSummary, ArtifactType, AskAnswer, AskRequest,
     CreateMemoryCardRequest, DocumentPreview, ImportReport, ImportRequest, IndexingJobStatus, MemoryCard,
@@ -15,7 +18,7 @@ use repomemo_ingestion::{
 };
 use repomemo_retrieval::{KeywordMode, RetrievalService};
 use repomemo_storage::{NewArtifact, StagedBlob, StorageConfig, StorageEngine};
-use serde_json::json;
+use serde_json::{json, Value};
 
 mod agent;
 mod archive;
@@ -1029,8 +1032,32 @@ impl RepoMemoCore {
                 message,
             });
         }
+        let manual_traits = settings.metadata.get("traits_manual").and_then(Value::as_bool) == Some(true);
+        let text_settings = (settings.purpose() == "text").then(|| settings.clone());
         let provider = provider_from_settings(settings)?;
-        provider.test_connection().await
+        let mut result = provider.test_connection().await?;
+        if let (true, Some(mut saved)) = (result.success, text_settings) {
+            if manual_traits {
+                let traits = ModelTraits::from_metadata(&saved.metadata);
+                result.message = format!(
+                    "{} Tools: {} and a context of {} tokens, as set by an administrator.",
+                    result.message,
+                    traits.tool_mode.as_str(),
+                    traits.context_tokens
+                );
+            } else {
+                let traits = detect_model_traits(&provider).await;
+                traits.write_to(&mut saved.metadata);
+                self.storage.save_provider_settings(saved).await?;
+                result.message = format!(
+                    "{} Tools: {} and a context of {} tokens.",
+                    result.message,
+                    traits.tool_mode.as_str(),
+                    traits.context_tokens
+                );
+            }
+        }
+        Ok(result)
     }
 
     pub async fn summarize_artifact(&self, artifact_id: String, provider_id: String) -> Result<SummaryResult> {

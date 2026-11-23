@@ -996,6 +996,13 @@ export interface SharedAiProviderSettings {
   enabled: boolean;
   /** `text` (answers, summaries, embeddings) or `vision` (image to text). */
   purpose: string;
+  /**
+   * How the model takes tools: `native`, `json` or `none`. Filled by *Test connection*, or set by
+   * an administrator; empty until one of them has.
+   */
+  tool_mode: string | null;
+  /** The model's context window in tokens, from the same two sources. */
+  context_tokens: number | null;
 }
 
 /** A rendered-for-reading view of an uploaded business document. */

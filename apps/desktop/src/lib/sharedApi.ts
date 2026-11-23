@@ -797,6 +797,8 @@ export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: 
   enabled: boolean;
   cloudContentAcknowledged: boolean;
   purpose: "text" | "vision" | "embedding";
+  toolMode?: "native" | "json" | "none";
+  contextTokens?: number;
 }): Promise<SharedAiProviderSettings> {
   return request<SharedAiProviderSettings>(`/v1/workspaces/${workspaceId}/ai-providers`, {
     method: "PUT",
@@ -810,6 +812,8 @@ export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: 
       enabled: input.enabled,
       cloud_content_acknowledged: input.cloudContentAcknowledged,
       purpose: input.purpose,
+      tool_mode: input.toolMode ?? null,
+      context_tokens: input.contextTokens ?? null,
     }),
   }, accessToken);
 }

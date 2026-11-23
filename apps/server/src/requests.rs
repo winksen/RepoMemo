@@ -490,6 +490,12 @@ pub(crate) struct SaveAiProviderRequest {
     pub(crate) cloud_content_acknowledged: bool,
     /// `text` or `vision`; keeps the saved purpose when omitted.
     pub(crate) purpose: Option<String>,
+    /// `native`, `json` or `none`: how the model takes tools. Absent keeps what a test recorded.
+    #[serde(default)]
+    pub(crate) tool_mode: Option<String>,
+    /// The model's context window in tokens. Absent keeps what a test recorded.
+    #[serde(default)]
+    pub(crate) context_tokens: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]

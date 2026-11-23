@@ -8,6 +8,11 @@ use repomemo_domain::{ProviderSettings, ProviderTestResult};
 use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{json, Value};
 
+mod chat;
+
+pub use chat::*;
+use chat::{ollama_chat_body, ollama_chat_response, openrouter_chat_body, openrouter_chat_response};
+
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434";
 const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 
@@ -389,140 +394,6 @@ impl GenerateRequest {
     }
 }
 
-/// Who said a message of a conversation with the model.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ChatRole {
-    System,
-    User,
-    Assistant,
-}
-
-impl ChatRole {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::System => "system",
-            Self::User => "user",
-            Self::Assistant => "assistant",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChatMessage {
-    pub role: ChatRole,
-    pub content: String,
-}
-
-impl ChatMessage {
-    pub fn new(role: ChatRole, content: impl Into<String>) -> Self {
-        Self {
-            role,
-            content: content.into(),
-        }
-    }
-}
-
-/// A conversation with the model: messages with roles, and provider options.
-#[derive(Debug, Clone)]
-pub struct ChatRequest {
-    pub messages: Vec<ChatMessage>,
-    pub options: Value,
-}
-
-/// Tokens a provider reports for one call, when it reports them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Usage {
-    pub input_tokens: u32,
-    pub output_tokens: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ChatResponse {
-    pub content: String,
-    pub usage: Option<Usage>,
-}
-
-impl GenerateRequest {
-    /// The conversation `generate` has: the system prompt, then the prompt with its context.
-    pub fn to_chat(&self) -> ChatRequest {
-        ChatRequest {
-            messages: vec![
-                ChatMessage::new(ChatRole::System, self.system_prompt()),
-                ChatMessage::new(ChatRole::User, format!("{}\n\nContext:\n{}", self.prompt, self.context)),
-            ],
-            options: self.options.clone(),
-        }
-    }
-}
-
-fn chat_messages_json(messages: &[ChatMessage]) -> Vec<Value> {
-    messages
-        .iter()
-        .map(|message| json!({ "role": message.role.as_str(), "content": message.content }))
-        .collect()
-}
-
-fn token_count(value: Option<u64>) -> Option<u32> {
-    value.map(|count| count.min(u64::from(u32::MAX)) as u32)
-}
-
-fn usage_from(input: Option<u32>, output: Option<u32>) -> Option<Usage> {
-    (input.is_some() || output.is_some()).then(|| Usage {
-        input_tokens: input.unwrap_or_default(),
-        output_tokens: output.unwrap_or_default(),
-    })
-}
-
-/// The body Ollama's `/api/chat` receives. The context window is asked for explicitly because
-/// Ollama's default cuts retrieved context off silently.
-fn ollama_chat_body(model: &str, request: &ChatRequest) -> Value {
-    let mut options = request.options.clone();
-    if let Some(options) = options.as_object_mut() {
-        options.entry("num_ctx").or_insert(json!(OLLAMA_NUM_CTX));
-    }
-    json!({
-        "model": model,
-        "messages": chat_messages_json(&request.messages),
-        "stream": false,
-        "options": options,
-    })
-}
-
-fn ollama_chat_response(body: &Value) -> ChatResponse {
-    let count = |key: &str| token_count(body.get(key).and_then(Value::as_u64));
-    ChatResponse {
-        content: body
-            .pointer("/message/content")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .trim()
-            .to_owned(),
-        usage: usage_from(count("prompt_eval_count"), count("eval_count")),
-    }
-}
-
-/// The body an OpenAI-style `/chat/completions` receives.
-fn openrouter_chat_body(model: &str, request: &ChatRequest) -> Value {
-    json!({
-        "model": model,
-        "messages": chat_messages_json(&request.messages),
-        "temperature": request.options.get("temperature").and_then(Value::as_f64).unwrap_or(0.2),
-    })
-}
-
-fn openrouter_chat_response(body: &Value) -> ChatResponse {
-    let count = |key: &str| token_count(body.pointer(&format!("/usage/{key}")).and_then(Value::as_u64));
-    ChatResponse {
-        content: body
-            .pointer("/choices/0/message/content")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .trim()
-            .to_owned(),
-        usage: usage_from(count("prompt_tokens"), count("completion_tokens")),
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct ImageAnalysisRequest {
     pub prompt: String,
@@ -536,6 +407,8 @@ pub trait AiProvider {
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse>;
     /// A system prompt and one user message, answered as text: `chat` with those two messages.
     async fn generate(&self, request: GenerateRequest) -> Result<String>;
+    /// The context window of the configured model in tokens, when the provider says.
+    async fn context_tokens(&self) -> Result<Option<u32>>;
     async fn embed(&self, texts: Vec<String>, options: Value) -> Result<Vec<Vec<f32>>>;
     async fn summarize(&self, target: String, options: Value) -> Result<String>;
     async fn rerank(&self, query: String, candidates: Vec<String>) -> Result<Vec<usize>>;
@@ -594,6 +467,20 @@ impl AiProvider for OllamaProvider {
             bail!("local Ollama provider returned an empty summary")
         }
         Ok(answer)
+    }
+
+    /// Ollama's `/api/show` lists the model's context length under a key named for its family.
+    async fn context_tokens(&self) -> Result<Option<u32>> {
+        let response = self
+            .client
+            .post(self.endpoint("/api/show"))
+            .json(&json!({ "model": self.model }))
+            .send()
+            .await
+            .context("could not reach the local Ollama provider")?;
+        let response = checked(response, "The local Ollama provider could not describe the model").await?;
+        let body: Value = read_json(response, "local Ollama provider returned an invalid response").await?;
+        Ok(ollama_context_length(&body))
     }
 
     async fn embed(&self, texts: Vec<String>, _options: Value) -> Result<Vec<Vec<f32>>> {
@@ -731,6 +618,21 @@ impl AiProvider for OpenRouterProvider {
             bail!("OpenRouter returned an empty answer")
         }
         Ok(answer)
+    }
+
+    /// The model's `context_length` in OpenRouter's model list.
+    async fn context_tokens(&self) -> Result<Option<u32>> {
+        let response = self
+            .request(reqwest::Method::GET, "/models")
+            .send()
+            .await
+            .context("could not reach OpenRouter")?;
+        let models: Value = read_json(
+            checked(response, "OpenRouter could not list its models").await?,
+            "OpenRouter returned an invalid model list",
+        )
+        .await?;
+        Ok(openrouter_context_length(&models, &self.model))
     }
 
     /// OpenRouter's OpenAI-compatible embeddings endpoint.
@@ -891,6 +793,24 @@ impl AiProvider for OpenRouterProvider {
         }
         Ok(result(true, format!("OpenRouter is ready with {}. Workspace content will leave this device only when you request an AI action.", self.model)))
     }
+}
+
+fn ollama_context_length(body: &Value) -> Option<u32> {
+    body.get("model_info")?
+        .as_object()?
+        .iter()
+        .find(|(key, _)| key.ends_with(".context_length"))
+        .and_then(|(_, value)| value.as_u64())
+        .map(|tokens| tokens.min(u64::from(u32::MAX)) as u32)
+}
+
+fn openrouter_context_length(models: &Value, model: &str) -> Option<u32> {
+    models["data"]
+        .as_array()?
+        .iter()
+        .find(|entry| entry["id"].as_str() == Some(model))
+        .and_then(|entry| entry["context_length"].as_u64())
+        .map(|tokens| tokens.min(u64::from(u32::MAX)) as u32)
 }
 
 /// One vector per input, none empty, so a caller can never store a partial
@@ -1068,6 +988,12 @@ impl AiProvider for ConfiguredProvider {
         match self {
             Self::Ollama(provider) => provider.generate(request).await,
             Self::OpenRouter(provider) => provider.generate(request).await,
+        }
+    }
+    async fn context_tokens(&self) -> Result<Option<u32>> {
+        match self {
+            Self::Ollama(provider) => provider.context_tokens().await,
+            Self::OpenRouter(provider) => provider.context_tokens().await,
         }
     }
     async fn embed(&self, texts: Vec<String>, options: Value) -> Result<Vec<Vec<f32>>> {
@@ -1268,6 +1194,21 @@ mod tests {
         );
     }
 
+    #[test]
+    fn context_lengths_are_found_per_provider() {
+        let ollama = json!({ "model_info": { "general.architecture": "llama", "llama.context_length": 131072 } });
+        assert_eq!(super::ollama_context_length(&ollama), Some(131_072));
+        assert_eq!(super::ollama_context_length(&json!({ "model_info": {} })), None);
+        let models = json!({ "data": [
+            { "id": "a/b", "context_length": 8000 },
+            { "id": "openai/gpt-4o-mini", "context_length": 128000 }
+        ] });
+        assert_eq!(
+            super::openrouter_context_length(&models, "openai/gpt-4o-mini"),
+            Some(128_000)
+        );
+        assert_eq!(super::openrouter_context_length(&models, "missing"), None);
+    }
     #[test]
     fn usage_is_none_when_the_provider_omits_it() {
         assert_eq!(

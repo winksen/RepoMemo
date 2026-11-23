@@ -15,6 +15,14 @@ import { apiMessage } from "../web/format";
 
 type ProviderType = "ollama" | "openrouter";
 type Purpose = "text" | "vision" | "embedding";
+type ToolModeChoice = "auto" | "native" | "json" | "none";
+
+const TOOL_MODES: { label: string; value: ToolModeChoice }[] = [
+  { label: "Detect with Test connection", value: "auto" },
+  { label: "Native tool calls", value: "native" },
+  { label: "JSON protocol", value: "json" },
+  { label: "No tools", value: "none" },
+];
 
 const COPY: Record<Purpose, { title: string; intro: string; modelLabel: string; ollamaModel: string; cloudModel: string; cloudNotice: string }> = {
   text: {
@@ -79,6 +87,8 @@ export function AiProviderForm({
   const [model, setModel] = useState(copy.ollamaModel);
   const [apiKey, setApiKey] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
+  const [toolMode, setToolMode] = useState<ToolModeChoice>("auto");
+  const [contextTokens, setContextTokens] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<ProviderTestResult | null>(null);
   const [action, setAction] = useState<"save" | "test" | null>(null);
@@ -94,7 +104,9 @@ export function AiProviderForm({
     setProviderName(current.name);
     setBaseUrl(current.base_url ?? "");
     setModel(current.model ?? "");
-  }, [current?.id, current?.provider_type, current?.name, current?.base_url, current?.model]);
+    setToolMode(current.tool_mode ?? "auto");
+    setContextTokens(current.context_tokens ? String(current.context_tokens) : "");
+  }, [current?.id, current?.provider_type, current?.name, current?.base_url, current?.model, current?.tool_mode, current?.context_tokens]);
 
   function selectType(value: ProviderType) {
     setProviderType(value);
@@ -121,6 +133,8 @@ export function AiProviderForm({
         enabled: true,
         cloudContentAcknowledged: acknowledged,
         purpose,
+        toolMode: purpose === "text" && toolMode !== "auto" ? toolMode : undefined,
+        contextTokens: purpose === "text" && Number(contextTokens) > 0 ? Number(contextTokens) : undefined,
       });
       setProviderId(saved.id);
       setApiKey("");
@@ -154,6 +168,7 @@ export function AiProviderForm({
         <Field label="Provider name" required><Input onChange={(event) => setProviderName(event.target.value)} value={providerName} /></Field>
         <Field label="Base URL"><Input onChange={(event) => setBaseUrl(event.target.value)} type="url" placeholder={providerType === "ollama" ? OLLAMA_URL : OPENROUTER_URL} value={baseUrl} /></Field>
         <Field label={copy.modelLabel} required><Input onChange={(event) => setModel(event.target.value)} placeholder={providerType === "ollama" ? copy.ollamaModel : copy.cloudModel} value={model} /></Field>
+        {purpose === "text" ? <><Field label="Tool calling"><Dropdown aria-label="Tool calling" onValueChange={(value) => setToolMode(value as ToolModeChoice)} options={TOOL_MODES} value={toolMode} /></Field><Field label="Context size (tokens)"><Input inputMode="numeric" min={512} onChange={(event) => setContextTokens(event.target.value.replace(/[^0-9]/g, ""))} placeholder="Detected by Test connection" value={contextTokens} /></Field></> : null}
         {providerType === "openrouter" ? <><Field label="API key"><Input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder={providerId ? "Leave blank to keep the saved key (enter it again if you change the address)" : "Required to enable cloud AI"} type="password" value={apiKey} /></Field><Checkbox checked={acknowledged} label={copy.cloudNotice} onCheckedChange={setAcknowledged} /></> : null}
         <div className="shared-ai-provider-actions"><Button busy={action === "save"} disabled={isBusy} type="submit" variant="secondary"><Icon size={ICON_SIZE.md} /> Save provider</Button><Button busy={action === "test"} disabled={isBusy || !providerId} onClick={() => void test()} variant="secondary"><Refresh size={ICON_SIZE.md} /> Test connection</Button></div>
         <Toast kind="error" message={error} />

@@ -492,7 +492,7 @@ Each workspace can set up three kinds of provider:
 - **Image (vision)**: describes screenshots and diagrams so they become searchable
 - **Embedding**: search by meaning
 
-Safety built in: keys are stored encrypted and never sent back to the browser. A **Test connection** button checks a provider. Admins choose **who may use AI** (everyone, members and above, or admins only). Each person has an hourly AI allowance, so nobody runs up a bill by accident. If AI fails or is off, keyword search keeps working.
+Safety built in: keys are stored encrypted and never sent back to the browser. A **Test connection** button checks a provider and, for a text provider, finds out whether its model can call tools (natively, through a JSON format, or not at all) and how large its context is; an admin can correct both under **Tool calling** and **Context size**. Nothing uses them yet; CAIRN's tool loop will. Admins choose **who may use AI** (everyone, members and above, or admins only). Each person has an hourly AI allowance, so nobody runs up a bill by accident. If AI fails or is off, keyword search keeps working.
 
 ---
 
