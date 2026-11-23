@@ -165,6 +165,7 @@ mod tests {
             proposals: Vec::new(),
             file_set: None,
             memory_cards: Vec::new(),
+            changeset: None,
         }
     }
 

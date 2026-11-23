@@ -246,6 +246,8 @@
 | GET | `/v1/agent/runs/{run_id}/events` | auth | the run's owner, require_workspace_read (rechecked every 30 s) | — | server-sent `step`, then `done` (AgentTurnResponse) or `error` |
 | POST | `/v1/agent/runs/{run_id}/cancel` | auth | the run's owner | — | 204; the run ends cancelled |
 | GET | `/v1/agent/turns/{turn_id}/run` | auth | the caller's own conversation, require_workspace_read | — | AgentRun (steps, duration, tokens; 404 when none was kept) |
+| POST | `/v1/agent/turns/{turn_id}/changeset/confirm` | auth | the caller's own conversation, require_workspace_write | { proposal_ids, confirm_counts } | AgentTurn (ticked actions applied in order, stopping at the first failure; 409 when already answered) |
+| POST | `/v1/agent/turns/{turn_id}/changeset/dismiss` | auth | the caller's own conversation | — | AgentTurn |
 | POST | `/v1/agent/turns/{turn_id}/proposals/{proposal_id}/confirm` | auth | the caller's own conversation, require_workspace_write | — | AgentTurn (the proposal applied, with its outcome) |
 | POST | `/v1/agent/turns/{turn_id}/proposals/{proposal_id}/dismiss` | auth | the caller's own conversation | — | AgentTurn |
 | PUT | `/v1/agent/conversations/{conversation_id}` | auth | require_workspace_read | RenameConversationRequest | AgentConversation |

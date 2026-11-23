@@ -495,6 +495,7 @@ fn reply(markdown: impl Into<String>) -> AgentReply {
         proposals: Vec::new(),
         file_set: None,
         memory_cards: Vec::new(),
+        changeset: None,
     }
 }
 

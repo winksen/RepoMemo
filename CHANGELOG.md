@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.44 (2026-11-23)
+
+CAIRN's changes come as one set of ticked actions.
+
+### Changed
+- **A changeset.** In Agent mode a run no longer stops at its first proposal: it goes on, can propose several changes (at most 20), and then answers. Its proposals become one card, *N proposed changes*, listing each with a tick box (all ticked). **Apply all** (or **Apply N**) applies the ticked ones in the order CAIRN proposed them, as you, through the same handlers and checks as when you do them yourself, and **Dismiss all** dismisses them. This replaces V0.9.40's stop at the first proposal. Jobs mode and picked jobs still show one card per proposal.
+- **It stops at the first failure.** If an action fails, the ones before it stay applied, the rest are not applied, and the card says which were applied and which failed and why ("Applied 1 change. Stopped at … : …"). The set is answered once: a second confirmation is refused (HTTP 409), and so is confirming one action of a set on its own. A large move or trash proposed after reading outside content still needs its count typed, for each such action, before anything in the set is applied.
+- **The next message builds on what was done.** What you confirmed is added to the conversation CAIRN sees, so "now summarize what you moved" continues from it.
+- `POST /v1/agent/turns/{id}/changeset/confirm` (`{ proposal_ids, confirm_counts }`) and `.../changeset/dismiss` are new; a viewer is offered no proposing tool, so gets no changeset. Proposals of a run are numbered `p1`, `p2`…, so ids are unique in a reply. No migration.
+
+### Checks
+- Unit tests that a run goes on after a proposal and ends with one pending changeset, that proposals are renumbered, that a large change after untrusted reading needs its count and a smaller or trusted one does not, and that a changeset is answered once (a second answer is a conflict, no changeset is not found); formatted and linted for the core and the server, typecheck passes; tests not run. The apply loop itself (one action failing in the middle of three) was not exercised, nothing was built or run, and the card was not seen.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.43 (2026-11-23)
 
 In Agent mode the chat shows CAIRN working, and lets you stop it.

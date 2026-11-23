@@ -3299,6 +3299,7 @@ async fn a_run_trace_is_kept_with_its_steps_and_goes_with_its_chat_and_its_age()
         proposals: Vec::new(),
         file_set: None,
         memory_cards: Vec::new(),
+        changeset: None,
     };
     let turn = storage
         .append_agent_turn(&conversation.id, "Hi", &AgentMessage::default(), &reply)

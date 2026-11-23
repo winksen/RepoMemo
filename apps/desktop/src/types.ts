@@ -624,6 +624,13 @@ export interface AgentReply {
   file_set?: AgentFileSet | null;
   /** The memory cards a reply found (V0.9.29). */
   memory_cards?: MemoryCardSummary[];
+  /** The proposals of the reply as one set to apply together (V0.9.44). */
+  changeset?: AgentChangeset | null;
+}
+
+export interface AgentChangeset {
+  state: "pending" | "applied" | "partial" | "dismissed";
+  outcome?: string | null;
 }
 
 export interface MemoryCard {

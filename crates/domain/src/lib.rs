@@ -3174,6 +3174,19 @@ pub struct AgentReply {
     /// The memory cards a reply found (V0.9.29), shown in the chat with what each cites.
     #[serde(default)]
     pub memory_cards: Vec<MemoryCardSummary>,
+    /// The reply's proposals taken as one set to apply together (V0.9.44); none for a reply of the router.
+    #[serde(default)]
+    pub changeset: Option<AgentChangeset>,
+}
+
+/// A run's proposals as one card of ticked actions, applied in order as the person when they confirm it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentChangeset {
+    /// `pending`, `applied` (every ticked action was applied), `partial` (it stopped at a failure) or `dismissed`.
+    pub state: String,
+    /// What happened, once it was confirmed: which actions were applied and which was not.
+    #[serde(default)]
+    pub outcome: Option<String>,
 }
 
 /// The files a reply found, said in words and by id.

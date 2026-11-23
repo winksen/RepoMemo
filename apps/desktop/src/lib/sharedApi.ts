@@ -807,6 +807,15 @@ export function confirmSharedAgentProposal(accessToken: string, turnId: string, 
   return request<AgentTurn>(`/v1/agent/turns/${turnId}/proposals/${proposalId}/confirm`, { method: "POST", body: JSON.stringify(confirmCount === undefined ? {} : { confirm_count: confirmCount }) }, accessToken);
 }
 
+/** Applies the ticked actions of a changeset, in order, as the person; it stops at the first one that fails (V0.9.44). */
+export function confirmSharedAgentChangeset(accessToken: string, turnId: string, proposalIds: string[], confirmCounts: Record<string, number> = {}): Promise<AgentTurn> {
+  return request<AgentTurn>(`/v1/agent/turns/${turnId}/changeset/confirm`, { method: "POST", body: JSON.stringify({ proposal_ids: proposalIds, confirm_counts: confirmCounts }) }, accessToken);
+}
+
+export function dismissSharedAgentChangeset(accessToken: string, turnId: string): Promise<AgentTurn> {
+  return request<AgentTurn>(`/v1/agent/turns/${turnId}/changeset/dismiss`, { method: "POST", body: "{}" }, accessToken);
+}
+
 export function dismissSharedAgentProposal(accessToken: string, turnId: string, proposalId: string): Promise<AgentTurn> {
   return request<AgentTurn>(`/v1/agent/turns/${turnId}/proposals/${proposalId}/dismiss`, { method: "POST", body: "{}" }, accessToken);
 }

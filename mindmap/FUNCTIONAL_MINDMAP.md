@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.43` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.44` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.44 — CAIRN's changes come as one set of ticked actions.
+
+- **Changes as a set.** When CAIRN prepares several changes you see them as one card with a tick box each and apply the ticked ones together. They run in order as you, stop at the first failure and say what was done; CAIRN then knows what was applied.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.43 — In Agent mode the chat shows CAIRN working, and lets you stop it.
 

@@ -488,9 +488,18 @@ fn history_of(turns: &[AgentTurn]) -> Vec<AgentHistoryTurn> {
                     }
                 }
             }
+            // What the person confirmed is part of the conversation, so "now summarize what you moved" can follow from it (V0.9.44).
+            let mut answer = turn.reply.reply_markdown.clone();
+            for proposal in &turn.reply.proposals {
+                if proposal.state == repomemo_domain::AgentProposalState::Applied {
+                    if let Some(outcome) = &proposal.outcome {
+                        answer.push_str(&format!("\n[Done: {outcome}]"));
+                    }
+                }
+            }
             AgentHistoryTurn {
                 question: turn.label.clone(),
-                answer: turn.reply.reply_markdown.clone(),
+                answer,
                 files,
             }
         })

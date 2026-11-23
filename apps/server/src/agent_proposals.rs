@@ -212,6 +212,11 @@ pub(crate) async fn confirm_agent_proposal(
     body: Option<Json<ConfirmProposalRequest>>,
 ) -> Result<Json<AgentTurn>, ApiError> {
     let (mut turn, workspace_id) = owned_turn(&state, &subject, &turn_id).await?;
+    if turn.reply.changeset.is_some() {
+        return Err(ApiError::bad_request(
+            "These changes are confirmed together: use the set of changes.",
+        ));
+    }
     // Whatever the action, the person must still be able to change the workspace.
     require_workspace_write(&state, &subject, &workspace_id).await?;
     let proposal = pending_proposal(&mut turn, &proposal_id)?;
@@ -235,6 +240,141 @@ pub(crate) async fn confirm_agent_proposal(
     Ok(Json(turn))
 }
 
+/// The ticked actions of a changeset (V0.9.44), and the count the person typed for each large change proposed after reading
+/// content from outside the workspace.
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct ConfirmChangesetRequest {
+    proposal_ids: Vec<String>,
+    #[serde(default)]
+    confirm_counts: std::collections::HashMap<String, i64>,
+}
+
+fn changeset_pending(turn: &AgentTurn) -> Result<(), ApiError> {
+    match turn.reply.changeset.as_ref() {
+        None => Err(ApiError::not_found("That message has no set of changes.")),
+        Some(set) if set.state != "pending" => Err(ApiError::conflict("That set of changes was already answered.")),
+        Some(_) => Ok(()),
+    }
+}
+
+/// Applies the ticked actions of a changeset in the order CAIRN proposed them, as the person, and stops at the first one that
+/// fails. The set is answered once: a second confirmation is refused. Actions not ticked, or after a failure, are not applied.
+pub(crate) async fn confirm_agent_changeset(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(turn_id): Path<String>,
+    Json(request): Json<ConfirmChangesetRequest>,
+) -> Result<Json<AgentTurn>, ApiError> {
+    let (mut turn, workspace_id) = owned_turn(&state, &subject, &turn_id).await?;
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    changeset_pending(&turn)?;
+    if request.proposal_ids.is_empty() {
+        return Err(ApiError::bad_request("Tick at least one change to apply."));
+    }
+    for id in &request.proposal_ids {
+        if !turn.reply.proposals.iter().any(|proposal| &proposal.id == id) {
+            return Err(ApiError::bad_request(
+                "One of the ticked changes is not part of this set.",
+            ));
+        }
+    }
+    // Nothing is applied until every large change made after untrusted reading has its count typed.
+    for proposal in turn
+        .reply
+        .proposals
+        .iter()
+        .filter(|proposal| request.proposal_ids.contains(&proposal.id))
+    {
+        if let Some(count) = needs_typed_count(proposal) {
+            if request.confirm_counts.get(&proposal.id) != Some(&count) {
+                return Err(ApiError::bad_request(format!(
+                    "\"{}\" was proposed after reading content from outside the workspace ({}). Type the number of files, {count}, to confirm.",
+                    proposal.title,
+                    proposal.untrusted_sources.join(", ")
+                )));
+            }
+        }
+    }
+    let mut applied = Vec::new();
+    let mut failure: Option<(String, String)> = None;
+    for index in 0..turn.reply.proposals.len() {
+        let ticked = request.proposal_ids.contains(&turn.reply.proposals[index].id);
+        if !ticked {
+            turn.reply.proposals[index].state = AgentProposalState::Dismissed;
+            continue;
+        }
+        if failure.is_some() {
+            turn.reply.proposals[index].state = AgentProposalState::Dismissed;
+            turn.reply.proposals[index].outcome = Some("Not applied: an earlier action failed.".to_owned());
+            continue;
+        }
+        let result = apply(&state, &subject, &workspace_id, &turn.reply.proposals[index]).await;
+        let proposal = &mut turn.reply.proposals[index];
+        match result {
+            Ok(outcome) => {
+                proposal.state = AgentProposalState::Applied;
+                applied.push(outcome.clone());
+                proposal.outcome = Some(outcome);
+            }
+            Err(error) => {
+                proposal.state = AgentProposalState::Dismissed;
+                proposal.outcome = Some(format!("Not applied: {}", error.message));
+                failure = Some((proposal.title.clone(), error.message));
+            }
+        }
+    }
+    let outcome = match &failure {
+        None => format!("Applied {} of {} changes.", applied.len(), turn.reply.proposals.len()),
+        Some((title, message)) => format!(
+            "Applied {}. Stopped at \"{title}\": {message}",
+            if applied.is_empty() {
+                "none of the changes".to_owned()
+            } else {
+                format!(
+                    "{} {}",
+                    applied.len(),
+                    if applied.len() == 1 { "change" } else { "changes" }
+                )
+            }
+        ),
+    };
+    if let Some(set) = turn.reply.changeset.as_mut() {
+        set.state = if failure.is_none() { "applied" } else { "partial" }.to_owned();
+        set.outcome = Some(outcome);
+    }
+    state
+        .storage
+        .update_agent_turn_reply(&turn.id, &turn.reply)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(turn))
+}
+
+/// Dismisses every action of a changeset.
+pub(crate) async fn dismiss_agent_changeset(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(turn_id): Path<String>,
+) -> Result<Json<AgentTurn>, ApiError> {
+    let (mut turn, _) = owned_turn(&state, &subject, &turn_id).await?;
+    changeset_pending(&turn)?;
+    for proposal in &mut turn.reply.proposals {
+        if proposal.state == AgentProposalState::Pending {
+            proposal.state = AgentProposalState::Dismissed;
+        }
+    }
+    if let Some(set) = turn.reply.changeset.as_mut() {
+        set.state = "dismissed".to_owned();
+        set.outcome = Some("Dismissed. Nothing was changed.".to_owned());
+    }
+    state
+        .storage
+        .update_agent_turn_reply(&turn.id, &turn.reply)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(turn))
+}
+
 pub(crate) async fn dismiss_agent_proposal(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -249,4 +389,91 @@ pub(crate) async fn dismiss_agent_proposal(
         .await
         .map_err(map_storage_error)?;
     Ok(Json(turn))
+}
+
+#[cfg(test)]
+mod tests {
+    use repomemo_domain::{AgentChangeset, AgentReply, AgentRouting, AgentTurn};
+    use serde_json::json;
+
+    use super::*;
+
+    fn proposal(id: &str, kind: AgentProposalKind, count: i64, untrusted: &[&str]) -> AgentProposal {
+        AgentProposal {
+            id: id.to_owned(),
+            kind,
+            state: AgentProposalState::Pending,
+            title: format!("Change {id}"),
+            detail: String::new(),
+            payload: json!({ "count": count }),
+            outcome: None,
+            untrusted_sources: untrusted.iter().map(|source| (*source).to_owned()).collect(),
+        }
+    }
+
+    fn turn_with(changeset: Option<&str>) -> AgentTurn {
+        AgentTurn {
+            id: "t1".to_owned(),
+            conversation_id: "c1".to_owned(),
+            position: 1,
+            label: "Tidy up".to_owned(),
+            request: Default::default(),
+            reply: AgentReply {
+                capability: None,
+                routing: AgentRouting::Agent,
+                subject: String::new(),
+                reply_markdown: String::new(),
+                generated: true,
+                files: Vec::new(),
+                matches: Vec::new(),
+                citations: Vec::new(),
+                warnings: Vec::new(),
+                context_turns: 0,
+                proposals: Vec::new(),
+                file_set: None,
+                memory_cards: Vec::new(),
+                changeset: changeset.map(|state| AgentChangeset {
+                    state: state.to_owned(),
+                    outcome: None,
+                }),
+            },
+            created_at: String::new(),
+        }
+    }
+
+    #[test]
+    fn a_large_move_or_trash_after_untrusted_reading_needs_its_count_typed() {
+        let issue = ["Login fails (an issue)"];
+        assert_eq!(
+            needs_typed_count(&proposal("p1", AgentProposalKind::TrashFiles, 11, &issue)),
+            Some(11)
+        );
+        assert_eq!(
+            needs_typed_count(&proposal("p1", AgentProposalKind::MoveFiles, 40, &issue)),
+            Some(40)
+        );
+        assert_eq!(
+            needs_typed_count(&proposal("p1", AgentProposalKind::TrashFiles, 10, &issue)),
+            None
+        );
+        assert_eq!(
+            needs_typed_count(&proposal("p1", AgentProposalKind::TrashFiles, 50, &[])),
+            None
+        );
+        assert_eq!(
+            needs_typed_count(&proposal("p1", AgentProposalKind::SaveMemory, 50, &issue)),
+            None
+        );
+    }
+
+    #[test]
+    fn a_set_of_changes_is_answered_once() {
+        assert!(changeset_pending(&turn_with(Some("pending"))).is_ok());
+        for answered in ["applied", "partial", "dismissed"] {
+            let error = changeset_pending(&turn_with(Some(answered))).unwrap_err();
+            assert_eq!(error.status, axum::http::StatusCode::CONFLICT, "{answered}");
+        }
+        let none = changeset_pending(&turn_with(None)).unwrap_err();
+        assert_eq!(none.status, axum::http::StatusCode::NOT_FOUND);
+    }
 }

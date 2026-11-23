@@ -4,7 +4,7 @@ import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
-import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
+import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, confirmSharedAgentChangeset, dismissSharedAgentChangeset, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentRun, AgentStep, AgentTurn, AgentTurnResponse, MemoryCardSummary } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
@@ -13,6 +13,7 @@ import { CairnIcon } from "./CairnIcon";
 import { ChatOptions } from "./ChatOptions";
 import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import { Dialog, DialogCancel } from "./ui/dialog";
 import { Field } from "./ui/field";
 import { IconButton } from "./ui/icon-button";
@@ -389,6 +390,19 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   }
 
   /** Confirms or dismisses what CAIRN proposed. The action runs on the server as the person; the turn comes back with its outcome. */
+  async function decideChangeset(turnId: string, action: "confirm" | "dismiss", proposalIds: string[], confirmCounts: Record<string, number>) {
+    setDeciding(`${turnId}/changeset`);
+    try {
+      const saved = await (action === "confirm" ? confirmSharedAgentChangeset(accessToken, turnId, proposalIds, confirmCounts) : dismissSharedAgentChangeset(accessToken, turnId));
+      setTurns((current) => current.map((entry) => entry.key === turnId ? storedTurn(saved) : entry));
+      if (action === "confirm") showToast(saved.reply.changeset?.state === "applied" ? "success" : "error", saved.reply.changeset?.outcome ?? "Done.");
+    } catch (error) {
+      showToast("error", apiMessage(error, action === "confirm" ? "Those changes could not be applied." : "Those changes could not be dismissed."));
+    } finally {
+      setDeciding(null);
+    }
+  }
+
   async function decide(turnId: string, proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) {
     setDeciding(`${turnId}/${proposal.id}`);
     try {
@@ -492,7 +506,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
           {turn.status === "pending" ? <div className="shared-assistant-live"><LoadingState label="Working on it" />{turn.steps?.length ? <ol>{turn.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol> : null}{turn.runId ? <Button onClick={() => void cancelSharedAgentRun(accessToken, turn.runId as string).catch(() => undefined)} variant="secondary">Stop</Button> : null}</div> : null}
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
-          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} canManage={canUpload} deciding={deciding} isBusy={isBusy} onActOnCard={actOnCard} onActOnSelection={(action) => actOnSelection(turn.key, action)} onSelection={(ids) => setSelection((current) => ({ ...current, [turn.key]: ids }))} selection={selection[turn.key] ?? []} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
+          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} canManage={canUpload} deciding={deciding} isBusy={isBusy} onActOnCard={actOnCard} onChangeset={(id, action, ids, counts) => void decideChangeset(id, action, ids, counts)} onActOnSelection={(action) => actOnSelection(turn.key, action)} onSelection={(ids) => setSelection((current) => ({ ...current, [turn.key]: ids }))} selection={selection[turn.key] ?? []} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
         </article>) : variant === "page"
           ? <div className="shared-assistant-welcome">
             <CairnIcon size={56} weight="fill" />
@@ -628,6 +642,35 @@ function RunTrace({ accessToken, turnId }: { accessToken: string; turnId: string
   </details>;
 }
 
+/** A run's proposals as one set (V0.9.44): each change with a tick box, applied in order when the person confirms, stopping at the first failure. */
+function Changeset({ deciding, onChangeset, reply, turnId }: { deciding: string | null; onChangeset: (action: "confirm" | "dismiss", proposalIds: string[], confirmCounts: Record<string, number>) => void; reply: AgentReply; turnId: string }) {
+  const proposals = reply.proposals ?? [];
+  const [ticked, setTicked] = useState<string[]>(() => proposals.map((proposal) => proposal.id));
+  const [typed, setTyped] = useState<Record<string, string>>({});
+  const set = reply.changeset;
+  if (!set || proposals.length === 0) return null;
+  const pending = set.state === "pending";
+  const bulk = (proposal: AgentProposal) => Number((proposal.payload as { count?: number } | null)?.count ?? 0);
+  const needsCount = (proposal: AgentProposal) => (proposal.untrusted_sources ?? []).length > 0 && (proposal.kind === "move_files" || proposal.kind === "trash_files") && bulk(proposal) > 10;
+  const blocked = proposals.some((proposal) => ticked.includes(proposal.id) && needsCount(proposal) && Number(typed[proposal.id]) !== bulk(proposal));
+  const counts = Object.fromEntries(proposals.filter((proposal) => ticked.includes(proposal.id) && needsCount(proposal)).map((proposal) => [proposal.id, bulk(proposal)]));
+  const waiting = deciding === `${turnId}/changeset`;
+  return <aside aria-label="Proposed changes" className={`shared-assistant-proposal shared-assistant-proposal-${set.state}`}>
+    <strong>{proposals.length === 1 ? "1 proposed change" : `${proposals.length} proposed changes`}</strong>
+    <ul className="shared-assistant-changeset">{proposals.map((proposal) => <li key={proposal.id}>
+      {pending ? <Checkbox checked={ticked.includes(proposal.id)} label={proposal.title} onCheckedChange={(checked) => setTicked((current) => checked ? [...current, proposal.id] : current.filter((id) => id !== proposal.id))} /> : <span>{proposal.title}</span>}
+      <div className="shared-markdown"><SafeMarkdown>{proposal.detail}</SafeMarkdown></div>
+      {(proposal.untrusted_sources ?? []).length ? <small>Proposed after reading content from outside this workspace: {(proposal.untrusted_sources ?? []).join(", ")}.</small> : null}
+      {pending && ticked.includes(proposal.id) && needsCount(proposal) ? <Field label={`Type ${bulk(proposal)} to confirm`}><Input inputMode="numeric" onChange={(event) => setTyped((current) => ({ ...current, [proposal.id]: event.target.value.replace(/[^0-9]/g, "") }))} value={typed[proposal.id] ?? ""} /></Field> : null}
+      {!pending && proposal.outcome ? <small>{proposal.outcome}</small> : null}
+    </li>)}</ul>
+    {pending ? <div className="shared-assistant-proposal-actions">
+      <Button busy={waiting} disabled={deciding !== null || ticked.length === 0 || blocked} onClick={() => onChangeset("confirm", proposals.filter((proposal) => ticked.includes(proposal.id)).map((proposal) => proposal.id), counts)} type="button" variant="main">{ticked.length === proposals.length ? "Apply all" : `Apply ${ticked.length}`}</Button>
+      <Button disabled={deciding !== null} onClick={() => onChangeset("dismiss", [], {})} type="button" variant="secondary">Dismiss all</Button>
+    </div> : <small>{set.outcome ?? (set.state === "dismissed" ? "Dismissed. Nothing was changed." : "Done.")}</small>}
+  </aside>;
+}
+
 /** What CAIRN proposes to do: shown before anything happens, with the person's *Confirm* and *Dismiss*, and afterwards with what was done. */
 function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string | null; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) => void; proposal: AgentProposal; turnId: string }) {
   const waiting = deciding === `${turnId}/${proposal.id}`;
@@ -648,7 +691,7 @@ function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string |
   </aside>;
 }
 
-function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnCard, onActOnSelection, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnCard: (card: MemoryCardSummary, action: "update" | "delete") => void; onActOnSelection: (action: "move" | "trash" | "status") => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
+function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnCard, onActOnSelection, onChangeset, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnCard: (card: MemoryCardSummary, action: "update" | "delete") => void; onActOnSelection: (action: "move" | "trash" | "status") => void; onChangeset: (turnId: string, action: "confirm" | "dismiss", proposalIds: string[], confirmCounts: Record<string, number>) => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
   const note = routingNote(reply, capabilities);
   const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.
@@ -687,7 +730,7 @@ function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, i
         <Button disabled={isBusy} onClick={() => onActOnCard(card, "delete")} type="button" variant="secondary">Delete</Button>
       </div> : null}
     </li>)}</ul> : null}
-    {(reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
+    {reply.changeset ? <Changeset deciding={deciding} onChangeset={(action, ids, counts) => onChangeset(turnId, action, ids, counts)} reply={reply} turnId={turnId} /> : (reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
     {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question" || reply.routing === "agent"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
     {turnId ? <RunTrace accessToken={accessToken} key={turnId} turnId={turnId} /> : null}
   </div>;

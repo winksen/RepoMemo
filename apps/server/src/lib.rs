@@ -927,6 +927,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/agent/runs/{run_id}/cancel", post(agent_live::cancel_agent_run))
         .route("/v1/agent/turns/{turn_id}/run", get(agent::get_agent_turn_run))
         .route(
+            "/v1/agent/turns/{turn_id}/changeset/confirm",
+            post(agent_proposals::confirm_agent_changeset),
+        )
+        .route(
+            "/v1/agent/turns/{turn_id}/changeset/dismiss",
+            post(agent_proposals::dismiss_agent_changeset),
+        )
+        .route(
             "/v1/agent/turns/{turn_id}/proposals/{proposal_id}/confirm",
             post(agent_proposals::confirm_agent_proposal),
         )

@@ -224,6 +224,9 @@ fn estimate_tokens(messages: &[ChatMessage]) -> usize {
         / 4
 }
 
+/// The most changes one run proposes as one changeset.
+const MAX_CHANGESET_ACTIONS: usize = 20;
+
 const OMITTED: &str = "[an earlier result was left out to keep within the model's window]";
 
 /// Keeps the conversation within half of the model's window: the oldest tool results are replaced by a note until it fits. The
@@ -277,6 +280,8 @@ struct Gathered {
     files: Vec<ArtifactSummary>,
     memory_cards: Vec<MemoryCardSummary>,
     proposals: Vec<repomemo_domain::AgentProposal>,
+    /// What untrusted content the run has read so far, for the proposals it makes (V0.9.42).
+    untrusted: Vec<String>,
     warnings: Vec<String>,
     /// The evidence the answer cites, which only the ledger sets (V0.9.41).
     citations: Vec<repomemo_domain::Citation>,
@@ -336,6 +341,16 @@ fn finish(
 ) -> AgentOutcome {
     let mut files = gathered.files;
     files.truncate(FILE_RESULT_LIMIT);
+    // Each proposal says what outside content the run read before it (V0.9.42), and the ids are unique within the reply.
+    let mut proposals = gathered.proposals;
+    for (index, proposal) in proposals.iter_mut().enumerate() {
+        proposal.id = format!("p{}", index + 1);
+        proposal.untrusted_sources = gathered.untrusted.clone();
+    }
+    let changeset = (!proposals.is_empty()).then(|| repomemo_domain::AgentChangeset {
+        state: "pending".to_owned(),
+        outcome: None,
+    });
     let reply = AgentReply {
         capability: None,
         routing: AgentRouting::Agent,
@@ -347,9 +362,10 @@ fn finish(
         citations: gathered.citations,
         warnings: gathered.warnings,
         context_turns: history_turns as i64,
-        proposals: gathered.proposals,
+        proposals,
         file_set: None,
         memory_cards: gathered.memory_cards,
+        changeset,
     };
     AgentOutcome {
         reply,
@@ -450,6 +466,10 @@ impl RepoMemoCore {
                 let Source::Job(job) = &tool.source else {
                     return ("This tool is not available.".to_owned(), Vec::new(), None, summary);
                 };
+                if job.writes() && gathered.proposals.len() >= MAX_CHANGESET_ACTIONS {
+                    let problem = format!("A request proposes at most {MAX_CHANGESET_ACTIONS} changes. Stop proposing and say what is left.");
+                    return (problem.clone(), Vec::new(), Some(problem), summary);
+                }
                 match self.run_tool(job.capability, request, &subject, history).await {
                     Ok(reply) => {
                         for file in reply.files {
@@ -667,7 +687,12 @@ impl RepoMemoCore {
                 let checked = check_answer(&ledger, &answer, super::says_insufficient(&answer));
                 gathered.warnings.extend(checked.warnings);
                 gathered.citations = checked.citations;
-                return Ok(finish(&request, checked.markdown, gathered, "answered", history.len()));
+                let state = if gathered.proposals.is_empty() {
+                    "answered"
+                } else {
+                    "awaiting_confirmation"
+                };
+                return Ok(finish(&request, checked.markdown, gathered, state, history.len()));
             }
             if !turn.content.trim().is_empty() {
                 draft = turn.content.trim().to_owned();
@@ -676,7 +701,6 @@ impl RepoMemoCore {
                 turn.content.clone(),
                 turn.tool_calls.clone(),
             ));
-            let mut proposed = false;
             for call in &turn.tool_calls {
                 let called = Instant::now();
                 let (for_model, evidence, error, summary) = self
@@ -693,28 +717,7 @@ impl RepoMemoCore {
                 );
                 ran.push(call.name.clone());
                 messages.push(ChatMessage::tool_result(call.id.clone(), for_model));
-                proposed |= is_proposal;
-            }
-            if proposed && !gathered.proposals.is_empty() {
-                // A proposal made after reading content from outside the workspace says so (V0.9.42).
-                let sources = ledger.untrusted_sources();
-                for proposal in &mut gathered.proposals {
-                    proposal.untrusted_sources = sources.clone();
-                }
-                let text = if turn.content.trim().is_empty() {
-                    "I prepared this for you. Nothing changes until you confirm it.".to_owned()
-                } else {
-                    turn.content.trim().to_owned()
-                };
-                gathered.step(
-                    "answer",
-                    None,
-                    "Waiting for you to confirm what it proposed".to_owned(),
-                    Vec::new(),
-                    Duration::ZERO,
-                    None,
-                );
-                return Ok(finish(&request, text, gathered, "awaiting_confirmation", history.len()));
+                gathered.untrusted = ledger.untrusted_sources();
             }
         }
         let why = format!("I reached my limit of {} steps for one request", setup.max_steps.max(1));
@@ -916,13 +919,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_writers_proposal_ends_the_run_waiting_for_confirmation() {
+    async fn a_writers_proposals_become_one_changeset_the_run_then_waits_on() {
         let (core, data_dir) = core("proposal").await;
         let workspace_id = workspace_with_a_note(&core).await;
-        let provider = ScriptedProvider::new(vec![ChatResponse::call(
-            "propose_note",
-            json!({ "subject": "create a note titled Pager rota: Alice is on call in March" }),
-        )]);
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call(
+                "propose_note",
+                json!({ "subject": "create a note titled Pager rota: Alice is on call in March" }),
+            ),
+            ChatResponse::text("I prepared the note for you to confirm."),
+        ]);
         let outcome = core
             .loop_with(
                 &provider,
@@ -931,8 +937,15 @@ mod tests {
             )
             .await
             .unwrap();
-        assert_eq!(provider.requests().len(), 1, "the run stops at the proposal");
+        // The run goes on after a proposal until the model answers, and the proposals become one changeset.
+        assert_eq!(provider.requests().len(), 2);
         assert_eq!(outcome.reply.proposals.len(), 1);
+        assert_eq!(outcome.reply.proposals[0].id, "p1");
+        assert_eq!(
+            outcome.reply.changeset.as_ref().map(|set| set.state.as_str()),
+            Some("pending")
+        );
+        assert_eq!(outcome.reply.reply_markdown, "I prepared the note for you to confirm.");
         let trace = outcome.trace.unwrap();
         assert_eq!(trace.state, "awaiting_confirmation");
         assert!(trace.steps.iter().any(|step| step.kind == "proposal"));
