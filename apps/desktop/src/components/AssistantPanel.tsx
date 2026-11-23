@@ -4,8 +4,8 @@ import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
-import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, getSharedAgentConversation, getSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
-import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentRun, AgentTurn, MemoryCardSummary } from "../types";
+import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
+import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentRun, AgentStep, AgentTurn, AgentTurnResponse, MemoryCardSummary } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
@@ -36,6 +36,9 @@ type ThreadTurn = {
   request: AgentMessage;
   status: "pending" | "done" | "failed";
   reply?: AgentReply;
+  /** The steps of a live run, as they are taken (V0.9.43). */
+  steps?: string[];
+  runId?: string;
 };
 
 type ChatDialog = { kind: "rename" | "delete"; conversation: AgentConversation };
@@ -244,7 +247,17 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     const conversationId = activeId;
     setTurns((current) => [...current.filter((entry) => entry.key !== turn.key), { ...turn, status: "pending", reply: undefined }]);
     try {
-      const { conversation, turn: saved } = await sendSharedAgentMessage(accessToken, workspaceId, turn.request, conversationId ?? undefined);
+      // In Agent mode a message is followed live: each step as it is taken, and a Stop (V0.9.43).
+      const live = Boolean(capabilities?.agent_mode) && !turn.request.capability && !turn.request.artifact_id;
+      let response: AgentTurnResponse;
+      if (live) {
+        const started = await startSharedAgentRun(accessToken, workspaceId, turn.request, conversationId ?? undefined);
+        setTurns((current) => current.map((entry) => entry.key === turn.key ? { ...entry, runId: started.run_id, steps: [] } : entry));
+        response = await streamSharedAgentRun(accessToken, started.run_id, (step: AgentStep) => setTurns((current) => current.map((entry) => entry.key === turn.key ? { ...entry, steps: [...(entry.steps ?? []), step.summary] } : entry)), new AbortController().signal);
+      } else {
+        response = await sendSharedAgentMessage(accessToken, workspaceId, turn.request, conversationId ?? undefined);
+      }
+      const { conversation, turn: saved } = response;
       upsertConversation(conversation);
       if (token !== view.current) return;
       if (!conversationId) {
@@ -477,7 +490,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
       <div className="shared-assistant-thread" role="log" aria-live="polite" aria-busy={isBusy || isLoadingChat}>
         {isLoadingChat ? <LoadingState label="Loading chat" /> : turns.length ? turns.map((turn) => <article className="shared-assistant-turn" key={turn.key}>
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
-          {turn.status === "pending" ? <LoadingState label="Working on it" /> : null}
+          {turn.status === "pending" ? <div className="shared-assistant-live"><LoadingState label="Working on it" />{turn.steps?.length ? <ol>{turn.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol> : null}{turn.runId ? <Button onClick={() => void cancelSharedAgentRun(accessToken, turn.runId as string).catch(() => undefined)} variant="secondary">Stop</Button> : null}</div> : null}
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
           {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} canManage={canUpload} deciding={deciding} isBusy={isBusy} onActOnCard={actOnCard} onActOnSelection={(action) => actOnSelection(turn.key, action)} onSelection={(ids) => setSelection((current) => ({ ...current, [turn.key]: ids }))} selection={selection[turn.key] ?? []} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
         </article>) : variant === "page"

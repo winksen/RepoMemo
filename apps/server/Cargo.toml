@@ -34,6 +34,7 @@ tower.workspace = true
 tower-http = { version = "0.6", features = ["catch-panic", "compression-br", "compression-gzip", "cors", "timeout", "trace"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
+uuid.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.8"

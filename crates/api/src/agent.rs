@@ -29,7 +29,7 @@ use files::{
 mod ledger;
 mod proposals;
 mod run;
-pub use run::{AgentLoopSetup, AgentOutcome};
+pub use run::{AgentLoopSetup, AgentOutcome, ProgressHook};
 mod tools;
 mod trace;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};

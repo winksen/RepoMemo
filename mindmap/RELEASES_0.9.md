@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.42` (2026-11-23)
+> **Current:** `V0.9.43` (2026-11-23)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md)
 
@@ -66,7 +66,7 @@
 | **V0.9.40** | 🧪 2026-11-23 | AP. CAIRN loop | ✨ | Bounded tool loop | Let CAIRN call tools in a loop within limits on steps, time, tokens and AI quota, as an Agent mode a workspace administrator turns on for a tool-capable model | In Agent mode a two-step request runs both tools and answers, a budget ends with a partial answer that says what is missing, each model call counts against the quota, and a viewer's run never proposes |
 | **V0.9.41** | 🧪 2026-11-23 | AP. CAIRN loop | 🔒 | Citation ledger | Accept in a final answer only the evidence handles its run read, in the order cited, and report any other | An invented handle is removed with a warning, cited handles become the evidence list in order, and an answer resting on nothing it read says so |
 | **V0.9.42** | 🧪 2026-11-23 | AP. CAIRN loop | 🔒 | Untrusted content | Treat passages from connectors, mail and guest uploads as quoted data, and show on any proposal that it was made after reading them | The injection fixtures trigger no tool call by themselves, every proposal after untrusted reading names its source, and a large trash or move after it asks for the count to be typed |
-| **V0.9.43** | 🔜 | AP. CAIRN loop | ✨ | Live runs | Run CAIRN in the background with its steps and answer streamed to the chat, and let the person stop it | The chat shows each step as it happens and the answer as it is written, Stop ends the run as cancelled, and the synchronous route still answers |
+| **V0.9.43** | 🧪 2026-11-23 | AP. CAIRN loop | ✨ | Live runs | Run CAIRN in the background with its steps and answer streamed to the chat, and let the person stop it | The chat shows each step as it happens and the answer as it is written, Stop ends the run as cancelled, and the synchronous route still answers |
 | **V0.9.44** | 🔜 | AP. CAIRN loop | ✨ | Changesets | Gather a run's proposals into one card of ticked actions applied in order as the person, and let the next message build on the outcome | A three-action changeset applies the ticked actions and stops at the first failure saying which were applied, a second confirmation is refused, and "now summarize what you moved" uses the outcome |
 | **V0.9.45** | 🔜 | AP. CAIRN loop | 🔧 | Trust signals in answers | Tell CAIRN each source's state and show under an answer how many of its sources are verified, outdated, needing review, stale or untrusted | An answer resting on an outdated file shows the badge and says so, and the evidence rows carry the states used in Evidence |
 | **V0.9.46** | 🔜 | AP. CAIRN loop | 📘 | Evaluation set | Add a fixture workspace and 40 CAIRN cases run with a scripted provider in the tests, and a live runner that writes a report for a real model | The scripted cases pass, the live runner writes citation precision, tool accuracy, forbidden actions, steps, tokens and time, and the maintainer runs it |

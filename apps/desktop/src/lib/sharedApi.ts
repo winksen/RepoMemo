@@ -22,6 +22,7 @@ import type {
   AgentConversationDetail,
   AgentMessage,
   AgentRun,
+  AgentStep,
   AgentTurn,
   AgentTurnResponse,
   AskAnswer,
@@ -757,6 +758,48 @@ export function attachSharedAgentFile(accessToken: string, workspaceId: string, 
     method: "POST",
     body: JSON.stringify({ artifact_id: artifactId, conversation_id: conversationId }),
   }, accessToken);
+}
+
+/** Starts answering a message in the background (V0.9.43). The run is followed with `streamSharedAgentRun`. */
+export function startSharedAgentRun(accessToken: string, workspaceId: string, message: AgentMessage, conversationId?: string): Promise<{ run_id: string }> {
+  return request<{ run_id: string }>(`/v1/workspaces/${workspaceId}/agent/runs`, {
+    method: "POST",
+    body: JSON.stringify({ message: message.message, capability: message.capability ?? null, artifact_id: message.artifact_id ?? null, artifact_ids: message.artifact_ids ?? [], conversation_id: conversationId ?? null }),
+  }, accessToken);
+}
+
+/** Asks a live run to stop; it ends as cancelled at its next step. */
+export function cancelSharedAgentRun(accessToken: string, runId: string): Promise<void> {
+  return request<void>(`/v1/agent/runs/${runId}/cancel`, { method: "POST", body: "{}" }, accessToken);
+}
+
+/** Follows a live run: `onStep` for each step as it is taken, and the stored turn when it is done. Fails with the run's own message. */
+export async function streamSharedAgentRun(accessToken: string, runId: string, onStep: (step: AgentStep) => void, signal: AbortSignal): Promise<AgentTurnResponse> {
+  const response = await openSharedEventStream(`/v1/agent/runs/${runId}/events`, accessToken, signal);
+  if (!response.ok || !response.body) throw new Error("The live run could not be followed.");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let end = buffer.indexOf("\n\n");
+    while (end >= 0) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const name = /^event: ?(.*)$/m.exec(block)?.[1];
+      const data = /^data: ?(.*)$/m.exec(block)?.[1];
+      if (name && data) {
+        const payload = JSON.parse(data);
+        if (name === "step") onStep(payload as AgentStep);
+        else if (name === "done") return payload as AgentTurnResponse;
+        else if (name === "error") throw new Error(String(payload.message ?? "CAIRN could not reply."));
+      }
+      end = buffer.indexOf("\n\n");
+    }
+  }
+  throw new Error("The live run ended without an answer.");
 }
 
 /** Confirms what CAIRN proposed: the action runs as the person, and the turn comes back with its outcome (V0.9.10). */

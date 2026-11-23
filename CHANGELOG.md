@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.43 (2026-11-23)
+
+In Agent mode the chat shows CAIRN working, and lets you stop it.
+
+### Changed
+- **Live runs.** `POST /v1/workspaces/{id}/agent/runs` starts answering a message in the background and returns a run id at once; `GET /v1/agent/runs/{id}/events` streams a `step` event for each step as it is taken (the tool, the files it named, the time), then `done` with the stored turn (or `error`); `POST /v1/agent/runs/{id}/cancel` stops it. The synchronous `POST .../agent/messages` is unchanged and still answers when the run is over.
+- **The chat follows it.** In a workspace in Agent mode (the capabilities answer says `agent_mode`), a typed message is followed live: each step appears under *Working on it* as it happens, with a **Stop** button. Stop ends the run as *cancelled* at its next step, with an answer that says what it had done; the exchange is stored like any other. Picked jobs and uploads use the synchronous route as before.
+- **A run is private to its person.** Only the person who started a run can open its stream or stop it (another person's run is "not found"), the stream closes when they may no longer read the workspace (checked when it opens and every 30 seconds), a person has one unfinished run at a time, and a finished run is forgotten after ten minutes.
+- **Narrowed.** The answer arrives whole when the run ends; it is not written out token by token, because providers do not stream yet (`chat_stream` is not built). Steps are live; the words are not.
+- No migration or setting changes.
+
+### Checks
+- A test that a live run replays what it has sent to a stream that opens late; the loop's existing tests pass the new hooks; formatted and linted for the core and the server, typecheck passes; tests not run. Nothing was built or run: no stream was opened and the Stop button was not tried.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.42 (2026-11-23)
 
 Text from outside the workspace is data to CAIRN, never instructions.

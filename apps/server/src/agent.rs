@@ -31,6 +31,8 @@ pub(crate) struct AgentCapabilitiesResponse {
     provider_name: Option<String>,
     /// The model the workspace's text provider is set to use, when it names one.
     model: Option<String>,
+    /// Whether CAIRN works in a loop in this workspace (V0.9.40), so a client can run it live (V0.9.43).
+    agent_mode: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,6 +87,9 @@ pub(crate) async fn list_agent_capabilities(
             }
         }
     }
+    let agent_mode = provider
+        .as_ref()
+        .is_some_and(|provider| crate::ai::cairn_mode_of(&provider.metadata) == "agent");
     let (provider_name, model) = match provider {
         Some(provider) => (
             Some(provider.name),
@@ -96,6 +101,7 @@ pub(crate) async fn list_agent_capabilities(
         capabilities,
         provider_name,
         model,
+        agent_mode,
     }))
 }
 
@@ -105,10 +111,31 @@ pub(crate) async fn send_agent_message(
     Path(workspace_id): Path<String>,
     Json(request): Json<AgentMessageRequest>,
 ) -> Result<Json<AgentTurnResponse>, ApiError> {
-    let role = require_workspace_read(&state, &subject, &workspace_id).await?;
+    run_message(&state, &subject, workspace_id, request, LiveHooks::default())
+        .await
+        .map(Json)
+}
+
+/// What a live run (V0.9.43) adds to answering a message: a hook told of each step as it is taken, and the flag the person's Stop
+/// sets.
+#[derive(Default, Clone)]
+pub(crate) struct LiveHooks {
+    pub(crate) progress: Option<repomemo_api::ProgressHook>,
+    pub(crate) cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+}
+
+/// Answers one message and stores the exchange: the work of the synchronous route and of a live run alike.
+pub(crate) async fn run_message(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: String,
+    request: AgentMessageRequest,
+    live: LiveHooks,
+) -> Result<AgentTurnResponse, ApiError> {
+    let role = require_workspace_read(state, subject, &workspace_id).await?;
     let existing = match request.conversation_id.as_deref() {
         Some(conversation_id) => {
-            let conversation = owned_conversation(&state, &subject, conversation_id).await?;
+            let conversation = owned_conversation(state, subject, conversation_id).await?;
             if conversation.workspace_id != workspace_id {
                 return Err(conversation_not_found());
             }
@@ -135,7 +162,7 @@ pub(crate) async fn send_agent_message(
         }
         None => (Vec::new(), Vec::new()),
     };
-    let provider = text_provider(&state, &workspace_id).await?;
+    let provider = text_provider(state, &workspace_id).await?;
     let provider_model = provider.as_ref().map(|provider| {
         (
             provider.model.clone().filter(|model| !model.trim().is_empty()),
@@ -160,6 +187,8 @@ pub(crate) async fn send_agent_message(
                 max_steps: runtime.cairn_max_steps.clamp(1, 30) as usize,
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
                 can_write: !matches!(role, WorkspaceRole::Viewer),
+                progress: live.progress.clone(),
+                cancel: live.cancel.clone(),
                 consume_quota: std::sync::Arc::new(move || {
                     ai_access::consume_ai_quota(&quota_state, &quota_subject).map_err(|error| error.message)
                 }),
@@ -167,7 +196,7 @@ pub(crate) async fn send_agent_message(
         });
     let (provider_id, ai_unavailable_reason) = match provider {
         Some(provider) => {
-            let min_role = ai_access::workspace_ai_min_role(&state, &workspace_id).await?;
+            let min_role = ai_access::workspace_ai_min_role(state, &workspace_id).await?;
             if min_role.allows(&role) {
                 // Lookups and searches never call the provider; anything else
                 // may, if only to understand the message.
@@ -178,7 +207,7 @@ pub(crate) async fn send_agent_message(
                         .any(|info| info.id == capability && info.requires_ai),
                 };
                 if may_call_ai {
-                    ai_access::consume_ai_quota(&state, &subject)?;
+                    ai_access::consume_ai_quota(state, subject)?;
                 }
                 (Some(provider.id), None)
             } else {
@@ -267,7 +296,7 @@ pub(crate) async fn send_agent_message(
     }
     if reply.generated {
         record_workspace_activity(
-            &state,
+            state,
             &workspace_id,
             &subject.user_id,
             "assistant_answered",
@@ -280,10 +309,10 @@ pub(crate) async fn send_agent_message(
         )
         .await;
     }
-    Ok(Json(AgentTurnResponse {
-        conversation: owned_conversation(&state, &subject, &conversation_id).await?,
+    Ok(AgentTurnResponse {
+        conversation: owned_conversation(state, subject, &conversation_id).await?,
         turn,
-    }))
+    })
 }
 
 /// Records an uploaded file as a turn of the chat. The upload itself (its role check, its quota, its indexing) is the upload

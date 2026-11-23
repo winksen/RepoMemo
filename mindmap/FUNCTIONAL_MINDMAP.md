@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.42` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.43` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.43 — In Agent mode the chat shows CAIRN working, and lets you stop it.
+
+- **Watching CAIRN work.** In Agent mode the chat lists each step as CAIRN takes it and offers Stop; the answer appears when the run ends. Stopping keeps what CAIRN had done and says so.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.42 — Text from outside the workspace is data to CAIRN, never instructions.
 

@@ -30,6 +30,9 @@ use super::{
 };
 use crate::RepoMemoCore;
 
+/// Called with each step of a run as it is recorded.
+pub type ProgressHook = Arc<dyn Fn(&AgentStep) + Send + Sync>;
+
 /// What the server gives a run: how the model takes tools, the budgets, what the person may do and how to pay for a model call.
 #[derive(Clone)]
 pub struct AgentLoopSetup {
@@ -40,6 +43,10 @@ pub struct AgentLoopSetup {
     pub max_seconds: u64,
     /// Whether the person may change the workspace: a viewer's tool list holds no proposing tool.
     pub can_write: bool,
+    /// Told of each step as it is taken, so a chat can show the run as it happens (V0.9.43).
+    pub progress: Option<ProgressHook>,
+    /// Set by the person's Stop; the run ends `cancelled` at the next step.
+    pub cancel: Option<Arc<std::sync::atomic::AtomicBool>>,
     /// Called before each model call. An error (the person's AI allowance is used up) ends the run as partial with that message.
     pub consume_quota: Arc<dyn Fn() -> std::result::Result<(), String> + Send + Sync>,
 }
@@ -266,6 +273,7 @@ fn arg_list(arguments: &Value, key: &str) -> Vec<String> {
 /// What a run gathers besides the model's words.
 #[derive(Default)]
 struct Gathered {
+    progress: Option<ProgressHook>,
     files: Vec<ArtifactSummary>,
     memory_cards: Vec<MemoryCardSummary>,
     proposals: Vec<repomemo_domain::AgentProposal>,
@@ -286,7 +294,7 @@ impl Gathered {
         duration: Duration,
         error: Option<String>,
     ) {
-        self.steps.push(AgentStep {
+        let step = AgentStep {
             position: self.steps.len() as i64 + 1,
             kind: kind.to_owned(),
             tool: tool.map(str::to_owned),
@@ -294,7 +302,11 @@ impl Gathered {
             evidence,
             duration_ms: duration.as_millis() as i64,
             error,
-        });
+        };
+        if let Some(progress) = &self.progress {
+            progress(&step);
+        }
+        self.steps.push(step);
     }
 }
 
@@ -519,11 +531,32 @@ impl RepoMemoCore {
         let started = Instant::now();
         let limit = Duration::from_secs(setup.max_seconds.max(1));
         let mut ledger = EvidenceLedger::new(&request.workspace_id);
-        let mut gathered = Gathered::default();
+        let mut gathered = Gathered {
+            progress: setup.progress.clone(),
+            ..Gathered::default()
+        };
+        let cancelled = || {
+            setup
+                .cancel
+                .as_ref()
+                .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Relaxed))
+        };
         let mut ran: Vec<String> = Vec::new();
         let mut draft = String::new();
 
         for step in 1..=setup.max_steps.max(1) {
+            if cancelled() {
+                let text = partial_markdown("you asked me to stop", &ran, &draft);
+                gathered.step(
+                    "answer",
+                    None,
+                    "Stopped because you asked".to_owned(),
+                    Vec::new(),
+                    Duration::ZERO,
+                    None,
+                );
+                return Ok(finish(&request, text, gathered, "cancelled", history.len()));
+            }
             if started.elapsed() >= limit {
                 let why = format!("I used the {} seconds I am given for one request", setup.max_seconds);
                 let text = partial_markdown(&why, &ran, &draft);
@@ -751,6 +784,8 @@ mod tests {
             max_steps,
             max_seconds: 60,
             can_write,
+            progress: None,
+            cancel: None,
             consume_quota: Arc::new(|| Ok(())),
         }
     }

@@ -95,6 +95,8 @@ fn setup() -> AgentLoopSetup {
         max_steps: 8,
         max_seconds: 60,
         can_write: true,
+        progress: None,
+        cancel: None,
         consume_quota: Arc::new(|| Ok(())),
     }
 }

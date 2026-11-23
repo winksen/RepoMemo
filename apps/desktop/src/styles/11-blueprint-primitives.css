@@ -489,6 +489,8 @@ body.shared-dock-resizing { cursor: col-resize; user-select: none; }
 .shared-assistant-proposal { display: grid; gap: 8px; max-width: 72ch; padding: 12px 14px; border: 1px solid var(--color-border-strong); border-radius: 12px; }
 .shared-assistant-proposal > strong { font-size: 13px; }
 .shared-assistant-proposal .shared-markdown { color: var(--color-text-muted); font-size: 13px; }
+.shared-assistant-live { display: grid; gap: 6px; max-width: 72ch; color: var(--color-text-muted); font-size: 13px; }
+.shared-assistant-live ol { display: grid; gap: 2px; margin: 0; padding-left: 20px; }
 .shared-assistant-trace { max-width: 72ch; color: var(--color-text-muted); font-size: 12px; }
 .shared-assistant-trace > summary { cursor: pointer; color: var(--color-text-subtle); }
 .shared-assistant-trace ol { display: grid; gap: 4px; margin: 8px 0; padding-left: 20px; }

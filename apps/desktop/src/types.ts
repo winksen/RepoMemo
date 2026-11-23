@@ -574,6 +574,8 @@ export interface AgentCapabilities {
   provider_name: string | null;
   /** The model the workspace's text provider is set to use, when it names one. */
   model?: string | null;
+  /** Whether CAIRN works in a loop in this workspace, so a message can run live. */
+  agent_mode?: boolean;
 }
 
 export interface AgentMessage {

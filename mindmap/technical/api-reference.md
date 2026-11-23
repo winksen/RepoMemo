@@ -242,6 +242,9 @@
 | POST | `/v1/workspaces/{workspace_id}/agent/attachments` | auth | require_workspace_read (the upload route did the write check) | AgentAttachmentRequest (artifact_id, conversation_id) | AgentTurnResponse |
 | GET | `/v1/workspaces/{workspace_id}/agent/conversations` | auth | require_workspace_read | — | Vec<AgentConversation |
 | GET | `/v1/agent/conversations/{conversation_id}` | auth | require_workspace_read | — | AgentConversationDetail |
+| POST | `/v1/workspaces/{workspace_id}/agent/runs` | auth | require_workspace_read | AgentMessageRequest | 202 { run_id }; one unfinished run per person |
+| GET | `/v1/agent/runs/{run_id}/events` | auth | the run's owner, require_workspace_read (rechecked every 30 s) | — | server-sent `step`, then `done` (AgentTurnResponse) or `error` |
+| POST | `/v1/agent/runs/{run_id}/cancel` | auth | the run's owner | — | 204; the run ends cancelled |
 | GET | `/v1/agent/turns/{turn_id}/run` | auth | the caller's own conversation, require_workspace_read | — | AgentRun (steps, duration, tokens; 404 when none was kept) |
 | POST | `/v1/agent/turns/{turn_id}/proposals/{proposal_id}/confirm` | auth | the caller's own conversation, require_workspace_write | — | AgentTurn (the proposal applied, with its outcome) |
 | POST | `/v1/agent/turns/{turn_id}/proposals/{proposal_id}/dismiss` | auth | the caller's own conversation | — | AgentTurn |
