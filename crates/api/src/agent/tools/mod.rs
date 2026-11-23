@@ -12,6 +12,9 @@ use serde_json::{json, Value};
 
 use crate::RepoMemoCore;
 
+// The loop reads the atoms from V0.9.40; until then only their tests do.
+#[allow(dead_code)]
+pub(in crate::agent) mod atoms;
 mod change;
 pub(in crate::agent) mod find;
 mod understand;

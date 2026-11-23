@@ -1,0 +1,696 @@
+//! The loop's read atoms (V0.9.38): small tools a model can chain, each returning bounded text whose passages and files carry
+//! run-local evidence handles (`E1`, `E2`, …). The model sees handles and never database ids; a handle means the same thing for
+//! the whole run. Nothing here changes anything, and everything is limited to the one workspace of the run by the storage
+//! calls themselves: another workspace's files, and files of a quarantined connector, are never returned.
+
+use crate::agent::*;
+
+/// The most characters one tool result gives the model.
+pub(in crate::agent) const TOOL_OUTPUT_CHARS: usize = 6_000;
+/// The most passages one search returns.
+pub(in crate::agent) const EVIDENCE_SEARCH_MAX: usize = 12;
+/// The most chunks one page of a file holds.
+pub(in crate::agent) const READ_FILE_CHUNKS_MAX: usize = 6;
+/// The most files one listing names.
+pub(in crate::agent) const LIST_FILES_MAX: usize = 40;
+/// A passage is cut to this many characters in a result.
+const PASSAGE_CHARS: usize = 600;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::agent) enum EvidenceKind {
+    /// A passage of a file: one chunk.
+    Passage,
+    /// A file as a whole, named without reading it.
+    File,
+}
+
+/// One thing a tool showed the model, and what its handle stands for.
+#[derive(Debug, Clone, PartialEq)]
+pub(in crate::agent) struct EvidenceItem {
+    pub handle: String,
+    pub kind: EvidenceKind,
+    pub artifact_id: String,
+    pub chunk_id: Option<String>,
+    pub workspace_id: String,
+    pub title: String,
+    pub path: String,
+    /// `verified`, `needs_review`, `outdated` and so on; `active` when the file was never reviewed.
+    pub lifecycle_state: Option<String>,
+}
+
+/// The handles of one run. The same passage or file is given the same handle each time a tool returns it.
+pub(in crate::agent) struct EvidenceLedger {
+    workspace_id: String,
+    items: Vec<EvidenceItem>,
+}
+
+impl EvidenceLedger {
+    pub fn new(workspace_id: &str) -> Self {
+        Self {
+            workspace_id: workspace_id.to_owned(),
+            items: Vec::new(),
+        }
+    }
+
+    pub fn workspace_id(&self) -> &str {
+        &self.workspace_id
+    }
+
+    /// Everything shown so far, in handle order.
+    pub fn items(&self) -> &[EvidenceItem] {
+        &self.items
+    }
+
+    /// The item a handle stands for, as the model wrote it (`E3`, `e3` and `[E3]` are the same).
+    pub fn get(&self, handle: &str) -> Option<&EvidenceItem> {
+        let wanted = handle.trim().trim_matches(['[', ']']).to_ascii_uppercase();
+        self.items.iter().find(|item| item.handle == wanted)
+    }
+
+    /// The handle for a passage or file, new the first time and the same afterwards.
+    pub fn handle_for(
+        &mut self,
+        kind: EvidenceKind,
+        artifact_id: &str,
+        chunk_id: Option<&str>,
+        title: &str,
+        path: &str,
+        lifecycle_state: Option<&str>,
+    ) -> String {
+        if let Some(found) = self
+            .items
+            .iter()
+            .find(|item| item.artifact_id == artifact_id && item.chunk_id.as_deref() == chunk_id)
+        {
+            return found.handle.clone();
+        }
+        let handle = format!("E{}", self.items.len() + 1);
+        self.items.push(EvidenceItem {
+            handle: handle.clone(),
+            kind,
+            artifact_id: artifact_id.to_owned(),
+            chunk_id: chunk_id.map(str::to_owned),
+            workspace_id: self.workspace_id.clone(),
+            title: title.to_owned(),
+            path: path.to_owned(),
+            lifecycle_state: lifecycle_state.map(str::to_owned),
+        });
+        handle
+    }
+}
+
+/// What a read atom returns: the compact text the model reads, and the evidence it names.
+pub(in crate::agent) struct ToolOutput {
+    pub for_model: String,
+    /// The handles this result used, in order, new or not.
+    pub handles: Vec<String>,
+}
+
+impl ToolOutput {
+    fn text(for_model: impl Into<String>) -> Self {
+        Self {
+            for_model: for_model.into(),
+            handles: Vec::new(),
+        }
+    }
+}
+
+/// Lines joined and cut at a bound: lines that do not fit are left out and counted ("… 7 more").
+pub(in crate::agent) fn bounded(lines: &[String], limit: usize) -> String {
+    let mut out = String::new();
+    let mut shown = 0;
+    for line in lines {
+        let extra = line.chars().count() + 1;
+        if out.chars().count() + extra > limit {
+            break;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(line);
+        shown += 1;
+    }
+    if shown < lines.len() {
+        if shown == 0 {
+            // A single line over the bound is cut, not dropped.
+            out = shorten(&lines[0], limit.saturating_sub(1));
+            shown = 1;
+        }
+        if shown < lines.len() {
+            out.push_str(&format!("\n… {} more", lines.len() - shown));
+        }
+    }
+    out
+}
+
+fn state_note(state: Option<&str>) -> String {
+    match state {
+        Some(state) if state != "active" => format!(" · {}", state.replace('_', " ")),
+        _ => String::new(),
+    }
+}
+
+impl RepoMemoCore {
+    /// The lifecycle state of each file of a workspace that has one; a file with none is `active`.
+    async fn lifecycle_by_file(&self, workspace_id: &str) -> std::collections::HashMap<String, String> {
+        self.storage
+            .workspace_lifecycle_states(workspace_id)
+            .await
+            .map(|states| states.into_iter().map(|(id, (status, _))| (id, status)).collect())
+            .unwrap_or_default()
+    }
+
+    /// Passages that match a query, by keywords and by meaning where the workspace has embeddings, with a handle each.
+    pub(in crate::agent) async fn tool_search_evidence(
+        &self,
+        ledger: &mut EvidenceLedger,
+        query: &str,
+        kinds: &[String],
+        folder: Option<&str>,
+        limit: usize,
+    ) -> Result<ToolOutput> {
+        let query = query.trim();
+        if query.is_empty() {
+            return Ok(ToolOutput::text("Give some words to search for."));
+        }
+        let workspace_id = ledger.workspace_id().to_owned();
+        let folder_id = match folder.map(str::trim).filter(|name| !name.is_empty()) {
+            None => None,
+            Some(wanted) => {
+                let folders = self.storage.list_folders(&workspace_id).await?;
+                match choose_folder(wanted, &folders) {
+                    FolderChoice::One(found) => Some(found.id),
+                    FolderChoice::TopLevel => None,
+                    FolderChoice::Many(names) => {
+                        return Ok(ToolOutput::text(format!(
+                            "Several folders match \"{wanted}\": {}. Name one by its full path.",
+                            names.join(", ")
+                        )))
+                    }
+                    FolderChoice::Missing(_) => {
+                        return Ok(ToolOutput::text(format!("There is no folder named \"{wanted}\".")))
+                    }
+                }
+            }
+        };
+        let filter = parse_filter(&kinds.join(" "));
+        let limit = limit.clamp(1, EVIDENCE_SEARCH_MAX);
+        let mut found = self
+            .search_workspace(SearchRequest {
+                workspace_id: workspace_id.clone(),
+                query: query.to_owned(),
+                artifact_types: Vec::new(),
+                languages: Vec::new(),
+                source_ids: Vec::new(),
+                // Ask for more than is shown when a kind filter will drop some.
+                limit: Some(if filter.kinds.is_empty() { limit } else { limit * 3 } as i64),
+                lifecycle_statuses: Vec::new(),
+                folder_id,
+                modified_after: None,
+                modified_before: None,
+            })
+            .await?;
+        if !filter.kinds.is_empty() {
+            found.retain(|hit| {
+                let path = hit.path.to_lowercase();
+                filter.kinds.iter().any(|&index| {
+                    filters::KINDS[index]
+                        .extensions
+                        .iter()
+                        .any(|extension| path.ends_with(extension))
+                })
+            });
+        }
+        found.truncate(limit);
+        if found.is_empty() {
+            return Ok(ToolOutput::text(format!(
+                "No indexed passage matched \"{query}\". Files still being indexed are not searchable yet."
+            )));
+        }
+        let states = self.lifecycle_by_file(&workspace_id).await;
+        let mut handles = Vec::new();
+        let mut lines = Vec::new();
+        for hit in &found {
+            let state = states.get(&hit.artifact_id).map(String::as_str);
+            let handle = ledger.handle_for(
+                EvidenceKind::Passage,
+                &hit.artifact_id,
+                Some(&hit.chunk_id),
+                &hit.title,
+                &hit.path,
+                state.or(Some("active")),
+            );
+            let lines_at = match (hit.start_line, hit.end_line) {
+                (Some(start), Some(end)) => format!(" · lines {start}-{end}"),
+                _ => String::new(),
+            };
+            lines.push(format!(
+                "[{handle}] {} ({}){}{lines_at}: {}",
+                hit.title,
+                hit.path,
+                state_note(state),
+                shorten(
+                    &hit.snippet.split_whitespace().collect::<Vec<_>>().join(" "),
+                    PASSAGE_CHARS
+                )
+            ));
+            handles.push(handle);
+        }
+        Ok(ToolOutput {
+            for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
+            handles,
+        })
+    }
+
+    /// The file a name, a path or an id means in this workspace: the one file, or what to say instead.
+    async fn tool_file(
+        &self,
+        ledger: &EvidenceLedger,
+        file: &str,
+    ) -> Result<std::result::Result<ArtifactSummary, String>> {
+        let file = file.trim();
+        if file.is_empty() {
+            return Ok(Err("Name the file.".to_owned()));
+        }
+        // A handle the model was given stands for a file of this run.
+        if let Some(item) = ledger.get(file) {
+            if let Ok(summary) = self.storage.get_artifact_summary(&item.artifact_id).await {
+                if summary.workspace_id == ledger.workspace_id() {
+                    return Ok(Ok(summary));
+                }
+            }
+        }
+        let matches = self.match_files(ledger.workspace_id(), file).await?;
+        match matches.as_slice() {
+            [] => Ok(Err(format!("No file in this workspace is named like \"{file}\"."))),
+            [only] => Ok(Ok(only.artifact.clone())),
+            [first, rest @ ..] if first.exact && !rest.iter().any(|other| other.exact) => {
+                Ok(Ok(first.artifact.clone()))
+            }
+            many => Ok(Err(format!(
+                "Several files match \"{file}\": {}. Name one by its path.",
+                many.iter()
+                    .take(FILE_CHOICE_LIMIT)
+                    .map(|found| found.artifact.path.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))),
+        }
+    }
+
+    /// A file's text a few chunks at a time, each chunk with a handle, and where the next page starts.
+    pub(in crate::agent) async fn tool_read_file(
+        &self,
+        ledger: &mut EvidenceLedger,
+        file: &str,
+        from_chunk: usize,
+        chunks: usize,
+    ) -> Result<ToolOutput> {
+        let summary = match self.tool_file(ledger, file).await? {
+            Ok(summary) => summary,
+            Err(problem) => return Ok(ToolOutput::text(problem)),
+        };
+        let detail = match self.storage.get_artifact(&summary.id).await {
+            Ok(detail) if detail.summary.workspace_id == ledger.workspace_id() => detail,
+            _ => {
+                return Ok(ToolOutput::text(format!(
+                    "No file in this workspace is named like \"{file}\"."
+                )))
+            }
+        };
+        let mut all = detail.chunks;
+        all.sort_by_key(|chunk| chunk.chunk_index);
+        if all.is_empty() {
+            return Ok(ToolOutput::text(format!(
+                "{} has no indexed text yet. It may still be indexing, or hold only an image.",
+                summary.path
+            )));
+        }
+        let total = all.len();
+        let chunks = chunks.clamp(1, READ_FILE_CHUNKS_MAX);
+        if from_chunk >= total {
+            return Ok(ToolOutput::text(format!(
+                "{} has {total} chunks; from_chunk {from_chunk} is past the end.",
+                summary.path
+            )));
+        }
+        let state = self.lifecycle_by_file(ledger.workspace_id()).await;
+        let state = state.get(&summary.id).map(String::as_str).or(Some("active"));
+        let page = all.iter().skip(from_chunk).take(chunks).collect::<Vec<_>>();
+        let mut lines = vec![format!(
+            "{} ({}){} — chunks {}-{} of {total}",
+            summary.title,
+            summary.path,
+            state_note(state),
+            from_chunk,
+            from_chunk + page.len() - 1
+        )];
+        let mut handles = Vec::new();
+        for chunk in &page {
+            let handle = ledger.handle_for(
+                EvidenceKind::Passage,
+                &summary.id,
+                Some(&chunk.id),
+                &summary.title,
+                &summary.path,
+                state,
+            );
+            let heading = chunk
+                .heading_path
+                .as_deref()
+                .filter(|heading| !heading.is_empty())
+                .map(|heading| format!(" {heading}:"))
+                .unwrap_or_default();
+            lines.push(format!("[{handle}]{heading} {}", shorten(chunk.text.trim(), 1_800)));
+            handles.push(handle);
+        }
+        let next = from_chunk + page.len();
+        if next < total {
+            lines.push(format!("(More: call read_file again with from_chunk={next}.)"));
+        }
+        Ok(ToolOutput {
+            for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
+            handles,
+        })
+    }
+
+    /// The files a filter means ("the pdfs in Finance"), by path, each with a handle and its state.
+    pub(in crate::agent) async fn tool_list_files(
+        &self,
+        ledger: &mut EvidenceLedger,
+        filter: &str,
+        limit: usize,
+    ) -> Result<ToolOutput> {
+        let workspace_id = ledger.workspace_id().to_owned();
+        let parsed = parse_filter(filter);
+        let files = match self.filter_files(&workspace_id, &parsed).await? {
+            Ok(files) => files,
+            Err(problem) => return Ok(ToolOutput::text(problem)),
+        };
+        if files.is_empty() {
+            return Ok(ToolOutput::text(format!(
+                "There are no {} in this workspace.",
+                parsed.describe()
+            )));
+        }
+        let limit = limit.clamp(1, LIST_FILES_MAX);
+        let states = self.lifecycle_by_file(&workspace_id).await;
+        let total = files.len();
+        let mut handles = Vec::new();
+        let mut lines = vec![format!("{total} {}:", parsed.describe())];
+        for file in files.iter().take(limit) {
+            let state = states.get(&file.id).map(String::as_str).or(Some("active"));
+            let handle = ledger.handle_for(EvidenceKind::File, &file.id, None, &file.title, &file.path, state);
+            lines.push(format!("[{handle}] {}{}", file.path, state_note(state)));
+            handles.push(handle);
+        }
+        if total > limit {
+            lines.push(format!("… {} more; narrow the filter to see them.", total - limit));
+        }
+        Ok(ToolOutput {
+            for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
+            handles,
+        })
+    }
+
+    /// What is known about a file apart from its text: its state, who owns and reviews it, its versions, where it came from
+    /// and what names it.
+    pub(in crate::agent) async fn tool_file_facts(
+        &self,
+        ledger: &mut EvidenceLedger,
+        file: &str,
+    ) -> Result<ToolOutput> {
+        let summary = match self.tool_file(ledger, file).await? {
+            Ok(summary) => summary,
+            Err(problem) => return Ok(ToolOutput::text(problem)),
+        };
+        let lifecycle = self.storage.get_artifact_lifecycle(&summary.id).await.ok();
+        let state = lifecycle
+            .as_ref()
+            .map(|found| found.status.as_str())
+            .unwrap_or("active");
+        let handle = ledger.handle_for(
+            EvidenceKind::File,
+            &summary.id,
+            None,
+            &summary.title,
+            &summary.path,
+            Some(state),
+        );
+        let mut lines = vec![format!(
+            "[{handle}] {} ({}), {}, updated {}",
+            summary.title,
+            summary.path,
+            summary.source_name,
+            summary.updated_at.get(..10).unwrap_or(&summary.updated_at)
+        )];
+        lines.push(format!("State: {}", state.replace('_', " ")));
+        if let Some(found) = &lifecycle {
+            if let Some(owner) = &found.owner {
+                lines.push(format!("Owner: {}", owner.display_name));
+            }
+            if let Some(by) = &found.reviewed_by {
+                lines.push(format!(
+                    "Last reviewed by {}{}",
+                    by.display_name,
+                    found
+                        .reviewed_at
+                        .as_deref()
+                        .map(|at| format!(" on {}", at.get(..10).unwrap_or(at)))
+                        .unwrap_or_default()
+                ));
+            }
+            if !found.review_note.trim().is_empty() {
+                lines.push(format!("Review note: {}", shorten(found.review_note.trim(), 300)));
+            }
+            if let Some(newer) = &found.superseded_by_artifact_id {
+                if let Ok(newer) = self.storage.get_artifact_summary(newer).await {
+                    if newer.workspace_id == summary.workspace_id {
+                        lines.push(format!("Superseded by {}", newer.path));
+                    }
+                }
+            }
+        }
+        if let Ok(Some(assignment)) = self.storage.review_assignment("evidence", &summary.id).await {
+            if let Some(reviewer) = &assignment.reviewer {
+                lines.push(format!("Reviewer: {}", reviewer.display_name));
+            }
+            if let Some(due) = &assignment.next_review_at {
+                lines.push(format!("Review due: {}", due.get(..10).unwrap_or(due)));
+            }
+        }
+        if let Ok(versions) = self.storage.list_artifact_versions(&summary.id).await {
+            if let Some(current) = versions.iter().find(|version| version.is_current) {
+                lines.push(format!("Version {} of {}", current.version, versions.len()));
+            }
+        }
+        if let Ok(detail) = self.storage.get_artifact(&summary.id).await {
+            if let Some(synced) = &detail.source_synced_at {
+                lines.push(format!("Source last synced {}", synced.get(..10).unwrap_or(synced)));
+            }
+        }
+        if let Ok(mentions) = self.artifact_mentions(&summary.id).await {
+            if !mentions.mentioned_in.is_empty() || !mentions.mentions.is_empty() {
+                lines.push(format!(
+                    "Named by {} {}, names {}",
+                    mentions.mentioned_in.len(),
+                    plural(mentions.mentioned_in.len(), "file", "files"),
+                    mentions.mentions.len()
+                ));
+            }
+        }
+        Ok(ToolOutput {
+            for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
+            handles: vec![handle],
+        })
+    }
+
+    /// The workspace in a few lines: what it holds and in what state.
+    pub(in crate::agent) async fn tool_workspace_brief(&self, ledger: &EvidenceLedger) -> Result<ToolOutput> {
+        let workspace_id = ledger.workspace_id();
+        let name = self
+            .storage
+            .list_workspaces()
+            .await
+            .ok()
+            .and_then(|all| all.into_iter().find(|workspace| workspace.id == workspace_id))
+            .map(|workspace| workspace.name)
+            .unwrap_or_else(|| "this workspace".to_owned());
+        let overview = self.storage.workspace_overview(workspace_id).await?;
+        let states = self.lifecycle_by_file(workspace_id).await;
+        let mut by_state = std::collections::BTreeMap::<String, usize>::new();
+        for state in states.values() {
+            *by_state.entry(state.replace('_', " ")).or_default() += 1;
+        }
+        let folders = self.storage.list_folders(workspace_id).await.unwrap_or_default();
+        let mut lines = vec![format!(
+            "{name}: {} {}, {} {} and {} {}.",
+            overview.artifact_count,
+            plural(overview.artifact_count as usize, "file", "files"),
+            overview.chunk_count,
+            plural(overview.chunk_count as usize, "indexed passage", "indexed passages"),
+            overview.memory_card_count,
+            plural(overview.memory_card_count as usize, "memory card", "memory cards"),
+        )];
+        if !by_state.is_empty() {
+            lines.push(format!(
+                "Reviewed files: {}.",
+                by_state
+                    .iter()
+                    .map(|(state, count)| format!("{count} {state}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        let mut top = folders
+            .iter()
+            .filter(|folder| folder.parent_id.is_none())
+            .map(|folder| (folder.file_count, folder.name.as_str()))
+            .collect::<Vec<_>>();
+        top.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(b.1)));
+        if !top.is_empty() {
+            lines.push(format!(
+                "Top folders: {}.",
+                top.iter()
+                    .take(8)
+                    .map(|(count, name)| format!("{name} ({count})"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        Ok(ToolOutput::text(bounded(&lines, TOOL_OUTPUT_CHARS)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_handle_is_the_same_each_time_and_new_for_new_things() {
+        let mut ledger = EvidenceLedger::new("w1");
+        let a = ledger.handle_for(EvidenceKind::Passage, "a1", Some("c1"), "A", "a.md", Some("active"));
+        let b = ledger.handle_for(EvidenceKind::Passage, "a1", Some("c2"), "A", "a.md", Some("active"));
+        let again = ledger.handle_for(EvidenceKind::Passage, "a1", Some("c1"), "A", "a.md", Some("active"));
+        let file = ledger.handle_for(EvidenceKind::File, "a1", None, "A", "a.md", None);
+        assert_eq!(
+            (a.as_str(), b.as_str(), again.as_str(), file.as_str()),
+            ("E1", "E2", "E1", "E3")
+        );
+        assert_eq!(ledger.items().len(), 3);
+    }
+
+    #[test]
+    fn handles_are_looked_up_as_the_model_writes_them() {
+        let mut ledger = EvidenceLedger::new("w1");
+        ledger.handle_for(EvidenceKind::Passage, "a1", Some("c1"), "A", "a.md", None);
+        assert_eq!(ledger.get("e1").map(|item| item.artifact_id.as_str()), Some("a1"));
+        assert!(ledger.get("[E1]").is_some());
+        assert!(ledger.get("E9").is_none());
+        assert_eq!(ledger.get("E1").map(|item| item.workspace_id.as_str()), Some("w1"));
+    }
+
+    async fn core(label: &str) -> (RepoMemoCore, std::path::PathBuf) {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let data_dir = std::env::temp_dir().join(format!("repomemo-atoms-{label}-{nanos}"));
+        (RepoMemoCore::boot(data_dir.clone()).await.unwrap(), data_dir)
+    }
+
+    async fn note(core: &RepoMemoCore, workspace_id: &str, title: &str, text: &str) -> ArtifactSummary {
+        let file = core
+            .import_text(
+                workspace_id.to_owned(),
+                title.to_owned(),
+                text.to_owned(),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+        core.index_artifact(file.id.clone()).await.unwrap();
+        file
+    }
+
+    #[tokio::test]
+    async fn the_atoms_read_one_workspace_and_name_what_they_show_with_stable_handles() {
+        let (core, data_dir) = core("atoms").await;
+        let here = core.create_workspace("Here".to_owned()).await.unwrap();
+        let elsewhere = core.create_workspace("Elsewhere".to_owned()).await.unwrap();
+        let retry = note(
+            &core,
+            &here.id,
+            "retry-policy.md",
+            "# Retries
+
+Retries wait twice as long each time, at most five times.",
+        )
+        .await;
+        note(
+            &core,
+            &elsewhere.id,
+            "secret.md",
+            "# Secret
+
+The retries here are private to another workspace.",
+        )
+        .await;
+
+        let mut ledger = EvidenceLedger::new(&here.id);
+        let found = core
+            .tool_search_evidence(&mut ledger, "retries", &[], None, 5)
+            .await
+            .unwrap();
+        assert!(found.for_model.contains("retry-policy.md"), "{}", found.for_model);
+        assert!(!found.for_model.contains("secret.md"));
+        assert!(found.handles.iter().all(|handle| handle.starts_with('E')));
+        let first = found.handles[0].clone();
+        let again = core
+            .tool_search_evidence(&mut ledger, "retries", &[], None, 5)
+            .await
+            .unwrap();
+        assert_eq!(again.handles[0], first, "the same passage keeps its handle");
+
+        // A file is read by name or by a handle it was shown with, and never from another workspace.
+        let read = core.tool_read_file(&mut ledger, "retry-policy.md", 0, 3).await.unwrap();
+        assert!(read.for_model.contains("twice as long"), "{}", read.for_model);
+        assert!(read.for_model.chars().count() <= TOOL_OUTPUT_CHARS + 20);
+        let by_handle = core.tool_read_file(&mut ledger, &first, 0, 1).await.unwrap();
+        assert!(by_handle.for_model.contains("retry-policy.md"));
+        let outside = core.tool_read_file(&mut ledger, "secret.md", 0, 1).await.unwrap();
+        assert!(
+            outside.for_model.contains("No file in this workspace"),
+            "{}",
+            outside.for_model
+        );
+        assert!(outside.handles.is_empty());
+        assert!(ledger.items().iter().all(|item| item.workspace_id == here.id));
+
+        let listed = core.tool_list_files(&mut ledger, "markdown files", 10).await.unwrap();
+        assert!(listed.for_model.contains("retry-policy.md") && !listed.for_model.contains("secret.md"));
+
+        let facts = core.tool_file_facts(&mut ledger, &retry.title).await.unwrap();
+        assert!(facts.for_model.contains("State: active"), "{}", facts.for_model);
+        assert!(facts.for_model.contains("Version 1 of 1"), "{}", facts.for_model);
+
+        let brief = core.tool_workspace_brief(&ledger).await.unwrap();
+        assert!(brief.for_model.starts_with("Here: 1 file"), "{}", brief.for_model);
+
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn output_is_cut_at_its_bound_and_counts_what_is_left_out() {
+        let lines = (1..=10)
+            .map(|n| format!("line {n} {}", "x".repeat(20)))
+            .collect::<Vec<_>>();
+        let text = bounded(&lines, 100);
+        assert!(text.chars().count() <= 100 + "\n… 10 more".len());
+        assert!(text.contains("line 1"));
+        assert!(text.contains("more"));
+        assert_eq!(bounded(&lines[..2], 1_000), format!("{}\n{}", lines[0], lines[1]));
+        let long = vec!["y".repeat(500)];
+        assert!(bounded(&long, 50).chars().count() <= 50);
+    }
+}

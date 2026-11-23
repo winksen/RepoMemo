@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.38 (2026-11-23)
+
+CAIRN gets the read tools a loop will chain, with evidence handles. Nothing a person sees changes yet.
+
+### Changed
+- **Five read tools.** `search_evidence` (passages by keywords and by meaning, optionally of some file kinds or in a folder, at most 12), `read_file` (a file's text a few chunks at a time, at most 6, saying where the next page starts), `list_files` (the files a filter such as "the pdfs in Finance" means, at most 40), `file_facts` (a file's state, owner, reviewer and review date, version, last sync of its source, and what names it) and `workspace_brief` (what the workspace holds and in what state). Each returns compact text cut at 6,000 characters, with "… N more" for what did not fit.
+- **Evidence handles.** Every passage or file a tool shows gets a handle (`E1`, `E2`, …) that stands for the same thing for the whole run and is the same each time a tool returns it. The model sees handles, never database ids, and a file can be named by name, path or a handle it was shown. A handle records its workspace, title, path and review state.
+- **One workspace, nothing held back.** The tools read through the same storage calls as search and the file lists, so files of other workspaces and files of a quarantined connector are never returned, and a name from another workspace is answered as not found.
+- Not connected to a chat yet: the loop that calls them arrives with V0.9.40. No route, setting, migration or screen changes.
+
+### Checks
+- Unit tests for handle allocation and lookup and for the output bound, and a test over a real workspace that the five tools find, read, list and describe a file, keep a handle stable, return nothing of another workspace and respect the bound; formatted and linted for the core; tests not run. Nothing was built or run, and the tools were not tried against a model.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.37 (2026-11-23)
 
 CAIRN's jobs are registered tools. No behaviour changes.

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.37` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.38` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.38 — CAIRN gets the read tools a loop will chain, with evidence handles. Nothing a person sees changes yet.
+
+- No change a person sees. The tools a later release lets CAIRN chain are in place: searching, reading a file page by page, listing files, a file's facts and a workspace brief, each citing evidence by handle.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.37 — CAIRN's jobs are registered tools. No behaviour changes.
 
