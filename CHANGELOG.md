@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.48 (2026-11-23)
+
+CAIRN remembers a long chat.
+
+### Changed
+- **A window that fits the model.** In a workspace with a provider, the turns CAIRN reads are the newest ones that fit 40% of the model's context window (found by *Test connection*, 8,192 tokens when unknown), not the last eight within 1,500 tokens. A turn is still kept whole or left out. With no provider the small window applies as before.
+- **A rolling summary of the rest.** What falls out of the window is kept as a short summary with the files those older turns were about. It is rewritten with one AI call when more than four turns have fallen out since it was written (the call uses one of your AI requests and is skipped when none is left), and the model reads it before the newest turns, in Agent mode and in the router's own prompts. A summary that claims turns the chat no longer has is dropped and rebuilt. Without a provider older turns are dropped, as before.
+- **"That file" still works.** "Summarize that file" at turn 30 means the file of turn 2 when the turns in the window were about no file, through the summary's files.
+- The summary is part of the chat: stored in a new column of the chat's row (migration `0089`), private to its owner, deleted with the chat and with the account. Nothing shows it in the chat.
+
+### Checks
+- Unit tests that a window of the model's own size keeps more turns than the router's, that the window start is right at both ends, that "that file" at turn 30 resolves through the summary and a file in the window is preferred, that a summary claiming turns the chat no longer has is rebuilt, and that the summary's files stay in order and bounded; a storage test of the summary's read, replace and clear; formatted and linted for the core, storage and server, generated types and migration lock pass; tests not run. Nothing was built or run: no real summary was written by a model and the migration did not run.
+
+### Upgrading
+- The migration runs on start. Existing chats have no summary until they pass the window.
+
 ## V0.9.47 (2026-11-23)
 
 Agent mode becomes the default for a model that has passed the live evaluation, and the router's keyword lists stop growing. No workspace changes mode yet.

@@ -10,7 +10,7 @@ use axum::{
 };
 use repomemo_api::{
     agent_capabilities, agent_conversation_title, agent_run_trace, agent_turn_label, attachment_reply,
-    capability_needs_write, HISTORY_MAX_TURNS,
+    capability_needs_write, history_window_start, usable_summary, TURNS_BEFORE_REFRESH,
 };
 use repomemo_domain::{
     AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail, AgentExchange, AgentHistoryFile,
@@ -151,18 +151,22 @@ pub(crate) async fn run_message(
     };
     // What goes with the question comes from the stored conversation, never
     // from the request, so a client cannot make the assistant "remember" text.
-    let (history, exchanges) = match &existing {
+    let (turns, history, exchanges) = match &existing {
         Some(conversation) => {
             let turns = state
                 .storage
                 .list_agent_turns(&conversation.id)
                 .await
                 .map_err(map_storage_error)?;
-            (history_of(&turns), exchanges_of(&turns))
+            let (history, exchanges) = (history_of(&turns), exchanges_of(&turns));
+            (turns, history, exchanges)
         }
-        None => (Vec::new(), Vec::new()),
+        None => (Vec::new(), Vec::new(), Vec::new()),
     };
     let provider = text_provider(state, &workspace_id).await?;
+    let context_tokens = provider
+        .as_ref()
+        .map(|provider| repomemo_ai::ModelTraits::from_metadata(&provider.metadata).context_tokens);
     let provider_model = provider.as_ref().map(|provider| {
         (
             provider.model.clone().filter(|model| !model.trim().is_empty()),
@@ -217,6 +221,18 @@ pub(crate) async fn run_message(
         None => (None, None),
     };
     let provider_for_run = provider_id.clone();
+    // What goes with the message from the chat's older turns: as many as the model's window has room for, and a summary of the rest.
+    let (history, summary, history_tokens) = conversation_memory(
+        state,
+        subject,
+        &workspace_id,
+        existing.as_ref().map(|conversation| conversation.id.as_str()),
+        &turns,
+        history,
+        provider_id.as_deref(),
+        context_tokens,
+    )
+    .await;
     let started_at = chrono::Utc::now();
     let outcome = state
         .core
@@ -230,6 +246,8 @@ pub(crate) async fn run_message(
                 provider_id,
                 ai_unavailable_reason,
                 history,
+                summary,
+                history_tokens,
                 exchanges,
             },
             agent_setup,
@@ -464,8 +482,74 @@ pub(crate) async fn delete_agent_conversation(
 /// The newest turns of a conversation as the assistant is reminded of them.
 /// A turn is about the files its reply listed or summarized, else those it
 /// cited; the core trims the lot to its token budget.
+/// The most stored turns of a chat read to build its history; the core keeps the newest that fit the model's window.
+const MAX_TURNS_READ: usize = 200;
+
+/// What goes with a message from the chat's older turns (V0.9.48). With a provider, the newest turns that fit 40% of the model's
+/// window and a stored summary of the older ones, rewritten with one AI call when more than a few turns have fallen out since it
+/// was written (the call uses one of the person's AI requests, and is skipped when none is left). A summary that claims turns the
+/// chat no longer has is dropped and rebuilt. Without a provider the router's own small window applies and older turns are dropped.
+#[allow(clippy::too_many_arguments)]
+async fn conversation_memory(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: &str,
+    conversation_id: Option<&str>,
+    turns: &[AgentTurn],
+    history: Vec<AgentHistoryTurn>,
+    provider_id: Option<&str>,
+    context_tokens: Option<u32>,
+) -> (
+    Vec<AgentHistoryTurn>,
+    Option<repomemo_domain::AgentSummary>,
+    Option<usize>,
+) {
+    let (Some(conversation_id), Some(provider_id), Some(context_tokens)) =
+        (conversation_id, provider_id, context_tokens)
+    else {
+        return (history, None, None);
+    };
+    let budget = (context_tokens as usize * 40 / 100).max(500);
+    let start = history_window_start(&history, budget);
+    let stored = state.storage.get_agent_summary(conversation_id).await.ok().flatten();
+    let last_position = turns.last().map_or(0, |turn| turn.position);
+    let mut summary = usable_summary(stored.clone(), last_position);
+    if stored.is_some() && summary.is_none() {
+        let _ = state.storage.set_agent_summary(conversation_id, None).await;
+    }
+    let covered = summary.as_ref().map_or(0, |summary| summary.covers_up_to);
+    let offset = turns.len().saturating_sub(history.len());
+    let fallen: Vec<(i64, AgentHistoryTurn)> = history[..start]
+        .iter()
+        .enumerate()
+        .filter_map(|(index, turn)| {
+            let position = turns.get(offset + index)?.position;
+            (position > covered).then(|| (position, turn.clone()))
+        })
+        .collect();
+    if fallen.len() > TURNS_BEFORE_REFRESH && ai_access::consume_ai_quota(state, subject).is_ok() {
+        match state
+            .core
+            .summarize_conversation(provider_id, workspace_id, summary.as_ref(), &fallen)
+            .await
+        {
+            Ok(fresh) => {
+                if let Err(error) = state.storage.set_agent_summary(conversation_id, Some(&fresh)).await {
+                    tracing::warn!(error = %format!("{error:#}"), "A CAIRN chat summary could not be stored");
+                }
+                summary = Some(fresh);
+            }
+            Err(error) => {
+                tracing::warn!(error = %format!("{error:#}"), "A CAIRN chat summary could not be written");
+            }
+        }
+    }
+    let kept = history[start..].to_vec();
+    (kept, summary.filter(|_| start > 0), Some(budget))
+}
+
 fn history_of(turns: &[AgentTurn]) -> Vec<AgentHistoryTurn> {
-    let start = turns.len().saturating_sub(HISTORY_MAX_TURNS);
+    let start = turns.len().saturating_sub(MAX_TURNS_READ);
     turns[start..]
         .iter()
         .map(|turn| {

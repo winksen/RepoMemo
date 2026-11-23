@@ -26,7 +26,8 @@ use super::tools::atoms::{
 use super::tools::{tool_for, CairnTool};
 use super::trace::RunTrace;
 use super::{
-    cairn_persona, fit_history, shorten, ASK_SOURCE_RULE, FILE_RESULT_LIMIT, MAX_MESSAGE_CHARS, MEMORY_CARDS_SHOWN,
+    cairn_persona, shorten, summary_text, window, ASK_SOURCE_RULE, FILE_RESULT_LIMIT, MAX_MESSAGE_CHARS,
+    MEMORY_CARDS_SHOWN,
 };
 use crate::RepoMemoCore;
 
@@ -583,10 +584,14 @@ impl RepoMemoCore {
         setup: AgentLoopSetup,
     ) -> Result<AgentOutcome> {
         let message = request.message.trim().to_owned();
-        let history = fit_history(&request.history);
+        let history = window(&request);
         let tools = loop_tools(setup.can_write);
         let specs = tools.iter().map(LoopTool::spec).collect::<Vec<_>>();
-        let mut messages = vec![ChatMessage::new(ChatRole::System, loop_system(&tools))];
+        let mut system = loop_system(&tools);
+        if let Some(summary) = summary_text(request.summary.as_ref()) {
+            system = format!("{system}\n\n{summary}");
+        }
+        let mut messages = vec![ChatMessage::new(ChatRole::System, system)];
         messages.extend(history_messages(&history));
         messages.push(ChatMessage::new(ChatRole::User, message.clone()));
 
@@ -823,6 +828,8 @@ mod tests {
             ai_unavailable_reason: None,
             history: Vec::new(),
             artifact_ids: Vec::new(),
+            summary: None,
+            history_tokens: None,
             exchanges: Vec::new(),
         }
     }

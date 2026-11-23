@@ -3392,3 +3392,40 @@ async fn a_run_trace_is_kept_with_its_steps_and_goes_with_its_chat_and_its_age()
     assert_eq!(storage.count_agent_runs(&again.id).await.unwrap(), 0);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// V0.9.48: a chat keeps a rolling summary of its older turns, which can be read, replaced and cleared, and goes with the chat.
+#[tokio::test]
+async fn a_chat_keeps_a_summary_of_its_older_turns_until_it_is_cleared_or_the_chat_goes() {
+    use repomemo_domain::{AgentHistoryFile, AgentSummary};
+    let (storage, data_dir) = temp_storage("chat-summary").await;
+    let user = storage
+        .create_user("summary@example.com", "Summary", "hash")
+        .await
+        .unwrap();
+    let workspace = storage.create_workspace("Summary").await.unwrap();
+    let conversation = storage
+        .create_agent_conversation(&workspace.id, &user.id, "A long chat")
+        .await
+        .unwrap();
+    assert!(storage.get_agent_summary(&conversation.id).await.unwrap().is_none());
+    let summary = AgentSummary {
+        text: "We looked at the retry policy.".to_owned(),
+        covers_up_to: 24,
+        files: vec![AgentHistoryFile {
+            id: "f2".to_owned(),
+            title: "retry-policy.md".to_owned(),
+        }],
+    };
+    storage
+        .set_agent_summary(&conversation.id, Some(&summary))
+        .await
+        .unwrap();
+    let read = storage.get_agent_summary(&conversation.id).await.unwrap().unwrap();
+    assert_eq!((read.covers_up_to, read.files.len()), (24, 1));
+    assert_eq!(read.text, "We looked at the retry policy.");
+    storage.set_agent_summary(&conversation.id, None).await.unwrap();
+    assert!(storage.get_agent_summary(&conversation.id).await.unwrap().is_none());
+    // Another chat has its own, and an unknown one has none.
+    assert!(storage.get_agent_summary("no-such-chat").await.unwrap().is_none());
+    let _ = std::fs::remove_dir_all(data_dir);
+}

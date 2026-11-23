@@ -2688,6 +2688,18 @@ export interface AgentConversationDetail {
   turns: AgentTurn[];
 }
 
+/**
+ * What a CAIRN chat remembers of its older turns (V0.9.48): a short summary, how far it reaches and the files those turns were
+ * about, so "that file" still means the file of turn 2 at turn 30.
+ */
+export interface AgentSummary {
+  text: string;
+  /** The position of the last turn the summary covers. */
+  covers_up_to: number;
+  /** The files the covered turns were about, oldest first. */
+  files: AgentHistoryFile[];
+}
+
 export interface AgentRequest {
   workspace_id: string;
   message: string;
@@ -2713,6 +2725,10 @@ export interface AgentRequest {
    * checked against the workspace before they are used.
    */
   artifact_ids: string[];
+  /** What the chat remembers of turns older than `history` (V0.9.48). The server fills it from the stored conversation. */
+  summary: AgentSummary | null;
+  /** How many estimated tokens of `history` the model's window has room for; the router's own small budget when none (V0.9.48). */
+  history_tokens: number | null;
   /**
    * Every earlier exchange of the conversation in full, oldest first (V0.9.10), for the jobs that act on an earlier
    * answer, such as saving it as a memory card. Like `history`, the server fills it from the stored conversation.

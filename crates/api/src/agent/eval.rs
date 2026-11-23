@@ -249,6 +249,8 @@ async fn the_scripted_cases_pass_and_meet_the_thresholds() {
                     ai_unavailable_reason: None,
                     history: Vec::new(),
                     artifact_ids: Vec::new(),
+                    summary: None,
+                    history_tokens: None,
                     exchanges: Vec::new(),
                 },
                 AgentLoopSetup {

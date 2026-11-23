@@ -3087,6 +3087,18 @@ pub struct AgentConversationDetail {
     pub turns: Vec<AgentTurn>,
 }
 
+/// What a CAIRN chat remembers of its older turns (V0.9.48): a short summary, how far it reaches and the files those turns were
+/// about, so "that file" still means the file of turn 2 at turn 30.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentSummary {
+    pub text: String,
+    /// The position of the last turn the summary covers.
+    pub covers_up_to: i64,
+    /// The files the covered turns were about, oldest first.
+    #[serde(default)]
+    pub files: Vec<AgentHistoryFile>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRequest {
     pub workspace_id: String,
@@ -3110,6 +3122,12 @@ pub struct AgentRequest {
     /// checked against the workspace before they are used.
     #[serde(default)]
     pub artifact_ids: Vec<String>,
+    /// What the chat remembers of turns older than `history` (V0.9.48). The server fills it from the stored conversation.
+    #[serde(default)]
+    pub summary: Option<AgentSummary>,
+    /// How many estimated tokens of `history` the model's window has room for; the router's own small budget when none (V0.9.48).
+    #[serde(default)]
+    pub history_tokens: Option<usize>,
     /// Every earlier exchange of the conversation in full, oldest first (V0.9.10), for the jobs that act on an earlier
     /// answer, such as saving it as a memory card. Like `history`, the server fills it from the stored conversation.
     #[serde(default)]

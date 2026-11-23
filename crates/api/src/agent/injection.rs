@@ -84,6 +84,8 @@ fn request(workspace_id: &str, message: &str) -> AgentRequest {
         ai_unavailable_reason: None,
         history: Vec::new(),
         artifact_ids: Vec::new(),
+        summary: None,
+        history_tokens: None,
         exchanges: Vec::new(),
     }
 }

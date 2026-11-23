@@ -29,7 +29,12 @@ use files::{
 mod ledger;
 mod proposals;
 mod run;
+mod summary;
 pub use run::{AgentLoopSetup, AgentOutcome, ProgressHook};
+#[cfg(test)]
+use summary::fit_history;
+use summary::{earlier_file_for, summary_text, window};
+pub use summary::{history_window_start, usable_summary, TURNS_BEFORE_REFRESH};
 mod tools;
 mod trace;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};
@@ -296,10 +301,10 @@ impl RepoMemoCore {
             repomemo_domain::bail_invalid!("Messages must be between 1 and {MAX_MESSAGE_CHARS} characters.");
         }
 
-        let history = fit_history(&request.history);
+        let history = window(&request);
         // "Summarize it" and "summarize that file" mean the file just discussed.
         let earlier_file = if request.capability.is_none() && request.artifact_id.is_none() {
-            last_file(&history).filter(|_| asks_for_earlier_file(message))
+            earlier_file_for(&history, request.summary.as_ref()).filter(|_| asks_for_earlier_file(message))
         } else {
             None
         };
@@ -530,30 +535,6 @@ fn shorten(text: &str, limit: usize) -> String {
     }
     let cut = flat.chars().take(limit.saturating_sub(1)).collect::<String>();
     format!("{}…", cut.trim_end())
-}
-
-/// The earlier turns that go with a question, oldest first: the newest ones
-/// whose questions and (shortened) answers fit `HISTORY_TOKEN_BUDGET`. A turn
-/// is kept whole or left out, so the model never reads half an exchange.
-pub fn fit_history(history: &[AgentHistoryTurn]) -> Vec<AgentHistoryTurn> {
-    let mut kept = Vec::new();
-    let mut spent = 0;
-    for turn in history.iter().rev().take(HISTORY_MAX_TURNS) {
-        let question = shorten(&turn.question, HISTORY_ANSWER_CHARS / 3);
-        let answer = shorten(&turn.answer, HISTORY_ANSWER_CHARS);
-        let cost = estimate_tokens(&question) + estimate_tokens(&answer);
-        if spent + cost > HISTORY_TOKEN_BUDGET {
-            break;
-        }
-        spent += cost;
-        kept.push(AgentHistoryTurn {
-            question,
-            answer,
-            files: turn.files.clone(),
-        });
-    }
-    kept.reverse();
-    kept
 }
 
 /// The one file the latest turn that had any was about. None when that turn

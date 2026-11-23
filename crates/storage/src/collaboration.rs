@@ -400,6 +400,33 @@ impl StorageEngine {
         Ok(())
     }
 
+    /// The rolling summary of a chat's older turns, when it has one (V0.9.48).
+    pub async fn get_agent_summary(&self, conversation_id: &str) -> Result<Option<repomemo_domain::AgentSummary>> {
+        let stored: Option<Option<String>> =
+            sqlx::query_scalar("SELECT summary_json FROM assistant_conversations WHERE id = ?1")
+                .bind(conversation_id)
+                .fetch_optional(self.reader())
+                .await?;
+        Ok(stored
+            .flatten()
+            .and_then(|json| serde_json::from_str::<repomemo_domain::AgentSummary>(&json).ok()))
+    }
+
+    /// Stores the summary of a chat's older turns, or clears it.
+    pub async fn set_agent_summary(
+        &self,
+        conversation_id: &str,
+        summary: Option<&repomemo_domain::AgentSummary>,
+    ) -> Result<()> {
+        let json = summary.map(serde_json::to_string).transpose()?;
+        sqlx::query("UPDATE assistant_conversations SET summary_json = ?2 WHERE id = ?1")
+            .bind(conversation_id)
+            .bind(json)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn list_agent_turns(&self, conversation_id: &str) -> Result<Vec<AgentTurn>> {
         let rows = sqlx::query_as::<_, AgentTurnRow>("SELECT id, conversation_id, position, label, request_json, reply_json, created_at FROM assistant_turns WHERE conversation_id = ?1 ORDER BY position")
             .bind(conversation_id)
