@@ -626,6 +626,13 @@ export interface AgentReply {
   memory_cards?: MemoryCardSummary[];
   /** The proposals of the reply as one set to apply together (V0.9.44). */
   changeset?: AgentChangeset | null;
+  /** How far the sources the answer cites can be trusted (V0.9.45). */
+  trust?: AgentTrust | null;
+}
+
+export interface AgentTrust {
+  summary: string;
+  sources: { artifact_id: string; state: string; untrusted?: string | null; synced_days_ago?: number | null }[];
 }
 
 export interface AgentChangeset {

@@ -496,6 +496,7 @@ fn reply(markdown: impl Into<String>) -> AgentReply {
         file_set: None,
         memory_cards: Vec::new(),
         changeset: None,
+        trust: None,
     }
 }
 

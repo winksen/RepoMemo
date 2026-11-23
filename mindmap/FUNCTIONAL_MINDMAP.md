@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.44` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.45` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.45 — An Agent answer says how far its sources can be trusted.
+
+- **Trust at a glance.** Under an Agent answer, one line says how many of its sources are verified, outdated or need review, and which come from outside the workspace and how fresh they are; each source carries its badge and a stale or outside source is called out.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.44 — CAIRN's changes come as one set of ticked actions.
 

@@ -2,7 +2,7 @@
 //! count: the ones it read become the evidence list, in the order they are cited and numbered to match the markers in the text;
 //! any other is removed from the text and reported. An answer that rests on files the run read and cites none of them says so.
 
-use repomemo_domain::Citation;
+use repomemo_domain::{AgentSourceState, Citation};
 
 use super::tools::atoms::EvidenceLedger;
 
@@ -125,6 +125,86 @@ pub(in crate::agent) fn check_answer(ledger: &EvidenceLedger, answer: &str, says
     }
 }
 
+/// The line under an answer about its sources (V0.9.45): how many are verified, need review, are outdated or superseded or have not
+/// been reviewed, and for each kind of outside content how many there are and how long ago the oldest was synced.
+pub(in crate::agent) fn trust_summary(sources: &[AgentSourceState]) -> Option<String> {
+    if sources.is_empty() {
+        return None;
+    }
+    let count = |state: &str| {
+        sources
+            .iter()
+            .filter(|source| source.untrusted.is_none() && source.state == state)
+            .count()
+    };
+    let mut parts = Vec::new();
+    for (state, label) in [
+        ("verified", "verified"),
+        ("needs_review", "needing review"),
+        ("outdated", "outdated"),
+        ("superseded", "superseded"),
+        ("active", "not reviewed"),
+    ] {
+        let found = count(state);
+        if found > 0 {
+            parts.push(format!("{found} {label}"));
+        }
+    }
+    let mut kinds: Vec<&str> = Vec::new();
+    for source in sources {
+        if let Some(kind) = source.untrusted.as_deref() {
+            if !kinds.contains(&kind) {
+                kinds.push(kind);
+            }
+        }
+    }
+    for kind in kinds {
+        let from = sources
+            .iter()
+            .filter(|source| source.untrusted.as_deref() == Some(kind))
+            .collect::<Vec<_>>();
+        let oldest = from.iter().filter_map(|source| source.synced_days_ago).max();
+        parts.push(match oldest {
+            Some(days) => format!(
+                "{} from {kind} (synced {})",
+                from.len(),
+                if days == 0 {
+                    "today".to_owned()
+                } else if days == 1 {
+                    "1 day ago".to_owned()
+                } else {
+                    format!("{days} days ago")
+                }
+            ),
+            None => format!("{} from {kind}", from.len()),
+        });
+    }
+    Some(parts.join(" · "))
+}
+
+/// What to say next to an answer that rests on a source that may be wrong: one warning naming each such source.
+pub(in crate::agent) fn trust_warnings(citations: &[Citation], sources: &[AgentSourceState]) -> Vec<String> {
+    let mut warnings = Vec::new();
+    for source in sources {
+        let title = citations
+            .iter()
+            .find(|citation| citation.artifact_id == source.artifact_id)
+            .map_or("a source", |citation| citation.title.as_str());
+        match (source.state.as_str(), source.untrusted.as_deref()) {
+            ("outdated", _) => warnings.push(format!("This answer rests on {title}, which is marked outdated.")),
+            ("superseded", _) => warnings.push(format!(
+                "This answer rests on {title}, which a newer file has replaced."
+            )),
+            ("needs_review", _) => warnings.push(format!("This answer rests on {title}, which is waiting for review.")),
+            (_, Some(kind)) => warnings.push(format!(
+                "{title} is {kind} from outside the workspace; check it before you rely on this answer."
+            )),
+            _ => {}
+        }
+    }
+    warnings
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,6 +257,52 @@ mod tests {
         let nothing_read = check_answer(&EvidenceLedger::new("w1"), "Hello! How can I help?", false);
         assert_eq!(nothing_read.markdown, "Hello! How can I help?");
         assert!(nothing_read.warnings.is_empty());
+    }
+
+    fn source(id: &str, state: &str, untrusted: Option<&str>, synced: Option<i64>) -> AgentSourceState {
+        AgentSourceState {
+            artifact_id: id.to_owned(),
+            state: state.to_owned(),
+            untrusted: untrusted.map(str::to_owned),
+            synced_days_ago: synced,
+        }
+    }
+
+    #[test]
+    fn the_summary_counts_states_and_outside_content_with_how_stale_it_is() {
+        let sources = [
+            source("a", "verified", None, None),
+            source("b", "verified", None, None),
+            source("c", "verified", None, None),
+            source("d", "outdated", None, None),
+            source("e", "active", Some("an issue"), Some(9)),
+        ];
+        assert_eq!(
+            trust_summary(&sources).as_deref(),
+            Some("3 verified · 1 outdated · 1 from an issue (synced 9 days ago)")
+        );
+        assert_eq!(trust_summary(&[]), None);
+        assert_eq!(
+            trust_summary(&[source("a", "needs_review", None, None)]).as_deref(),
+            Some("1 needing review")
+        );
+    }
+
+    #[test]
+    fn an_answer_resting_on_an_outdated_file_says_so() {
+        let citations = ledger_citations();
+        let warnings = trust_warnings(&citations, &[source("a1", "outdated", None, None)]);
+        assert_eq!(
+            warnings,
+            vec!["This answer rests on retries.md, which is marked outdated.".to_owned()]
+        );
+        assert!(trust_warnings(&citations, &[source("a1", "verified", None, None)]).is_empty());
+        let outside = trust_warnings(&citations, &[source("a1", "active", Some("an issue"), None)]);
+        assert!(outside[0].contains("from outside the workspace"));
+    }
+
+    fn ledger_citations() -> Vec<Citation> {
+        check_answer(&ledger(), "See [E1].", false).citations
     }
 
     #[test]

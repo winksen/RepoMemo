@@ -592,16 +592,21 @@ function routingNote(reply: AgentReply, capabilities: AgentCapabilities | null) 
 
 const EVIDENCE_PREVIEW_LIMIT = 5;
 
-function Evidence({ accessToken, citations, isQuestion, onOpenArtifact }: { accessToken: string; citations: AgentReply["citations"]; isQuestion: boolean; onOpenArtifact: (artifactId: string) => void }) {
+const STATE_BADGES: Record<string, string> = { verified: "verified", needs_review: "needs review", outdated: "outdated", superseded: "superseded" };
+
+function Evidence({ accessToken, citations, isQuestion, onOpenArtifact, trust }: { accessToken: string; citations: AgentReply["citations"]; isQuestion: boolean; onOpenArtifact: (artifactId: string) => void; trust?: AgentReply["trust"] }) {
+  const badgeOf = (artifactId: string) => { const found = trust?.sources.find((source) => source.artifact_id === artifactId); return found?.untrusted ? `from ${found.untrusted}` : found ? STATE_BADGES[found.state] ?? null : null; };
   const [showAll, setShowAll] = useState(false);
   const hidden = citations.length - EVIDENCE_PREVIEW_LIMIT;
   const renderCitation = (citation: AgentReply["citations"][number], index: number, onOpen: (artifactId: string) => void) => <span className="shared-assistant-citation-row" key={`${citation.artifact_id}-${citation.chunk_id ?? "artifact"}`}>
     <button className="shared-assistant-citation" onClick={() => onOpen(citation.artifact_id)} type="button">{/* Answers cite their passages as [1], [2]… in this order. */}{isQuestion ? `[${index + 1}] ` : ""}{citation.title} · {citation.path}{citation.start_line ? ` · line ${citation.start_line}` : ""}</button>
     {citationChange(citation) ? <small className="shared-citation-change">{citationChange(citation)}</small> : null}
+    {badgeOf(citation.artifact_id) ? <small className="shared-citation-change">{badgeOf(citation.artifact_id)}</small> : null}
     <ViewAtCommit accessToken={accessToken} citation={citation} />
   </span>;
   return <div className="shared-ai-citations">
     <strong>What {ASSISTANT_NAME} read</strong>
+    {trust?.summary ? <small>{trust.summary}</small> : null}
     {citations.slice(0, EVIDENCE_PREVIEW_LIMIT).map((citation, index) => renderCitation(citation, index, onOpenArtifact))}
     {hidden > 0 ? <button className="shared-assistant-citation-more" onClick={() => setShowAll(true)} type="button">Show all {citations.length} sources</button> : null}
     {showAll ? <Dialog size="lg" footer={<DialogCancel label="Close" onClick={() => setShowAll(false)} />} onClose={() => setShowAll(false)} open title={`What ${ASSISTANT_NAME} read (${citations.length})`}>
@@ -731,7 +736,7 @@ function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, i
       </div> : null}
     </li>)}</ul> : null}
     {reply.changeset ? <Changeset deciding={deciding} onChangeset={(action, ids, counts) => onChangeset(turnId, action, ids, counts)} reply={reply} turnId={turnId} /> : (reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
-    {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question" || reply.routing === "agent"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
+    {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question" || reply.routing === "agent"} citations={reply.citations} onOpenArtifact={onOpenArtifact} trust={reply.trust} /> : null}
     {turnId ? <RunTrace accessToken={accessToken} key={turnId} turnId={turnId} /> : null}
   </div>;
 }

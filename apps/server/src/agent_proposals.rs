@@ -436,6 +436,7 @@ mod tests {
                     state: state.to_owned(),
                     outcome: None,
                 }),
+                trust: None,
             },
             created_at: String::new(),
         }

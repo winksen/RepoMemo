@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.45 (2026-11-23)
+
+An Agent answer says how far its sources can be trusted.
+
+### Changed
+- **The state of each source.** Each passage or file a tool shows CAIRN already carries its review state (verified, needs review, outdated, superseded; nothing is said for a file never reviewed). The rules CAIRN works under now require it to say so in the answer when it rests on a source marked outdated, superseded or needing review, or on content from outside the workspace.
+- **A line under each answer.** Under **What CAIRN read**, one line counts the sources the answer cites by state, and the outside content by kind with how long ago its source was last synced: *3 verified · 1 outdated · 1 from an issue (synced 9 days ago)*. Files never reviewed are counted as *not reviewed*.
+- **A badge on each source.** The evidence rows carry the same badge as in Evidence (*verified*, *needs review*, *outdated*, *superseded*) or *from an issue / a pull request / a mail*.
+- **A warning for a source that may be wrong.** An answer citing an outdated or superseded file, one waiting for review, or outside content gets a warning naming the source ("This answer rests on retries.md, which is marked outdated.").
+- Only answers of the loop have it; Jobs mode is unchanged. The domain's reply gains an optional `trust`; older stored replies simply have none. No migration or setting changes.
+
+### Checks
+- Unit tests that the line counts states and outside content as above, that an outdated file, a superseded one, one needing review and outside content each give their warning and a verified file gives none; formatted and linted for the core, the storage and the server, typecheck and the generated types pass; tests not run. Nothing was built or run; whether a model says so in its own words was not measured.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.44 (2026-11-23)
 
 CAIRN's changes come as one set of ticked actions.

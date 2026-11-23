@@ -3177,6 +3177,31 @@ pub struct AgentReply {
     /// The reply's proposals taken as one set to apply together (V0.9.44); none for a reply of the router.
     #[serde(default)]
     pub changeset: Option<AgentChangeset>,
+    /// How far the sources an answer cites can be trusted (V0.9.45); only a run of the loop has it.
+    #[serde(default)]
+    pub trust: Option<AgentTrust>,
+}
+
+/// What the sources an answer rests on are like: their review state and where they came from.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentTrust {
+    /// One line for under the answer, such as `3 verified · 1 outdated · 1 from an issue (synced 9 days ago)`.
+    pub summary: String,
+    pub sources: Vec<AgentSourceState>,
+}
+
+/// One cited file's state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSourceState {
+    pub artifact_id: String,
+    /// `verified`, `needs_review`, `outdated`, `superseded` or `active` (never reviewed).
+    pub state: String,
+    /// What kind of untrusted content it is ("an issue"), when it is.
+    #[serde(default)]
+    pub untrusted: Option<String>,
+    /// For content from a connector: how many days ago its source was last synced.
+    #[serde(default)]
+    pub synced_days_ago: Option<i64>,
 }
 
 /// A run's proposals as one card of ticked actions, applied in order as the person when they confirm it.

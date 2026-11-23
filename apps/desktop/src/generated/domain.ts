@@ -2779,6 +2779,26 @@ export interface AgentReply {
   memory_cards: MemoryCardSummary[];
   /** The reply's proposals taken as one set to apply together (V0.9.44); none for a reply of the router. */
   changeset: AgentChangeset | null;
+  /** How far the sources an answer cites can be trusted (V0.9.45); only a run of the loop has it. */
+  trust: AgentTrust | null;
+}
+
+/** What the sources an answer rests on are like: their review state and where they came from. */
+export interface AgentTrust {
+  /** One line for under the answer, such as `3 verified · 1 outdated · 1 from an issue (synced 9 days ago)`. */
+  summary: string;
+  sources: AgentSourceState[];
+}
+
+/** One cited file's state. */
+export interface AgentSourceState {
+  artifact_id: string;
+  /** `verified`, `needs_review`, `outdated`, `superseded` or `active` (never reviewed). */
+  state: string;
+  /** What kind of untrusted content it is ("an issue"), when it is. */
+  untrusted: string | null;
+  /** For content from a connector: how many days ago its source was last synced. */
+  synced_days_ago: number | null;
 }
 
 /** A run's proposals as one card of ticked actions, applied in order as the person when they confirm it. */

@@ -166,6 +166,7 @@ mod tests {
             file_set: None,
             memory_cards: Vec::new(),
             changeset: None,
+            trust: None,
         }
     }
 
