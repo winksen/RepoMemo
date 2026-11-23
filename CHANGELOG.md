@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.47 (2026-11-23)
+
+Agent mode becomes the default for a model that has passed the live evaluation, and the router's keyword lists stop growing. No workspace changes mode yet.
+
+### Changed
+- **A default for models with a passing report.** `REPOMEMO_CAIRN_EVAL_PASSED_MODELS` lists the models the maintainer has recorded a passing live report for (`npm run cairn:eval`, V0.9.46: citation precision at least 0.9, no forbidden action, tool accuracy at least 0.8). A workspace whose text provider has native tool calling and one of those models and whose administrator has not chosen a mode now starts in *Agent*; every other workspace stays in *Jobs*. An administrator's choice always wins, and a saved *Jobs* choice is kept so the default cannot switch it back. **The list is empty, so nothing changes until the maintainer has run the evaluation against a real model and listed it**; this release does not claim any model passes.
+- **The keyword lists are frozen.** A test counts the phrases in the router's lists in `agent.rs` (136) and fails when there are more: the loop reads the message itself, so a new wording is not taught with a new phrase.
+- **Narrowed.** The classification call (`route_by_model`) is not removed. Workspaces in Jobs mode still use it for messages the rules do not recognise, and removing it changes their behaviour, which the plan allows only after a live report has passed. It goes in the release that records the first passing report.
+- Settings › AI shows the mode the workspace is really in. No migration; one new server setting, `REPOMEMO_CAIRN_EVAL_PASSED_MODELS` (empty by default).
+
+### Checks
+- Unit tests that a model defaults to Agent mode only when listed (case and spaces ignored, nothing when the list is empty) and that the router's keyword count has not grown; formatted and linted for the AI crate, the core and the server; tests not run. Nothing was built or run, and no model has been evaluated live.
+
+### Upgrading
+- Nothing to do. After running `npm run cairn:eval` for a model and reading its report, list the model in `REPOMEMO_CAIRN_EVAL_PASSED_MODELS` to make Agent mode its workspaces' default.
+
 ## V0.9.46 (2026-11-23)
 
 CAIRN has an evaluation set, a scripted run of it and a live runner. Nothing a person sees changes.

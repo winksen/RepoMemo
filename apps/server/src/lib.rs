@@ -406,6 +406,7 @@ async fn build_state(
     }) {
         tracing::debug!("The AI endpoint policy was already set in this process");
     }
+    repomemo_ai::set_agent_default_models(config.cairn_eval_passed_models.clone());
     repomemo_api::set_document_time_limit(config.document_time_limit);
     repomemo_api::set_document_memory_limit_mb(config.document_memory_mb);
     // Readings run in a child process (this program started as a reader), so

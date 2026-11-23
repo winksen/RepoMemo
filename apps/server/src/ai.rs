@@ -271,14 +271,20 @@ pub(crate) fn provider_endpoint(provider_type: &str, base_url: Option<&str>) -> 
     )
 }
 
-/// How CAIRN answers in the workspace of a provider: `agent` only when it was chosen and the model takes tools.
-pub(crate) fn cairn_mode_of(metadata: &serde_json::Value) -> &'static str {
-    let chosen = metadata.get("cairn_mode").and_then(serde_json::Value::as_str) == Some("agent");
-    let tools = repomemo_ai::ModelTraits::from_metadata(metadata).tool_mode != repomemo_ai::ToolMode::None;
-    if chosen && tools {
-        "agent"
-    } else {
-        "jobs"
+/// How CAIRN answers in the workspace of a provider (V0.9.47). What an administrator chose wins (Agent only for a model that takes
+/// tools). With no choice, a native tool-calling model that has a passing live evaluation report on record starts in Agent mode,
+/// and every other model, and every model until a report is recorded, in Jobs mode.
+pub(crate) fn cairn_mode_of(provider: &ProviderSettings) -> &'static str {
+    let tool_mode = repomemo_ai::ModelTraits::from_metadata(&provider.metadata).tool_mode;
+    match provider.metadata.get("cairn_mode").and_then(serde_json::Value::as_str) {
+        Some("agent") if tool_mode != repomemo_ai::ToolMode::None => "agent",
+        Some("agent") | Some("jobs") => "jobs",
+        _ if tool_mode == repomemo_ai::ToolMode::Native
+            && repomemo_ai::agent_default_for(provider.model.as_deref()) =>
+        {
+            "agent"
+        }
+        _ => "jobs",
     }
 }
 
@@ -286,6 +292,7 @@ pub(crate) fn shared_provider_settings(provider: ProviderSettings) -> SharedAiPr
     let purpose = provider.purpose().to_owned();
     let known = repomemo_ai::ModelTraits::is_known(&provider.metadata);
     let traits = repomemo_ai::ModelTraits::from_metadata(&provider.metadata);
+    let cairn_mode = cairn_mode_of(&provider).to_owned();
     SharedAiProviderSettings {
         id: provider.id,
         provider_type: provider.provider_type,
@@ -296,7 +303,7 @@ pub(crate) fn shared_provider_settings(provider: ProviderSettings) -> SharedAiPr
         enabled: provider.enabled,
         tool_mode: known.then(|| traits.tool_mode.as_str().to_owned()),
         context_tokens: known.then_some(traits.context_tokens),
-        cairn_mode: Some(cairn_mode_of(&provider.metadata).to_owned()),
+        cairn_mode: Some(cairn_mode),
     }
 }
 
@@ -345,6 +352,11 @@ fn provider_metadata(
         None if kept.get("cairn_mode").and_then(serde_json::Value::as_str) == Some("agent") => "agent",
         None => "jobs",
     };
+    if mode == "jobs"
+        && (cairn_mode == Some("jobs") || kept.get("cairn_mode").and_then(serde_json::Value::as_str) == Some("jobs"))
+    {
+        metadata["cairn_mode"] = json!("jobs");
+    }
     if mode == "agent" {
         if traits.tool_mode == repomemo_ai::ToolMode::None || !(known || manual) {
             return Err("Agent mode needs a model that takes tools: test the connection first, or set Tool calling to native or JSON.".to_owned());

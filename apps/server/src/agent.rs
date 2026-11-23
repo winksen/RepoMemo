@@ -89,7 +89,7 @@ pub(crate) async fn list_agent_capabilities(
     }
     let agent_mode = provider
         .as_ref()
-        .is_some_and(|provider| crate::ai::cairn_mode_of(&provider.metadata) == "agent");
+        .is_some_and(|provider| crate::ai::cairn_mode_of(provider) == "agent");
     let (provider_name, model) = match provider {
         Some(provider) => (
             Some(provider.name),
@@ -176,7 +176,7 @@ pub(crate) async fn run_message(
     // not spent up front.
     let agent_setup = provider
         .as_ref()
-        .filter(|provider| crate::ai::cairn_mode_of(&provider.metadata) == "agent")
+        .filter(|provider| crate::ai::cairn_mode_of(provider) == "agent")
         .map(|provider| {
             let traits = repomemo_ai::ModelTraits::from_metadata(&provider.metadata);
             let runtime = state.settings();

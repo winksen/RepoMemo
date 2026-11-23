@@ -385,6 +385,35 @@ impl ModelTraits {
     }
 }
 
+static AGENT_DEFAULT_MODELS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+
+/// Installs the models the maintainer has recorded a passing live evaluation report for (V0.9.47). A workspace whose text provider
+/// has native tool calling and one of these models starts in Agent mode unless an administrator chose a mode. Set once at
+/// startup; returns false when a list was already set.
+pub fn set_agent_default_models(models: Vec<String>) -> bool {
+    let models = models
+        .into_iter()
+        .map(|model| model.trim().to_ascii_lowercase())
+        .filter(|model| !model.is_empty())
+        .collect();
+    AGENT_DEFAULT_MODELS.set(models).is_ok()
+}
+
+/// Whether a model has a passing live evaluation report on record, so its workspaces default to Agent mode. False for every model
+/// until the maintainer lists one.
+pub fn agent_default_for(model: Option<&str>) -> bool {
+    AGENT_DEFAULT_MODELS
+        .get()
+        .is_some_and(|models| model_is_listed(models, model))
+}
+
+fn model_is_listed(models: &[String], model: Option<&str>) -> bool {
+    model
+        .map(|model| model.trim().to_ascii_lowercase())
+        .filter(|model| !model.is_empty())
+        .is_some_and(|model| models.contains(&model))
+}
+
 /// The reply of a model on the JSON protocol could not be read, even after being asked again.
 #[derive(Debug)]
 pub struct InvalidToolReply {
@@ -714,6 +743,19 @@ mod tests {
             tools: echo_only(),
             options: json!({}),
         }
+    }
+
+    #[test]
+    fn a_model_defaults_to_agent_mode_only_when_it_is_listed() {
+        let listed = vec!["llama3.1:8b".to_owned(), "openai/gpt-4o-mini".to_owned()];
+        assert!(model_is_listed(&listed, Some(" OpenAI/GPT-4o-mini ")));
+        assert!(!model_is_listed(&listed, Some("llama3.2")));
+        assert!(!model_is_listed(&listed, Some("")));
+        assert!(!model_is_listed(&listed, None));
+        assert!(
+            !model_is_listed(&[], Some("llama3.1:8b")),
+            "no report on record, no default"
+        );
     }
 
     #[test]

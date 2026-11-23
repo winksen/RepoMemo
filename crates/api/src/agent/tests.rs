@@ -460,3 +460,46 @@ fn ai_capabilities_are_unavailable_without_a_provider() {
         .all(|capability| capability.available != capability.requires_ai));
     assert!(agent_capabilities(true).iter().all(|capability| capability.available));
 }
+
+/// V0.9.47: the keyword lists of the router are frozen. The loop reads the message itself, so a new phrase is never the way to
+/// teach CAIRN a wording: this fails when `agent.rs` gains phrases. (Removing one is fine: lower the number.)
+#[test]
+fn the_routers_keyword_lists_do_not_grow() {
+    const FROZEN: usize = 136;
+    let source = include_str!("../agent.rs");
+    let mut total = 0;
+    let mut inside = false;
+    for line in source.lines() {
+        let trimmed = line.trim();
+        if !inside {
+            if let Some(rest) = trimmed
+                .strip_prefix("const ")
+                .filter(|rest| rest.contains(": &[&str] = &["))
+            {
+                let after = rest.split(": &[&str] = &[").nth(1).unwrap_or_default();
+                if let Some(end) = after.find("];") {
+                    // A list on one line.
+                    total += after[..end]
+                        .split(',')
+                        .filter(|entry| entry.trim().starts_with('"'))
+                        .count();
+                } else {
+                    inside = true;
+                    total += after.split(',').filter(|entry| entry.trim().starts_with('"')).count();
+                }
+            }
+        } else if trimmed.starts_with("];") {
+            inside = false;
+        } else {
+            total += trimmed.split(',').filter(|entry| entry.trim().starts_with('"')).count();
+        }
+    }
+    assert!(
+        total <= FROZEN,
+        "agent.rs has {total} keyword phrases, {FROZEN} were allowed: the loop replaces new phrases (V0.9.47)"
+    );
+    assert!(
+        total >= FROZEN - 20,
+        "the count looks wrong ({total}); did the lists move?"
+    );
+}

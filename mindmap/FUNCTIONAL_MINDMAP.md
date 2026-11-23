@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.46` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.47` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.47 — Agent mode becomes the default for a model that has passed the live evaluation, and the router's keyword lists stop growing. No workspace changes mode yet.
+
+- **A safe default.** When the maintainer has measured a model and listed it, workspaces that use it start in Agent mode; until then every workspace stays in Jobs mode and an administrator can still choose either.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.46 — CAIRN has an evaluation set, a scripted run of it and a live runner. Nothing a person sees changes.
 

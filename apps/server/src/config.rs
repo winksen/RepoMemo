@@ -152,6 +152,8 @@ pub struct ServerConfig {
     /// Hosts AI providers may be configured at; `None` allows any host except
     /// link-local and cloud-metadata addresses.
     pub ai_allowed_hosts: Option<Vec<String>>,
+    /// Models with a passing live CAIRN evaluation report on record; a workspace using one starts in Agent mode (V0.9.47).
+    pub cairn_eval_passed_models: Vec<String>,
     /// Hosts the mail server may be at although they resolve to private
     /// addresses (`REPOMEMO_SMTP_ALLOWED_HOSTS`, `*` for any).
     pub smtp_allowed_hosts: Vec<String>,
@@ -462,6 +464,14 @@ impl ServerConfig {
             backup_interval_hours: env_parse("REPOMEMO_BACKUP_INTERVAL_HOURS", 0)?,
             backup_keep: env_parse::<u32>("REPOMEMO_BACKUP_KEEP", 7)?.max(1),
             ai_allowed_hosts,
+            cairn_eval_passed_models: env_text("REPOMEMO_CAIRN_EVAL_PASSED_MODELS")
+                .map(|list| {
+                    list.split(',')
+                        .map(|model| model.trim().to_owned())
+                        .filter(|model| !model.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default(),
             smtp_allowed_hosts,
             smtp_extra_roots,
             repo_roots,
@@ -575,6 +585,7 @@ impl ServerConfig {
             backup_interval_hours: 0,
             backup_keep: 7,
             ai_allowed_hosts: None,
+            cairn_eval_passed_models: Vec::new(),
             smtp_allowed_hosts: Vec::new(),
             smtp_extra_roots: Vec::new(),
             repo_roots: Vec::new(),
