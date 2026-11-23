@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.34 (2026-11-23)
+
+Providers take a conversation with roles and report the tokens they used.
+
+### Changed
+- **A chat call for providers.** The AI crate gains `chat`: a list of messages with roles (system, user, assistant) in, the answer and the tokens the provider reported out. It runs on Ollama (`/api/chat`) and OpenRouter (`/chat/completions`) and through the configured provider.
+- **`generate` is built on it.** Every existing prompt (answers, summaries, overviews, rerank, CAIRN's jobs) is still one system message and one user message holding the prompt and its context, so the model is asked the same thing as before. On OpenRouter the request body is the same; on Ollama the same two messages now go to `/api/chat` instead of `/api/generate`, with the same 8,192-token context request. Image analysis is unchanged.
+- **Tokens are read when given.** OpenRouter's `prompt_tokens` and `completion_tokens` and Ollama's `prompt_eval_count` and `eval_count` become input and output tokens; a provider that returns neither gives none. Nothing shows them yet: the runs of a later release record them.
+- No setting, route or migration changes; nothing a person sees changes.
+
+### Checks
+- Unit tests that `generate` becomes a system and a user message, that both request bodies carry the prompt, the context window and the temperature as before, and that tokens are parsed or absent; formatted and linted for the AI crate; not run. Nothing was built or run against a real provider: Ollama's `/api/chat` call was not tried.
+
+### Upgrading
+- Nothing to do. Ollama 0.1.14 or later is needed for `/api/chat`; every release that supports `num_ctx` has it.
+
 ## V0.9.33 (2026-11-22)
 
 The rest of the 0.9 line is planned: CAIRN becomes a bounded tool loop over governed evidence. No behaviour changes.

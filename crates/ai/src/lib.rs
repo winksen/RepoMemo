@@ -389,6 +389,140 @@ impl GenerateRequest {
     }
 }
 
+/// Who said a message of a conversation with the model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChatRole {
+    System,
+    User,
+    Assistant,
+}
+
+impl ChatRole {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::User => "user",
+            Self::Assistant => "assistant",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatMessage {
+    pub role: ChatRole,
+    pub content: String,
+}
+
+impl ChatMessage {
+    pub fn new(role: ChatRole, content: impl Into<String>) -> Self {
+        Self {
+            role,
+            content: content.into(),
+        }
+    }
+}
+
+/// A conversation with the model: messages with roles, and provider options.
+#[derive(Debug, Clone)]
+pub struct ChatRequest {
+    pub messages: Vec<ChatMessage>,
+    pub options: Value,
+}
+
+/// Tokens a provider reports for one call, when it reports them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Usage {
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatResponse {
+    pub content: String,
+    pub usage: Option<Usage>,
+}
+
+impl GenerateRequest {
+    /// The conversation `generate` has: the system prompt, then the prompt with its context.
+    pub fn to_chat(&self) -> ChatRequest {
+        ChatRequest {
+            messages: vec![
+                ChatMessage::new(ChatRole::System, self.system_prompt()),
+                ChatMessage::new(ChatRole::User, format!("{}\n\nContext:\n{}", self.prompt, self.context)),
+            ],
+            options: self.options.clone(),
+        }
+    }
+}
+
+fn chat_messages_json(messages: &[ChatMessage]) -> Vec<Value> {
+    messages
+        .iter()
+        .map(|message| json!({ "role": message.role.as_str(), "content": message.content }))
+        .collect()
+}
+
+fn token_count(value: Option<u64>) -> Option<u32> {
+    value.map(|count| count.min(u64::from(u32::MAX)) as u32)
+}
+
+fn usage_from(input: Option<u32>, output: Option<u32>) -> Option<Usage> {
+    (input.is_some() || output.is_some()).then(|| Usage {
+        input_tokens: input.unwrap_or_default(),
+        output_tokens: output.unwrap_or_default(),
+    })
+}
+
+/// The body Ollama's `/api/chat` receives. The context window is asked for explicitly because
+/// Ollama's default cuts retrieved context off silently.
+fn ollama_chat_body(model: &str, request: &ChatRequest) -> Value {
+    let mut options = request.options.clone();
+    if let Some(options) = options.as_object_mut() {
+        options.entry("num_ctx").or_insert(json!(OLLAMA_NUM_CTX));
+    }
+    json!({
+        "model": model,
+        "messages": chat_messages_json(&request.messages),
+        "stream": false,
+        "options": options,
+    })
+}
+
+fn ollama_chat_response(body: &Value) -> ChatResponse {
+    let count = |key: &str| token_count(body.get(key).and_then(Value::as_u64));
+    ChatResponse {
+        content: body
+            .pointer("/message/content")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_owned(),
+        usage: usage_from(count("prompt_eval_count"), count("eval_count")),
+    }
+}
+
+/// The body an OpenAI-style `/chat/completions` receives.
+fn openrouter_chat_body(model: &str, request: &ChatRequest) -> Value {
+    json!({
+        "model": model,
+        "messages": chat_messages_json(&request.messages),
+        "temperature": request.options.get("temperature").and_then(Value::as_f64).unwrap_or(0.2),
+    })
+}
+
+fn openrouter_chat_response(body: &Value) -> ChatResponse {
+    let count = |key: &str| token_count(body.pointer(&format!("/usage/{key}")).and_then(Value::as_u64));
+    ChatResponse {
+        content: body
+            .pointer("/choices/0/message/content")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_owned(),
+        usage: usage_from(count("prompt_tokens"), count("completion_tokens")),
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ImageAnalysisRequest {
     pub prompt: String,
@@ -398,6 +532,9 @@ pub struct ImageAnalysisRequest {
 
 #[allow(async_fn_in_trait)]
 pub trait AiProvider {
+    /// One call with message roles: the answer and the tokens the provider reports.
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse>;
+    /// A system prompt and one user message, answered as text: `chat` with those two messages.
     async fn generate(&self, request: GenerateRequest) -> Result<String>;
     async fn embed(&self, texts: Vec<String>, options: Value) -> Result<Vec<Vec<f32>>>;
     async fn summarize(&self, target: String, options: Value) -> Result<String>;
@@ -438,28 +575,21 @@ impl OllamaProvider {
 }
 
 impl AiProvider for OllamaProvider {
-    async fn generate(&self, request: GenerateRequest) -> Result<String> {
-        let mut options = request.options.clone();
-        if let Some(options) = options.as_object_mut() {
-            options.entry("num_ctx").or_insert(json!(OLLAMA_NUM_CTX));
-        }
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse> {
         let response = self
             .client
-            .post(self.endpoint("/api/generate"))
-            .json(&json!({
-                "model": self.model,
-                "system": request.system_prompt(),
-                "prompt": format!("{}\n\nContext:\n{}", request.prompt, request.context),
-                "stream": false,
-                "options": options,
-            }))
+            .post(self.endpoint("/api/chat"))
+            .json(&ollama_chat_body(&self.model, &request))
             .send()
             .await
             .context("could not reach the local Ollama provider")?;
         let response = checked(response, "The local Ollama provider rejected the request").await?;
-        let body: OllamaGenerateResponse =
-            read_json(response, "local Ollama provider returned an invalid response").await?;
-        let answer = body.response.trim().to_owned();
+        let body: Value = read_json(response, "local Ollama provider returned an invalid response").await?;
+        Ok(ollama_chat_response(&body))
+    }
+
+    async fn generate(&self, request: GenerateRequest) -> Result<String> {
+        let answer = self.chat(request.to_chat()).await?.content;
         if answer.is_empty() {
             bail!("local Ollama provider returned an empty summary")
         }
@@ -579,22 +709,28 @@ impl OpenRouterProvider {
 }
 
 impl AiProvider for OpenRouterProvider {
-    async fn generate(&self, request: GenerateRequest) -> Result<String> {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse> {
         let response = self
             .request(reqwest::Method::POST, "/chat/completions")
-            .json(&json!({
-                "model": self.model,
-                "messages": [
-                  { "role": "system", "content": request.system_prompt() },
-                  { "role": "user", "content": format!("{}\n\nContext:\n{}", request.prompt, request.context) }
-                ],
-                "temperature": request.options.get("temperature").and_then(Value::as_f64).unwrap_or(0.2),
-            }))
+            .json(&openrouter_chat_body(&self.model, &request))
             .send()
             .await
             .context("could not reach OpenRouter")?;
         let response = checked(response, "OpenRouter rejected the request").await?;
-        openrouter_answer(response, "OpenRouter returned an empty answer").await
+        let body: Value = read_json(response, "OpenRouter returned an invalid response").await?;
+        if let Some(message) = error_message(&body) {
+            tracing::warn!(detail = %message, "OpenRouter could not complete the request");
+            bail!("OpenRouter could not complete the request. The server log has the provider's message.")
+        }
+        Ok(openrouter_chat_response(&body))
+    }
+
+    async fn generate(&self, request: GenerateRequest) -> Result<String> {
+        let answer = self.chat(request.to_chat()).await?.content;
+        if answer.is_empty() {
+            bail!("OpenRouter returned an empty answer")
+        }
+        Ok(answer)
     }
 
     /// OpenRouter's OpenAI-compatible embeddings endpoint.
@@ -922,6 +1058,12 @@ pub fn provider_from_settings(settings: ProviderSettings) -> Result<ConfiguredPr
 }
 
 impl AiProvider for ConfiguredProvider {
+    async fn chat(&self, request: ChatRequest) -> Result<ChatResponse> {
+        match self {
+            Self::Ollama(provider) => provider.chat(request).await,
+            Self::OpenRouter(provider) => provider.chat(request).await,
+        }
+    }
     async fn generate(&self, request: GenerateRequest) -> Result<String> {
         match self {
             Self::Ollama(provider) => provider.generate(request).await,
@@ -1031,7 +1173,111 @@ struct OllamaModel {
 
 #[cfg(test)]
 mod tests {
-    use super::{ensure_embeddings, error_message, parse_ranking, validate_settings};
+    use super::{
+        ensure_embeddings, error_message, ollama_chat_body, ollama_chat_response, openrouter_chat_body,
+        openrouter_chat_response, parse_ranking, validate_settings, ChatMessage, ChatRole, GenerateRequest, Usage,
+    };
+
+    fn generate_request() -> GenerateRequest {
+        GenerateRequest {
+            system: Some("Be brief.".to_owned()),
+            prompt: "Question?".to_owned(),
+            context: "Some context".to_owned(),
+            options: json!({ "temperature": 0.5 }),
+        }
+    }
+
+    #[test]
+    fn generate_is_a_system_and_a_user_message() {
+        let chat = generate_request().to_chat();
+        assert_eq!(
+            chat.messages,
+            vec![
+                ChatMessage::new(ChatRole::System, "Be brief."),
+                ChatMessage::new(ChatRole::User, "Question?\n\nContext:\nSome context"),
+            ]
+        );
+        let default = GenerateRequest {
+            system: None,
+            ..generate_request()
+        };
+        assert!(default.to_chat().messages[0]
+            .content
+            .starts_with("You are RepoMemo's assistant"));
+    }
+
+    #[test]
+    fn ollama_chat_body_keeps_the_prompt_and_asks_for_room() {
+        let body = ollama_chat_body("llama3.2", &generate_request().to_chat());
+        assert_eq!(body["model"], "llama3.2");
+        assert_eq!(body["stream"], false);
+        assert_eq!(body["messages"][0], json!({ "role": "system", "content": "Be brief." }));
+        assert_eq!(body["messages"][1]["role"], "user");
+        assert_eq!(body["options"]["num_ctx"], 8192);
+        assert_eq!(body["options"]["temperature"], 0.5);
+        let mut request = generate_request().to_chat();
+        request.options = json!({ "num_ctx": 2048 });
+        assert_eq!(ollama_chat_body("m", &request)["options"]["num_ctx"], 2048);
+    }
+
+    #[test]
+    fn openrouter_chat_body_is_the_request_generate_always_sent() {
+        let body = openrouter_chat_body("openai/gpt-4o-mini", &generate_request().to_chat());
+        assert_eq!(
+            body,
+            json!({
+                "model": "openai/gpt-4o-mini",
+                "messages": [
+                    { "role": "system", "content": "Be brief." },
+                    { "role": "user", "content": "Question?\n\nContext:\nSome context" }
+                ],
+                "temperature": 0.5,
+            })
+        );
+        let mut request = generate_request().to_chat();
+        request.options = json!({});
+        assert_eq!(openrouter_chat_body("m", &request)["temperature"], 0.2);
+    }
+
+    #[test]
+    fn usage_is_read_when_the_provider_returns_it() {
+        let ollama = ollama_chat_response(&json!({
+            "message": { "role": "assistant", "content": " Hi " },
+            "prompt_eval_count": 12,
+            "eval_count": 3
+        }));
+        assert_eq!(ollama.content, "Hi");
+        assert_eq!(
+            ollama.usage,
+            Some(Usage {
+                input_tokens: 12,
+                output_tokens: 3
+            })
+        );
+        let open = openrouter_chat_response(&json!({
+            "choices": [{ "message": { "content": "Hello" } }],
+            "usage": { "prompt_tokens": 20, "completion_tokens": 5, "total_tokens": 25 }
+        }));
+        assert_eq!(open.content, "Hello");
+        assert_eq!(
+            open.usage,
+            Some(Usage {
+                input_tokens: 20,
+                output_tokens: 5
+            })
+        );
+    }
+
+    #[test]
+    fn usage_is_none_when_the_provider_omits_it() {
+        assert_eq!(
+            ollama_chat_response(&json!({ "message": { "content": "x" } })).usage,
+            None
+        );
+        let empty = openrouter_chat_response(&json!({ "choices": [] }));
+        assert_eq!(empty.usage, None);
+        assert_eq!(empty.content, "");
+    }
 
     #[test]
     fn rankings_cover_every_candidate_once() {
