@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.50 (2026-11-23)
+
+CAIRN looks in the team's memory first.
+
+### Changed
+- **Matching cards at the start of a run.** In Agent mode CAIRN is given, before it calls any tool, up to five memory cards that match the words of your message, as a *Team memory* block of lines like `[M1] Retry decision (current): …`. A card whose evidence still holds comes before one that needs review, then the card matching more of your words, then the one with more evidence. A card that needs review is marked *needs review*.
+- **Prefer the team's card.** CAIRN is told that these cards were saved on purpose: to prefer a current card to a passage that disagrees with it, to say when they disagree, to treat a card needing review as possibly out of date, and to cite a card with its handle (`[M1]`).
+- **A cited card is shown.** A card the answer cites appears in the chat with the memory cards (what it says, what it cites, whether it needs review), and its marker stays `[M1]`. A card handle the run was not given is removed from the text and reported like an invented source, and an answer citing only a card counts as tied to a source.
+- Only the Agent loop does this; Jobs mode's *Recall memory* job is as before. Matching is by the words of the message (the card's title and the start of its text); no model or embedding is used for it. No migration or setting changes.
+
+### Checks
+- Unit tests for the words of a message, the order and the bound of the cards, the block's wording, a card cited by its handle with an invented one removed, and an answer citing only a card; a loop test that a matching card is in the prompt as \`[M1]\`, that a cited card is shown and that a question no card matches gets no block; formatted and linted for the core; tests not run. Nothing was built or run, and matching by words alone may miss a card a meaning search would find.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.49 (2026-11-23)
 
 A team tells CAIRN how it wants to work, in a note.

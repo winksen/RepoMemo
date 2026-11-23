@@ -31,6 +31,7 @@ mod ledger;
 mod proposals;
 mod run;
 mod summary;
+mod team_memory;
 pub use run::{AgentLoopSetup, AgentOutcome, ProgressHook};
 #[cfg(test)]
 use summary::fit_history;

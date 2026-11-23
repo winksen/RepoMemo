@@ -71,6 +71,8 @@ pub(in crate::agent) struct EvidenceItem {
 pub(in crate::agent) struct EvidenceLedger {
     workspace_id: String,
     items: Vec<EvidenceItem>,
+    /// The memory cards the run was given, with handles `M1`, `M2`, … (V0.9.50).
+    cards: Vec<(String, repomemo_domain::MemoryCardSummary)>,
 }
 
 impl EvidenceLedger {
@@ -78,6 +80,7 @@ impl EvidenceLedger {
         Self {
             workspace_id: workspace_id.to_owned(),
             items: Vec::new(),
+            cards: Vec::new(),
         }
     }
 
@@ -150,6 +153,30 @@ impl EvidenceLedger {
             }
         }
         out
+    }
+
+    /// The handle of a memory card the run is given, new the first time and the same afterwards.
+    pub fn card_handle_for(&mut self, card: &repomemo_domain::MemoryCardSummary) -> String {
+        if let Some((handle, _)) = self.cards.iter().find(|(_, known)| known.id == card.id) {
+            return handle.clone();
+        }
+        let handle = format!("M{}", self.cards.len() + 1);
+        self.cards.push((handle.clone(), card.clone()));
+        handle
+    }
+
+    /// The card a handle (`M1`, `[m1]`) stands for.
+    pub fn card(&self, handle: &str) -> Option<&repomemo_domain::MemoryCardSummary> {
+        let wanted = handle.trim().trim_matches(['[', ']']).to_ascii_uppercase();
+        self.cards
+            .iter()
+            .find(|(known, _)| *known == wanted)
+            .map(|(_, card)| card)
+    }
+
+    /// Whether the run was given any memory card.
+    pub fn has_cards(&self) -> bool {
+        !self.cards.is_empty()
     }
 
     /// Records the lines of the passage a handle stands for.

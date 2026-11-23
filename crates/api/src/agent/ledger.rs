@@ -2,7 +2,7 @@
 //! count: the ones it read become the evidence list, in the order they are cited and numbered to match the markers in the text;
 //! any other is removed from the text and reported. An answer that rests on files the run read and cites none of them says so.
 
-use repomemo_domain::{AgentSourceState, Citation};
+use repomemo_domain::{AgentSourceState, Citation, MemoryCardSummary};
 
 use super::tools::atoms::EvidenceLedger;
 
@@ -11,17 +11,30 @@ use super::tools::atoms::EvidenceLedger;
 pub(in crate::agent) struct LedgerCheck {
     pub markdown: String,
     pub citations: Vec<Citation>,
+    /// The memory cards the answer cites (`[M1]`), in the order they are cited (V0.9.50).
+    pub cards: Vec<MemoryCardSummary>,
     pub warnings: Vec<String>,
 }
 
 /// Said under an answer that read evidence and cites none of it.
 pub(in crate::agent) const UNTIED: &str = "I could not tie this answer to a source.";
 
-/// The handle a token of a marker names, if it is one: `E3`, `e3`.
+/// The handle a token of a marker names, if it is one: `E3` for evidence, `M1` for a memory card (either case).
 fn handle_of(token: &str) -> Option<String> {
     let token = token.trim();
-    let digits = token.strip_prefix(['E', 'e'])?;
-    (!digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit())).then(|| format!("E{digits}"))
+    let kind = token.chars().next()?.to_ascii_uppercase();
+    let digits = &token[1..];
+    (matches!(kind, 'E' | 'M') && !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()))
+        .then(|| format!("{kind}{digits}"))
+}
+
+/// Whether the run was given what a handle stands for.
+fn is_known(ledger: &EvidenceLedger, handle: &str) -> bool {
+    if handle.starts_with('M') {
+        ledger.card(handle).is_some()
+    } else {
+        ledger.get(handle).is_some()
+    }
 }
 
 /// The tokens of a marker's inside when every one of them is a handle (`E3`, `E3, E1`, `E3 E1`), else none.
@@ -47,7 +60,7 @@ pub(in crate::agent) fn check_answer(ledger: &EvidenceLedger, answer: &str, says
         let Some(close) = after.find(']') else { break };
         if let Some(handles) = marker_handles(&after[..close]) {
             for handle in handles {
-                if ledger.get(&handle).is_some() {
+                if is_known(ledger, &handle) {
                     if !cited.contains(&handle) {
                         cited.push(handle);
                     }
@@ -69,8 +82,19 @@ pub(in crate::agent) fn check_answer(ledger: &EvidenceLedger, answer: &str, says
             Some(handles) => {
                 let numbers = handles
                     .iter()
-                    .filter_map(|handle| cited.iter().position(|known| known == handle))
-                    .map(|position| (position + 1).to_string())
+                    .filter_map(|handle| {
+                        if !is_known(ledger, handle) {
+                            None
+                        } else if handle.starts_with('M') {
+                            Some(handle.clone())
+                        } else {
+                            cited
+                                .iter()
+                                .filter(|known| known.starts_with('E'))
+                                .position(|known| known == handle)
+                                .map(|position| (position + 1).to_string())
+                        }
+                    })
                     .collect::<Vec<_>>();
                 markdown.push_str(&rest[..open]);
                 if numbers.is_empty() {
@@ -90,8 +114,14 @@ pub(in crate::agent) fn check_answer(ledger: &EvidenceLedger, answer: &str, says
     }
     markdown.push_str(rest);
 
+    let cards = cited
+        .iter()
+        .filter(|handle| handle.starts_with('M'))
+        .filter_map(|handle| ledger.card(handle).cloned())
+        .collect::<Vec<_>>();
     let citations = cited
         .iter()
+        .filter(|handle| handle.starts_with('E'))
         .filter_map(|handle| ledger.get(handle))
         .map(|item| Citation {
             artifact_id: item.artifact_id.clone(),
@@ -115,12 +145,13 @@ pub(in crate::agent) fn check_answer(ledger: &EvidenceLedger, answer: &str, says
             invented.join(", ")
         ));
     }
-    if cited.is_empty() && !ledger.items().is_empty() && !says_insufficient {
+    if cited.is_empty() && (!ledger.items().is_empty() || ledger.has_cards()) && !says_insufficient {
         markdown = format!("{}\n\n{UNTIED}", markdown.trim_end());
     }
     LedgerCheck {
         markdown,
         citations,
+        cards,
         warnings,
     }
 }
@@ -303,6 +334,44 @@ mod tests {
 
     fn ledger_citations() -> Vec<Citation> {
         check_answer(&ledger(), "See [E1].", false).citations
+    }
+
+    #[test]
+    fn a_memory_card_is_cited_by_its_handle_and_an_invented_one_is_removed() {
+        let mut ledger = ledger();
+        let card = repomemo_domain::MemoryCardSummary {
+            id: "card-1".to_owned(),
+            workspace_id: "w1".to_owned(),
+            title: "Retry decision".to_owned(),
+            body_excerpt: "Capped at five.".to_owned(),
+            source: "chat".to_owned(),
+            evidence_count: 1,
+            created_at: String::new(),
+            updated_at: String::new(),
+            needs_review: false,
+        };
+        assert_eq!(ledger.card_handle_for(&card), "M1");
+        assert_eq!(ledger.card_handle_for(&card), "M1", "the same card keeps its handle");
+        let check = check_answer(
+            &ledger,
+            "The team capped retries [M1] and the file agrees [E2]. See also [M7].",
+            false,
+        );
+        assert_eq!(
+            check.markdown,
+            "The team capped retries [M1] and the file agrees [1]. See also."
+        );
+        assert_eq!(check.cards.len(), 1);
+        assert_eq!(check.cards[0].title, "Retry decision");
+        assert_eq!(check.citations.len(), 1);
+        assert_eq!(
+            check.warnings,
+            vec!["I removed a source that I had not read: M7.".to_owned()]
+        );
+        // An answer that cites only a card is tied to a source.
+        assert!(!check_answer(&ledger, "Capped at five [M1].", false)
+            .markdown
+            .contains(UNTIED));
     }
 
     #[test]
