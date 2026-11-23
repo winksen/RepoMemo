@@ -555,6 +555,7 @@ function capabilityLabel(capabilities: AgentCapabilities | null, id: AgentCapabi
 }
 
 function routingNote(reply: AgentReply, capabilities: AgentCapabilities | null) {
+  if (reply.routing === "agent") return "worked out with its tools";
   if (!reply.capability) return null;
   const label = capabilityLabel(capabilities, reply.capability);
   if (reply.routing === "rules") return `${label} · matched from your wording`;

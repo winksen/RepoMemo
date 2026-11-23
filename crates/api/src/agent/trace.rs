@@ -20,6 +20,9 @@ pub struct RunTrace {
     /// `answered`, `awaiting_confirmation` or `failed`.
     pub state: String,
     pub steps: Vec<AgentStep>,
+    /// Tokens the model reported for the run; 0 for a run with no model call or a provider that does not say.
+    pub input_tokens: i64,
+    pub output_tokens: i64,
 }
 
 fn named_files(files: &[ArtifactSummary], citations: &[Citation]) -> Vec<AgentStepEvidence> {
@@ -49,6 +52,7 @@ fn how(routing: AgentRouting) -> &'static str {
         AgentRouting::Explicit => "picked",
         AgentRouting::Rules => "recognised",
         AgentRouting::Model => "classified by the model",
+        AgentRouting::Agent => "worked out with its tools",
         AgentRouting::Unmatched => "answered in CAIRN's own words",
     }
 }
@@ -135,6 +139,8 @@ pub fn agent_run_trace(_message: &AgentMessage, reply: &AgentReply, duration_ms:
     RunTrace {
         state: state.to_owned(),
         steps,
+        input_tokens: 0,
+        output_tokens: 0,
     }
 }
 

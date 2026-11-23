@@ -1104,6 +1104,10 @@ pub struct SharedAiProviderSettings {
     /// The model's context window in tokens, from the same two sources.
     #[serde(default)]
     pub context_tokens: Option<u32>,
+    /// How CAIRN answers in this workspace: `jobs` (one job per message, the default) or `agent` (a loop of tool calls, only
+    /// for a model that takes tools; V0.9.40).
+    #[serde(default)]
+    pub cairn_mode: Option<String>,
 }
 
 /// A rendered-for-reading view of an uploaded business document.
@@ -2983,6 +2987,8 @@ pub enum AgentRouting {
     Rules,
     /// The enabled provider classified the request.
     Model,
+    /// CAIRN worked it out with its tools, in a loop (V0.9.40).
+    Agent,
     Unmatched,
 }
 

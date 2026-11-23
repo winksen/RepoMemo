@@ -185,6 +185,10 @@ pub struct ServerConfig {
     pub system_audit_retention_days: i64,
     /// CAIRN's run traces are kept this many days; 0 keeps them forever (V0.9.39).
     pub cairn_trace_days: i64,
+    /// The most model calls one CAIRN run in Agent mode makes (V0.9.40).
+    pub cairn_max_steps: i64,
+    /// The longest one CAIRN run in Agent mode takes, in seconds.
+    pub cairn_max_run_seconds: i64,
     /// What is logged, how it is printed and whether it is kept in files.
     pub logging: LogSettings,
     /// A new server shows an onboarding that creates its first system
@@ -491,6 +495,8 @@ impl ServerConfig {
                 .unwrap_or_default(),
             system_audit_retention_days: env_parse("REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS", 365)?,
             cairn_trace_days: env_parse("REPOMEMO_CAIRN_TRACE_DAYS", 90)?,
+            cairn_max_steps: env_parse("REPOMEMO_CAIRN_MAX_STEPS", 8)?,
+            cairn_max_run_seconds: env_parse("REPOMEMO_CAIRN_MAX_RUN_SECONDS", 90)?,
             logging: LogSettings::from_env()?,
             setup_wizard: env_flag("REPOMEMO_SETUP_WIZARD", true)?,
             web_dir,
@@ -586,6 +592,8 @@ impl ServerConfig {
             system_admin_emails: Vec::new(),
             system_audit_retention_days: 365,
             cairn_trace_days: 90,
+            cairn_max_steps: 8,
+            cairn_max_run_seconds: 90,
             logging: LogSettings {
                 to_file: false,
                 ..LogSettings::default()
@@ -834,6 +842,8 @@ pub(crate) struct RuntimeSettings {
     pub(crate) maintenance: MaintenanceSettings,
     pub(crate) system_audit_retention_days: i64,
     pub(crate) cairn_trace_days: i64,
+    pub(crate) cairn_max_steps: i64,
+    pub(crate) cairn_max_run_seconds: i64,
     pub(crate) system_admin_emails: Vec<String>,
     pub(crate) logging: LogSettings,
 }
@@ -880,6 +890,8 @@ impl RuntimeSettings {
             maintenance: config.maintenance.clone(),
             system_audit_retention_days: config.system_audit_retention_days,
             cairn_trace_days: config.cairn_trace_days,
+            cairn_max_steps: config.cairn_max_steps,
+            cairn_max_run_seconds: config.cairn_max_run_seconds,
             system_admin_emails: config.system_admin_emails.clone(),
             logging: config.logging.clone(),
         }

@@ -496,6 +496,9 @@ pub(crate) struct SaveAiProviderRequest {
     /// The model's context window in tokens. Absent keeps what a test recorded.
     #[serde(default)]
     pub(crate) context_tokens: Option<u32>,
+    /// `jobs` or `agent`. Absent keeps the saved mode.
+    #[serde(default)]
+    pub(crate) cairn_mode: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

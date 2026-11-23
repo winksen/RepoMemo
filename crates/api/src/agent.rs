@@ -27,6 +27,8 @@ use files::{
     FolderChoice,
 };
 mod proposals;
+mod run;
+pub use run::{AgentLoopSetup, AgentOutcome};
 mod tools;
 mod trace;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};
@@ -250,7 +252,37 @@ pub fn agent_conversation_title(label: &str) -> String {
 }
 
 impl RepoMemoCore {
+    /// Answers a message with the router: one job, picked, recognised or classified.
     pub async fn run_agent(&self, request: AgentRequest) -> Result<AgentReply> {
+        self.run_agent_router(request).await
+    }
+
+    /// Answers a message, with the tool loop when the workspace is in Agent mode (V0.9.40). Chatter, a job picked from the +
+    /// menu, a message about an uploaded file and a workspace with no provider keep the router, which is also the fallback
+    /// when no loop is set up.
+    pub async fn run_agent_with(
+        &self,
+        request: AgentRequest,
+        loop_setup: Option<AgentLoopSetup>,
+    ) -> Result<AgentOutcome> {
+        if let Some(setup) = loop_setup {
+            let message = request.message.trim();
+            if request.capability.is_none()
+                && request.artifact_id.is_none()
+                && request.provider_id.is_some()
+                && !message.is_empty()
+                && recognise_chatter(message).is_none()
+            {
+                return self.run_loop(request, setup).await;
+            }
+        }
+        Ok(AgentOutcome {
+            reply: self.run_agent_router(request).await?,
+            trace: None,
+        })
+    }
+
+    async fn run_agent_router(&self, request: AgentRequest) -> Result<AgentReply> {
         if request.workspace_id.trim().is_empty() {
             repomemo_domain::bail_invalid!("Workspace id is required.");
         }

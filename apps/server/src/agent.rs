@@ -145,6 +145,26 @@ pub(crate) async fn send_agent_message(
                 .to_owned(),
         )
     });
+    // In Agent mode (V0.9.40) a message is answered by a loop that spends one AI request for each model call, so the quota is
+    // not spent up front.
+    let agent_setup = provider
+        .as_ref()
+        .filter(|provider| crate::ai::cairn_mode_of(&provider.metadata) == "agent")
+        .map(|provider| {
+            let traits = repomemo_ai::ModelTraits::from_metadata(&provider.metadata);
+            let runtime = state.settings();
+            let (quota_state, quota_subject) = (state.clone(), subject.clone());
+            repomemo_api::AgentLoopSetup {
+                tool_mode: traits.tool_mode,
+                context_tokens: traits.context_tokens,
+                max_steps: runtime.cairn_max_steps.clamp(1, 30) as usize,
+                max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
+                can_write: !matches!(role, WorkspaceRole::Viewer),
+                consume_quota: std::sync::Arc::new(move || {
+                    ai_access::consume_ai_quota(&quota_state, &quota_subject).map_err(|error| error.message)
+                }),
+            }
+        });
     let (provider_id, ai_unavailable_reason) = match provider {
         Some(provider) => {
             let min_role = ai_access::workspace_ai_min_role(&state, &workspace_id).await?;
@@ -152,7 +172,7 @@ pub(crate) async fn send_agent_message(
                 // Lookups and searches never call the provider; anything else
                 // may, if only to understand the message.
                 let may_call_ai = match message.capability {
-                    None => true,
+                    None => agent_setup.is_none(),
                     Some(capability) => agent_capabilities(true)
                         .iter()
                         .any(|info| info.id == capability && info.requires_ai),
@@ -169,21 +189,25 @@ pub(crate) async fn send_agent_message(
     };
     let provider_for_run = provider_id.clone();
     let started_at = chrono::Utc::now();
-    let mut reply = state
+    let outcome = state
         .core
-        .run_agent(AgentRequest {
-            workspace_id: workspace_id.clone(),
-            message: message.message.clone(),
-            capability: message.capability,
-            artifact_id: message.artifact_id.clone(),
-            artifact_ids: message.artifact_ids.clone(),
-            provider_id,
-            ai_unavailable_reason,
-            history,
-            exchanges,
-        })
+        .run_agent_with(
+            AgentRequest {
+                workspace_id: workspace_id.clone(),
+                message: message.message.clone(),
+                capability: message.capability,
+                artifact_id: message.artifact_id.clone(),
+                artifact_ids: message.artifact_ids.clone(),
+                provider_id,
+                ai_unavailable_reason,
+                history,
+                exchanges,
+            },
+            agent_setup,
+        )
         .await
         .map_err(map_core_error)?;
+    let (mut reply, loop_trace) = (outcome.reply, outcome.trace);
     // A viewer is not offered what would change the workspace (V0.9.10).
     if matches!(role, WorkspaceRole::Viewer) && !reply.proposals.is_empty() {
         reply.proposals.clear();
@@ -213,7 +237,8 @@ pub(crate) async fn send_agent_message(
         .map_err(map_storage_error)?;
     // How the message was answered, kept for the person who asked (V0.9.39). A trace that cannot be stored never fails the answer.
     let ended_at = chrono::Utc::now();
-    let trace = agent_run_trace(&message, &reply, (ended_at - started_at).num_milliseconds().max(0));
+    let trace = loop_trace
+        .unwrap_or_else(|| agent_run_trace(&message, &reply, (ended_at - started_at).num_milliseconds().max(0)));
     let (model, tool_mode) = match (&provider_for_run, provider_model) {
         (Some(_), Some((model, tool_mode))) => (model, Some(tool_mode)),
         _ => (None, None),
@@ -230,8 +255,8 @@ pub(crate) async fn send_agent_message(
             model,
             tool_mode,
             state: trace.state,
-            input_tokens: 0,
-            output_tokens: 0,
+            input_tokens: trace.input_tokens,
+            output_tokens: trace.output_tokens,
             started_at: started_at.to_rfc3339(),
             ended_at: Some(ended_at.to_rfc3339()),
             steps: trace.steps,

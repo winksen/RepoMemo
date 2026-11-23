@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.39` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.40` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.40 — CAIRN can work in a loop: Agent mode.
+
+- **Agent mode.** On a workspace whose text model can call tools, an administrator can let CAIRN work in a loop: it searches, reads files page by page, looks at what is known about a file, and answers, or prepares a change for the person to confirm. It is bounded in steps, time, the model's window and the person's AI allowance, and says what is missing when it has to stop. Jobs mode stays the default.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.39 — CAIRN records what it did for each answer, and shows it.
 

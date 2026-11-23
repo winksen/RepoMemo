@@ -194,6 +194,7 @@ pub(crate) async fn save_workspace_ai_provider(
             existing.as_ref().map(|settings| &settings.metadata),
             request.tool_mode.as_deref(),
             request.context_tokens,
+            request.cairn_mode.as_deref(),
         )
         .map_err(ApiError::bad_request)?,
         api_key,
@@ -270,6 +271,17 @@ pub(crate) fn provider_endpoint(provider_type: &str, base_url: Option<&str>) -> 
     )
 }
 
+/// How CAIRN answers in the workspace of a provider: `agent` only when it was chosen and the model takes tools.
+pub(crate) fn cairn_mode_of(metadata: &serde_json::Value) -> &'static str {
+    let chosen = metadata.get("cairn_mode").and_then(serde_json::Value::as_str) == Some("agent");
+    let tools = repomemo_ai::ModelTraits::from_metadata(metadata).tool_mode != repomemo_ai::ToolMode::None;
+    if chosen && tools {
+        "agent"
+    } else {
+        "jobs"
+    }
+}
+
 pub(crate) fn shared_provider_settings(provider: ProviderSettings) -> SharedAiProviderSettings {
     let purpose = provider.purpose().to_owned();
     let known = repomemo_ai::ModelTraits::is_known(&provider.metadata);
@@ -284,6 +296,7 @@ pub(crate) fn shared_provider_settings(provider: ProviderSettings) -> SharedAiPr
         enabled: provider.enabled,
         tool_mode: known.then(|| traits.tool_mode.as_str().to_owned()),
         context_tokens: known.then_some(traits.context_tokens),
+        cairn_mode: Some(cairn_mode_of(&provider.metadata).to_owned()),
     }
 }
 
@@ -296,6 +309,7 @@ fn provider_metadata(
     existing: Option<&serde_json::Value>,
     tool_mode: Option<&str>,
     context_tokens: Option<u32>,
+    cairn_mode: Option<&str>,
 ) -> Result<serde_json::Value, String> {
     let mut metadata = json!({
         "cloud_content_acknowledged": cloud_content_acknowledged,
@@ -323,6 +337,20 @@ fn provider_metadata(
     if manual {
         metadata["traits_manual"] = json!(true);
     }
+    // The CAIRN mode is kept across saves; Agent mode needs a model that takes tools.
+    let mode = match cairn_mode {
+        Some("jobs") => "jobs",
+        Some("agent") => "agent",
+        Some(_) => return Err("CAIRN mode must be jobs or agent.".to_owned()),
+        None if kept.get("cairn_mode").and_then(serde_json::Value::as_str) == Some("agent") => "agent",
+        None => "jobs",
+    };
+    if mode == "agent" {
+        if traits.tool_mode == repomemo_ai::ToolMode::None || !(known || manual) {
+            return Err("Agent mode needs a model that takes tools: test the connection first, or set Tool calling to native or JSON.".to_owned());
+        }
+        metadata["cairn_mode"] = json!("agent");
+    }
     Ok(metadata)
 }
 
@@ -333,7 +361,7 @@ mod provider_metadata_tests {
 
     #[test]
     fn a_new_provider_has_no_traits_until_tested_or_set() {
-        let metadata = provider_metadata(false, "text", None, None, None).unwrap();
+        let metadata = provider_metadata(false, "text", None, None, None, None).unwrap();
         assert_eq!(
             metadata,
             json!({ "cloud_content_acknowledged": false, "purpose": "text" })
@@ -343,7 +371,7 @@ mod provider_metadata_tests {
     #[test]
     fn tested_traits_survive_a_save_without_becoming_manual() {
         let existing = json!({ "purpose": "text", "tool_mode": "native", "context_tokens": 32000 });
-        let metadata = provider_metadata(true, "text", Some(&existing), Some("native"), Some(32000)).unwrap();
+        let metadata = provider_metadata(true, "text", Some(&existing), Some("native"), Some(32000), None).unwrap();
         assert_eq!(metadata["tool_mode"], "native");
         assert_eq!(metadata["context_tokens"], 32000);
         assert!(metadata.get("traits_manual").is_none());
@@ -352,18 +380,18 @@ mod provider_metadata_tests {
     #[test]
     fn a_correction_is_kept_as_the_administrators() {
         let existing = json!({ "purpose": "text", "tool_mode": "none", "context_tokens": 8192 });
-        let metadata = provider_metadata(true, "text", Some(&existing), Some("json"), Some(16000)).unwrap();
+        let metadata = provider_metadata(true, "text", Some(&existing), Some("json"), Some(16000), None).unwrap();
         assert_eq!(metadata["tool_mode"], "json");
         assert_eq!(metadata["context_tokens"], 16000);
         assert_eq!(metadata["traits_manual"], true);
-        let again = provider_metadata(true, "text", Some(&metadata), None, None).unwrap();
+        let again = provider_metadata(true, "text", Some(&metadata), None, None, None).unwrap();
         assert_eq!(again["traits_manual"], true);
         assert_eq!(again["tool_mode"], "json");
     }
 
     #[test]
     fn nonsense_is_refused() {
-        assert!(provider_metadata(false, "text", None, Some("magic"), None).is_err());
-        assert!(provider_metadata(false, "text", None, None, Some(10)).is_err());
+        assert!(provider_metadata(false, "text", None, Some("magic"), None, None).is_err());
+        assert!(provider_metadata(false, "text", None, None, Some(10), None).is_err());
     }
 }

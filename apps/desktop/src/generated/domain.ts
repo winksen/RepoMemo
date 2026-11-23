@@ -1003,6 +1003,11 @@ export interface SharedAiProviderSettings {
   tool_mode: string | null;
   /** The model's context window in tokens, from the same two sources. */
   context_tokens: number | null;
+  /**
+   * How CAIRN answers in this workspace: `jobs` (one job per message, the default) or `agent` (a loop of tool calls, only
+   * for a model that takes tools; V0.9.40).
+   */
+  cairn_mode: string | null;
 }
 
 /** A rendered-for-reading view of an uploaded business document. */
@@ -2600,6 +2605,7 @@ export type AgentRouting =
   | "explicit"
   | "rules"
   | "model"
+  | "agent"
   | "unmatched";
 
 /** What the user sent: typed text, optionally pinned to a capability or file. */

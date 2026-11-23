@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.40 (2026-11-23)
+
+CAIRN can work in a loop: Agent mode.
+
+### Changed
+- **Agent mode.** An administrator can set **CAIRN mode** to *Agent* on the workspace's text provider (Settings › AI), which is offered only for a model that takes tools (native or JSON, found by *Test connection* or set by hand). In Agent mode a message that is not chatter and not a job picked from the + menu is answered by a loop: CAIRN is given tools, calls them in turns, reads what they return and answers. *Jobs* mode (the default), chatter, picked jobs, messages about an uploaded file and workspaces with no provider keep working exactly as before.
+- **The tools.** The five read tools of V0.9.38 (search evidence, read a file by pages, list files, file facts, workspace brief), find a symbol and recall memory, and, for people who can change the workspace, the four proposing jobs (save memory, change memory, manage files, create note). A person who cannot change the workspace is offered no proposing tool, and one the model names anyway is answered as unknown. A proposing tool only builds a proposal: the loop stops there and the card waits for the person to confirm, as in Jobs mode.
+- **Bounded.** A run ends when CAIRN answers, when it proposes a change, or at a budget: 8 model calls (`REPOMEMO_CAIRN_MAX_STEPS`), 90 seconds (`REPOMEMO_CAIRN_MAX_RUN_SECONDS`), half the model's context window (the oldest tool results are left out first) and the person's AI allowance, of which **each model call uses one request**. A budget ends the run with a partial answer that says why it stopped, what it ran and what is missing. A model that cannot keep to the JSON tool format is stopped the same way. Both limits are also System settings. Lowering them for one workspace is not built.
+- **What CAIRN did** (V0.9.39) lists each tool the run called, with its time, the files it named and the tokens the run used. An unknown tool or a tool that failed is answered to the model as an error it can recover from, and shown in the list.
+- **Not yet.** An Agent answer shows its evidence markers (`[E3]`) as the model wrote them and no list of what CAIRN read until the next release checks them against what the run read; the answer is not streamed until V0.9.43.
+- No migration. The mode and the budgets are settings; chat history still fits the model's window as before.
+
+### Checks
+- Unit tests with a scripted model for a two-step request that runs both tools and answers with their results, an unknown tool, the step budget ending partial, a viewer who is offered no proposing tool and cannot call one, a writer's proposal stopping the run, the AI allowance used by each model call and ending the run, and old tool results being left out first; formatted and linted for the core and the server, typecheck and the generated types pass; tests not run. Nothing was built or run: no real model chained a tool and Settings was not seen.
+
+### Upgrading
+- Nothing to do; every workspace stays in Jobs mode. To try Agent mode, test the text provider's connection, then choose *Agent* under CAIRN mode.
+
 ## V0.9.39 (2026-11-23)
 
 CAIRN records what it did for each answer, and shows it.

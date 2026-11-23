@@ -222,6 +222,8 @@ const SETTINGS: &[SettingSpec] = &[
     SettingSpec { key: "log_to_file", group: "Logging", label: "Write log files", description: "Keeps logs in one file per day (JSON lines) in the logs folder of the data folder. Past days can be browsed and downloaded under Logs.", kind: SettingKind::Boolean, min: 0, max: 1, unit: "", options: &[] },
     SettingSpec { key: "log_retention_days", group: "Logging", label: "Log file retention", description: "Daily log files older than this are deleted by maintenance. 0 keeps them forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
     SettingSpec { key: "system_audit_retention_days", group: "Background", label: "System audit history", description: "System administration events are kept this long. 0 keeps them forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
+    SettingSpec { key: "cairn_max_steps", group: "AI", label: "CAIRN steps per request", description: "The most model calls one CAIRN request makes in Agent mode; each uses one of the person's AI requests for the hour. A request that needs more ends with a partial answer.", kind: SettingKind::Integer, min: 1, max: 30, unit: "calls", options: &[] },
+    SettingSpec { key: "cairn_max_run_seconds", group: "AI", label: "CAIRN time per request", description: "The longest one CAIRN request takes in Agent mode before it answers with what it has.", kind: SettingKind::Integer, min: 10, max: 600, unit: "seconds", options: &[] },
     SettingSpec { key: "cairn_trace_days", group: "Background", label: "CAIRN run history", description: "What CAIRN did for each answer (its steps, not their text) is kept this long, personal to the person who asked. 0 keeps it forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
 ];
 
@@ -258,6 +260,8 @@ fn read_setting(settings: &RuntimeSettings, key: &str) -> Value {
         "index_retry_hours" => json!(maintenance.index_retry_interval.as_secs() / 3600),
         "system_audit_retention_days" => json!(settings.system_audit_retention_days),
         "cairn_trace_days" => json!(settings.cairn_trace_days),
+        "cairn_max_steps" => json!(settings.cairn_max_steps),
+        "cairn_max_run_seconds" => json!(settings.cairn_max_run_seconds),
         "log_level" => json!(settings.logging.level),
         "log_console_format" => json!(settings.logging.console_format.as_str()),
         "log_to_file" => json!(settings.logging.to_file),
@@ -372,6 +376,8 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                 "index_retry_hours" => settings.maintenance.index_retry_interval = Duration::from_secs(seconds * 3600),
                 "system_audit_retention_days" => settings.system_audit_retention_days = number,
                 "cairn_trace_days" => settings.cairn_trace_days = number,
+                "cairn_max_steps" => settings.cairn_max_steps = number,
+                "cairn_max_run_seconds" => settings.cairn_max_run_seconds = number,
                 "log_retention_days" => settings.logging.retention_days = number,
                 _ => unreachable!("every integer setting is handled"),
             }

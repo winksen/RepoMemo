@@ -446,6 +446,8 @@ export interface SharedAiProviderSettings {
   tool_mode?: "native" | "json" | "none" | null;
   /** The model's context window in tokens. */
   context_tokens?: number | null;
+  /** How CAIRN answers in the workspace: one job per message, or a loop of tool calls. */
+  cairn_mode?: "jobs" | "agent" | null;
 }
 
 export interface FileLink {
@@ -604,7 +606,7 @@ export interface AgentTurnResponse {
 
 export interface AgentReply {
   capability: AgentCapability | null;
-  routing: "explicit" | "rules" | "model" | "unmatched";
+  routing: "explicit" | "rules" | "model" | "agent" | "unmatched";
   subject: string;
   reply_markdown: string;
   generated: boolean;
