@@ -183,6 +183,8 @@ pub struct ServerConfig {
     pub system_admin_emails: Vec<String>,
     /// System audit events are kept this many days; 0 keeps them forever.
     pub system_audit_retention_days: i64,
+    /// CAIRN's run traces are kept this many days; 0 keeps them forever (V0.9.39).
+    pub cairn_trace_days: i64,
     /// What is logged, how it is printed and whether it is kept in files.
     pub logging: LogSettings,
     /// A new server shows an onboarding that creates its first system
@@ -488,6 +490,7 @@ impl ServerConfig {
                 })
                 .unwrap_or_default(),
             system_audit_retention_days: env_parse("REPOMEMO_SYSTEM_AUDIT_RETENTION_DAYS", 365)?,
+            cairn_trace_days: env_parse("REPOMEMO_CAIRN_TRACE_DAYS", 90)?,
             logging: LogSettings::from_env()?,
             setup_wizard: env_flag("REPOMEMO_SETUP_WIZARD", true)?,
             web_dir,
@@ -582,6 +585,7 @@ impl ServerConfig {
             },
             system_admin_emails: Vec::new(),
             system_audit_retention_days: 365,
+            cairn_trace_days: 90,
             logging: LogSettings {
                 to_file: false,
                 ..LogSettings::default()
@@ -829,6 +833,7 @@ pub(crate) struct RuntimeSettings {
     pub(crate) repo_clone_timeout_minutes: u64,
     pub(crate) maintenance: MaintenanceSettings,
     pub(crate) system_audit_retention_days: i64,
+    pub(crate) cairn_trace_days: i64,
     pub(crate) system_admin_emails: Vec<String>,
     pub(crate) logging: LogSettings,
 }
@@ -874,6 +879,7 @@ impl RuntimeSettings {
             repo_clone_timeout_minutes: config.repo_clone_timeout_minutes,
             maintenance: config.maintenance.clone(),
             system_audit_retention_days: config.system_audit_retention_days,
+            cairn_trace_days: config.cairn_trace_days,
             system_admin_emails: config.system_admin_emails.clone(),
             logging: config.logging.clone(),
         }

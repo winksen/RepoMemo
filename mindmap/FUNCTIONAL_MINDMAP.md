@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.38` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.39` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.39 — CAIRN records what it did for each answer, and shows it.
+
+- **What CAIRN did.** Under every answer a collapsed list shows the steps behind it: the job CAIRN ran, how it was chosen, the files it named, how long it took and what it proposed. It is private to the person who asked, goes with the chat, and expires after 90 days by default.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.38 — CAIRN gets the read tools a loop will chain, with evidence handles. Nothing a person sees changes yet.
 

@@ -28,11 +28,13 @@ use files::{
 };
 mod proposals;
 mod tools;
+mod trace;
 use chatter::{chat_system, chatter_reply, recognise_chatter, unmatched_reply, ChatterContext, WorkspaceBrief};
 use evidence::{evidence_for, next_steps, says_insufficient};
 use proposals::{save_memory_reply, save_memory_request};
 pub use tools::{agent_capabilities, capability_needs_write};
 use tools::{classifier_catalog, requires_ai, tool_for, tool_for_capability_id};
+pub use trace::{agent_run_trace, RunTrace};
 
 const MAX_MESSAGE_CHARS: usize = 2_000;
 const FILE_RESULT_LIMIT: usize = 50;
@@ -333,7 +335,7 @@ impl RepoMemoCore {
         // Provider and indexing problems are part of the conversation, not a
         // failed request: the user can fix the cause and ask again.
         let mut answer = outcome.unwrap_or_else(|error| {
-            let mut failed = reply("I couldn't complete that.");
+            let mut failed = reply(trace::FAILED_REPLY);
             // `{:#}` keeps the cause, e.g. a timeout behind "could not reach OpenRouter".
             failed.warnings.push(format!("{error:#}"));
             failed

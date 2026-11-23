@@ -3271,3 +3271,122 @@ async fn a_due_review_is_reminded_once_per_window_and_skips_snoozed_viewers_and_
     assert!(assignment.reviewer_departed);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+/// V0.9.39: a run's trace is stored with its steps, belongs to the chat it answered, goes with the chat and with the account's
+/// anonymization, and is pruned after its retention.
+#[tokio::test]
+async fn a_run_trace_is_kept_with_its_steps_and_goes_with_its_chat_and_its_age() {
+    use crate::NewAgentRun;
+    use repomemo_domain::{AgentMessage, AgentReply, AgentRouting, AgentStep, AgentStepEvidence};
+    let (storage, data_dir) = temp_storage("run-traces").await;
+    let user = storage.create_user("runs@example.com", "Runs", "hash").await.unwrap();
+    let workspace = storage.create_workspace("Runs").await.unwrap();
+    let conversation = storage
+        .create_agent_conversation(&workspace.id, &user.id, "Retries")
+        .await
+        .unwrap();
+    let reply = AgentReply {
+        capability: None,
+        routing: AgentRouting::Unmatched,
+        subject: String::new(),
+        reply_markdown: "Hello".to_owned(),
+        generated: false,
+        files: Vec::new(),
+        matches: Vec::new(),
+        citations: Vec::new(),
+        warnings: Vec::new(),
+        context_turns: 0,
+        proposals: Vec::new(),
+        file_set: None,
+        memory_cards: Vec::new(),
+    };
+    let turn = storage
+        .append_agent_turn(&conversation.id, "Hi", &AgentMessage::default(), &reply)
+        .await
+        .unwrap();
+    let run = |started: &str| NewAgentRun {
+        turn_id: Some(turn.id.clone()),
+        conversation_id: conversation.id.clone(),
+        user_id: user.id.clone(),
+        workspace_id: workspace.id.clone(),
+        origin: "chat".to_owned(),
+        provider_id: None,
+        model: Some("llama3.2".to_owned()),
+        tool_mode: Some("none".to_owned()),
+        state: "answered".to_owned(),
+        input_tokens: 10,
+        output_tokens: 4,
+        started_at: started.to_owned(),
+        ended_at: Some("2026-11-23T10:00:02.000+00:00".to_owned()),
+        steps: vec![
+            AgentStep {
+                position: 1,
+                kind: "tool".to_owned(),
+                tool: Some("search_content".to_owned()),
+                summary: "Search content: retries".to_owned(),
+                evidence: vec![AgentStepEvidence {
+                    artifact_id: "a1".to_owned(),
+                    title: "retries.md".to_owned(),
+                }],
+                duration_ms: 900,
+                error: None,
+            },
+            AgentStep {
+                position: 2,
+                kind: "answer".to_owned(),
+                tool: None,
+                summary: "Answered".to_owned(),
+                evidence: Vec::new(),
+                duration_ms: 0,
+                error: None,
+            },
+        ],
+    };
+    storage
+        .record_agent_run(run("2026-11-23T10:00:00.000+00:00"))
+        .await
+        .unwrap();
+    let found = storage.get_agent_run_for_turn(&turn.id).await.unwrap().unwrap();
+    assert_eq!(
+        (found.state.as_str(), found.step_count, found.duration_ms),
+        ("answered", 2, 2000)
+    );
+    assert_eq!(found.steps[0].evidence[0].title, "retries.md");
+    assert_eq!(found.steps[0].tool.as_deref(), Some("search_content"));
+    assert!(storage.get_agent_run_for_turn("no-such-turn").await.unwrap().is_none());
+
+    // Retention: a trace older than the cutoff goes, a newer one stays.
+    assert_eq!(storage.prune_agent_runs("2026-11-23T09:00:00+00:00").await.unwrap(), 0);
+    assert_eq!(storage.prune_agent_runs("2026-11-24T00:00:00+00:00").await.unwrap(), 1);
+    assert!(storage.get_agent_run_for_turn(&turn.id).await.unwrap().is_none());
+
+    // The chat takes its traces with it.
+    storage
+        .record_agent_run(run("2026-11-23T10:00:00.000+00:00"))
+        .await
+        .unwrap();
+    assert_eq!(storage.count_agent_runs(&conversation.id).await.unwrap(), 1);
+    storage
+        .delete_agent_conversation(&conversation.id, &user.id)
+        .await
+        .unwrap();
+    assert_eq!(storage.count_agent_runs(&conversation.id).await.unwrap(), 0);
+
+    // So does anonymizing the account, which deletes its chats.
+    let again = storage
+        .create_agent_conversation(&workspace.id, &user.id, "Again")
+        .await
+        .unwrap();
+    let again_turn = storage
+        .append_agent_turn(&again.id, "Hi", &AgentMessage::default(), &reply)
+        .await
+        .unwrap();
+    let mut kept = run("2026-11-23T10:00:00.000+00:00");
+    kept.conversation_id = again.id.clone();
+    kept.turn_id = Some(again_turn.id.clone());
+    storage.record_agent_run(kept).await.unwrap();
+    storage.deactivate_user(&user.id).await.unwrap();
+    storage.anonymize_user(&user.id).await.unwrap();
+    assert_eq!(storage.count_agent_runs(&again.id).await.unwrap(), 0);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

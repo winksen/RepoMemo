@@ -4,8 +4,8 @@ import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
-import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, getSharedAgentConversation, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
-import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentTurn, MemoryCardSummary } from "../types";
+import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, getSharedAgentConversation, getSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
+import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentRun, AgentTurn, MemoryCardSummary } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
@@ -582,6 +582,38 @@ function Evidence({ accessToken, citations, isQuestion, onOpenArtifact }: { acce
   </div>;
 }
 
+function traceDuration(milliseconds: number) {
+  return milliseconds < 1000 ? `${milliseconds} ms` : `${(milliseconds / 1000).toFixed(1)} s`;
+}
+
+/** What CAIRN did for one answer (V0.9.39): its steps, one line each, fetched when the list is opened. A trace is personal and expires, so an older answer may have none. */
+function RunTrace({ accessToken, turnId }: { accessToken: string; turnId: string }) {
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "none">("idle");
+  const [run, setRun] = useState<AgentRun | null>(null);
+  async function open(isOpen: boolean) {
+    if (!isOpen || status !== "idle") return;
+    setStatus("loading");
+    try {
+      setRun(await getSharedAgentRun(accessToken, turnId));
+      setStatus("ready");
+    } catch {
+      setStatus("none");
+    }
+  }
+  return <details className="shared-assistant-trace" onToggle={(event) => void open(event.currentTarget.open)}>
+    <summary>What {ASSISTANT_NAME} did</summary>
+    {status === "loading" ? <p className="shared-muted-copy">Loading the steps…</p> : null}
+    {status === "none" ? <p className="shared-muted-copy">There is no record of the steps behind this answer. Answers from before runs were recorded, and old ones, have none.</p> : null}
+    {status === "ready" && run ? <>
+      <ol>{run.steps.map((step) => <li key={step.position}>
+        <span>{step.summary}</span>
+        <small>{[step.tool, step.duration_ms > 0 ? traceDuration(step.duration_ms) : null, step.evidence.length ? `${step.evidence.length} ${step.evidence.length === 1 ? "file" : "files"}: ${step.evidence.slice(0, 3).map((file) => file.title).join(", ")}${step.evidence.length > 3 ? ", …" : ""}` : null, step.error].filter(Boolean).join(" · ")}</small>
+      </li>)}</ol>
+      <small className="shared-muted-copy">{run.step_count} {run.step_count === 1 ? "step" : "steps"} · {traceDuration(run.duration_ms)}{run.input_tokens + run.output_tokens > 0 ? ` · ${run.input_tokens + run.output_tokens} tokens` : ""}{run.model ? ` · ${run.model}` : ""}</small>
+    </> : null}
+  </details>;
+}
+
 /** What CAIRN proposes to do: shown before anything happens, with the person's *Confirm* and *Dismiss*, and afterwards with what was done. */
 function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string | null; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; proposal: AgentProposal; turnId: string }) {
   const waiting = deciding === `${turnId}/${proposal.id}`;
@@ -636,5 +668,6 @@ function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, i
     </li>)}</ul> : null}
     {(reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
     {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
+    {turnId ? <RunTrace accessToken={accessToken} key={turnId} turnId={turnId} /> : null}
   </div>;
 }

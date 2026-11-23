@@ -66,6 +66,8 @@ Enter the new key in the workspace's AI integration (the key is encrypted and ne
 
 Nothing leaves the server for an AI provider until a workspace owner or admin configures one. A **cloud** provider (OpenRouter, or an OpenAI-compatible endpoint whose address is not on this machine or a private network) additionally needs an **explicit acknowledgement** that workspace excerpts leave the server; a local Ollama keeps them on a machine you run. Providers can only be set at hosts in `REPOMEMO_AI_ALLOWED_HOSTS`; addresses of cloud metadata services and link-local addresses are refused. To withdraw consent: remove the provider in *Settings*, or restrict who may use AI there. Image descriptions and search vectors are built in the background from stored excerpts, so removing the provider is what stops them. Interactive use is limited per person by `REPOMEMO_AI_REQUESTS_PER_HOUR`.
 
+CAIRN keeps a **trace** of each answer (its steps, the files it named, how long it took; never the text of a passage). A trace is personal to the person who asked: it is deleted with the chat, removed when the account is anonymized, left out of workspace archives and pruned by maintenance after `REPOMEMO_CAIRN_TRACE_DAYS` (90 by default). No report of what people asked CAIRN is built from traces.
+
 ## 5. TLS and trusted proxies
 
 - **TLS** is the front door's job: the container edge (`repomemo-edge`, Let's Encrypt), your own proxy ([Front doors](FRONT_DOORS.md)), or none on a trusted network. Set `REPOMEMO_PUBLIC_URL` to the `https://` address so HSTS is on and the refresh cookie is `Secure`. The server refuses to listen beyond loopback over plain HTTP unless told it is behind TLS.

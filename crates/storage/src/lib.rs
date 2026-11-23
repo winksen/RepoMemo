@@ -5,14 +5,14 @@ use std::sync::{Arc, RwLock};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use repomemo_domain::{
-    AgentConversation, AgentMessage, AgentReply, AgentTurn, ArtifactComment, ArtifactDetail, ArtifactIndexFailure,
-    ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType, ArtifactVersion, Chunk, Citation,
-    CollaborationTask, Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail, MemoryCardSummary, MemoryEvidence,
-    MemoryReviewReason, Milestone, Organization, OrganizationMember, OrganizationRole, Project, ProjectReference,
-    ProviderSettings, SavedSearch, SearchRequest, SearchResult, SharedNotification, SharedUser, SharedWorkspace,
-    Source, SourceType, Symbol, SymbolKind, SymbolSearchResult, TaskChecklistItem, TaskComment, TaskDependency,
-    TaskLabelTag, TaskReference, TaskSummary, Workspace, WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership,
-    WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
+    AgentConversation, AgentMessage, AgentReply, AgentRun, AgentStep, AgentStepEvidence, AgentTurn, ArtifactComment,
+    ArtifactDetail, ArtifactIndexFailure, ArtifactLifecycle, ArtifactLifecycleEvent, ArtifactSummary, ArtifactType,
+    ArtifactVersion, Chunk, Citation, CollaborationTask, Folder, IndexingJobStatus, MemoryCard, MemoryCardDetail,
+    MemoryCardSummary, MemoryEvidence, MemoryReviewReason, Milestone, Organization, OrganizationMember,
+    OrganizationRole, Project, ProjectReference, ProviderSettings, SavedSearch, SearchRequest, SearchResult,
+    SharedNotification, SharedUser, SharedWorkspace, Source, SourceType, Symbol, SymbolKind, SymbolSearchResult,
+    TaskChecklistItem, TaskComment, TaskDependency, TaskLabelTag, TaskReference, TaskSummary, Workspace,
+    WorkspaceActivityEvent, WorkspaceMember, WorkspaceMembership, WorkspaceOverview, WorkspaceRole, MAX_FOLDER_DEPTH,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -23,6 +23,7 @@ use uuid::Uuid;
 mod access;
 mod accounts;
 mod activity;
+mod agent_runs;
 mod ai_usage;
 mod approvals;
 mod archive;
@@ -78,6 +79,7 @@ mod vectors;
 mod workflow;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
+pub use agent_runs::NewAgentRun;
 pub use ai_usage::{AiSpend, AiUsageRow};
 pub use approvals::{StoredApproval, StoredImportedApproval};
 pub use archive_import::{ImportedWorkspace, PendingPassage};

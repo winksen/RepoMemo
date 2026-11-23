@@ -489,6 +489,11 @@ body.shared-dock-resizing { cursor: col-resize; user-select: none; }
 .shared-assistant-proposal { display: grid; gap: 8px; max-width: 72ch; padding: 12px 14px; border: 1px solid var(--color-border-strong); border-radius: 12px; }
 .shared-assistant-proposal > strong { font-size: 13px; }
 .shared-assistant-proposal .shared-markdown { color: var(--color-text-muted); font-size: 13px; }
+.shared-assistant-trace { max-width: 72ch; color: var(--color-text-muted); font-size: 12px; }
+.shared-assistant-trace > summary { cursor: pointer; color: var(--color-text-subtle); }
+.shared-assistant-trace ol { display: grid; gap: 4px; margin: 8px 0; padding-left: 20px; }
+.shared-assistant-trace li { display: grid; gap: 1px; }
+.shared-assistant-trace li small { color: var(--color-text-subtle); }
 .shared-assistant-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .shared-assistant-proposal > small { color: var(--color-text-subtle); font-size: 12px; }
 .shared-assistant-proposal-dismissed { opacity: 0.7; }

@@ -70,6 +70,8 @@ pub struct MaintenanceReport {
     pub counters_pruned: usize,
     pub channels_pruned: usize,
     pub system_events_pruned: u64,
+    /// CAIRN run traces past their retention (V0.9.39).
+    pub agent_runs_pruned: u64,
     pub log_files_removed: usize,
     pub failures: usize,
 }
@@ -79,6 +81,7 @@ impl MaintenanceReport {
         self.refresh_tokens_purged > 0
             || self.access_links_purged > 0
             || self.jobs_pruned > 0
+            || self.agent_runs_pruned > 0
             || self.blobs_removed > 0
             || self.previews_removed > 0
             || self.untracked_files_removed > 0
@@ -260,6 +263,14 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         match storage.prune_system_events(&cutoff).await {
             Ok(count) => report.system_events_pruned = count,
             Err(error) => failed(&mut report, "system audit events", error),
+        }
+    }
+
+    if runtime.cairn_trace_days > 0 {
+        let cutoff = (Utc::now() - chrono::Duration::days(runtime.cairn_trace_days)).to_rfc3339();
+        match storage.prune_agent_runs(&cutoff).await {
+            Ok(count) => report.agent_runs_pruned = count,
+            Err(error) => failed(&mut report, "CAIRN run traces", error),
         }
     }
 

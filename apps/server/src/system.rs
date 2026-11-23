@@ -222,6 +222,7 @@ const SETTINGS: &[SettingSpec] = &[
     SettingSpec { key: "log_to_file", group: "Logging", label: "Write log files", description: "Keeps logs in one file per day (JSON lines) in the logs folder of the data folder. Past days can be browsed and downloaded under Logs.", kind: SettingKind::Boolean, min: 0, max: 1, unit: "", options: &[] },
     SettingSpec { key: "log_retention_days", group: "Logging", label: "Log file retention", description: "Daily log files older than this are deleted by maintenance. 0 keeps them forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
     SettingSpec { key: "system_audit_retention_days", group: "Background", label: "System audit history", description: "System administration events are kept this long. 0 keeps them forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
+    SettingSpec { key: "cairn_trace_days", group: "Background", label: "CAIRN run history", description: "What CAIRN did for each answer (its steps, not their text) is kept this long, personal to the person who asked. 0 keeps it forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
 ];
 
 fn spec(key: &str) -> Option<&'static SettingSpec> {
@@ -256,6 +257,7 @@ fn read_setting(settings: &RuntimeSettings, key: &str) -> Value {
         "job_retention_days" => json!(maintenance.job_retention_days),
         "index_retry_hours" => json!(maintenance.index_retry_interval.as_secs() / 3600),
         "system_audit_retention_days" => json!(settings.system_audit_retention_days),
+        "cairn_trace_days" => json!(settings.cairn_trace_days),
         "log_level" => json!(settings.logging.level),
         "log_console_format" => json!(settings.logging.console_format.as_str()),
         "log_to_file" => json!(settings.logging.to_file),
@@ -369,6 +371,7 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                 "job_retention_days" => settings.maintenance.job_retention_days = number,
                 "index_retry_hours" => settings.maintenance.index_retry_interval = Duration::from_secs(seconds * 3600),
                 "system_audit_retention_days" => settings.system_audit_retention_days = number,
+                "cairn_trace_days" => settings.cairn_trace_days = number,
                 "log_retention_days" => settings.logging.retention_days = number,
                 _ => unreachable!("every integer setting is handled"),
             }

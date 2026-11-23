@@ -918,6 +918,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/workspaces/{workspace_id}/agent/conversations",
             get(agent::list_agent_conversations),
         )
+        .route("/v1/agent/turns/{turn_id}/run", get(agent::get_agent_turn_run))
         .route(
             "/v1/agent/turns/{turn_id}/proposals/{proposal_id}/confirm",
             post(agent_proposals::confirm_agent_proposal),

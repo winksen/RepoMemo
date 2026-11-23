@@ -21,6 +21,7 @@ import type {
   AgentConversation,
   AgentConversationDetail,
   AgentMessage,
+  AgentRun,
   AgentTurn,
   AgentTurnResponse,
   AskAnswer,
@@ -773,6 +774,11 @@ export function listSharedAgentConversations(accessToken: string, workspaceId: s
 
 export function getSharedAgentConversation(accessToken: string, conversationId: string): Promise<AgentConversationDetail> {
   return request<AgentConversationDetail>(`/v1/agent/conversations/${conversationId}`, {}, accessToken);
+}
+
+/** What CAIRN did for one answer; 404 for an older answer or one whose trace expired (V0.9.39). */
+export function getSharedAgentRun(accessToken: string, turnId: string): Promise<AgentRun> {
+  return request<AgentRun>(`/v1/agent/turns/${turnId}/run`, {}, accessToken);
 }
 
 export function renameSharedAgentConversation(accessToken: string, conversationId: string, title: string): Promise<AgentConversation> {

@@ -404,6 +404,8 @@ The chat is a small set of jobs that CAIRN picks from what you write, in three k
 
 **Managing files.** Say `move retry-policy.md to Runbooks`, `rename the deploy runbook file to Release runbook` or `delete the file old-notes.md`, and CAIRN finds the file (and the folder), then proposes the change in a card. Confirm does it as you; the trash keeps what it takes and the workspace trash can restore it. CAIRN handles one file at a time and only when it is clear which file you mean; with several candidates it lists them and waits. A request that does not speak of a file ("remove duplicates from the list") is not read as one.
 
+Under each answer, **What CAIRN did** (collapsed) lists the steps behind it: the job CAIRN ran and how it was chosen (picked, recognised or classified by the model), the files it named, how long it took and what it proposed. It is private to you, goes when you delete the chat, and is kept for 90 days by default; an answer from before this existed, or an old one, has none.
+
 Under an answer, **What CAIRN read** lists only the passages the answer cites, numbered like the markers in its text, and nothing when the answer says the indexed context is not enough. In that case CAIRN also says what to try next: a search for the words of your question, and a lookup by file name, which need no AI.
 
 ---

@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.39 (2026-11-23)
+
+CAIRN records what it did for each answer, and shows it.
+
+### Changed
+- **A run for every message.** Each message CAIRN answers now records a run: the tool it ran and how it was chosen (picked, recognised or classified by the model), the files that step named, each change it proposed, the answer, how long it took, the model and its tool mode. A message no job fits is a note and an answer. A run is `answered`, `awaiting_confirmation` (it proposed changes) or `failed`. Token counts stay 0 until the loop counts them (V0.9.40).
+- **What CAIRN did.** Under each answer on Cairn's page and in the dock, a collapsed **What CAIRN did** lists the steps, one line each with the tool, the time and the files named. It is read when opened, and an answer from before runs were recorded, or whose trace expired, says there is no record.
+- **Personal and short-lived.** A trace is private to the person whose chat it belongs to (`GET /v1/agent/turns/{id}/run` answers only the chat's owner), is deleted with the chat, is removed when the account is anonymized, is left out of workspace archives, and is pruned by maintenance after `REPOMEMO_CAIRN_TRACE_DAYS` (90; 0 keeps it; also under System › Settings). Steps hold a one-line summary and the titles of files, never the text of a passage, and no report of what people asked is built from them.
+- A trace that cannot be stored never fails the answer. Migration `0088_agent_runs.sql` adds two tables.
+
+### Checks
+- Unit tests for the trace of a routed job, of a message no job fits, of proposals and of a failed job, and a storage test that a trace is stored with its steps, is pruned by age, goes with its chat and with the account's anonymization; formatted and linted for the storage, core and server crates, typecheck, the generated types and the migration lock pass; tests not run. Nothing was built or run: the list was not seen in the chat and the new migration did not run.
+
+### Upgrading
+- The migration runs on start. Answers given before this release have no trace.
+
 ## V0.9.38 (2026-11-23)
 
 CAIRN gets the read tools a loop will chain, with evidence handles. Nothing a person sees changes yet.

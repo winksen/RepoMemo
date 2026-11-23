@@ -9,12 +9,12 @@ use axum::{
     Json,
 };
 use repomemo_api::{
-    agent_capabilities, agent_conversation_title, agent_turn_label, attachment_reply, capability_needs_write,
-    HISTORY_MAX_TURNS,
+    agent_capabilities, agent_conversation_title, agent_run_trace, agent_turn_label, attachment_reply,
+    capability_needs_write, HISTORY_MAX_TURNS,
 };
 use repomemo_domain::{
     AgentCapability, AgentCapabilityInfo, AgentConversation, AgentConversationDetail, AgentExchange, AgentHistoryFile,
-    AgentHistoryTurn, AgentMessage, AgentRequest, AgentTurn, ProviderSettings, WorkspaceRole,
+    AgentHistoryTurn, AgentMessage, AgentRequest, AgentRun, AgentTurn, ProviderSettings, WorkspaceRole,
 };
 use serde::{Deserialize, Serialize};
 
@@ -136,6 +136,15 @@ pub(crate) async fn send_agent_message(
         None => (Vec::new(), Vec::new()),
     };
     let provider = text_provider(&state, &workspace_id).await?;
+    let provider_model = provider.as_ref().map(|provider| {
+        (
+            provider.model.clone().filter(|model| !model.trim().is_empty()),
+            repomemo_ai::ModelTraits::from_metadata(&provider.metadata)
+                .tool_mode
+                .as_str()
+                .to_owned(),
+        )
+    });
     let (provider_id, ai_unavailable_reason) = match provider {
         Some(provider) => {
             let min_role = ai_access::workspace_ai_min_role(&state, &workspace_id).await?;
@@ -158,6 +167,8 @@ pub(crate) async fn send_agent_message(
         }
         None => (None, None),
     };
+    let provider_for_run = provider_id.clone();
+    let started_at = chrono::Utc::now();
     let mut reply = state
         .core
         .run_agent(AgentRequest {
@@ -200,6 +211,35 @@ pub(crate) async fn send_agent_message(
         .append_agent_turn(&conversation_id, &label, &message, &reply)
         .await
         .map_err(map_storage_error)?;
+    // How the message was answered, kept for the person who asked (V0.9.39). A trace that cannot be stored never fails the answer.
+    let ended_at = chrono::Utc::now();
+    let trace = agent_run_trace(&message, &reply, (ended_at - started_at).num_milliseconds().max(0));
+    let (model, tool_mode) = match (&provider_for_run, provider_model) {
+        (Some(_), Some((model, tool_mode))) => (model, Some(tool_mode)),
+        _ => (None, None),
+    };
+    if let Err(error) = state
+        .storage
+        .record_agent_run(repomemo_storage::NewAgentRun {
+            turn_id: Some(turn.id.clone()),
+            conversation_id: conversation_id.clone(),
+            user_id: subject.user_id.clone(),
+            workspace_id: workspace_id.clone(),
+            origin: "chat".to_owned(),
+            provider_id: provider_for_run,
+            model,
+            tool_mode,
+            state: trace.state,
+            input_tokens: 0,
+            output_tokens: 0,
+            started_at: started_at.to_rfc3339(),
+            ended_at: Some(ended_at.to_rfc3339()),
+            steps: trace.steps,
+        })
+        .await
+    {
+        tracing::warn!(error = %format!("{error:#}"), "A CAIRN run trace could not be stored");
+    }
     if reply.generated {
         record_workspace_activity(
             &state,
@@ -276,6 +316,29 @@ pub(crate) async fn attach_agent_file(
         conversation: owned_conversation(&state, &subject, &conversation_id).await?,
         turn,
     }))
+}
+
+/// What CAIRN did for one answer: the steps of its run. Only the person whose chat it is may read it, and an older answer, or one
+/// whose trace expired, has none.
+pub(crate) async fn get_agent_turn_run(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(turn_id): Path<String>,
+) -> Result<Json<AgentRun>, ApiError> {
+    let turn = state
+        .storage
+        .get_agent_turn(&turn_id)
+        .await
+        .map_err(|_| conversation_not_found())?;
+    let conversation = owned_conversation(&state, &subject, &turn.conversation_id).await?;
+    require_workspace_read(&state, &subject, &conversation.workspace_id).await?;
+    state
+        .storage
+        .get_agent_run_for_turn(&turn.id)
+        .await
+        .map_err(map_storage_error)?
+        .map(Json)
+        .ok_or_else(|| ApiError::not_found("CAIRN kept no record of the steps behind that answer."))
 }
 
 pub(crate) async fn list_agent_conversations(

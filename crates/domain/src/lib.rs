@@ -3021,6 +3021,57 @@ pub struct AgentTurn {
     pub created_at: String,
 }
 
+/// A file a step of a run named or used (V0.9.39). The trace keeps its title, never its text.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentStepEvidence {
+    pub artifact_id: String,
+    pub title: String,
+}
+
+/// One step of a CAIRN run: a tool that ran, a change it proposed, or the answer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentStep {
+    /// 1 is the first step.
+    pub position: i64,
+    /// `model`, `tool`, `proposal`, `answer` or `note`.
+    pub kind: String,
+    /// The registered tool, for a `tool` step.
+    #[serde(default)]
+    pub tool: Option<String>,
+    /// One line saying what the step did; never a passage of a file.
+    pub summary: String,
+    #[serde(default)]
+    pub evidence: Vec<AgentStepEvidence>,
+    pub duration_ms: i64,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+/// One message CAIRN answered, with how (V0.9.39). Personal to the person whose chat it belongs to.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRun {
+    pub id: String,
+    pub turn_id: Option<String>,
+    pub conversation_id: String,
+    pub workspace_id: String,
+    /// `chat`, `routine` or `inbox`.
+    pub origin: String,
+    #[serde(default)]
+    pub model: Option<String>,
+    /// `native`, `json` or `none`, for a run that used the model's tools.
+    #[serde(default)]
+    pub tool_mode: Option<String>,
+    /// `running`, `answered`, `awaiting_confirmation`, `partial`, `failed` or `cancelled`.
+    pub state: String,
+    pub step_count: i64,
+    pub input_tokens: i64,
+    pub output_tokens: i64,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub duration_ms: i64,
+    pub steps: Vec<AgentStep>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConversationDetail {
     pub conversation: AgentConversation,

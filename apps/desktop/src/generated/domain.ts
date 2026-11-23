@@ -2632,6 +2632,49 @@ export interface AgentTurn {
   created_at: string;
 }
 
+/** A file a step of a run named or used (V0.9.39). The trace keeps its title, never its text. */
+export interface AgentStepEvidence {
+  artifact_id: string;
+  title: string;
+}
+
+/** One step of a CAIRN run: a tool that ran, a change it proposed, or the answer. */
+export interface AgentStep {
+  /** 1 is the first step. */
+  position: number;
+  /** `model`, `tool`, `proposal`, `answer` or `note`. */
+  kind: string;
+  /** The registered tool, for a `tool` step. */
+  tool: string | null;
+  /** One line saying what the step did; never a passage of a file. */
+  summary: string;
+  evidence: AgentStepEvidence[];
+  duration_ms: number;
+  error: string | null;
+}
+
+/** One message CAIRN answered, with how (V0.9.39). Personal to the person whose chat it belongs to. */
+export interface AgentRun {
+  id: string;
+  turn_id: string | null;
+  conversation_id: string;
+  workspace_id: string;
+  /** `chat`, `routine` or `inbox`. */
+  origin: string;
+  model: string | null;
+  /** `native`, `json` or `none`, for a run that used the model's tools. */
+  tool_mode: string | null;
+  /** `running`, `answered`, `awaiting_confirmation`, `partial`, `failed` or `cancelled`. */
+  state: string;
+  step_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  started_at: string;
+  ended_at: string | null;
+  duration_ms: number;
+  steps: AgentStep[];
+}
+
 export interface AgentConversationDetail {
   conversation: AgentConversation;
   turns: AgentTurn[];
