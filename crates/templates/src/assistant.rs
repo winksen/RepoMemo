@@ -30,6 +30,8 @@ pub const SUGGESTION_MAX: usize = 120;
 pub const PHRASES_MAX: usize = 12;
 pub const PHRASE_MAX: usize = 60;
 pub const FOCUS_MAX: usize = 160;
+/// The most characters of the starting `CAIRN.md` a template ships, and of the note CAIRN reads (V0.9.49).
+pub const INSTRUCTIONS_MAX: usize = 2000;
 
 /// A phrase the assistant's keyword router recognises (V0.2.185) and the job it maps onto. It is tried after the
 /// router's own rules and before the AI provider is asked, so it can only add: it never takes a message from a rule.
@@ -58,6 +60,10 @@ pub struct AssistantBlock {
     /// One line about what the workspace is for, added to the Ask prompt as context (V0.2.185), at most 160 characters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus: Option<String>,
+    /// The text of the `CAIRN.md` note a workspace made from the template starts with (V0.9.49): how the team wants CAIRN to work,
+    /// at most 2,000 characters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
 }
 
 pub(crate) fn validate(block: &AssistantBlock, issues: &mut Vec<TemplateIssue>) {
@@ -136,6 +142,19 @@ pub(crate) fn validate(block: &AssistantBlock, issues: &mut Vec<TemplateIssue>) 
             None
         };
         issues.extend(problem.map(|problem| TemplateIssue::new("assistant.focus", problem)));
+    }
+    if let Some(instructions) = &block.instructions {
+        let length = instructions.chars().count();
+        let problem = if instructions.trim().is_empty() {
+            Some("the instructions are empty".to_owned())
+        } else if length > INSTRUCTIONS_MAX {
+            Some(format!(
+                "the instructions are {length} characters; the most is {INSTRUCTIONS_MAX}"
+            ))
+        } else {
+            None
+        };
+        issues.extend(problem.map(|problem| TemplateIssue::new("assistant.instructions", problem)));
     }
     let mut asked = HashSet::new();
     for (index, suggestion) in block.suggestions.iter().enumerate() {

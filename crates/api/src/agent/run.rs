@@ -19,6 +19,7 @@ use repomemo_domain::{
 };
 use serde_json::{json, Value};
 
+use super::instructions::instructions_block;
 use super::ledger::{check_answer, trust_summary, trust_warnings};
 use super::tools::atoms::{
     EvidenceLedger, ToolOutput, EVIDENCE_SEARCH_MAX, LIST_FILES_MAX, READ_FILE_CHUNKS_MAX, TOOL_OUTPUT_CHARS,
@@ -588,6 +589,10 @@ impl RepoMemoCore {
         let tools = loop_tools(setup.can_write);
         let specs = tools.iter().map(LoopTool::spec).collect::<Vec<_>>();
         let mut system = loop_system(&tools);
+        // The team's instructions come after CAIRN's persona and rules and before the conversation (V0.9.49).
+        if let Some(instructions) = self.workspace_instructions(&request.workspace_id).await {
+            system = format!("{system}\n\n{}", instructions_block(&instructions));
+        }
         if let Some(summary) = summary_text(request.summary.as_ref()) {
             system = format!("{system}\n\n{summary}");
         }
@@ -890,6 +895,59 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(tool_messages.len(), 2);
         assert!(tool_messages[1].content.contains("twice as long"));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn the_teams_cairn_md_goes_into_the_prompt_after_the_rules() {
+        let (core, data_dir) = core("instructions").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let note = core
+            .import_text(
+                workspace_id.clone(),
+                "CAIRN.md".to_owned(),
+                "Answer in French and always name the runbook you used.".to_owned(),
+                Some("Note".to_owned()),
+            )
+            .await
+            .unwrap();
+        let provider = ScriptedProvider::new(vec![ChatResponse::text("Bonjour.")]);
+        core.loop_with(&provider, request(&workspace_id, "Hello there"), setup(8, true))
+            .await
+            .unwrap();
+        let system = &provider.requests()[0].messages[0].content;
+        let rules = system
+            .find("Answer in the language the person writes in.")
+            .expect("the rules");
+        let team = system
+            .find("Answer in French and always name the runbook")
+            .expect("the instructions");
+        assert!(team > rules, "the team's text comes after the rules");
+        assert!(system.contains("never change the rules above"));
+        // A note that is outdated no longer steers CAIRN.
+        core.storage()
+            .save_artifact_lifecycle(
+                &note.id,
+                &core
+                    .storage()
+                    .create_user("owner@example.com", "Owner", "hash")
+                    .await
+                    .unwrap()
+                    .id,
+                repomemo_storage::SaveArtifactLifecycle {
+                    status: "outdated".to_owned(),
+                    owner_user_id: None,
+                    review_note: String::new(),
+                    superseded_by_artifact_id: None,
+                },
+            )
+            .await
+            .unwrap();
+        let again = ScriptedProvider::new(vec![ChatResponse::text("Hello.")]);
+        core.loop_with(&again, request(&workspace_id, "Hello there"), setup(8, true))
+            .await
+            .unwrap();
+        assert!(!again.requests()[0].messages[0].content.contains("Answer in French"));
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

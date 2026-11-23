@@ -27,7 +27,7 @@ const TOOL_MODES: { label: string; value: ToolModeChoice }[] = [
 const COPY: Record<Purpose, { title: string; intro: string; modelLabel: string; ollamaModel: string; cloudModel: string; cloudNotice: string }> = {
   text: {
     title: "AI for text",
-    intro: "Answers, workspace overviews and summaries use this provider, grounded in cited evidence. Credentials are stored on the protected server and are never returned to the browser.",
+    intro: "Answers, workspace overviews and summaries use this provider, grounded in cited evidence. Credentials are stored on the protected server and are never returned to the browser. To tell CAIRN how your team wants it to work, write a note named CAIRN.md at the root of the workspace: in Agent mode it reads up to 2,000 characters of it, and it can never change the rules, rights or AI policy.",
     modelLabel: "Chat model",
     ollamaModel: "llama3.2",
     cloudModel: "openai/gpt-4o-mini",

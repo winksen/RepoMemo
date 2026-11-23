@@ -2330,3 +2330,23 @@ fn a_choice_saved_by_a_newer_server_resolves_to_general_with_a_reason() {
         "{reason}"
     );
 }
+
+#[test]
+fn a_template_may_ship_a_starting_cairn_md_of_up_to_two_thousand_characters() {
+    let instructions = |text: &str| {
+        with_assistant(&format!(
+            r#"{{ "instructions": {} }}"#,
+            serde_json::to_string(text).unwrap()
+        ))
+    };
+    let ok = parse(&instructions("Answer in French and name the runbook you used.")).unwrap();
+    assert_eq!(
+        ok.assistant().instructions.as_deref(),
+        Some("Answer in French and name the runbook you used.")
+    );
+    assert!(parse(&instructions(&"a".repeat(INSTRUCTIONS_MAX))).is_ok());
+    for bad in ["", "   ", "a".repeat(INSTRUCTIONS_MAX + 1).as_str()] {
+        assert_eq!(parse(&instructions(bad)).unwrap_err()[0].path, "assistant.instructions");
+    }
+    assert!(general().assistant().instructions.is_none());
+}

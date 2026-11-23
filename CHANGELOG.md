@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.49 (2026-11-23)
+
+A team tells CAIRN how it wants to work, in a note.
+
+### Changed
+- **`CAIRN.md`.** A note named `CAIRN.md` (any case) at the root of a workspace is read into every run of the Agent loop of that workspace, after CAIRN's persona and rules and before the conversation, at most 2,000 characters, under a heading that says it can change how CAIRN works and words things but never the rules, what it may do or whom it may help, and is not evidence. Only the note's current text counts, and only if it is a text file at the root that is not marked outdated or superseded; with several, the newest. It is an ordinary note: writers edit it, versions and the workspace's review and approval rules apply, and editing it changes CAIRN's next run.
+- **Templates can ship one.** A template's `assistant` block takes `instructions` (up to 2,000 characters, checked with the rest of the template and listed in the templates guide). A workspace made from such a template starts with a `CAIRN.md` note holding that text.
+- **Settings › AI says so.** The text provider's description now explains the note.
+- **Narrowed.** Jobs mode and the router's prompts do not read `CAIRN.md` yet, only the Agent loop does; Settings › AI does not link to the note; and CAIRN cannot propose a change to the existing `CAIRN.md` (its note job creates a note), so edit it as you would any note. No migration or API change.
+
+### Checks
+- Unit tests for choosing the note (name in any case, the root only, a text kind, not outdated or superseded, the newest), for the bound and the empty text, and for the heading that says it cannot change the rules; a loop test that the instructions come after the rules in the first request and that an outdated note stops steering; a template test for the bound and for a template without the key; formatted and linted for the core, the server and the templates crate (its test code has an older lint that this release does not touch); typecheck passes; tests not run. Nothing was built or run: no real model was steered by a `CAIRN.md`.
+
+### Upgrading
+- Nothing to do. Existing workspaces have no `CAIRN.md` until someone writes one.
+
 ## V0.9.48 (2026-11-23)
 
 CAIRN remembers a long chat.

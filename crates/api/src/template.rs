@@ -414,6 +414,16 @@ impl RepoMemoCore {
         })
     }
 
+    /// The text of the `CAIRN.md` note a workspace made from the template starts with, when the template ships one (V0.9.49).
+    pub fn starter_instructions(&self, template_id: &str) -> Option<String> {
+        let catalogue = self.templates.catalogue();
+        catalogue
+            .get(template_id)?
+            .assistant()
+            .instructions
+            .filter(|text| !text.trim().is_empty())
+    }
+
     /// The phrases the workspace's template adds to the assistant's router (V0.2.185). If the template cannot be read
     /// there are none: the router's own rules are all there is.
     pub(crate) async fn assistant_phrases(&self, workspace_id: &str) -> Vec<crate::agent::PhraseRule> {

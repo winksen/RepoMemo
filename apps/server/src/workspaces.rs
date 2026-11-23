@@ -20,6 +20,10 @@ pub(crate) async fn create_workspace(
     };
     let restricted = parse_access_policy(request.access_policy.as_deref())?;
     quotas::check_new_workspace(&state, &subject).await?;
+    let starter_instructions = request
+        .template_id
+        .as_deref()
+        .and_then(|id| state.core.starter_instructions(id));
     let workspace = state
         .storage
         .create_shared_workspace_with_policy(
@@ -31,6 +35,29 @@ pub(crate) async fn create_workspace(
         )
         .await
         .map_err(map_storage_error)?;
+    // A template may ship the team's first instructions for CAIRN as a note at the root (V0.9.49). Made after the workspace, so a
+    // failure leaves a workspace without the note, never without the workspace.
+    if let Some(text) = starter_instructions {
+        let made = state
+            .core
+            .import_text(
+                workspace.workspace.id.clone(),
+                "CAIRN.md".to_owned(),
+                text,
+                Some("Note".to_owned()),
+            )
+            .await;
+        match made {
+            Ok(note) => {
+                if let Err(error) = state.core.index_artifact(note.id).await {
+                    tracing::warn!(error = %format!("{error:#}"), "The CAIRN.md of a new workspace could not be indexed");
+                }
+            }
+            Err(error) => {
+                tracing::warn!(error = %format!("{error:#}"), "The CAIRN.md of a new workspace could not be made");
+            }
+        }
+    }
     Ok((StatusCode::CREATED, Json(workspace)))
 }
 
