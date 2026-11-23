@@ -26,6 +26,7 @@ use files::{
     choose_folder, file_command, files_help, is_set_reference, move_reply, rename_reply, status_reply, trash_reply,
     FolderChoice,
 };
+mod ledger;
 mod proposals;
 mod run;
 pub use run::{AgentLoopSetup, AgentOutcome};

@@ -36,6 +36,9 @@ pub(in crate::agent) struct EvidenceItem {
     pub path: String,
     /// `verified`, `needs_review`, `outdated` and so on; `active` when the file was never reviewed.
     pub lifecycle_state: Option<String>,
+    /// The lines of the passage, when it has them.
+    pub start_line: Option<i64>,
+    pub end_line: Option<i64>,
 }
 
 /// The handles of one run. The same passage or file is given the same handle each time a tool returns it.
@@ -94,8 +97,18 @@ impl EvidenceLedger {
             title: title.to_owned(),
             path: path.to_owned(),
             lifecycle_state: lifecycle_state.map(str::to_owned),
+            start_line: None,
+            end_line: None,
         });
         handle
+    }
+
+    /// Records the lines of the passage a handle stands for.
+    pub fn set_lines(&mut self, handle: &str, start_line: Option<i64>, end_line: Option<i64>) {
+        if let Some(item) = self.items.iter_mut().find(|item| item.handle == handle) {
+            item.start_line = start_line;
+            item.end_line = end_line;
+        }
     }
 }
 
@@ -240,6 +253,7 @@ impl RepoMemoCore {
                 &hit.path,
                 state.or(Some("active")),
             );
+            ledger.set_lines(&handle, hit.start_line, hit.end_line);
             let lines_at = match (hit.start_line, hit.end_line) {
                 (Some(start), Some(end)) => format!(" · lines {start}-{end}"),
                 _ => String::new(),
@@ -355,6 +369,7 @@ impl RepoMemoCore {
                 &summary.path,
                 state,
             );
+            ledger.set_lines(&handle, chunk.start_line, chunk.end_line);
             let heading = chunk
                 .heading_path
                 .as_deref()

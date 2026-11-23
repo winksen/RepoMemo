@@ -19,6 +19,7 @@ use repomemo_domain::{
 };
 use serde_json::{json, Value};
 
+use super::ledger::check_answer;
 use super::tools::atoms::{
     EvidenceLedger, ToolOutput, EVIDENCE_SEARCH_MAX, LIST_FILES_MAX, READ_FILE_CHUNKS_MAX, TOOL_OUTPUT_CHARS,
 };
@@ -269,6 +270,8 @@ struct Gathered {
     memory_cards: Vec<MemoryCardSummary>,
     proposals: Vec<repomemo_domain::AgentProposal>,
     warnings: Vec<String>,
+    /// The evidence the answer cites, which only the ledger sets (V0.9.41).
+    citations: Vec<repomemo_domain::Citation>,
     steps: Vec<AgentStep>,
     usage: Usage,
 }
@@ -329,7 +332,7 @@ fn finish(
         generated: true,
         files,
         matches: Vec::new(),
-        citations: Vec::new(),
+        citations: gathered.citations,
         warnings: gathered.warnings,
         context_turns: history_turns as i64,
         proposals: gathered.proposals,
@@ -627,7 +630,11 @@ impl RepoMemoCore {
                     asked.elapsed(),
                     None,
                 );
-                return Ok(finish(&request, answer, gathered, "answered", history.len()));
+                // Only evidence the run read can be cited, in the order it is cited.
+                let checked = check_answer(&ledger, &answer, super::says_insufficient(&answer));
+                gathered.warnings.extend(checked.warnings);
+                gathered.citations = checked.citations;
+                return Ok(finish(&request, checked.markdown, gathered, "answered", history.len()));
             }
             if !turn.content.trim().is_empty() {
                 draft = turn.content.trim().to_owned();
@@ -760,10 +767,13 @@ mod tests {
             )
             .await
             .unwrap();
+        // The marker is renumbered to the evidence list the run read.
         assert_eq!(
             outcome.reply.reply_markdown,
-            "Retries wait twice as long each time [E1]."
+            "Retries wait twice as long each time [1]."
         );
+        assert_eq!(outcome.reply.citations.len(), 1);
+        assert_eq!(outcome.reply.citations[0].title, "retry-policy.md");
         assert_eq!(outcome.reply.routing, AgentRouting::Agent);
         let trace = outcome.trace.unwrap();
         assert_eq!(trace.state, "answered");

@@ -668,7 +668,7 @@ function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, i
       </div> : null}
     </li>)}</ul> : null}
     {(reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
-    {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
+    {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question" || reply.routing === "agent"} citations={reply.citations} onOpenArtifact={onOpenArtifact} /> : null}
     {turnId ? <RunTrace accessToken={accessToken} key={turnId} turnId={turnId} /> : null}
   </div>;
 }

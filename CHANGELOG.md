@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.41 (2026-11-23)
+
+An Agent answer cites only what CAIRN read.
+
+### Changed
+- **A citation ledger.** In Agent mode the final answer is checked against the evidence handles the run was given. The handles it cited that it read become the list under **What CAIRN read**, in the order they are cited, with their lines, and the markers in the text are renumbered to match (`[E3][E1]` read in that order becomes `[1][2]` and citations 1 and 2).
+- **Invented sources are removed and said.** A handle the run never read (`[E9]`) is taken out of the text, and a warning names it ("I removed a source that I had not read: E9."). Ordinary brackets, such as `arr[0]` or a Markdown link, are left alone.
+- **An answer that rests on nothing says so.** When CAIRN read files and the answer cites none of them, it ends with "I could not tie this answer to a source.", unless the answer itself says the context is not enough. An answer after no reading, such as a greeting, passes as written.
+- The evidence list numbers its entries `[1]`, `[2]` for Agent answers as it does for Ask. This replaces the markers shown as written in V0.9.40. No setting, route or migration changes.
+
+### Checks
+- Unit tests for an unread handle removed and reported, handles becoming citations in cited order with renumbered markers, an answer resting on nothing, an answer after no reading, an insufficient-context answer and ordinary brackets; the two-step loop test now checks the renumbered marker and the citation; formatted and linted for the core, typecheck passes; tests not run. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.40 (2026-11-23)
 
 CAIRN can work in a loop: Agent mode.
