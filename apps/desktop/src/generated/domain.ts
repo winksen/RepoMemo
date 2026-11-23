@@ -2598,6 +2598,8 @@ export interface AgentProposal {
   payload: unknown;
   /** What happened once it was confirmed. */
   outcome: string | null;
+  /** Content CAIRN read before making this proposal that it does not trust (an issue, a pull request, a mail), by title (V0.9.42). */
+  untrusted_sources: string[];
 }
 
 /** How a message was matched to a capability. */

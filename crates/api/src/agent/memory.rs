@@ -175,6 +175,7 @@ fn card_proposal(kind: AgentProposalKind, title: &str, detail: String, payload: 
         detail,
         payload,
         outcome: None,
+        untrusted_sources: Vec::new(),
     }
 }
 

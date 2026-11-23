@@ -166,6 +166,7 @@ pub(crate) fn note_proposal(title: String, text: &str, sources: &[Citation], wha
             "language": "Note",
         }),
         outcome: None,
+        untrusted_sources: Vec::new(),
     }
 }
 

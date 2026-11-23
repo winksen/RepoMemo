@@ -186,6 +186,7 @@ pub(crate) fn note_reply(asked: &NoteRequest, exchanges: &[AgentExchange], folde
             "folder_id": folder.map(|(id, _)| id),
         }),
         outcome: None,
+        untrusted_sources: Vec::new(),
     };
     let mut answer = reply(format!(
         "I can create a note named **{title}** in {place}. Nothing is stored until you confirm below."

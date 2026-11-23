@@ -2975,6 +2975,9 @@ pub struct AgentProposal {
     /// What happened once it was confirmed.
     #[serde(default)]
     pub outcome: Option<String>,
+    /// Content CAIRN read before making this proposal that it does not trust (an issue, a pull request, a mail), by title (V0.9.42).
+    #[serde(default)]
+    pub untrusted_sources: Vec<String>,
 }
 
 /// How a message was matched to a capability.

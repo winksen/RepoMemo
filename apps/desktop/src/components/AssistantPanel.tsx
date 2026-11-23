@@ -376,10 +376,10 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   }
 
   /** Confirms or dismisses what CAIRN proposed. The action runs on the server as the person; the turn comes back with its outcome. */
-  async function decide(turnId: string, proposal: AgentProposal, action: "confirm" | "dismiss") {
+  async function decide(turnId: string, proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) {
     setDeciding(`${turnId}/${proposal.id}`);
     try {
-      const saved = await (action === "confirm" ? confirmSharedAgentProposal : dismissSharedAgentProposal)(accessToken, turnId, proposal.id);
+      const saved = await (action === "confirm" ? confirmSharedAgentProposal(accessToken, turnId, proposal.id, confirmCount) : dismissSharedAgentProposal(accessToken, turnId, proposal.id));
       setTurns((current) => current.map((entry) => entry.key === turnId ? storedTurn(saved) : entry));
       if (action === "confirm") showToast("success", saved.reply.proposals?.find((entry) => entry.id === proposal.id)?.outcome ?? "Done.");
     } catch (error) {
@@ -616,19 +616,26 @@ function RunTrace({ accessToken, turnId }: { accessToken: string; turnId: string
 }
 
 /** What CAIRN proposes to do: shown before anything happens, with the person's *Confirm* and *Dismiss*, and afterwards with what was done. */
-function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string | null; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; proposal: AgentProposal; turnId: string }) {
+function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string | null; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) => void; proposal: AgentProposal; turnId: string }) {
   const waiting = deciding === `${turnId}/${proposal.id}`;
+  // A large move or trash made after reading content from outside the workspace is confirmed by typing how many files it touches.
+  const untrusted = proposal.untrusted_sources ?? [];
+  const bulkCount = Number((proposal.payload as { count?: number } | null)?.count ?? 0);
+  const needsCount = untrusted.length > 0 && (proposal.kind === "move_files" || proposal.kind === "trash_files") && bulkCount > 10;
+  const [typed, setTyped] = useState("");
   return <aside aria-label={proposal.title} className={`shared-assistant-proposal shared-assistant-proposal-${proposal.state}`}>
     <strong>{proposal.title}</strong>
     <div className="shared-markdown"><SafeMarkdown>{proposal.detail}</SafeMarkdown></div>
+    {untrusted.length ? <small>Proposed after reading content from outside this workspace: {untrusted.join(", ")}.</small> : null}
+    {proposal.state === "pending" && needsCount ? <Field label={`Type ${bulkCount} to confirm`}><Input inputMode="numeric" onChange={(event) => setTyped(event.target.value.replace(/[^0-9]/g, ""))} value={typed} /></Field> : null}
     {proposal.state === "pending" ? <div className="shared-assistant-proposal-actions">
-      <Button busy={waiting} disabled={deciding !== null} onClick={() => onDecide(proposal, "confirm")} type="button" variant="main">Confirm</Button>
+      <Button busy={waiting} disabled={deciding !== null || (needsCount && Number(typed) !== bulkCount)} onClick={() => onDecide(proposal, "confirm", needsCount ? Number(typed) : undefined)} type="button" variant="main">Confirm</Button>
       <Button disabled={deciding !== null} onClick={() => onDecide(proposal, "dismiss")} type="button" variant="secondary">Dismiss</Button>
     </div> : <small>{proposal.state === "applied" ? proposal.outcome ?? "Done." : "Dismissed. Nothing was changed."}</small>}
   </aside>;
 }
 
-function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnCard, onActOnSelection, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnCard: (card: MemoryCardSummary, action: "update" | "delete") => void; onActOnSelection: (action: "move" | "trash" | "status") => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss") => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
+function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnCard, onActOnSelection, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnCard: (card: MemoryCardSummary, action: "update" | "delete") => void; onActOnSelection: (action: "move" | "trash" | "status") => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
   const note = routingNote(reply, capabilities);
   const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.

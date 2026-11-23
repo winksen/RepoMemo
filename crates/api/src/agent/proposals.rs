@@ -128,6 +128,7 @@ pub(crate) fn save_memory_reply(statement: &str, exchanges: &[AgentExchange]) ->
             "citations": citations,
         }),
         outcome: None,
+        untrusted_sources: Vec::new(),
     };
     let mut answer = reply(format!(
         "I can save this as a memory card named **{title}**. {evidence} Nothing is saved until you confirm below."

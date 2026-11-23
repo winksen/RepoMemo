@@ -239,6 +239,7 @@ mod tests {
             detail: String::new(),
             payload: json!({}),
             outcome: None,
+            untrusted_sources: Vec::new(),
         }];
         let trace = agent_run_trace(&message(), &proposing, 5);
         assert_eq!(trace.state, "awaiting_confirmation");

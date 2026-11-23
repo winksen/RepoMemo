@@ -232,6 +232,7 @@ fn proposal(kind: AgentProposalKind, title: &str, detail: String, payload: serde
         detail,
         payload,
         outcome: None,
+        untrusted_sources: Vec::new(),
     }
 }
 

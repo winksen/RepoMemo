@@ -760,8 +760,8 @@ export function attachSharedAgentFile(accessToken: string, workspaceId: string, 
 }
 
 /** Confirms what CAIRN proposed: the action runs as the person, and the turn comes back with its outcome (V0.9.10). */
-export function confirmSharedAgentProposal(accessToken: string, turnId: string, proposalId: string): Promise<AgentTurn> {
-  return request<AgentTurn>(`/v1/agent/turns/${turnId}/proposals/${proposalId}/confirm`, { method: "POST", body: "{}" }, accessToken);
+export function confirmSharedAgentProposal(accessToken: string, turnId: string, proposalId: string, confirmCount?: number): Promise<AgentTurn> {
+  return request<AgentTurn>(`/v1/agent/turns/${turnId}/proposals/${proposalId}/confirm`, { method: "POST", body: JSON.stringify(confirmCount === undefined ? {} : { confirm_count: confirmCount }) }, accessToken);
 }
 
 export function dismissSharedAgentProposal(accessToken: string, turnId: string, proposalId: string): Promise<AgentTurn> {

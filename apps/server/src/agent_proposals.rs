@@ -180,15 +180,50 @@ fn payload_text(proposal: &AgentProposal, key: &str) -> String {
         .to_owned()
 }
 
+/// What the person typed to confirm a large change CAIRN proposed after reading content it does not trust (V0.9.42).
+#[derive(Debug, Default, serde::Deserialize)]
+pub(crate) struct ConfirmProposalRequest {
+    #[serde(default)]
+    confirm_count: Option<i64>,
+}
+
+/// The most files a proposal made after untrusted reading may move or trash without the person typing how many.
+const UNTRUSTED_BULK_LIMIT: i64 = 10;
+
+/// Whether a proposal must be confirmed by typing its count: it moves or trashes more than ten files and was made after CAIRN
+/// read content it does not trust. Returns that count.
+fn needs_typed_count(proposal: &AgentProposal) -> Option<i64> {
+    if proposal.untrusted_sources.is_empty()
+        || !matches!(
+            proposal.kind,
+            AgentProposalKind::MoveFiles | AgentProposalKind::TrashFiles
+        )
+    {
+        return None;
+    }
+    let count = proposal.payload.get("count").and_then(|count| count.as_i64())?;
+    (count > UNTRUSTED_BULK_LIMIT).then_some(count)
+}
+
 pub(crate) async fn confirm_agent_proposal(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
     Path((turn_id, proposal_id)): Path<(String, String)>,
+    body: Option<Json<ConfirmProposalRequest>>,
 ) -> Result<Json<AgentTurn>, ApiError> {
     let (mut turn, workspace_id) = owned_turn(&state, &subject, &turn_id).await?;
     // Whatever the action, the person must still be able to change the workspace.
     require_workspace_write(&state, &subject, &workspace_id).await?;
     let proposal = pending_proposal(&mut turn, &proposal_id)?;
+    if let Some(count) = needs_typed_count(proposal) {
+        let typed = body.and_then(|Json(request)| request.confirm_count);
+        if typed != Some(count) {
+            return Err(ApiError::bad_request(format!(
+                "This was proposed after reading content from outside the workspace ({}). Type the number of files, {count}, to confirm.",
+                proposal.untrusted_sources.join(", ")
+            )));
+        }
+    }
     let outcome = apply(&state, &subject, &workspace_id, proposal).await?;
     proposal.state = AgentProposalState::Applied;
     proposal.outcome = Some(outcome);

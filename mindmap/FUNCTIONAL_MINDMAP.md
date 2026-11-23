@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.41` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.42` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.42 — Text from outside the workspace is data to CAIRN, never instructions.
+
+- **Outside text is never obeyed.** What CAIRN reads in issues, pull requests and mails is treated as quoted data. A change it proposes after reading such content says so on the card, and a large move or trash must be confirmed by typing how many files it touches.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.41 — An Agent answer cites only what CAIRN read.
 
