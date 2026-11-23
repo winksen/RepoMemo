@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.46 (2026-11-23)
+
+CAIRN has an evaluation set, a scripted run of it and a live runner. Nothing a person sees changes.
+
+### Changed
+- **A fixture workspace and 40 cases.** `crates/api/tests/cairn_eval/` holds 36 documents of different topics, a connector issue and a mail that carry instructions (the injection cases), review states (verified, needs review, outdated) and two memory cards, and `cases.json` with 40 cases: lookups by search and by reading, comparisons of two files, file facts, answers resting on outdated files, injection attempts, proposals, a viewer, a step budget and a message with nothing to look up. Each case has the message, a script of what a model that does this well calls and says, and what must be true: the tools called (as a set, or in order), the files cited, the tools and files that must not appear, the proposals, the warnings and the end state.
+- **A scripted run.** The core's tests run all 40 cases with a scripted provider and a real workspace built from the fixture, and fail if a case's expectation fails or if citation precision (0.9), tool accuracy (0.8) or forbidden actions (none) miss the thresholds. It is deterministic, so it checks the harness, the tools, the ledger, the budgets and the viewer rule, not a model.
+- **A live runner.** `npm run cairn:eval -- --workspace <empty workspace> --provider <name> --model <name>` (with `REPOMEMO_URL` and `REPOMEMO_TOKEN`) loads the fixture into that workspace, sends the 40 messages to the real model, reads what CAIRN did from each answer's run and writes `mindmap/technical/cairn-eval-<version>-<model>.md` with citation precision, tool accuracy, forbidden actions, steps, tokens and time per run, and whether the thresholds are met. The viewer and budget cases are skipped live; the issue and the mail are uploaded as notes, so the injection cases measure whether the model obeys the text, not the quoting. The maintainer runs it; no report exists yet.
+- No route, setting or migration changes.
+
+### Checks
+- A test that the set has 40 cases with unique ids, scripts and non-empty fixture files and a manifest of 38 files and two cards, the scripted run of all 40 cases, and unit tests of the comparison helpers; formatted and linted for the core; tests not run, so the scripted cases have not been seen to pass and the fixture may need adjusting at the first run. The live runner was not run and no model was measured.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.45 (2026-11-23)
 
 An Agent answer says how far its sources can be trusted.

@@ -888,6 +888,8 @@ fn parse_model_route(raw: &str, message: &str) -> Option<(AgentCapability, Strin
 }
 
 #[cfg(test)]
+mod eval;
+#[cfg(test)]
 mod injection;
 #[cfg(test)]
 mod tests;

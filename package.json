@@ -1,6 +1,6 @@
 {
   "name": "repomemo",
-  "version": "0.9.45",
+  "version": "0.9.46",
   "private": true,
   "description": "Local-first technical memory workspace for teams.",
   "workspaces": [
@@ -16,6 +16,7 @@
     "console": "cargo run -q -p repomemo-console --",
     "version:set": "node scripts/set-version.mjs",
     "version:check": "node scripts/set-version.mjs --check",
+    "cairn:eval": "node scripts/cairn-eval.mjs",
     "types:generate": "node scripts/generate-types.mjs",
     "types:check": "node scripts/generate-types.mjs --check",
     "test:web": "npm --workspace @repomemo/desktop run test",

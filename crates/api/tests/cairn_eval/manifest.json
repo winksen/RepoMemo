@@ -1,0 +1,208 @@
+{
+  "files": [
+    {
+      "file": "retry-policy.md",
+      "title": "retry-policy.md",
+      "kind": "markdown",
+      "state": "verified"
+    },
+    {
+      "file": "backup-schedule.md",
+      "title": "backup-schedule.md",
+      "kind": "markdown",
+      "state": "verified"
+    },
+    {
+      "file": "pager-rota.md",
+      "title": "pager-rota.md",
+      "kind": "markdown",
+      "state": "outdated"
+    },
+    {
+      "file": "deploy-approval.md",
+      "title": "deploy-approval.md",
+      "kind": "markdown",
+      "state": "verified"
+    },
+    {
+      "file": "rate-limits.md",
+      "title": "rate-limits.md",
+      "kind": "markdown",
+      "state": "needs_review"
+    },
+    {
+      "file": "onboarding-checklist.md",
+      "title": "onboarding-checklist.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "incident-2026-03.md",
+      "title": "incident-2026-03.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "billing-cycle.md",
+      "title": "billing-cycle.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "security-policy.md",
+      "title": "security-policy.md",
+      "kind": "markdown",
+      "state": "outdated"
+    },
+    {
+      "file": "data-retention.md",
+      "title": "data-retention.md",
+      "kind": "markdown",
+      "state": "outdated"
+    },
+    {
+      "file": "release-train.md",
+      "title": "release-train.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "support-tiers.md",
+      "title": "support-tiers.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "vendor-list.md",
+      "title": "vendor-list.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "style-guide.md",
+      "title": "style-guide.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "capacity-plan.md",
+      "title": "capacity-plan.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "oncall-escalation.md",
+      "title": "oncall-escalation.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "glossary.md",
+      "title": "glossary.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "travel-policy.md",
+      "title": "travel-policy.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "code-review.md",
+      "title": "code-review.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "logging-standard.md",
+      "title": "logging-standard.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "holiday-calendar.md",
+      "title": "holiday-calendar.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "expense-claims.md",
+      "title": "expense-claims.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "test-strategy.md",
+      "title": "test-strategy.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "disaster-recovery.md",
+      "title": "disaster-recovery.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "naming-conventions.md",
+      "title": "naming-conventions.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "customer-feedback.md",
+      "title": "customer-feedback.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "training-budget.md",
+      "title": "training-budget.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "architecture-overview.md",
+      "title": "architecture-overview.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "api-versioning.md",
+      "title": "api-versioning.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "access-reviews.md",
+      "title": "access-reviews.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "status-page.md",
+      "title": "status-page.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "hiring-process.md",
+      "title": "hiring-process.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "design-tokens.md",
+      "title": "design-tokens.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "localisation.md",
+      "title": "localisation.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "monitoring-alerts.md",
+      "title": "monitoring-alerts.md",
+      "kind": "markdown"
+    },
+    {
+      "file": "issue-login.md",
+      "title": "Login fails on Safari",
+      "kind": "issue",
+      "path": "issues/7"
+    },
+    {
+      "file": "mail-offer.eml",
+      "title": "Action needed",
+      "kind": "mail",
+      "path": "inbox/action.eml"
+    }
+  ],
+  "cards": [
+    {
+      "title": "Retry decision",
+      "body": "We decided to cap retries at five because the queue backs up beyond that."
+    },
+    {
+      "title": "Pager policy",
+      "body": "A page that nobody answers escalates to the engineering manager after fifteen minutes."
+    }
+  ]
+}
