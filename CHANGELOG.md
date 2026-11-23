@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.37 (2026-11-23)
+
+CAIRN's jobs are registered tools. No behaviour changes.
+
+### Changed
+- **One registry of tools.** Each job CAIRN offers is one entry of a table in the core: a stable snake-case name, what the person and the model read about it, the schema of its arguments, whether it only reads (*Read*) or builds a proposal the person confirms (*Propose*), whether it needs AI, its kind (*Find*, *Understand*, *Change*), a one-line hint for the routing classifier and the handler that runs it. The three jobs that propose a change to memory, files and notes are named `propose_memory`, `propose_memory_change`, `propose_file_changes` and `propose_note`.
+- **Everything is derived from it.** The + menu, what CAIRN says it can do, the rule that a viewer is not offered a changing job, which jobs need AI, the explicit-pick subject rule, the listing the routing classifier chooses from and the dispatch of the routed job all read the registry. The classifier prompt and the menu read exactly as before.
+- **The handlers moved.** They now live in `agent/tools/` by kind (find, understand, change), and `agent.rs` keeps the routing, the chatter, the history rules and the persona, about 850 lines instead of 2,300.
+- No route, setting, migration or screen changes.
+
+### Checks
+- Unit tests that every job has exactly one tool, that names are unique snake case, that the Change jobs are exactly the proposing tools and that each has an object schema, that the menu and the rules follow the registry, and that the classifier lists every job; the routing tests moved with the code and are unchanged; formatted and linted for the core and the server; tests not run. Nothing was built or run, so no chat was tried after the move.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.36 (2026-11-23)
 
 A provider for any OpenAI-compatible endpoint.
