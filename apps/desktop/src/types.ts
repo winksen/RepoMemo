@@ -432,7 +432,7 @@ export interface AiPolicy {
 
 export interface SharedAiProviderSettings {
   id: string;
-  provider_type: "ollama" | "openrouter";
+  provider_type: "ollama" | "openrouter" | "openai_compatible";
   name: string;
   base_url: string | null;
   model: string | null;

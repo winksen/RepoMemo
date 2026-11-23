@@ -485,6 +485,7 @@ Nothing goes to an AI service until a workspace owner or admin configures one in
 |---|---|
 | **Ollama** (local) | A server you run yourself |
 | **OpenRouter** (cloud) | The OpenRouter cloud, after you explicitly confirm that excerpts leave your server |
+| **OpenAI-compatible** (any endpoint) | The address you give: OpenAI, Mistral, Groq, Together, or a server of your own such as vLLM, LM Studio or the llama.cpp server. An address on this machine or your private network counts as local; any other needs the same explicit confirmation as OpenRouter. The server's operator must allow the host first |
 
 Each workspace can set up three kinds of provider:
 

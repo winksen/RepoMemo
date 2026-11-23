@@ -9,9 +9,11 @@ use serde::{de::DeserializeOwned, Deserialize};
 use serde_json::{json, Value};
 
 mod chat;
+mod openai;
 
 pub use chat::*;
 use chat::{ollama_chat_body, ollama_chat_response, openrouter_chat_body, openrouter_chat_response};
+pub use openai::OpenAiCompatibleProvider;
 
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434";
 const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
@@ -965,6 +967,7 @@ async fn openrouter_answer(response: reqwest::Response, empty_message: &str) -> 
 pub enum ConfiguredProvider {
     Ollama(OllamaProvider),
     OpenRouter(OpenRouterProvider),
+    OpenAiCompatible(OpenAiCompatibleProvider),
 }
 
 pub fn provider_from_settings(settings: ProviderSettings) -> Result<ConfiguredProvider> {
@@ -973,6 +976,9 @@ pub fn provider_from_settings(settings: ProviderSettings) -> Result<ConfiguredPr
         "openrouter" => Ok(ConfiguredProvider::OpenRouter(OpenRouterProvider::from_settings(
             settings,
         )?)),
+        "openai_compatible" => Ok(ConfiguredProvider::OpenAiCompatible(
+            OpenAiCompatibleProvider::from_settings(settings)?,
+        )),
         _ => bail!("Unsupported AI provider."),
     }
 }
@@ -982,48 +988,56 @@ impl AiProvider for ConfiguredProvider {
         match self {
             Self::Ollama(provider) => provider.chat(request).await,
             Self::OpenRouter(provider) => provider.chat(request).await,
+            Self::OpenAiCompatible(provider) => provider.chat(request).await,
         }
     }
     async fn generate(&self, request: GenerateRequest) -> Result<String> {
         match self {
             Self::Ollama(provider) => provider.generate(request).await,
             Self::OpenRouter(provider) => provider.generate(request).await,
+            Self::OpenAiCompatible(provider) => provider.generate(request).await,
         }
     }
     async fn context_tokens(&self) -> Result<Option<u32>> {
         match self {
             Self::Ollama(provider) => provider.context_tokens().await,
             Self::OpenRouter(provider) => provider.context_tokens().await,
+            Self::OpenAiCompatible(provider) => provider.context_tokens().await,
         }
     }
     async fn embed(&self, texts: Vec<String>, options: Value) -> Result<Vec<Vec<f32>>> {
         match self {
             Self::Ollama(provider) => provider.embed(texts, options).await,
             Self::OpenRouter(provider) => provider.embed(texts, options).await,
+            Self::OpenAiCompatible(provider) => provider.embed(texts, options).await,
         }
     }
     async fn summarize(&self, target: String, options: Value) -> Result<String> {
         match self {
             Self::Ollama(provider) => provider.summarize(target, options).await,
             Self::OpenRouter(provider) => provider.summarize(target, options).await,
+            Self::OpenAiCompatible(provider) => provider.summarize(target, options).await,
         }
     }
     async fn rerank(&self, query: String, candidates: Vec<String>) -> Result<Vec<usize>> {
         match self {
             Self::Ollama(provider) => provider.rerank(query, candidates).await,
             Self::OpenRouter(provider) => provider.rerank(query, candidates).await,
+            Self::OpenAiCompatible(provider) => provider.rerank(query, candidates).await,
         }
     }
     async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String> {
         match self {
             Self::Ollama(provider) => provider.analyze_image(request).await,
             Self::OpenRouter(provider) => provider.analyze_image(request).await,
+            Self::OpenAiCompatible(provider) => provider.analyze_image(request).await,
         }
     }
     async fn test_connection(&self) -> Result<ProviderTestResult> {
         match self {
             Self::Ollama(provider) => provider.test_connection().await,
             Self::OpenRouter(provider) => provider.test_connection().await,
+            Self::OpenAiCompatible(provider) => provider.test_connection().await,
         }
     }
 }
@@ -1038,18 +1052,24 @@ async fn ollama_image_answer(response: reqwest::Response) -> Result<String> {
 }
 
 pub fn validate_settings(settings: &ProviderSettings) -> Result<()> {
-    if settings.provider_type != "ollama" && settings.provider_type != "openrouter" {
+    if !matches!(
+        settings.provider_type.as_str(),
+        "ollama" | "openrouter" | "openai_compatible"
+    ) {
         bail!("Unsupported AI provider.")
     }
     if settings.name.trim().is_empty() {
         bail!("Provider name is required.")
     }
-    let (default_url, provider_path) = if settings.provider_type == "openrouter" {
-        (OPENROUTER_BASE_URL, "/api/v1")
-    } else {
-        (DEFAULT_BASE_URL, "")
+    let (default_url, provider_path) = match settings.provider_type.as_str() {
+        "openrouter" => (OPENROUTER_BASE_URL, "/api/v1"),
+        "openai_compatible" => ("", openai::OPENAI_COMPATIBLE_PATH),
+        _ => (DEFAULT_BASE_URL, ""),
     };
     let base_url = settings.base_url.as_deref().unwrap_or(default_url).trim();
+    if base_url.is_empty() {
+        bail!("A base URL is required, for example https://api.example.com/v1.")
+    }
     if !(base_url.starts_with("http://") || base_url.starts_with("https://")) {
         bail!("Provider base URL must start with http:// or https://.")
     }
@@ -1073,7 +1093,49 @@ pub fn validate_settings(settings: &ProviderSettings) -> Result<()> {
     {
         bail!("Confirm that workspace excerpts leave this device before enabling OpenRouter.")
     }
+    if settings.provider_type == "openai_compatible"
+        && settings.enabled
+        && is_cloud_endpoint(&settings.provider_type, Some(base_url))
+        && settings
+            .metadata
+            .get("cloud_content_acknowledged")
+            .and_then(Value::as_bool)
+            != Some(true)
+    {
+        bail!("Confirm that workspace excerpts leave your network before enabling a provider at this address.")
+    }
     Ok(())
+}
+
+/// Whether workspace content sent to this provider leaves the device and the private network: always
+/// for OpenRouter, never for Ollama (which the operator's allowed hosts already limit), and for an
+/// OpenAI-compatible endpoint when its host is neither `localhost` nor a loopback, private or
+/// link-local address. A name that is not `localhost` counts as cloud, because it can point
+/// anywhere.
+pub fn is_cloud_endpoint(provider_type: &str, base_url: Option<&str>) -> bool {
+    match provider_type {
+        "openrouter" => true,
+        "openai_compatible" => {
+            let host = base_url
+                .and_then(|url| reqwest::Url::parse(url.trim()).ok())
+                .and_then(|url| url.host_str().map(str::to_owned))
+                .map(|host| {
+                    host.trim_start_matches('[')
+                        .trim_end_matches(']')
+                        .trim_end_matches('.')
+                        .to_ascii_lowercase()
+                })
+                .unwrap_or_default();
+            if host == "localhost" || host.ends_with(".localhost") {
+                return false;
+            }
+            match host.parse::<IpAddr>() {
+                Ok(address) => !is_non_public(&address),
+                Err(_) => true,
+            }
+        }
+        _ => false,
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -1250,6 +1312,61 @@ mod tests {
         }
     }
 
+    fn compatible(base_url: &str) -> ProviderSettings {
+        ProviderSettings {
+            provider_type: "openai_compatible".to_owned(),
+            name: "Endpoint".to_owned(),
+            base_url: Some(base_url.to_owned()),
+            model: Some("some-model".to_owned()),
+            enabled: true,
+            metadata: json!({}),
+            ..settings()
+        }
+    }
+
+    #[test]
+    fn loopback_and_private_hosts_are_local_and_others_are_cloud() {
+        use super::is_cloud_endpoint;
+        for local in [
+            "http://localhost:1234/v1",
+            "http://127.0.0.1:8000/v1",
+            "http://192.168.1.20:8080/v1",
+            "http://10.0.0.5/v1",
+            "http://[::1]:8080/v1",
+            "http://llm.localhost/v1",
+        ] {
+            assert!(!is_cloud_endpoint("openai_compatible", Some(local)), "{local}");
+        }
+        for cloud in [
+            "https://api.openai.com/v1",
+            "https://api.groq.com/openai/v1",
+            "http://8.8.8.8/v1",
+            "https://llm.internal.example/v1",
+        ] {
+            assert!(is_cloud_endpoint("openai_compatible", Some(cloud)), "{cloud}");
+        }
+        assert!(is_cloud_endpoint("openrouter", None));
+        assert!(!is_cloud_endpoint("ollama", Some("http://example.com")));
+    }
+
+    #[test]
+    fn a_compatible_endpoint_needs_an_address_a_model_and_for_cloud_the_acknowledgement() {
+        let mut local = compatible("http://localhost:1234/v1");
+        assert!(validate_settings(&local).is_ok());
+        local.base_url = None;
+        assert!(validate_settings(&local).is_err());
+        let mut cloud = compatible("https://api.example.com/v1");
+        assert!(validate_settings(&cloud).is_err());
+        cloud.metadata = json!({ "cloud_content_acknowledged": true });
+        assert!(validate_settings(&cloud).is_ok());
+        cloud.api_key = None;
+        assert!(validate_settings(&cloud).is_ok(), "the key is optional");
+        cloud.model = None;
+        assert!(validate_settings(&cloud).is_err());
+        cloud.model = Some("m".to_owned());
+        cloud.base_url = Some("ftp://api.example.com/v1".to_owned());
+        assert!(validate_settings(&cloud).is_err());
+    }
     #[test]
     fn validates_local_provider_settings() {
         assert!(validate_settings(&settings()).is_ok());

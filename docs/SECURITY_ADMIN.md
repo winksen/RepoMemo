@@ -64,7 +64,7 @@ Enter the new key in the workspace's AI integration (the key is encrypted and ne
 
 ## 4. Cloud AI consent
 
-Nothing leaves the server for an AI provider until a workspace owner or admin configures one. A **cloud** provider (OpenRouter) additionally needs an **explicit acknowledgement** that workspace excerpts leave the server; a local Ollama keeps them on a machine you run. Providers can only be set at hosts in `REPOMEMO_AI_ALLOWED_HOSTS`; addresses of cloud metadata services and link-local addresses are refused. To withdraw consent: remove the provider in *Settings*, or restrict who may use AI there. Image descriptions and search vectors are built in the background from stored excerpts, so removing the provider is what stops them. Interactive use is limited per person by `REPOMEMO_AI_REQUESTS_PER_HOUR`.
+Nothing leaves the server for an AI provider until a workspace owner or admin configures one. A **cloud** provider (OpenRouter, or an OpenAI-compatible endpoint whose address is not on this machine or a private network) additionally needs an **explicit acknowledgement** that workspace excerpts leave the server; a local Ollama keeps them on a machine you run. Providers can only be set at hosts in `REPOMEMO_AI_ALLOWED_HOSTS`; addresses of cloud metadata services and link-local addresses are refused. To withdraw consent: remove the provider in *Settings*, or restrict who may use AI there. Image descriptions and search vectors are built in the background from stored excerpts, so removing the provider is what stops them. Interactive use is limited per person by `REPOMEMO_AI_REQUESTS_PER_HOUR`.
 
 ## 5. TLS and trusted proxies
 

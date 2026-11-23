@@ -289,7 +289,7 @@ impl StorageEngine {
             repository_count: count("SELECT COUNT(*) FROM sources WHERE type = 'git_repo'").await?,
             enabled_provider_count: count("SELECT COUNT(*) FROM provider_settings WHERE enabled = 1").await?,
             cloud_provider_count: count(
-                "SELECT COUNT(*) FROM provider_settings WHERE enabled = 1 AND provider_type = 'openrouter'",
+                "SELECT COUNT(*) FROM provider_settings WHERE enabled = 1 AND (provider_type = 'openrouter' OR (provider_type = 'openai_compatible' AND json_extract(metadata_json, '$.cloud_content_acknowledged') = 1))",
             )
             .await?,
             jobs_by_status,

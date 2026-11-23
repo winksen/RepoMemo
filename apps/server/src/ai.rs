@@ -145,7 +145,7 @@ pub(crate) async fn save_workspace_ai_provider(
     let api_key = match supplied_key.clone() {
         Some(key) => Some(key),
         None if endpoint_changed => {
-            if stored_key.is_some() && request.provider_type == "openrouter" {
+            if stored_key.is_some() && matches!(request.provider_type.as_str(), "openrouter" | "openai_compatible") {
                 return Err(ApiError::bad_request(
                     "Enter the API key again: the provider's type or address changed, and a saved key is only sent to the address it was saved for.",
                 ));
@@ -163,6 +163,11 @@ pub(crate) async fn save_workspace_ai_provider(
             .and_then(|settings| settings.metadata.get("cloud_content_acknowledged"))
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
+    // Only an endpoint that leaves the network needs (and keeps) the acknowledgement, so the
+    // count of cloud providers in the system report is the count of providers content leaves for.
+    let cloud_content_acknowledged = cloud_content_acknowledged
+        && (request.provider_type != "openai_compatible"
+            || repomemo_ai::is_cloud_endpoint(&request.provider_type, request.base_url.as_deref()));
     let purpose = match request.purpose.as_deref() {
         Some("vision") => "vision",
         Some("text") => "text",

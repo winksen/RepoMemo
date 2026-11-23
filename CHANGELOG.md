@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.36 (2026-11-23)
+
+A provider for any OpenAI-compatible endpoint.
+
+### Changed
+- **New provider type: OpenAI-compatible.** Settings › AI offers it next to Ollama and OpenRouter. It needs a base URL (for example `https://api.example.com/v1` or `http://localhost:1234/v1`), a model and, if the server wants one, an API key. It covers OpenAI, Mistral, Groq, Together, vLLM, LM Studio, the llama.cpp server and others. It answers, summarizes, describes images, reranks and calls tools like OpenRouter does, and builds embeddings through `/embeddings` when an embedding model is set.
+- **Local or cloud by its address.** A host of `localhost`, a loopback, private or link-local address counts as local and needs nothing more. Any other host (including a name such as `llm.internal.example`, which can point anywhere) counts as cloud and needs the same explicit confirmation as OpenRouter that excerpts leave your network; the confirmation is kept only for such an address, so the system report's count of cloud providers stays true.
+- **The endpoint policy still applies.** The host must be allowed by `REPOMEMO_AI_ALLOWED_HOSTS` (with the built-in list only local Ollama and OpenRouter are reachable, so an operator adds the endpoint's host), link-local and cloud-metadata addresses are refused, redirects are not followed, and a saved key is sent only to the address it was saved for.
+- **Test connection** checks the key, the model id where the server lists its models, and a tiny completion, and records the model's tool mode and context size as for other text providers (a server that lists `context_length`, `max_model_len` or `context_window` gives the size).
+- No migration; the type is a new value of the provider type. The guides list the endpoints named above as untested until the maintainer tries them.
+
+### Checks
+- Unit tests for local and cloud addresses, the rules for saving an endpoint (address, model, optional key, acknowledgement only for cloud), the order of embeddings and the context sizes under the names servers use; formatted and linted for the AI, storage and server crates, typecheck passes; tests not run. Nothing was built or run: no OpenAI-compatible server was reached, and none of the endpoints named above has been tried.
+
+### Upgrading
+- Nothing to do. To use an endpoint, an operator adds its host to `REPOMEMO_AI_ALLOWED_HOSTS` first.
+
 ## V0.9.35 (2026-11-23)
 
 Providers can carry tool calls, and each text provider records what its model can do.

@@ -13,7 +13,7 @@ import { Toast, showToast } from "./ui/toast";
 import { ICON_SIZE } from "./ui/icon";
 import { apiMessage } from "../web/format";
 
-type ProviderType = "ollama" | "openrouter";
+type ProviderType = "ollama" | "openrouter" | "openai_compatible";
 type Purpose = "text" | "vision" | "embedding";
 type ToolModeChoice = "auto" | "native" | "json" | "none";
 
@@ -61,6 +61,7 @@ const ICONS = { text: Brain, vision: Photo, embedding: Search } as const;
 
 const OLLAMA_URL = "http://127.0.0.1:11434";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1";
+const OPENAI_COMPATIBLE_URL = "https://api.example.com/v1";
 
 /** One provider configuration, either for text analysis or for image-to-text. */
 export function AiProviderForm({
@@ -110,7 +111,10 @@ export function AiProviderForm({
 
   function selectType(value: ProviderType) {
     setProviderType(value);
-    if (value === "openrouter") {
+    if (value === "openai_compatible") {
+      if (baseUrl === OLLAMA_URL || baseUrl === OPENROUTER_URL) setBaseUrl("");
+      if (model === copy.ollamaModel) setModel("");
+    } else if (value === "openrouter") {
       if (!baseUrl || baseUrl === OLLAMA_URL) setBaseUrl(OPENROUTER_URL);
       if (!model || model === copy.ollamaModel) setModel(copy.cloudModel);
     } else {
@@ -164,11 +168,12 @@ export function AiProviderForm({
       <p className="shared-muted-copy">{copy.intro}</p>
       {status ? <p className="shared-ai-provider-status">{status}</p> : null}
       <form className="shared-ai-provider-form" onSubmit={save}>
-        <Field label="Provider">{(control) => <Dropdown aria-label={`${copy.title} provider`} id={control.id} onValueChange={(value) => selectType(value as ProviderType)} options={[{ label: "Ollama (local)", value: "ollama" }, { label: "OpenRouter (cloud)", value: "openrouter" }]} value={providerType} />}</Field>
+        <Field label="Provider">{(control) => <Dropdown aria-label={`${copy.title} provider`} id={control.id} onValueChange={(value) => selectType(value as ProviderType)} options={[{ label: "Ollama (local)", value: "ollama" }, { label: "OpenRouter (cloud)", value: "openrouter" }, { label: "OpenAI-compatible (any endpoint)", value: "openai_compatible" }]} value={providerType} />}</Field>
         <Field label="Provider name" required><Input onChange={(event) => setProviderName(event.target.value)} value={providerName} /></Field>
-        <Field label="Base URL"><Input onChange={(event) => setBaseUrl(event.target.value)} type="url" placeholder={providerType === "ollama" ? OLLAMA_URL : OPENROUTER_URL} value={baseUrl} /></Field>
-        <Field label={copy.modelLabel} required><Input onChange={(event) => setModel(event.target.value)} placeholder={providerType === "ollama" ? copy.ollamaModel : copy.cloudModel} value={model} /></Field>
+        <Field label="Base URL"><Input onChange={(event) => setBaseUrl(event.target.value)} type="url" placeholder={providerType === "ollama" ? OLLAMA_URL : providerType === "openai_compatible" ? OPENAI_COMPATIBLE_URL : OPENROUTER_URL} value={baseUrl} /></Field>
+        <Field label={copy.modelLabel} required><Input onChange={(event) => setModel(event.target.value)} placeholder={providerType === "ollama" ? copy.ollamaModel : providerType === "openai_compatible" ? "the model id the endpoint serves" : copy.cloudModel} value={model} /></Field>
         {purpose === "text" ? <><Field label="Tool calling"><Dropdown aria-label="Tool calling" onValueChange={(value) => setToolMode(value as ToolModeChoice)} options={TOOL_MODES} value={toolMode} /></Field><Field label="Context size (tokens)"><Input inputMode="numeric" min={512} onChange={(event) => setContextTokens(event.target.value.replace(/[^0-9]/g, ""))} placeholder="Detected by Test connection" value={contextTokens} /></Field></> : null}
+        {providerType === "openai_compatible" ? <><Field label="API key (optional)"><Input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder={providerId ? "Leave blank to keep the saved key (enter it again if you change the address)" : "Leave blank for a server that needs none"} type="password" value={apiKey} /></Field><Checkbox checked={acknowledged} label={`${copy.cloudNotice} (needed only when the address is outside your machine and private network)`} onCheckedChange={setAcknowledged} /></> : null}
         {providerType === "openrouter" ? <><Field label="API key"><Input autoComplete="off" onChange={(event) => setApiKey(event.target.value)} placeholder={providerId ? "Leave blank to keep the saved key (enter it again if you change the address)" : "Required to enable cloud AI"} type="password" value={apiKey} /></Field><Checkbox checked={acknowledged} label={copy.cloudNotice} onCheckedChange={setAcknowledged} /></> : null}
         <div className="shared-ai-provider-actions"><Button busy={action === "save"} disabled={isBusy} type="submit" variant="secondary"><Icon size={ICON_SIZE.md} /> Save provider</Button><Button busy={action === "test"} disabled={isBusy || !providerId} onClick={() => void test()} variant="secondary"><Refresh size={ICON_SIZE.md} /> Test connection</Button></div>
         <Toast kind="error" message={error} />

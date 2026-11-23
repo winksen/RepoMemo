@@ -789,7 +789,7 @@ export function listSharedWorkspaceAiProviders(accessToken: string, workspaceId:
 
 export function saveSharedWorkspaceAiProvider(accessToken: string, workspaceId: string, input: {
   id?: string;
-  providerType: "ollama" | "openrouter";
+  providerType: "ollama" | "openrouter" | "openai_compatible";
   name: string;
   baseUrl?: string;
   model: string;

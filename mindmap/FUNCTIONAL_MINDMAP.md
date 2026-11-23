@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.35` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.36` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.36 — A provider for any OpenAI-compatible endpoint.
+
+- **Any OpenAI-compatible endpoint.** An administrator can point a workspace's text, image or search provider at OpenAI, Mistral, Groq, Together or a server of their own (vLLM, LM Studio, llama.cpp). An address on the machine or private network is local; any other needs the same confirmation as OpenRouter and the host must be allowed by the operator.
+
+Checks: static checks pass; nothing was run.
 
 ## V0.9.35 — Providers can carry tool calls, and each text provider records what its model can do.
 
