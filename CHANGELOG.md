@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.33 (2026-11-22)
+
+The rest of the 0.9 line is planned: CAIRN becomes a bounded tool loop over governed evidence. No behaviour changes.
+
+### Changed
+- **A plan for V0.9.34 to V0.9.70.** The [CAIRN agent review](mindmap/analysis/2026-11-22-cairn-agent-review.md), the [harness plan](mindmap/plans/2026-11-22-0.9-cairn-harness.md) and [ADR 0006](docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md) record why and how: provider messages and tool calls, a tool registry, evidence handles, a bounded loop with a citation ledger, memory in governed layers, shared and cross-workspace chats, routines, and an MCP surface.
+- **The 0.9 line is the CAIRN line.** Its release index lists rows V0.9.33 to V0.9.70 by track (AO to AU). The pilot rows that followed V0.9.32 moved unchanged to the new [0.10 line](mindmap/RELEASES_0.10.md) as V0.10.0 to V0.10.12.
+- The roadmap, the readiness report and the contributor guide point to the new line and index. No code, API, setting or migration changes.
+
+### Checks
+- Documentation only; the version files agree (`npm run version:set`). Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.32 (2026-11-21)
 
 CAIRN's jobs are grouped by what they do.
