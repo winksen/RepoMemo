@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.56` (2026-11-24)
+> **Current:** `V0.9.57` (2026-11-24)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md)
 
@@ -80,7 +80,7 @@
 | **V0.9.54** | 🧪 2026-11-24 | AQ. CAIRN memory | ✨ | Playbooks | Let a workspace keep procedures as notes in a Playbooks folder that CAIRN follows on demand once they are verified, and let templates ship some | A verified playbook is listed to CAIRN and loaded when it fits, an unverified one is not offered, and a playbook never grants a tool the role lacks |
 | **V0.9.55** | 🧪 2026-11-24 | AQ. CAIRN memory | ✨ | Playbooks from runs | After a multi-step run the person found helpful, offer to save how it was done as a playbook that waits for review | The proposal creates a playbook needing review linked to the run, and it is used only after a writer verifies it |
 | **V0.9.56** | 🧪 2026-11-24 | AQ. CAIRN memory | ✨ | Memory upkeep | Add an opt-in weekly job that finds cards citing changed or trashed files, contradicting cards, unanswered questions and unused playbooks, and puts them in the review queue | Each finding is a review item with its evidence, nothing is edited, and the job has its own call cap and is off by default |
-| **V0.9.57** | 🔜 | AR. CAIRN teams | ✨ | Shared chats | Let a chat's owner share it read-only with the workspace, and let readers continue it in a chat of their own | A reader opens a shared chat and continues it in a copy, only the owner can confirm its proposals, and unsharing removes access at once |
+| **V0.9.57** | 🧪 2026-11-24 | AR. CAIRN teams | ✨ | Shared chats | Let a chat's owner share it read-only with the workspace, and let readers continue it in a chat of their own | A reader opens a shared chat and continues it in a copy, only the owner can confirm its proposals, and unsharing removes access at once |
 | **V0.9.58** | 🔜 | AR. CAIRN teams | ✨ | Projects and tasks as tools | Give CAIRN read tools for tasks, projects, milestones and the evidence they link | "What is blocking the migration project" answers from its tasks and dependencies with links to them |
 | **V0.9.59** | 🔜 | AR. CAIRN teams | ✨ | Task proposals | Let CAIRN propose creating tasks, commenting and changing a task's status, applied as the person with the version they read | "Turn this chat's open questions into tasks" gives one changeset, a task changed since is refused, and a viewer gets none |
 | **V0.9.60** | 🔜 | AR. CAIRN teams | ✨ | Chats across workspaces | Let a chat cover all the person's workspaces, with each result labelled by its workspace and every proposal bound to one | An all-workspaces chat finds files and cards across workspaces with no AI needed, and a change asks which workspace when it is unclear |

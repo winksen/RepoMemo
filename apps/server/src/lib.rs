@@ -6,6 +6,7 @@ mod agent;
 mod agent_live;
 mod agent_memory;
 mod agent_proposals;
+mod agent_shares;
 mod agent_upkeep;
 mod ai;
 mod ai_access;
@@ -933,6 +934,22 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/agent/upkeep/findings/{finding_id}/resolve",
             post(agent_upkeep::resolve_upkeep_finding),
+        )
+        .route(
+            "/v1/agent/conversations/{conversation_id}/share",
+            post(agent_shares::share_agent_conversation).delete(agent_shares::unshare_agent_conversation),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/shared-conversations",
+            get(agent_shares::list_shared_agent_conversations),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/shared-conversations/{conversation_id}",
+            get(agent_shares::get_shared_agent_conversation),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/shared-conversations/{conversation_id}/continue",
+            post(agent_shares::continue_shared_agent_conversation),
         )
         .route(
             "/v1/agent/personal-memory",

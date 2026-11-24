@@ -3023,6 +3023,20 @@ pub struct AgentConversation {
     pub turn_count: i64,
     pub created_at: String,
     pub updated_at: String,
+    /// Whether its owner shares it with the workspace (V0.9.57).
+    #[serde(default)]
+    pub shared: bool,
+}
+
+/// A chat shared with the workspace (V0.9.57), as the others see it in the list.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SharedConversation {
+    pub id: String,
+    pub title: String,
+    pub shared_by_id: String,
+    pub shared_by_name: String,
+    pub shared_at: String,
+    pub turn_count: i64,
 }
 
 /// One exchange: the request as the user saw it and the assistant's reply.

@@ -2630,6 +2630,18 @@ export interface AgentConversation {
   turn_count: number;
   created_at: string;
   updated_at: string;
+  /** Whether its owner shares it with the workspace (V0.9.57). */
+  shared: boolean;
+}
+
+/** A chat shared with the workspace (V0.9.57), as the others see it in the list. */
+export interface SharedConversation {
+  id: string;
+  title: string;
+  shared_by_id: string;
+  shared_by_name: string;
+  shared_at: string;
+  turn_count: number;
 }
 
 /** One exchange: the request as the user saw it and the assistant's reply. */

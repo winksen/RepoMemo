@@ -18,7 +18,8 @@ pub struct ChatHit {
 }
 
 impl StorageEngine {
-    /// The caller's exchanges in one workspace that match an FTS query, best first. Another person's chat never matches.
+    /// The caller's exchanges in one workspace that match an FTS query, best first, and those of chats shared with the workspace
+    /// (V0.9.57). Another person's chat that is not shared never matches.
     pub async fn search_agent_chats(
         &self,
         user_id: &str,
@@ -32,7 +33,8 @@ impl StorageEngine {
              FROM agent_chat_fts \
              JOIN assistant_turns turn ON turn.rowid = agent_chat_fts.rowid \
              JOIN assistant_conversations conversation ON conversation.id = turn.conversation_id \
-             WHERE agent_chat_fts MATCH ?1 AND conversation.user_id = ?2 AND conversation.workspace_id = ?3 \
+             WHERE agent_chat_fts MATCH ?1 AND conversation.workspace_id = ?3 \
+               AND (conversation.user_id = ?2 OR EXISTS (SELECT 1 FROM agent_conversation_shares share WHERE share.conversation_id = conversation.id)) \
              ORDER BY rank LIMIT ?4",
         )
         .bind(fts_query)

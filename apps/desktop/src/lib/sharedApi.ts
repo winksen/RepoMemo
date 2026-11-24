@@ -1,5 +1,5 @@
 import { clearAllDrafts } from "./drafts";
-import type { PersonalMemory, PersonalMemoryEntry, UpkeepSettings } from "../generated/domain";
+import type { PersonalMemory, PersonalMemoryEntry, SharedConversation, UpkeepSettings } from "../generated/domain";
 import type {
   ArchiveImportReport,
   ServerSetupStatus,
@@ -2388,4 +2388,15 @@ export function setSharedUpkeep(accessToken: string, workspaceId: string, enable
 }
 export function resolveSharedUpkeepFinding(accessToken: string, workspaceId: string, findingId: string): Promise<void> {
   return request<void>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/agent/upkeep/findings/${encodeURIComponent(findingId)}/resolve`, { method: "POST", body: "{}" }, accessToken);
+}
+
+/** Chats shared with the workspace (V0.9.57): the owner shares and unshares; readers list, open and continue them in a chat of their own. */
+export function shareSharedAgentConversation(accessToken: string, conversationId: string, shared: boolean): Promise<void> {
+  return request<void>(`/v1/agent/conversations/${encodeURIComponent(conversationId)}/share`, { method: shared ? "POST" : "DELETE", body: shared ? "{}" : undefined }, accessToken);
+}
+export function listSharedWithWorkspace(accessToken: string, workspaceId: string): Promise<SharedConversation[]> {
+  return request<SharedConversation[]>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/agent/shared-conversations`, {}, accessToken);
+}
+export function continueSharedConversation(accessToken: string, workspaceId: string, conversationId: string): Promise<AgentConversation> {
+  return request<AgentConversation>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/agent/shared-conversations/${encodeURIComponent(conversationId)}/continue`, { method: "POST", body: "{}" }, accessToken);
 }

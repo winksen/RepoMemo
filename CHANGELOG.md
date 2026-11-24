@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.57 (2026-11-24)
+
+A chat can be shared with the workspace.
+
+### Added
+- **Share a chat.** In CAIRN's chat list, *Share with the workspace* on one of your chats lets everyone who can read the workspace see it in a *Shared with the workspace* group, with who shared it and when. *Stop sharing* ends their access at once.
+- **Continue in my chat.** A reader chooses *Continue in my chat* and the shared chat is copied turn by turn into a new chat of their own. Nothing in the copy is waiting for confirmation: what the original proposed and had not applied is marked as not applied, and a proposal can be confirmed only by the owner of the original chat, in that chat.
+- **Searchable.** `Search your earlier chats` (V0.9.52) also finds exchanges of chats shared with the workspace, for people who can read it, and stops finding them when the chat is unshared or deleted.
+- New routes `POST/DELETE /v1/agent/conversations/{id}/share`, `GET /v1/workspaces/{id}/agent/shared-conversations`, `GET .../shared-conversations/{id}` (read-only view) and `POST .../shared-conversations/{id}/continue`, and a migration (`0094_agent_conversation_shares.sql`). A chat now says whether it is shared.
+- The read-only view of a shared chat is available from the API; the chat list offers *Continue in my chat*, not a separate reading screen.
+
+### Checks
+- A storage test that a chat is not visible, searchable or copyable until its owner shares it, that only the owner can share it, that a reader finds and copies it, and that unsharing ends access while the copy stays; a test that a copied reply has nothing waiting; formatted and linted for the touched crates; types and typecheck pass; tests not run. Nothing was built or run.
+
+### Upgrading
+- The migration runs on start. Nothing is shared until a person shares a chat.
+
 ## V0.9.56 (2026-11-24)
 
 CAIRN's memory gets a weekly check that edits nothing.

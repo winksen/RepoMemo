@@ -3531,3 +3531,98 @@ async fn a_person_finds_their_own_earlier_chats_and_nothing_deleted_or_anyone_el
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_shared_chat_is_read_searched_and_copied_by_others_until_it_is_unshared() {
+    use repomemo_domain::{AgentMessage, AgentReply, AgentRouting};
+    let (storage, data_dir) = temp_storage("chat-share").await;
+    let ana = storage.create_user("ana@example.com", "Ana", "hash").await.unwrap();
+    let ben = storage.create_user("ben@example.com", "Ben", "hash").await.unwrap();
+    let workspace = storage.create_workspace("Shared").await.unwrap();
+    let reply = AgentReply {
+        capability: None,
+        routing: AgentRouting::Unmatched,
+        subject: String::new(),
+        reply_markdown: "We chose exponential backoff.".to_owned(),
+        generated: false,
+        files: Vec::new(),
+        matches: Vec::new(),
+        citations: Vec::new(),
+        warnings: Vec::new(),
+        context_turns: 0,
+        proposals: Vec::new(),
+        file_set: None,
+        memory_cards: Vec::new(),
+        changeset: None,
+        trust: None,
+    };
+    let chat = storage
+        .create_agent_conversation(&workspace.id, &ana.id, "Backoff")
+        .await
+        .unwrap();
+    storage
+        .append_agent_turn(&chat.id, "Which retry strategy?", &AgentMessage::default(), &reply)
+        .await
+        .unwrap();
+    let query = "\"backoff\"*";
+    // Not shared: Ben sees nothing, finds nothing and cannot copy it.
+    assert!(storage
+        .list_shared_agent_conversations(&workspace.id)
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(storage
+        .search_agent_chats(&ben.id, &workspace.id, query, 5)
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(storage
+        .copy_shared_agent_conversation(&chat.id, &workspace.id, &ben.id)
+        .await
+        .is_err());
+    // Only the owner can share it.
+    assert!(storage.share_agent_conversation(&chat.id, &ben.id).await.is_err());
+    storage.share_agent_conversation(&chat.id, &ana.id).await.unwrap();
+    let listed = storage.list_shared_agent_conversations(&workspace.id).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].shared_by_name, "Ana");
+    assert!(storage.get_agent_conversation(&chat.id, &ana.id).await.unwrap().shared);
+    assert_eq!(
+        storage
+            .search_agent_chats(&ben.id, &workspace.id, query, 5)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    let copy = storage
+        .copy_shared_agent_conversation(&chat.id, &workspace.id, &ben.id)
+        .await
+        .unwrap();
+    assert_eq!(copy.turn_count, 1);
+    assert!(!copy.shared);
+    // Unsharing ends access at once; Ben keeps his own copy.
+    storage.unshare_agent_conversation(&chat.id, &ana.id).await.unwrap();
+    assert!(storage
+        .get_shared_agent_conversation(&chat.id, &workspace.id)
+        .await
+        .is_err());
+    assert!(
+        storage
+            .search_agent_chats(&ben.id, &workspace.id, query, 5)
+            .await
+            .unwrap()
+            .len()
+            == 1,
+        "only his own copy"
+    );
+    assert_eq!(
+        storage
+            .get_agent_conversation(&copy.id, &ben.id)
+            .await
+            .unwrap()
+            .turn_count,
+        1
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

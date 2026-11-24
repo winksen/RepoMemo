@@ -25,6 +25,7 @@ mod accounts;
 mod activity;
 mod agent_corrections;
 mod agent_runs;
+mod agent_shares;
 mod agent_upkeep;
 mod ai_usage;
 mod approvals;
@@ -84,6 +85,7 @@ mod workflow;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
 pub use agent_runs::NewAgentRun;
+pub use agent_shares::neutralize_for_copy;
 pub use agent_upkeep::{AskedQuestion, NewUpkeepFinding, UPKEEP_OPEN_MAX, UPKEEP_PER_PASS_MAX};
 pub use ai_usage::{AiSpend, AiUsageRow};
 pub use approvals::{StoredApproval, StoredImportedApproval};
@@ -407,7 +409,7 @@ pub struct EmbeddingCandidate {
     pub text: String,
 }
 
-const AGENT_CONVERSATION_SELECT: &str = "SELECT conversation.id, conversation.workspace_id, conversation.title, (SELECT COUNT(*) FROM assistant_turns turn WHERE turn.conversation_id = conversation.id) AS turn_count, conversation.created_at, conversation.updated_at FROM assistant_conversations conversation";
+const AGENT_CONVERSATION_SELECT: &str = "SELECT conversation.id, conversation.workspace_id, conversation.title, (SELECT COUNT(*) FROM assistant_turns turn WHERE turn.conversation_id = conversation.id) AS turn_count, conversation.created_at, conversation.updated_at, EXISTS (SELECT 1 FROM agent_conversation_shares share WHERE share.conversation_id = conversation.id) AS shared FROM assistant_conversations conversation";
 
 #[derive(Debug, sqlx::FromRow)]
 struct AgentConversationRow {
@@ -417,6 +419,7 @@ struct AgentConversationRow {
     turn_count: i64,
     created_at: String,
     updated_at: String,
+    shared: bool,
 }
 
 impl From<AgentConversationRow> for AgentConversation {
@@ -428,6 +431,7 @@ impl From<AgentConversationRow> for AgentConversation {
             turn_count: row.turn_count,
             created_at: row.created_at,
             updated_at: row.updated_at,
+            shared: row.shared,
         }
     }
 }

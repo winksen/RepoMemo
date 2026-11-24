@@ -4,8 +4,9 @@ import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
-import { offerSharedAgentPlaybook, attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, confirmSharedAgentChangeset, dismissSharedAgentChangeset, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
+import { continueSharedConversation, listSharedWithWorkspace, shareSharedAgentConversation, offerSharedAgentPlaybook, attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, confirmSharedAgentChangeset, dismissSharedAgentChangeset, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentRun, AgentStep, AgentTurn, AgentTurnResponse, MemoryCardSummary } from "../types";
+import type { SharedConversation } from "../generated/domain";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
@@ -236,6 +237,35 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     setIsLoadingChat(false);
     input.current?.focus();
     onChatChange?.(null);
+  }
+
+  const [sharedWithMe, setSharedWithMe] = useState<SharedConversation[]>([]);
+  useEffect(() => {
+    if (!showChats) return;
+    let active = true;
+    listSharedWithWorkspace(accessToken, workspaceId).then((list) => { if (active) setSharedWithMe(list); }).catch(() => { if (active) setSharedWithMe([]); });
+    return () => { active = false; };
+  }, [accessToken, workspaceId, showChats]);
+
+  async function shareChat(conversation: AgentConversation, shared: boolean) {
+    try {
+      await shareSharedAgentConversation(accessToken, conversation.id, shared);
+      upsertConversation({ ...conversation, shared });
+      showToast("success", shared ? "This chat is shared with the workspace. Others can read it and continue it in a chat of their own." : "This chat is no longer shared.");
+    } catch (error) {
+      showToast("error", apiMessage(error, "The chat could not be shared."));
+    }
+  }
+
+  async function continueShared(shared: SharedConversation) {
+    try {
+      const copy = await continueSharedConversation(accessToken, workspaceId, shared.id);
+      upsertConversation(copy);
+      setShowChats(false);
+      void openChat(copy.id);
+    } catch (error) {
+      showToast("error", apiMessage(error, "That chat could not be copied."));
+    }
   }
 
   function upsertConversation(conversation: AgentConversation) {
@@ -504,11 +534,19 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
             <span className="rm-option-text"><strong>{conversation.title}</strong><small>{formatRecentTime(conversation.updated_at)} · {conversation.turn_count} {conversation.turn_count === 1 ? "message" : "messages"}</small></span>
           </button>
           <ActionMenu items={[
+            { label: conversation.shared ? "Stop sharing" : "Share with the workspace", icon: <Message size={ICON_SIZE.sm} />, onSelect: () => void shareChat(conversation, !conversation.shared) },
             { label: "Rename", icon: <Pencil size={ICON_SIZE.sm} />, onSelect: () => { setRenameValue(conversation.title); setChatDialog({ kind: "rename", conversation }); } },
             { label: "Delete chat", icon: <Trash size={ICON_SIZE.sm} />, destructive: true, onSelect: () => setChatDialog({ kind: "delete", conversation }) },
           ]} label={`Actions for chat ${conversation.title}`} />
         </li>;
-      })}</ul> : <p className="shared-assistant-chats-empty">Your chats appear here. Only you can see them.</p>}
+      })}</ul> : <p className="shared-assistant-chats-empty">Your chats appear here. Only you can see them, unless you share one.</p>}
+      {sharedWithMe.length ? <>
+        <h4>Shared with the workspace</h4>
+        <ul className="rm-option-list">{sharedWithMe.map((shared) => <li className="rm-option-row" key={shared.id}>
+          <span className="rm-option-text"><strong>{shared.title}</strong><small>{shared.shared_by_name} · {formatRecentTime(shared.shared_at)} · {shared.turn_count} {shared.turn_count === 1 ? "message" : "messages"}</small></span>
+          <Button disabled={isBusy} onClick={() => void continueShared(shared)} type="button" variant="secondary">Continue in my chat</Button>
+        </li>)}</ul>
+      </> : null}
     </nav> : null}
     <div className="shared-assistant-main">
       <div className="shared-assistant-thread" role="log" aria-live="polite" aria-busy={isBusy || isLoadingChat}>
