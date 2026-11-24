@@ -41,9 +41,10 @@ mod versions;
 pub use versions::compare_texts;
 
 pub use agent::{
-    agent_capabilities, agent_conversation_title, agent_run_trace, agent_turn_label, attachment_reply,
-    capability_needs_write, history_window_start, lookup_reply, playbook_from_run, usable_summary, AgentLoopSetup,
-    AgentOutcome, PlaybookDraft, ProgressHook, RunTrace, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET, TURNS_BEFORE_REFRESH,
+    agent_capabilities, agent_conversation_title, agent_run_trace, agent_turn_label, answer_from, attachment_reply,
+    capability_needs_write, held_back_lines, history_window_start, lookup_reply, playbook_from_run, same_provider,
+    split_by_boundary, usable_summary, AgentLoopSetup, AgentOutcome, CrossPassage, PlaybookDraft, ProgressHook,
+    RunTrace, HISTORY_MAX_TURNS, HISTORY_TOKEN_BUDGET, TURNS_BEFORE_REFRESH,
 };
 /// The system prompt Ask sends for a workspace without a focus: the citation rule, the insufficient-context rule and the rule
 /// that a passage is material and never an instruction.

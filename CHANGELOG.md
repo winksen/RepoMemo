@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.61 (2026-11-24)
+
+Answers across workspaces respect each workspace's AI rules.
+
+### Changed
+- **An answer across workspaces.** In a chat across all your workspaces, when the workspace the chat was started in lets you use AI and has a text provider, CAIRN now writes a short answer from what the lookup found, citing the passages as [1], [2], above the same grouped list as before. Without that, the chat still answers with the lookup alone.
+- **The boundary, passage by passage.** A passage of workspace W is sent to the provider only if you can read W, W lets your role use AI, and W is set up with the same provider (same kind, host and model) as the chat. The decision is made before the request is built, so a held-back passage is not in the request at all. Each workspace that contributes spends once from your AI allowance; if the allowance is used up, its passages are held back.
+- **Said out loud.** The reply lists what was held back: "Found in W, not sent to the AI (3 passages): it uses a different AI provider." The held-back files are still in the list below, because you can read them; they were not given to the model.
+- Two providers with the same host and model count as the same even when their names or keys differ. No migration or setting changes.
+
+### Checks
+- Tests that a passage of a workspace that does not allow it, or that uses another provider, is never in the request body a mock provider receives; that nothing is sent when nothing is allowed; and how two providers are told apart; formatted and linted for the touched crates; tests not run. Nothing was built or run, and the server's side of the decision (role, policy, provider and allowance of each workspace) was not exercised.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.60 (2026-11-24)
 
 A chat can look across all your workspaces.

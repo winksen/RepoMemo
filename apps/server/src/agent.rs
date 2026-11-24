@@ -264,7 +264,7 @@ pub(crate) async fn run_message(
     let outcome = if all_workspaces {
         // Across workspaces the chat only looks things up, with no AI: each result is labelled with its own workspace (V0.9.60).
         repomemo_api::AgentOutcome {
-            reply: all_workspaces_reply(state, subject, &message.message).await?,
+            reply: all_workspaces_reply(state, subject, &workspace_id, &role, &message.message).await?,
             correction: None,
             trace: None,
         }
@@ -469,6 +469,8 @@ pub(crate) async fn attach_agent_file(
 async fn all_workspaces_reply(
     state: &AppState,
     subject: &AuthenticatedSubject,
+    home_workspace_id: &str,
+    home_role: &WorkspaceRole,
     message: &str,
 ) -> Result<repomemo_domain::AgentReply, ApiError> {
     let query: String = message
@@ -504,7 +506,99 @@ async fn all_workspaces_reply(
             found.workspaces.len()
         )));
     }
-    let mut text = format!("Found in {} of your workspaces, with no AI:\n", names.len());
+    // Writing an answer (V0.9.61): a passage goes to the provider of this chat only when its own workspace lets this person use AI
+    // and is set up with that same provider. The rest is listed as found and not sent, and none of it is in the request.
+    let mut answer: Option<String> = None;
+    let mut held_back = String::new();
+    let home_min = ai_access::workspace_ai_min_role(state, home_workspace_id).await?;
+    let home_provider = text_provider(state, home_workspace_id).await?;
+    if let (Some(home_provider), true) = (home_provider, home_min.allows(home_role)) {
+        let mut allowed = std::collections::HashSet::new();
+        let mut refusals = std::collections::BTreeMap::new();
+        for (workspace_id, _) in &names {
+            let reason = match crate::access_control::effective_workspace_role(
+                state,
+                &subject.user_id,
+                subject.is_system_admin,
+                workspace_id,
+            )
+            .await?
+            {
+                None => Some("you cannot read it".to_owned()),
+                Some(role) => {
+                    let min = ai_access::workspace_ai_min_role(state, workspace_id).await?;
+                    if !min.allows(&role) {
+                        Some("your role there may not use AI".to_owned())
+                    } else {
+                        match text_provider(state, workspace_id).await? {
+                            Some(own) if repomemo_api::same_provider(&own, &home_provider) => {
+                                // Each workspace that contributes spends from the person's AI allowance.
+                                ai_access::consume_ai_quota(state, subject)
+                                    .err()
+                                    .map(|_| "your AI allowance is used up".to_owned())
+                            }
+                            Some(_) => Some("it uses a different AI provider".to_owned()),
+                            None => Some("it has no AI provider".to_owned()),
+                        }
+                    }
+                }
+            };
+            match reason {
+                None => {
+                    allowed.insert(workspace_id.clone());
+                }
+                Some(reason) => {
+                    refusals.insert(workspace_id.clone(), reason);
+                }
+            }
+        }
+        let mut passages: Vec<repomemo_api::CrossPassage> = found
+            .results
+            .iter()
+            .map(|hit| repomemo_api::CrossPassage {
+                workspace_id: hit.workspace_id.clone(),
+                workspace_name: hit.workspace_name.clone(),
+                title: hit.result.title.clone(),
+                location: hit.result.path.clone(),
+                text: hit.result.snippet.clone(),
+            })
+            .collect();
+        passages.extend(found.memory_cards.iter().map(|card| repomemo_api::CrossPassage {
+            workspace_id: card.workspace_id.clone(),
+            workspace_name: card.workspace_name.clone(),
+            title: format!("Memory card: {}", card.card.title),
+            location: "memory card".to_owned(),
+            text: card.card.body_excerpt.clone(),
+        }));
+        let (sent, held) = repomemo_api::split_by_boundary(&passages, &allowed, &refusals);
+        held_back = repomemo_api::held_back_lines(&held);
+        if !sent.is_empty() {
+            match repomemo_ai::provider_from_settings(home_provider) {
+                Ok(provider) => match repomemo_api::answer_from(&provider, &query, &sent).await {
+                    Ok(text) if !text.is_empty() => answer = Some(text),
+                    Ok(_) => {}
+                    Err(error) => {
+                        tracing::warn!(error = %format!("{error:#}"), "An answer across workspaces could not be written")
+                    }
+                },
+                Err(error) => {
+                    tracing::warn!(error = %format!("{error:#}"), "The provider of a chat across workspaces could not be used")
+                }
+            }
+        }
+    }
+    let mut text = match &answer {
+        Some(answer) => format!("{answer}\n\n"),
+        None => String::new(),
+    };
+    if !held_back.is_empty() {
+        text.push_str(&format!("{held_back}\n\n"));
+    }
+    text.push_str(&format!(
+        "Found in {} of your workspaces{}:\n",
+        names.len(),
+        if answer.is_some() { "" } else { ", with no AI" }
+    ));
     for (workspace_id, name) in &names {
         text.push_str(&format!("\n**[{name}](/spaces/{workspace_id})**\n"));
         for hit in found
@@ -529,8 +623,12 @@ async fn all_workspaces_reply(
             ));
         }
     }
-    text.push_str("\nThis chat looks things up across your workspaces. To ask a question or to change something, open a chat in that workspace.");
-    Ok(repomemo_api::lookup_reply(text))
+    text.push_str(
+        "\nThis chat looks things up across your workspaces. To change something, open a chat in that workspace.",
+    );
+    let mut reply = repomemo_api::lookup_reply(text);
+    reply.generated = answer.is_some();
+    Ok(reply)
 }
 
 pub(crate) async fn get_agent_turn_run(

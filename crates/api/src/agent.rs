@@ -16,6 +16,7 @@ use crate::RepoMemoCore;
 mod analyze;
 mod chat_summary;
 mod chatter;
+mod cross;
 mod evidence;
 mod filters;
 mod memory;
@@ -34,6 +35,7 @@ mod run;
 mod summary;
 mod team_memory;
 mod upkeep;
+pub use cross::{answer_from, held_back_lines, same_provider, split_by_boundary, CrossPassage};
 pub use playbooks::{playbook_from_run, PlaybookDraft};
 pub use run::{AgentLoopSetup, AgentOutcome, ProgressHook};
 #[cfg(test)]
