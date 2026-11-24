@@ -222,6 +222,20 @@ pub(crate) async fn run_message(
         None => (None, None),
     };
     let provider_for_run = provider_id.clone();
+    // What the person told CAIRN was wrong earlier, and whether they stopped being offered to save decisions here (V0.9.53).
+    let corrections = state
+        .storage
+        .open_agent_corrections(&workspace_id, &subject.user_id, 5)
+        .await
+        .unwrap_or_default();
+    let decision_offers_off = match &existing {
+        Some(conversation) => state
+            .storage
+            .decision_offers_off(&conversation.id)
+            .await
+            .unwrap_or(false),
+        None => false,
+    };
     // What CAIRN remembers about this person goes into their own run and nobody else's (V0.9.51).
     let personal_memory = state
         .storage
@@ -255,6 +269,8 @@ pub(crate) async fn run_message(
                 history,
                 summary,
                 personal_memory,
+                corrections,
+                decision_offers_off,
                 history_tokens,
                 exchanges,
             },
@@ -262,7 +278,7 @@ pub(crate) async fn run_message(
         )
         .await
         .map_err(map_core_error)?;
-    let (mut reply, loop_trace) = (outcome.reply, outcome.trace);
+    let (mut reply, loop_trace, correction) = (outcome.reply, outcome.trace, outcome.correction);
     // A viewer is not offered what would change the workspace (V0.9.10).
     // Being remembered is not a change to the workspace, so a viewer is still offered that (V0.9.51).
     if matches!(role, WorkspaceRole::Viewer) && !reply.proposals.is_empty() {
@@ -299,6 +315,22 @@ pub(crate) async fn run_message(
         .append_agent_turn(&conversation_id, &label, &message, &reply)
         .await
         .map_err(map_storage_error)?;
+    // What the person said was wrong is kept against the turn that holds the run's answer (V0.9.53).
+    if let Some(statement) = correction {
+        if let Err(error) = state
+            .storage
+            .add_agent_correction(
+                &workspace_id,
+                &subject.user_id,
+                Some(&conversation_id),
+                Some(&turn.id),
+                &statement,
+            )
+            .await
+        {
+            tracing::warn!(error = %format!("{error:#}"), "A correction could not be stored");
+        }
+    }
     // How the message was answered, kept for the person who asked (V0.9.39). A trace that cannot be stored never fails the answer.
     let ended_at = chrono::Utc::now();
     let trace = loop_trace

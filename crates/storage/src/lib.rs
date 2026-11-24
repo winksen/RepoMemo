@@ -23,6 +23,7 @@ use uuid::Uuid;
 mod access;
 mod accounts;
 mod activity;
+mod agent_corrections;
 mod agent_runs;
 mod ai_usage;
 mod approvals;

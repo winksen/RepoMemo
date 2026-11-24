@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.53 (2026-11-24)
+
+CAIRN keeps your corrections and offers to save decisions.
+
+### Added
+- **Corrections.** When you tell CAIRN an answer was wrong ("no, the limit is 50, not 20"), it records the correction against that turn. When you stated the right fact and your role may change the workspace, it also proposes a memory card with the corrected fact, which you confirm; the card cites no file, since it is what you told CAIRN.
+- **Corrections are read back, unreviewed.** Your open corrections in the workspace (up to five, newest first, at most 20 kept) go into your later Agent requests as lines marked *correction, not yet reviewed*. They are your own statements, never evidence, and CAIRN is told to check the files. A correction whose card you confirmed is closed.
+- **Decisions.** When you state a decision in a chat ("we will go with option B"), CAIRN offers once, at most one offer in a request, to save it as a memory card. Dismissing that offer stops such offers in that chat.
+- A migration (`0092_agent_corrections.sql`) adds the corrections and the per-chat switch. Corrections are yours alone: other people's runs never read them.
+
+### Checks
+- Unit tests for the corrections block and its bound, and for a correction line; a loop test that a correction is recorded with one card, that a second decision offer is refused and that a viewer gets a recorded correction and no card or decision tool; formatted and linted for the touched crates; types current; tests not run. Nothing was built or run.
+- Not in this release: a *Wrong answer* button under CAIRN's replies. A correction is recorded when you say so in the chat.
+
+### Upgrading
+- The migration runs on start. Nothing else to do.
+
 ## V0.9.52 (2026-11-24)
 
 CAIRN finds what was said in your earlier chats.

@@ -138,6 +138,46 @@ pub(crate) fn save_memory_reply(statement: &str, exchanges: &[AgentExchange]) ->
     answer
 }
 
+/// A memory card proposed from a correction the person gave (V0.9.53): the corrected fact as they stated it, with what they said
+/// was wrong. It waits for their confirmation like any card, and it carries no evidence of its own.
+pub(crate) fn correction_card(title: &str, fact: &str, statement: &str) -> AgentProposal {
+    let body = shorten_keeping_lines(
+        &format!("{fact}\n\nCorrected after a wrong answer: {statement}"),
+        MEMORY_BODY_CHARS,
+    );
+    AgentProposal {
+        id: "p1".to_owned(),
+        kind: AgentProposalKind::SaveMemory,
+        state: AgentProposalState::Pending,
+        title: "Save the correction as a memory card".to_owned(),
+        detail: format!(
+            "**{title}**\n\n{}\n\nIt cites no file: it is what you told me.",
+            shorten(&body, 500)
+        ),
+        payload: json!({ "title": title, "body_markdown": body, "source": "CAIRN chat correction", "confidence": null, "citations": [], "offer": "correction" }),
+        outcome: None,
+        untrusted_sources: Vec::new(),
+    }
+}
+
+/// A decision card offered when the person stated a decision in the chat (V0.9.53). Dismissing it stops these offers in that chat.
+pub(crate) fn decision_card(title: &str, decision: &str) -> AgentProposal {
+    let body = shorten_keeping_lines(decision, MEMORY_BODY_CHARS);
+    AgentProposal {
+        id: "p1".to_owned(),
+        kind: AgentProposalKind::SaveMemory,
+        state: AgentProposalState::Pending,
+        title: "Save the decision as a memory card".to_owned(),
+        detail: format!(
+            "**{title}**\n\n{}\n\nIt cites no file: it is what was decided in this chat.",
+            shorten(&body, 500)
+        ),
+        payload: json!({ "title": title, "body_markdown": body, "source": "CAIRN chat decision", "confidence": null, "citations": [], "offer": "decision" }),
+        outcome: None,
+        untrusted_sources: Vec::new(),
+    }
+}
+
 /// A text cut to a length without losing its line breaks, which `shorten` flattens.
 fn shorten_keeping_lines(text: &str, limit: usize) -> String {
     let trimmed = text.trim();

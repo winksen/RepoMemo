@@ -86,6 +86,8 @@ fn request(workspace_id: &str, message: &str) -> AgentRequest {
         artifact_ids: Vec::new(),
         summary: None,
         personal_memory: Vec::new(),
+        corrections: Vec::new(),
+        decision_offers_off: false,
         history_tokens: None,
         exchanges: Vec::new(),
     }

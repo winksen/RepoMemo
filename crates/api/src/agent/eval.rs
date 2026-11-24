@@ -251,6 +251,8 @@ async fn the_scripted_cases_pass_and_meet_the_thresholds() {
                     artifact_ids: Vec::new(),
                     summary: None,
                     personal_memory: Vec::new(),
+                    corrections: Vec::new(),
+                    decision_offers_off: false,
                     history_tokens: None,
                     exchanges: Vec::new(),
                 },

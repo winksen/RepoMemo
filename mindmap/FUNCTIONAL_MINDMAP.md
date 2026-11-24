@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.52` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.53` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.53 — CAIRN keeps your corrections and offers to save decisions.
+
+- **Corrections and decisions.** Tell CAIRN an answer was wrong and it keeps your correction, offers to save the right fact as a memory card and mentions the correction, marked unreviewed, in your later requests. A decision you state can be offered once as a card; dismissing it stops the offers in that chat.
+
+Checks: fmt and clippy for the touched crates pass; nothing was run.
 
 ## V0.9.52 — CAIRN finds what was said in your earlier chats.
 

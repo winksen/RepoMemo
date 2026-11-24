@@ -2746,6 +2746,13 @@ export interface AgentRequest {
   summary: AgentSummary | null;
   /** What CAIRN remembers about the person asking, newest first; the server fills it for their own runs only (V0.9.51). */
   personal_memory: string[];
+  /**
+   * What the person told CAIRN was wrong earlier in this workspace and nobody has reviewed, newest first; the server fills it
+   * for their own runs only (V0.9.53).
+   */
+  corrections: string[];
+  /** Whether the person dismissed the offer to save a decision in this chat, so none is made again (V0.9.53). */
+  decision_offers_off: boolean;
   /** How many estimated tokens of `history` the model's window has room for; the router's own small budget when none (V0.9.48). */
   history_tokens: number | null;
   /**

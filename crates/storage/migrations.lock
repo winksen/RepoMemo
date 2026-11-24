@@ -95,3 +95,4 @@
 0.9.48  0089_agent_conversation_summary.sql  e62a0471ef4b3fda244547d1f51d77588b8bb21d54f9d382863880c451c8852d
 0.9.51  0090_agent_personal_memory.sql  2f2b472eb2d07745408b2ba2e4f72e95e4223f8a7db56596aadb37beb3abf743
 0.9.52  0091_agent_chat_search.sql  af9a498ce0b275d41b01f141de65a3009bc90c2219a948266a06f04216fb76e7
+0.9.53  0092_agent_corrections.sql  4cce424d7b0aaff4e29b1b60d18fbca0fffd42b313ee131b0c3f02068d7461ca

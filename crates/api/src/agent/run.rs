@@ -6,6 +6,8 @@
 //! Chatter, jobs picked from the + menu and workspaces without a tool-capable model keep the router.
 
 use std::sync::Arc;
+
+use super::proposals::{correction_card, decision_card};
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
@@ -58,6 +60,8 @@ pub struct AgentLoopSetup {
 /// A message answered: the reply, and for a run of the loop its own trace (the router's runs are traced from the reply).
 pub struct AgentOutcome {
     pub reply: AgentReply,
+    /// What the person said was wrong, when the run recorded a correction (V0.9.53); the server keeps it against the stored turn.
+    pub correction: Option<String>,
     pub trace: Option<RunTrace>,
 }
 
@@ -66,6 +70,10 @@ enum Source {
     Atom,
     /// What CAIRN remembers about the person (V0.9.51): proposed to any role, since it changes only their own memory.
     Personal,
+    /// A correction the person gave (V0.9.53): recorded for them, and a memory card offered when they stated the fact.
+    Correction,
+    /// A decision the person stated (V0.9.53): offered once as a decision card.
+    Decision,
     Job(&'static CairnTool),
 }
 
@@ -142,8 +150,35 @@ fn personal_block(entries: &[String]) -> Option<String> {
     })
 }
 
+/// The most corrections that go into a run.
+const CORRECTIONS_SHOWN: usize = 5;
+
+/// What the person told CAIRN was wrong and nobody has reviewed, as a block at the start of their run (V0.9.53). They are the
+/// person's own statements: possibly right, not yet checked, never evidence and never a reason to skip the files.
+/// Whether the run may offer a change to the workspace, which is when it was given a proposing tool of its own.
+fn tools_may_propose_cards(tools: &[LoopTool]) -> bool {
+    tools
+        .iter()
+        .any(|tool| tool.proposes && !matches!(tool.source, Source::Personal))
+}
+
+fn corrections_block(corrections: &[String]) -> Option<String> {
+    let lines = corrections
+        .iter()
+        .take(CORRECTIONS_SHOWN)
+        .enumerate()
+        .map(|(index, text)| format!("[C{}] {} (correction, not yet reviewed)", index + 1, shorten(text, 300)))
+        .collect::<Vec<_>>();
+    (!lines.is_empty()).then(|| {
+        format!(
+            "Corrections this person gave you earlier in this workspace that nobody has reviewed yet (their own statements, not evidence: mention one only when it bears on the question, say it is unreviewed, and check the files):\n{}",
+            lines.join("\n")
+        )
+    })
+}
+
 /// The tools a run of this person's role may call. A person who cannot change the workspace is offered no proposing tool.
-fn loop_tools(can_write: bool) -> Vec<LoopTool> {
+fn loop_tools(can_write: bool, offer_decisions: bool) -> Vec<LoopTool> {
     let mut tools = vec![
         atom(
             "search_evidence",
@@ -202,6 +237,23 @@ fn loop_tools(can_write: bool) -> Vec<LoopTool> {
         job(AgentCapability::FindSymbol),
         job(AgentCapability::RecallMemory),
     ];
+    // A correction is the person's own record, kept for them, so every role may record one (V0.9.53).
+    tools.push(LoopTool {
+        name: "record_correction",
+        label: "Note your correction",
+        description: "Record that the person said your earlier answer was wrong, such as \"no, the limit is 50, not 20\". Give what they said was wrong, and the corrected fact when they stated one so that you can offer to save it as a memory card. Use it only when they tell you an answer was wrong.".to_owned(),
+        parameters: json!({
+            "type": "object",
+            "properties": {
+                "statement": { "type": "string", "description": "What the person said was wrong and what is right, in one or two sentences" },
+                "corrected_fact": { "type": "string", "description": "The corrected fact on its own, when the person stated it; otherwise leave empty" },
+                "title": { "type": "string", "description": "A short title for the memory card, when corrected_fact is given" }
+            },
+            "required": ["statement"]
+        }),
+        proposes: false,
+        source: Source::Correction,
+    });
     // What the person said in their own earlier chats in this workspace (V0.9.52).
     tools.push(atom(
         "search_chats",
@@ -226,6 +278,23 @@ fn loop_tools(can_write: bool) -> Vec<LoopTool> {
         proposes: true,
         source: Source::Personal,
     });
+    if can_write && offer_decisions {
+        tools.push(LoopTool {
+            name: "offer_decision_card",
+            label: "Offer to save a decision",
+            description: "When the person states a decision in this chat (\"we will go with option B\"), offer once to save it as a decision card. Use it at most once in a request and only for a decision they stated, never for your own suggestion.".to_owned(),
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "title": { "type": "string", "description": "A short title for the decision" },
+                    "decision": { "type": "string", "description": "The decision and the reason the person gave, in a few sentences" }
+                },
+                "required": ["title", "decision"]
+            }),
+            proposes: true,
+            source: Source::Decision,
+        });
+    }
     if can_write {
         tools.extend([
             job(AgentCapability::SaveMemory),
@@ -334,6 +403,10 @@ struct Gathered {
     files: Vec<ArtifactSummary>,
     memory_cards: Vec<MemoryCardSummary>,
     proposals: Vec<repomemo_domain::AgentProposal>,
+    /// What the person said was wrong, recorded by the run (V0.9.53).
+    correction: Option<String>,
+    /// Whether the run already offered to save a decision: one offer at most (V0.9.53).
+    decision_offered: bool,
     /// What untrusted content the run has read so far, for the proposals it makes (V0.9.42).
     untrusted: Vec<String>,
     /// The memory cards the answer cites (V0.9.50), shown in the chat with their review state.
@@ -436,6 +509,7 @@ fn finish(
     };
     AgentOutcome {
         reply,
+        correction: gathered.correction,
         trace: Some(RunTrace {
             state: state.to_owned(),
             steps: gathered.steps,
@@ -494,6 +568,8 @@ impl RepoMemoCore {
             "read_file" | "file_facts" => arg_text(arguments, "file"),
             "list_files" => arg_text(arguments, "filter"),
             "search_chats" => arg_text(arguments, "query"),
+            "record_correction" => arg_text(arguments, "statement"),
+            "offer_decision_card" => arg_text(arguments, "title"),
             "workspace_brief" => String::new(),
             _ => subject.clone(),
         };
@@ -535,6 +611,55 @@ impl RepoMemoCore {
             "search_chats" => {
                 self.tool_search_chats(ledger, user_id, &arg_text(arguments, "query"))
                     .await
+            }
+            "record_correction" => {
+                let statement = arg_text(arguments, "statement");
+                let fact = arg_text(arguments, "corrected_fact");
+                if statement.is_empty() {
+                    Err(anyhow::anyhow!("Say what was wrong."))
+                } else if gathered.correction.is_some() {
+                    Err(anyhow::anyhow!("A correction is already recorded for this request."))
+                } else {
+                    gathered.correction = Some(statement.clone());
+                    let mut said = "Recorded. It is kept as the person's own correction, not yet reviewed.".to_owned();
+                    if !fact.is_empty() && !tools_may_propose_cards(tools) {
+                        said.push_str(" The person may not change this workspace, so do not offer a memory card.");
+                    } else if !fact.is_empty() && gathered.proposals.len() < MAX_CHANGESET_ACTIONS {
+                        let title = Some(arg_text(arguments, "title"))
+                            .filter(|title| !title.is_empty())
+                            .unwrap_or_else(|| shorten(&fact, 60));
+                        gathered.proposals.push(correction_card(&title, &fact, &statement));
+                        said.push_str(" A memory card with the corrected fact is proposed; the person confirms it.");
+                    }
+                    Ok(ToolOutput {
+                        for_model: said,
+                        handles: Vec::new(),
+                    })
+                }
+            }
+            "offer_decision_card" => {
+                let title = arg_text(arguments, "title");
+                let decision = arg_text(arguments, "decision");
+                if title.is_empty() || decision.is_empty() {
+                    Err(anyhow::anyhow!("Give the decision's title and what was decided."))
+                } else if gathered.decision_offered {
+                    Err(anyhow::anyhow!(
+                        "A decision was already offered in this request; do not offer another."
+                    ))
+                } else if gathered.proposals.len() >= MAX_CHANGESET_ACTIONS {
+                    Err(anyhow::anyhow!(
+                        "A request proposes at most {MAX_CHANGESET_ACTIONS} changes."
+                    ))
+                } else {
+                    gathered.decision_offered = true;
+                    gathered.proposals.push(decision_card(&title, &decision));
+                    Ok(ToolOutput {
+                        for_model:
+                            "Offered. The person confirms it, or dismisses it and is not offered again in this chat."
+                                .to_owned(),
+                        handles: Vec::new(),
+                    })
+                }
             }
             "propose_personal_memory" => {
                 let text = arg_text(arguments, "text");
@@ -682,10 +807,13 @@ impl RepoMemoCore {
     ) -> Result<AgentOutcome> {
         let message = request.message.trim().to_owned();
         let history = window(&request);
-        let tools = loop_tools(setup.can_write);
+        let tools = loop_tools(setup.can_write, !request.decision_offers_off);
         let specs = tools.iter().map(LoopTool::spec).collect::<Vec<_>>();
         let mut system = loop_system(&tools);
         if let Some(block) = personal_block(&request.personal_memory) {
+            system = format!("{system}\n\n{block}");
+        }
+        if let Some(block) = corrections_block(&request.corrections) {
             system = format!("{system}\n\n{block}");
         }
         // The team's instructions come after CAIRN's persona and rules and before the conversation (V0.9.49).
@@ -947,6 +1075,8 @@ mod tests {
             artifact_ids: Vec::new(),
             summary: None,
             personal_memory: Vec::new(),
+            corrections: Vec::new(),
+            decision_offers_off: false,
             history_tokens: None,
             exchanges: Vec::new(),
         }
@@ -1233,6 +1363,63 @@ mod tests {
         assert!(result.content.contains("/cairn/"), "{}", result.content);
         assert!(result.content.contains("quoted data"), "{}", result.content);
         assert!(!result.content.contains("Ben"), "{}", result.content);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[test]
+    fn open_corrections_are_a_bounded_block_marked_unreviewed() {
+        assert!(corrections_block(&[]).is_none());
+        let many = (0..9).map(|n| format!("Fact {n} was wrong")).collect::<Vec<_>>();
+        let block = corrections_block(&many).unwrap();
+        assert!(block.contains("[C1] Fact 0 was wrong (correction, not yet reviewed)"));
+        assert!(block.contains("[C5]") && !block.contains("[C6]"));
+        assert!(block.contains("not evidence"));
+    }
+
+    #[tokio::test]
+    async fn a_correction_is_recorded_with_one_memory_offer_and_a_viewer_gets_no_card() {
+        let (core, data_dir) = core("correction").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call(
+                "record_correction",
+                json!({ "statement": "The limit is 50, not 20", "corrected_fact": "The limit is 50.", "title": "Limit" }),
+            ),
+            ChatResponse::call(
+                "offer_decision_card",
+                json!({ "title": "Option B", "decision": "We go with option B." }),
+            ),
+            ChatResponse::call("offer_decision_card", json!({ "title": "Again", "decision": "Twice." })),
+            ChatResponse::text("Noted."),
+        ]);
+        let outcome = core
+            .loop_with(&provider, request(&workspace_id, "No, the limit is 50"), setup(8, true))
+            .await
+            .unwrap();
+        assert_eq!(outcome.correction.as_deref(), Some("The limit is 50, not 20"));
+        assert_eq!(
+            outcome.reply.proposals.len(),
+            2,
+            "one card for the fact and one decision, never a second decision"
+        );
+        assert_eq!(outcome.reply.proposals[1].payload["offer"], "decision");
+        // A viewer's correction is recorded but no card is offered, and no decision is offered once they are switched off.
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call(
+                "record_correction",
+                json!({ "statement": "Wrong limit", "corrected_fact": "The limit is 50." }),
+            ),
+            ChatResponse::text("Noted."),
+        ]);
+        let mut asking = request(&workspace_id, "No, the limit is 50");
+        asking.decision_offers_off = true;
+        let viewer = core.loop_with(&provider, asking, setup(8, false)).await.unwrap();
+        assert!(viewer.correction.is_some());
+        assert!(viewer.reply.proposals.is_empty());
+        assert!(provider.requests()[0]
+            .tools
+            .iter()
+            .all(|tool| tool.name != "offer_decision_card"));
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

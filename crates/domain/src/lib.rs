@@ -3150,6 +3150,13 @@ pub struct AgentRequest {
     /// What CAIRN remembers about the person asking, newest first; the server fills it for their own runs only (V0.9.51).
     #[serde(default)]
     pub personal_memory: Vec<String>,
+    /// What the person told CAIRN was wrong earlier in this workspace and nobody has reviewed, newest first; the server fills it
+    /// for their own runs only (V0.9.53).
+    #[serde(default)]
+    pub corrections: Vec<String>,
+    /// Whether the person dismissed the offer to save a decision in this chat, so none is made again (V0.9.53).
+    #[serde(default)]
+    pub decision_offers_off: bool,
     /// How many estimated tokens of `history` the model's window has room for; the router's own small budget when none (V0.9.48).
     #[serde(default)]
     pub history_tokens: Option<usize>,

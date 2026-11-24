@@ -286,6 +286,7 @@ impl RepoMemoCore {
         }
         Ok(AgentOutcome {
             reply: self.run_agent_router(request).await?,
+            correction: None,
             trace: None,
         })
     }

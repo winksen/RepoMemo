@@ -38,6 +38,24 @@ async fn owned_turn(
     Ok((turn, conversation.workspace_id))
 }
 
+/// What kind of offer a proposal was, when CAIRN made it unasked (V0.9.53): `decision` or `correction`.
+fn proposal_offer(turn: &AgentTurn, proposal_id: &str) -> Option<String> {
+    turn.reply
+        .proposals
+        .iter()
+        .find(|proposal| proposal.id == proposal_id)
+        .and_then(|proposal| proposal.payload.get("offer"))
+        .and_then(|offer| offer.as_str())
+        .map(str::to_owned)
+}
+
+/// Dismissing an offer to save a decision stops such offers in that chat, and dismissing the card of a correction closes it.
+async fn stop_offers_after(state: &AppState, conversation_id: &str, offer: Option<String>) {
+    if offer.as_deref() == Some("decision") {
+        let _ = state.storage.stop_decision_offers(conversation_id).await;
+    }
+}
+
 fn pending_proposal<'a>(turn: &'a mut AgentTurn, proposal_id: &str) -> Result<&'a mut AgentProposal, ApiError> {
     let proposal = turn
         .reply
@@ -247,9 +265,14 @@ pub(crate) async fn confirm_agent_proposal(
             )));
         }
     }
+    let settles_correction = proposal.payload.get("offer").and_then(|offer| offer.as_str()) == Some("correction");
     let outcome = apply(&state, &subject, &workspace_id, proposal).await?;
     proposal.state = AgentProposalState::Applied;
     proposal.outcome = Some(outcome);
+    // A correction whose fact became a memory card is reviewed (V0.9.53).
+    if settles_correction {
+        let _ = state.storage.settle_agent_corrections(&turn.id, "reviewed").await;
+    }
     state
         .storage
         .update_agent_turn_reply(&turn.id, &turn.reply)
@@ -390,6 +413,16 @@ pub(crate) async fn dismiss_agent_changeset(
             proposal.state = AgentProposalState::Dismissed;
         }
     }
+    let dismissed_offer = turn
+        .reply
+        .proposals
+        .iter()
+        .any(|proposal| {
+            proposal.state == AgentProposalState::Dismissed
+                && proposal.payload.get("offer").and_then(|offer| offer.as_str()) == Some("decision")
+        })
+        .then(|| "decision".to_owned());
+    stop_offers_after(&state, &turn.conversation_id, dismissed_offer).await;
     if let Some(set) = turn.reply.changeset.as_mut() {
         set.state = "dismissed".to_owned();
         set.outcome = Some("Dismissed. Nothing was changed.".to_owned());
@@ -410,6 +443,7 @@ pub(crate) async fn dismiss_agent_proposal(
     let (mut turn, _) = owned_turn(&state, &subject, &turn_id).await?;
     let proposal = pending_proposal(&mut turn, &proposal_id)?;
     proposal.state = AgentProposalState::Dismissed;
+    stop_offers_after(&state, &turn.conversation_id, proposal_offer(&turn, &proposal_id)).await;
     state
         .storage
         .update_agent_turn_reply(&turn.id, &turn.reply)
