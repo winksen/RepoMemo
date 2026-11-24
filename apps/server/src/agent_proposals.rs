@@ -109,6 +109,16 @@ async fn apply(
                 format!("Moved {subject} to {}.", payload_text(proposal, "folder_name"))
             })
         }
+        AgentProposalKind::SavePersonalMemory => {
+            // Only the person's own memory changes, so no role is needed beyond reading the chat they confirm it in (V0.9.51).
+            let text = payload_text(proposal, "text");
+            state
+                .storage
+                .add_personal_memory(&subject.user_id, None, &text, None)
+                .await
+                .map_err(map_storage_error)?;
+            Ok(format!("I will remember: {text}"))
+        }
         AgentProposalKind::SaveSummary | AgentProposalKind::SaveNote => {
             // The same handler as a note written by hand: its role check, its quota and the queue that indexes it.
             let body: CreateTextArtifactRequest = serde_json::from_value(proposal.payload.clone())
@@ -217,8 +227,16 @@ pub(crate) async fn confirm_agent_proposal(
             "These changes are confirmed together: use the set of changes.",
         ));
     }
-    // Whatever the action, the person must still be able to change the workspace.
-    require_workspace_write(&state, &subject, &workspace_id).await?;
+    // Whatever the action, the person must still be able to change the workspace, except to be remembered (V0.9.51).
+    if turn
+        .reply
+        .proposals
+        .iter()
+        .find(|proposal| proposal.id == proposal_id)
+        .is_none_or(|proposal| proposal.kind != AgentProposalKind::SavePersonalMemory)
+    {
+        require_workspace_write(&state, &subject, &workspace_id).await?;
+    }
     let proposal = pending_proposal(&mut turn, &proposal_id)?;
     if let Some(count) = needs_typed_count(proposal) {
         let typed = body.and_then(|Json(request)| request.confirm_count);
@@ -266,7 +284,16 @@ pub(crate) async fn confirm_agent_changeset(
     Json(request): Json<ConfirmChangesetRequest>,
 ) -> Result<Json<AgentTurn>, ApiError> {
     let (mut turn, workspace_id) = owned_turn(&state, &subject, &turn_id).await?;
-    require_workspace_write(&state, &subject, &workspace_id).await?;
+    // A set of changes to oneself needs no write role; any change to the workspace does.
+    let only_personal = turn
+        .reply
+        .proposals
+        .iter()
+        .filter(|proposal| request.proposal_ids.contains(&proposal.id))
+        .all(|proposal| proposal.kind == AgentProposalKind::SavePersonalMemory);
+    if !only_personal || request.proposal_ids.is_empty() {
+        require_workspace_write(&state, &subject, &workspace_id).await?;
+    }
     changeset_pending(&turn)?;
     if request.proposal_ids.is_empty() {
         return Err(ApiError::bad_request("Tick at least one change to apply."));

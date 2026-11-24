@@ -380,6 +380,15 @@ impl StorageEngine {
             .execute(&mut *tx)
             .await?
             .rows_affected();
+        // What CAIRN remembered about them is theirs alone (V0.9.51).
+        sqlx::query("DELETE FROM agent_personal_memory WHERE user_id = ?1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM agent_personal_memory_settings WHERE user_id = ?1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
         report.notifications = sqlx::query("DELETE FROM workspace_notifications WHERE user_id = ?1")
             .bind(user_id)
             .execute(&mut *tx)

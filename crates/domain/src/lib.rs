@@ -2948,6 +2948,9 @@ pub enum AgentProposalKind {
     DeleteMemory,
     /// Create a note, indexed like any file (V0.9.31).
     SaveNote,
+    /// Remember something about the person, for their own runs only (V0.9.51). Only the person's own memory changes, so a viewer
+    /// may confirm it.
+    SavePersonalMemory,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -3087,6 +3090,25 @@ pub struct AgentConversationDetail {
     pub turns: Vec<AgentTurn>,
 }
 
+/// One thing CAIRN remembers about a person (V0.9.51).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersonalMemoryEntry {
+    pub id: String,
+    /// The workspace it applies in; none means everywhere.
+    #[serde(default)]
+    pub workspace_id: Option<String>,
+    pub text: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// A person's memory with CAIRN: their entries and whether it is on.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersonalMemory {
+    pub enabled: bool,
+    pub entries: Vec<PersonalMemoryEntry>,
+}
+
 /// What a CAIRN chat remembers of its older turns (V0.9.48): a short summary, how far it reaches and the files those turns were
 /// about, so "that file" still means the file of turn 2 at turn 30.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -3125,6 +3147,9 @@ pub struct AgentRequest {
     /// What the chat remembers of turns older than `history` (V0.9.48). The server fills it from the stored conversation.
     #[serde(default)]
     pub summary: Option<AgentSummary>,
+    /// What CAIRN remembers about the person asking, newest first; the server fills it for their own runs only (V0.9.51).
+    #[serde(default)]
+    pub personal_memory: Vec<String>,
     /// How many estimated tokens of `history` the model's window has room for; the router's own small budget when none (V0.9.48).
     #[serde(default)]
     pub history_tokens: Option<usize>,

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.50` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.51` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.51 — CAIRN remembers what you ask it to remember about you.
+
+- **CAIRN remembers you.** You can ask CAIRN to remember a preference, confirm it, and see, edit, delete or switch off what it remembers in your profile. It is used in your own requests only.
+
+Checks: fmt and clippy for the touched crates, generated types and typecheck pass; nothing was run.
 
 ## V0.9.50 — CAIRN looks in the team's memory first.
 

@@ -1,4 +1,5 @@
 import { clearAllDrafts } from "./drafts";
+import type { PersonalMemory, PersonalMemoryEntry } from "../generated/domain";
 import type {
   ArchiveImportReport,
   ServerSetupStatus,
@@ -2356,3 +2357,19 @@ export function resolveSharedSearchFeedback(accessToken: string, workspaceId: st
   }, accessToken);
 }
 
+/** What CAIRN remembers about the caller (V0.9.51): theirs alone. */
+export function getPersonalMemory(accessToken: string): Promise<PersonalMemory> {
+  return request<PersonalMemory>("/v1/agent/personal-memory", {}, accessToken);
+}
+export function addPersonalMemory(accessToken: string, text: string): Promise<PersonalMemoryEntry> {
+  return request<PersonalMemoryEntry>("/v1/agent/personal-memory", { method: "POST", body: JSON.stringify({ text }) }, accessToken);
+}
+export function updatePersonalMemory(accessToken: string, entryId: string, text: string): Promise<void> {
+  return request<void>(`/v1/agent/personal-memory/${encodeURIComponent(entryId)}`, { method: "PUT", body: JSON.stringify({ text }) }, accessToken);
+}
+export function deletePersonalMemory(accessToken: string, entryId: string): Promise<void> {
+  return request<void>(`/v1/agent/personal-memory/${encodeURIComponent(entryId)}`, { method: "DELETE" }, accessToken);
+}
+export function setPersonalMemoryEnabled(accessToken: string, enabled: boolean): Promise<void> {
+  return request<void>("/v1/agent/personal-memory/settings", { method: "PUT", body: JSON.stringify({ enabled }) }, accessToken);
+}

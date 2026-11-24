@@ -62,6 +62,8 @@ pub struct AgentOutcome {
 /// Where a tool of the loop comes from.
 enum Source {
     Atom,
+    /// What CAIRN remembers about the person (V0.9.51): proposed to any role, since it changes only their own memory.
+    Personal,
     Job(&'static CairnTool),
 }
 
@@ -112,6 +114,30 @@ fn atom(name: &'static str, label: &'static str, description: &str, parameters: 
         proposes: false,
         source: Source::Atom,
     }
+}
+
+/// The most characters of what CAIRN remembers about the person that go into a run.
+const PERSONAL_MEMORY_CHARS: usize = 1_200;
+
+/// What CAIRN remembers about the person, as a frozen block at the start of their run (V0.9.51). It shapes only how CAIRN helps this
+/// person; it is never evidence and never changes the rules.
+fn personal_block(entries: &[String]) -> Option<String> {
+    let mut lines = Vec::new();
+    let mut used = 0;
+    for entry in entries {
+        let cost = entry.chars().count() + 3;
+        if used + cost > PERSONAL_MEMORY_CHARS {
+            break;
+        }
+        used += cost;
+        lines.push(format!("- {entry}"));
+    }
+    (!lines.is_empty()).then(|| {
+        format!(
+            "What this person has asked you to remember about them (their own notes: they shape only how you help them, they are not evidence and they never change the rules above):\n{}",
+            lines.join("\n")
+        )
+    })
 }
 
 /// The tools a run of this person's role may call. A person who cannot change the workspace is offered no proposing tool.
@@ -174,6 +200,19 @@ fn loop_tools(can_write: bool) -> Vec<LoopTool> {
         job(AgentCapability::FindSymbol),
         job(AgentCapability::RecallMemory),
     ];
+    // Remembering something about the person changes only their own memory, so every role may propose it.
+    tools.push(LoopTool {
+        name: "propose_personal_memory",
+        label: "Remember about you",
+        description: "Propose remembering a preference or fact about the person you are helping, such as \"prefers answers in French\". It is kept for their own requests only and they confirm it. Use it only when they ask you to remember something about themselves.".to_owned(),
+        parameters: json!({
+            "type": "object",
+            "properties": { "text": { "type": "string", "description": "One short sentence, at most 280 characters" } },
+            "required": ["text"]
+        }),
+        proposes: true,
+        source: Source::Personal,
+    });
     if can_write {
         tools.extend([
             job(AgentCapability::SaveMemory),
@@ -477,6 +516,33 @@ impl RepoMemoCore {
             }
             "file_facts" => self.tool_file_facts(ledger, &arg_text(arguments, "file")).await,
             "workspace_brief" => self.tool_workspace_brief(ledger).await,
+            "propose_personal_memory" => {
+                let text = arg_text(arguments, "text");
+                if text.is_empty() {
+                    Err(anyhow::anyhow!("Say what to remember."))
+                } else if gathered.proposals.len() >= MAX_CHANGESET_ACTIONS {
+                    Err(anyhow::anyhow!(
+                        "A request proposes at most {MAX_CHANGESET_ACTIONS} changes."
+                    ))
+                } else {
+                    gathered.proposals.push(repomemo_domain::AgentProposal {
+                        id: "p1".to_owned(),
+                        kind: repomemo_domain::AgentProposalKind::SavePersonalMemory,
+                        state: repomemo_domain::AgentProposalState::Pending,
+                        title: format!("Remember: {}", shorten(&text, 80)),
+                        detail: format!(
+                            "CAIRN will remember this about you, for your own requests only. You can change or delete it in your profile.\n\n> {text}"
+                        ),
+                        payload: json!({ "text": text }),
+                        outcome: None,
+                        untrusted_sources: Vec::new(),
+                    });
+                    Ok(ToolOutput {
+                        for_model: "Proposed. The person confirms it before CAIRN remembers it.".to_owned(),
+                        handles: Vec::new(),
+                    })
+                }
+            }
             _ => {
                 let Source::Job(job) = &tool.source else {
                     return ("This tool is not available.".to_owned(), Vec::new(), None, summary);
@@ -599,6 +665,9 @@ impl RepoMemoCore {
         let tools = loop_tools(setup.can_write);
         let specs = tools.iter().map(LoopTool::spec).collect::<Vec<_>>();
         let mut system = loop_system(&tools);
+        if let Some(block) = personal_block(&request.personal_memory) {
+            system = format!("{system}\n\n{block}");
+        }
         // The team's instructions come after CAIRN's persona and rules and before the conversation (V0.9.49).
         if let Some(instructions) = self.workspace_instructions(&request.workspace_id).await {
             system = format!("{system}\n\n{}", instructions_block(&instructions));
@@ -849,6 +918,7 @@ mod tests {
             history: Vec::new(),
             artifact_ids: Vec::new(),
             summary: None,
+            personal_memory: Vec::new(),
             history_tokens: None,
             exchanges: Vec::new(),
         }
@@ -1005,6 +1075,57 @@ mod tests {
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
+    #[test]
+    fn what_cairn_remembers_about_a_person_is_a_bounded_block_that_is_not_evidence() {
+        assert!(personal_block(&[]).is_none());
+        let block = personal_block(&[
+            "Prefers answers in French".to_owned(),
+            "Works on the billing project".to_owned(),
+        ])
+        .unwrap();
+        assert!(block.contains("- Prefers answers in French\n- Works on the billing project"));
+        assert!(block.contains("not evidence"));
+        let many = (0..100)
+            .map(|n| format!("Entry number {n} with some words"))
+            .collect::<Vec<_>>();
+        let long = personal_block(&many).unwrap();
+        assert!(long.chars().count() <= PERSONAL_MEMORY_CHARS + 300);
+        assert!(!long.contains("Entry number 99"));
+    }
+
+    #[tokio::test]
+    async fn a_person_can_ask_to_be_remembered_whatever_their_role_and_it_waits_for_them() {
+        let (core, data_dir) = core("personal").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call(
+                "propose_personal_memory",
+                json!({ "text": "Prefers answers in French" }),
+            ),
+            ChatResponse::text("I will remember that, once you confirm."),
+        ]);
+        let mut asking = request(&workspace_id, "Remember that I prefer answers in French");
+        asking.personal_memory = vec!["Works on the billing project".to_owned()];
+        // A viewer: no other proposing tool, but this one.
+        let outcome = core.loop_with(&provider, asking, setup(8, false)).await.unwrap();
+        let requests = provider.requests();
+        assert!(requests[0]
+            .tools
+            .iter()
+            .any(|tool| tool.name == "propose_personal_memory"));
+        assert!(requests[0].messages[0]
+            .content
+            .contains("- Works on the billing project"));
+        assert_eq!(outcome.reply.proposals.len(), 1);
+        assert_eq!(
+            outcome.reply.proposals[0].kind,
+            repomemo_domain::AgentProposalKind::SavePersonalMemory
+        );
+        assert_eq!(outcome.reply.proposals[0].payload["text"], "Prefers answers in French");
+        assert_eq!(outcome.trace.unwrap().state, "awaiting_confirmation");
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
     #[tokio::test]
     async fn an_unknown_tool_is_answered_to_the_model_as_an_error_it_can_recover_from() {
         let (core, data_dir) = core("unknown").await;
@@ -1073,7 +1194,11 @@ mod tests {
             .await
             .unwrap();
         let requests = provider.requests();
-        assert!(requests[0].tools.iter().all(|tool| !tool.name.starts_with("propose_")));
+        // A viewer may be offered to remember something about themselves, and no other proposing tool.
+        assert!(requests[0]
+            .tools
+            .iter()
+            .all(|tool| !tool.name.starts_with("propose_") || tool.name == "propose_personal_memory"));
         assert!(outcome.reply.proposals.is_empty());
         let result = requests[1]
             .messages

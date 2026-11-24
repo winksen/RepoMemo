@@ -2574,7 +2574,8 @@ export type AgentProposalKind =
   | "set_status"
   | "update_memory"
   | "delete_memory"
-  | "save_note";
+  | "save_note"
+  | "save_personal_memory";
 
 export type AgentProposalState =
   | "pending"
@@ -2688,6 +2689,22 @@ export interface AgentConversationDetail {
   turns: AgentTurn[];
 }
 
+/** One thing CAIRN remembers about a person (V0.9.51). */
+export interface PersonalMemoryEntry {
+  id: string;
+  /** The workspace it applies in; none means everywhere. */
+  workspace_id: string | null;
+  text: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A person's memory with CAIRN: their entries and whether it is on. */
+export interface PersonalMemory {
+  enabled: boolean;
+  entries: PersonalMemoryEntry[];
+}
+
 /**
  * What a CAIRN chat remembers of its older turns (V0.9.48): a short summary, how far it reaches and the files those turns were
  * about, so "that file" still means the file of turn 2 at turn 30.
@@ -2727,6 +2744,8 @@ export interface AgentRequest {
   artifact_ids: string[];
   /** What the chat remembers of turns older than `history` (V0.9.48). The server fills it from the stored conversation. */
   summary: AgentSummary | null;
+  /** What CAIRN remembers about the person asking, newest first; the server fills it for their own runs only (V0.9.51). */
+  personal_memory: string[];
   /** How many estimated tokens of `history` the model's window has room for; the router's own small budget when none (V0.9.48). */
   history_tokens: number | null;
   /**

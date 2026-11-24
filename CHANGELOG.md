@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.51 (2026-11-24)
+
+CAIRN remembers what you ask it to remember about you.
+
+### Added
+- **Personal memory.** Tell CAIRN "remember that I prefer answers in French" and it proposes one line to remember, which you confirm like any other change. Confirmed lines are read into your own Agent requests, after CAIRN's rules and before the chat, as notes that shape how it helps you and are never evidence.
+- **Yours alone.** A line is read into the requests of the person it belongs to and no one else's, is removed when the account is anonymized and is never part of a workspace archive. A viewer can be remembered too, since only their own memory changes.
+- **In your profile.** A *CAIRN memory* panel lists your lines (up to 40 of 280 characters), and lets you add, edit and delete one and turn the memory off, which stops it being read or added to.
+- New routes `GET/POST /v1/agent/personal-memory`, `PUT/DELETE /v1/agent/personal-memory/{entry_id}` and `PUT /v1/agent/personal-memory/settings`, a migration (`0090_agent_personal_memory.sql`) and a proposal kind `save_personal_memory`.
+
+### Checks
+- Unit tests for the bounds of an entry and the bounded block, and a loop test that a viewer is offered to remember, that the block reaches the prompt and that the proposal waits for confirmation; formatted and linted for the touched crates; types and typecheck pass; tests not run. Nothing was built or run.
+
+### Upgrading
+- The migration runs on start. Nothing else to do.
+
 ## V0.9.50 (2026-11-23)
 
 CAIRN looks in the team's memory first.

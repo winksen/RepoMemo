@@ -408,6 +408,8 @@ The chat is a small set of jobs that CAIRN picks from what you write, in three k
 
 **The team's memory comes first.** Before it calls any tool, CAIRN in Agent mode is given the memory cards that match your message. It prefers a current card to a file that disagrees, says so when they disagree, treats a card that needs review as possibly out of date, and shows the card it relied on under its answer.
 
+**CAIRN can remember things about you.** Say "remember that I prefer answers in French" and CAIRN offers to keep it; once you confirm, it follows it in your own requests and in no one else's. *Your profile > CAIRN memory* lists what it remembers, where you can edit or delete a line or switch the memory off.
+
 **Telling CAIRN how your team works.** Write a note named `CAIRN.md` at the root of the workspace (not in a folder): how you want CAIRN to answer, what to cite, what to put first. In Agent mode CAIRN reads up to 2,000 characters of it before every request. It can change how CAIRN works and words things, never the rules, your rights or the AI policy, and a note marked outdated is ignored. Some templates start a workspace with one.
 
 **Long chats.** CAIRN reads as many of the latest turns as its model can hold (40% of its context window) and keeps a short summary of the older ones, with the files they were about, so "summarize that file" still means the file you discussed far back. The summary is private to you and goes with the chat.

@@ -4,6 +4,7 @@ mod access;
 mod access_control;
 mod agent;
 mod agent_live;
+mod agent_memory;
 mod agent_proposals;
 mod ai;
 mod ai_access;
@@ -923,6 +924,18 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/agent/runs",
             post(agent_live::start_agent_run),
+        )
+        .route(
+            "/v1/agent/personal-memory",
+            get(agent_memory::get_personal_memory).post(agent_memory::add_personal_memory),
+        )
+        .route(
+            "/v1/agent/personal-memory/settings",
+            put(agent_memory::set_personal_memory_enabled),
+        )
+        .route(
+            "/v1/agent/personal-memory/{entry_id}",
+            put(agent_memory::update_personal_memory).delete(agent_memory::delete_personal_memory),
         )
         .route("/v1/agent/runs/{run_id}/events", get(agent_live::agent_run_events))
         .route("/v1/agent/runs/{run_id}/cancel", post(agent_live::cancel_agent_run))

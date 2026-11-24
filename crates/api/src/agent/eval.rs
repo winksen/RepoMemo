@@ -250,6 +250,7 @@ async fn the_scripted_cases_pass_and_meet_the_thresholds() {
                     history: Vec::new(),
                     artifact_ids: Vec::new(),
                     summary: None,
+                    personal_memory: Vec::new(),
                     history_tokens: None,
                     exchanges: Vec::new(),
                 },

@@ -50,6 +50,7 @@ mod milestones;
 mod organization_templates;
 mod organizations;
 mod outbound;
+mod personal_memory;
 mod project_references;
 mod project_updates;
 mod projects;

@@ -221,6 +221,12 @@ pub(crate) async fn run_message(
         None => (None, None),
     };
     let provider_for_run = provider_id.clone();
+    // What CAIRN remembers about this person goes into their own run and nobody else's (V0.9.51).
+    let personal_memory = state
+        .storage
+        .personal_memory_for_run(&subject.user_id, &workspace_id)
+        .await
+        .unwrap_or_default();
     // What goes with the message from the chat's older turns: as many as the model's window has room for, and a summary of the rest.
     let (history, summary, history_tokens) = conversation_memory(
         state,
@@ -247,6 +253,7 @@ pub(crate) async fn run_message(
                 ai_unavailable_reason,
                 history,
                 summary,
+                personal_memory,
                 history_tokens,
                 exchanges,
             },
@@ -256,11 +263,20 @@ pub(crate) async fn run_message(
         .map_err(map_core_error)?;
     let (mut reply, loop_trace) = (outcome.reply, outcome.trace);
     // A viewer is not offered what would change the workspace (V0.9.10).
+    // Being remembered is not a change to the workspace, so a viewer is still offered that (V0.9.51).
     if matches!(role, WorkspaceRole::Viewer) && !reply.proposals.is_empty() {
-        reply.proposals.clear();
+        let before = reply.proposals.len();
         reply
-            .warnings
-            .push("Your role in this workspace cannot change it, so I cannot offer to do that.".to_owned());
+            .proposals
+            .retain(|proposal| proposal.kind == repomemo_domain::AgentProposalKind::SavePersonalMemory);
+        if reply.proposals.len() < before {
+            reply
+                .warnings
+                .push("Your role in this workspace cannot change it, so I cannot offer to do that.".to_owned());
+        }
+        if reply.proposals.is_empty() {
+            reply.changeset = None;
+        }
     }
 
     // The conversation is only created once there is a reply to keep, so a
