@@ -38,6 +38,57 @@ async fn owned_turn(
     Ok((turn, conversation.workspace_id))
 }
 
+/// Offers to keep how an answer was reached as a playbook (V0.9.55): the run behind the turn must have at least three tool steps that
+/// worked. The proposal joins the turn's other proposals, waits for the person's confirmation like any change, and makes a note that
+/// no run uses until a writer verifies it.
+pub(crate) async fn offer_agent_playbook(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(turn_id): Path<String>,
+) -> Result<Json<AgentTurn>, ApiError> {
+    let (mut turn, workspace_id) = owned_turn(&state, &subject, &turn_id).await?;
+    require_workspace_write(&state, &subject, &workspace_id).await?;
+    if turn
+        .reply
+        .proposals
+        .iter()
+        .any(|proposal| proposal.kind == AgentProposalKind::SavePlaybook)
+        || turn.reply.changeset.is_some()
+    {
+        return Err(ApiError::conflict(
+            "This answer already has changes waiting or applied. Settle them before saving it as a playbook.",
+        ));
+    }
+    let run = state
+        .storage
+        .get_agent_run_for_turn(&turn.id)
+        .await
+        .map_err(map_storage_error)?
+        .ok_or_else(|| ApiError::not_found("CAIRN kept no record of the steps behind that answer."))?;
+    let draft = repomemo_api::playbook_from_run(&turn.label, &run.id, &run.steps).ok_or_else(|| {
+        ApiError::bad_request("That answer took fewer than three working steps, so there is no procedure to keep.")
+    })?;
+    turn.reply.proposals.push(AgentProposal {
+        id: "p1".to_owned(),
+        kind: AgentProposalKind::SavePlaybook,
+        state: AgentProposalState::Pending,
+        title: format!("Save “{}” as a playbook", draft.name),
+        detail: format!(
+            "A note in the Playbooks folder with the steps of this run, without what it looked at.\n\n{}",
+            draft.text
+        ),
+        payload: serde_json::json!({ "file_name": draft.file_name, "text": draft.text, "run_id": run.id }),
+        outcome: None,
+        untrusted_sources: Vec::new(),
+    });
+    state
+        .storage
+        .update_agent_turn_reply(&turn.id, &turn.reply)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(turn))
+}
+
 /// What kind of offer a proposal was, when CAIRN made it unasked (V0.9.53): `decision` or `correction`.
 fn proposal_offer(turn: &AgentTurn, proposal_id: &str) -> Option<String> {
     turn.reply
@@ -136,6 +187,46 @@ async fn apply(
                 .await
                 .map_err(map_storage_error)?;
             Ok(format!("I will remember: {text}"))
+        }
+        AgentProposalKind::SavePlaybook => {
+            let (file_name, text) = (payload_text(proposal, "file_name"), payload_text(proposal, "text"));
+            let folders = state
+                .storage
+                .list_folders(workspace_id)
+                .await
+                .map_err(map_storage_error)?;
+            let folder = match folders
+                .into_iter()
+                .find(|folder| folder.parent_id.is_none() && folder.name.eq_ignore_ascii_case("Playbooks"))
+            {
+                Some(folder) => folder,
+                None => state
+                    .storage
+                    .create_folder(workspace_id, None, "Playbooks", Some(&subject.user_id))
+                    .await
+                    .map_err(map_storage_error)?,
+            };
+            let note = state
+                .core
+                .import_text(
+                    workspace_id.to_owned(),
+                    file_name.clone(),
+                    text,
+                    Some("Note".to_owned()),
+                )
+                .await
+                .map_err(map_core_error)?;
+            state
+                .storage
+                .move_artifact_to_folder(&note.id, Some(&folder.id))
+                .await
+                .map_err(map_storage_error)?;
+            if let Err(error) = state.core.index_artifact(note.id).await {
+                tracing::warn!(error = %format!("{error:#}"), "A saved playbook could not be indexed");
+            }
+            Ok(format!(
+                "Saved {file_name} in the Playbooks folder. CAIRN does not use it until a writer has read and verified it."
+            ))
         }
         AgentProposalKind::SaveSummary | AgentProposalKind::SaveNote => {
             // The same handler as a note written by hand: its role check, its quota and the queue that indexes it.

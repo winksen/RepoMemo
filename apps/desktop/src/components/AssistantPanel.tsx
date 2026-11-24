@@ -4,7 +4,7 @@ import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
-import { attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, confirmSharedAgentChangeset, dismissSharedAgentChangeset, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
+import { offerSharedAgentPlaybook, attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, confirmSharedAgentChangeset, dismissSharedAgentChangeset, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentRun, AgentStep, AgentTurn, AgentTurnResponse, MemoryCardSummary } from "../types";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
@@ -403,6 +403,16 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     }
   }
 
+  async function offerPlaybook(turnId: string) {
+    try {
+      const saved = await offerSharedAgentPlaybook(accessToken, turnId);
+      setTurns((current) => current.map((entry) => entry.key === turnId ? storedTurn(saved) : entry));
+      showToast("success", "Review the playbook below and confirm it to save it.");
+    } catch (error) {
+      showToast("error", apiMessage(error, "That could not be offered as a playbook."));
+    }
+  }
+
   async function decide(turnId: string, proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) {
     setDeciding(`${turnId}/${proposal.id}`);
     try {
@@ -506,7 +516,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>
           {turn.status === "pending" ? <div className="shared-assistant-live"><LoadingState label="Working on it" />{turn.steps?.length ? <ol>{turn.steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol> : null}{turn.runId ? <Button onClick={() => void cancelSharedAgentRun(accessToken, turn.runId as string).catch(() => undefined)} variant="secondary">Stop</Button> : null}</div> : null}
           {turn.status === "failed" ? <div className="shared-assistant-failed"><span>No reply. The request did not complete and was not saved.</span><Button disabled={isBusy} onClick={() => void run(turn)} variant="secondary"><Refresh size={ICON_SIZE.sm} /> Retry</Button></div> : null}
-          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} canManage={canUpload} deciding={deciding} isBusy={isBusy} onActOnCard={actOnCard} onChangeset={(id, action, ids, counts) => void decideChangeset(id, action, ids, counts)} onActOnSelection={(action) => actOnSelection(turn.key, action)} onSelection={(ids) => setSelection((current) => ({ ...current, [turn.key]: ids }))} selection={selection[turn.key] ?? []} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
+          {turn.reply ? <Reply accessToken={accessToken} canSummarize={canSummarize} capabilities={capabilities} canManage={canUpload} deciding={deciding} isBusy={isBusy} onActOnCard={actOnCard} onChangeset={(id, action, ids, counts) => void decideChangeset(id, action, ids, counts)} onActOnSelection={(action) => actOnSelection(turn.key, action)} onSelection={(ids) => setSelection((current) => ({ ...current, [turn.key]: ids }))} selection={selection[turn.key] ?? []} onDecide={(proposal, action) => void decide(turn.key, proposal, action)} onPlaybook={() => void offerPlaybook(turn.key)} onOpenArtifact={onOpenArtifact} onSummarize={summarize} reply={turn.reply} turnId={turn.key} /> : null}
         </article>) : variant === "page"
           ? <div className="shared-assistant-welcome">
             <CairnIcon size={56} weight="fill" />
@@ -620,7 +630,7 @@ function traceDuration(milliseconds: number) {
 }
 
 /** What CAIRN did for one answer (V0.9.39): its steps, one line each, fetched when the list is opened. A trace is personal and expires, so an older answer may have none. */
-function RunTrace({ accessToken, turnId }: { accessToken: string; turnId: string }) {
+function RunTrace({ accessToken, onSavePlaybook, turnId }: { accessToken: string; onSavePlaybook?: () => void; turnId: string }) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "none">("idle");
   const [run, setRun] = useState<AgentRun | null>(null);
   async function open(isOpen: boolean) {
@@ -638,6 +648,7 @@ function RunTrace({ accessToken, turnId }: { accessToken: string; turnId: string
     {status === "loading" ? <p className="shared-muted-copy">Loading the steps…</p> : null}
     {status === "none" ? <p className="shared-muted-copy">There is no record of the steps behind this answer. Answers from before runs were recorded, and old ones, have none.</p> : null}
     {status === "ready" && run ? <>
+      {onSavePlaybook && run.steps.filter((step) => step.kind === "tool" && !step.error).length >= 3 ? <Button onClick={onSavePlaybook} type="button" variant="secondary">Save how {ASSISTANT_NAME} did this as a playbook</Button> : null}
       <ol>{run.steps.map((step) => <li key={step.position}>
         <span>{step.summary}</span>
         <small>{[step.tool, step.duration_ms > 0 ? traceDuration(step.duration_ms) : null, step.evidence.length ? `${step.evidence.length} ${step.evidence.length === 1 ? "file" : "files"}: ${step.evidence.slice(0, 3).map((file) => file.title).join(", ")}${step.evidence.length > 3 ? ", …" : ""}` : null, step.error].filter(Boolean).join(" · ")}</small>
@@ -696,7 +707,7 @@ function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string |
   </aside>;
 }
 
-function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnCard, onActOnSelection, onChangeset, onDecide, onOpenArtifact, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnCard: (card: MemoryCardSummary, action: "update" | "delete") => void; onActOnSelection: (action: "move" | "trash" | "status") => void; onChangeset: (turnId: string, action: "confirm" | "dismiss", proposalIds: string[], confirmCounts: Record<string, number>) => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) => void; onOpenArtifact: (artifactId: string) => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
+function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnCard, onActOnSelection, onChangeset, onDecide, onOpenArtifact, onPlaybook, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnCard: (card: MemoryCardSummary, action: "update" | "delete") => void; onActOnSelection: (action: "move" | "trash" | "status") => void; onChangeset: (turnId: string, action: "confirm" | "dismiss", proposalIds: string[], confirmCounts: Record<string, number>) => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) => void; onOpenArtifact: (artifactId: string) => void; onPlaybook: () => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
   const note = routingNote(reply, capabilities);
   const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.
@@ -737,6 +748,6 @@ function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, i
     </li>)}</ul> : null}
     {reply.changeset ? <Changeset deciding={deciding} onChangeset={(action, ids, counts) => onChangeset(turnId, action, ids, counts)} reply={reply} turnId={turnId} /> : (reply.proposals ?? []).map((proposal) => <Proposal deciding={deciding} key={proposal.id} onDecide={onDecide} proposal={proposal} turnId={turnId} />)}
     {reply.citations.length ? <Evidence accessToken={accessToken} isQuestion={reply.capability === "ask_question" || reply.routing === "agent"} citations={reply.citations} onOpenArtifact={onOpenArtifact} trust={reply.trust} /> : null}
-    {turnId ? <RunTrace accessToken={accessToken} key={turnId} turnId={turnId} /> : null}
+    {turnId ? <RunTrace accessToken={accessToken} key={turnId} onSavePlaybook={canManage && !(reply.proposals ?? []).length ? onPlaybook : undefined} turnId={turnId} /> : null}
   </div>;
 }

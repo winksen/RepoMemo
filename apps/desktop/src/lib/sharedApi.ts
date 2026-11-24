@@ -817,6 +817,11 @@ export function dismissSharedAgentChangeset(accessToken: string, turnId: string)
   return request<AgentTurn>(`/v1/agent/turns/${turnId}/changeset/dismiss`, { method: "POST", body: "{}" }, accessToken);
 }
 
+/** Offers to keep how an answer was reached as a playbook (V0.9.55); the offer joins the turn's proposals and waits for confirmation. */
+export function offerSharedAgentPlaybook(accessToken: string, turnId: string): Promise<AgentTurn> {
+  return request<AgentTurn>(`/v1/agent/turns/${turnId}/playbook`, { method: "POST", body: "{}" }, accessToken);
+}
+
 export function dismissSharedAgentProposal(accessToken: string, turnId: string, proposalId: string): Promise<AgentTurn> {
   return request<AgentTurn>(`/v1/agent/turns/${turnId}/proposals/${proposalId}/dismiss`, { method: "POST", body: "{}" }, accessToken);
 }

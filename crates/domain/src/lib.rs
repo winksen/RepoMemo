@@ -2951,6 +2951,8 @@ pub enum AgentProposalKind {
     /// Remember something about the person, for their own runs only (V0.9.51). Only the person's own memory changes, so a viewer
     /// may confirm it.
     SavePersonalMemory,
+    /// Save how a run was done as a note in the workspace's Playbooks folder, unverified until a writer verifies it (V0.9.55).
+    SavePlaybook,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -2575,7 +2575,8 @@ export type AgentProposalKind =
   | "update_memory"
   | "delete_memory"
   | "save_note"
-  | "save_personal_memory";
+  | "save_personal_memory"
+  | "save_playbook";
 
 export type AgentProposalState =
   | "pending"

@@ -1,6 +1,6 @@
 # RepoMemo Roadmap
 
-> **Current version:** `V0.9.54` (2026-11-24) · **Next:** the maintainer's test run and the 0.8 exit-journey sheet, then the rest of the 0.9 CAIRN line ([plan](plans/2026-11-22-0.9-cairn-harness.md), V0.9.33 to V0.9.70) and the 0.10 pilot line. Local implementation commits only; live distribution and provider validation remain pending.
+> **Current version:** `V0.9.55` (2026-11-24) · **Next:** the maintainer's test run and the 0.8 exit-journey sheet, then the rest of the 0.9 CAIRN line ([plan](plans/2026-11-22-0.9-cairn-harness.md), V0.9.33 to V0.9.70) and the 0.10 pilot line. Local implementation commits only; live distribution and provider validation remain pending.
 > **Feature freeze (V0.1.76 to the `RM-V0.3.0` tag):** lifted by the tag on 2026-10-24. The 0.3.x releases follow the rules of [Road to V0.4.0](#-road-to-v040).
 > **Related:** [Functional mindmap](FUNCTIONAL_MINDMAP.md) · [Technical mindmap](TECHNICAL_MINDMAP.md) · Release index [0.1 → 0.2](RELEASES_0.1.md) and [0.2 → 0.3](RELEASES_0.2.md) · [Security review 2026-10-10](security/2026-10-10-security-review.md) · [Security review 2026-10-14 (V0.2.6)](security/2026-10-14-security-review.md) · [Security review 2026-10-16 (V0.2.52)](security/2026-10-16-security-review.md) · [Security and backend review 2026-10-21 (V0.2.129)](security/2026-10-21-security-review.md) · [Security review of workspace templates 2026-10-22 (V0.2.192)](security/2026-10-22-workspace-templates-security-review.md) · [Security review of 0.3.x 2026-10-24 (V0.3.26)](security/2026-10-24-0.3-security-review.md) · [Deployment security review 2026-10-27 (V0.4.65)](security/2026-10-27-deployment-security-review.md) · [Enhancement analysis 2026-10-13](analysis/2026-10-13-enhancement-analysis.md)
 
@@ -98,7 +98,7 @@ timeline
 | Gap audit 2026-11-04 | 🔜 Twelve findings against V0.6.9, scheduled in twelve new 0.6 and 0.8 rows and in changes to existing rows; [findings](#gap-audit-of-2026-11-04) |
 | 0.7.x evidence-backed projects | 🧪 Built API-first (V0.7.0–V0.7.20): projects with briefs, task numbers and discussion, milestones, sub-tasks, blockers, labels, named states, a list, views and a board, bulk changes, reminders, schedules, updates, CSV and archives; no web screens yet and no test has been run; the [closing record](technical/release-evidence-0.7.20.md) has the journey sheet; [index](RELEASES_0.7.md) |
 | 0.8.x connections and community knowledge | 🧪 Built API-first (V0.8.0–V0.8.20; Linear and Teams deferred), no test run, the exit-journey sheet pending: connector trust, tracker/chat adoption, migration and curated publication; [index](RELEASES_0.8.md) |
-| 0.9.x CAIRN agent | 🔄 V0.9.0 to V0.9.54 built; V0.9.55 to V0.9.70 make CAIRN a bounded tool loop over governed evidence; [index](RELEASES_0.9.md) |
+| 0.9.x CAIRN agent | 🔄 V0.9.0 to V0.9.55 built; V0.9.56 to V0.9.70 make CAIRN a bounded tool loop over governed evidence; [index](RELEASES_0.9.md) |
 | 0.10.x pilot proof → 1.0.0 | 🔜 Observed team journeys, capacity, recovery and exact-candidate release proof; [index](RELEASES_0.10.md) |
 
 ---
@@ -2001,7 +2001,7 @@ The documentation sequence is deliberately after the feature and interface track
 
 ### The 0.9.x line: CAIRN agent
 
-> **Index:** [every 0.9 release](RELEASES_0.9.md) · **Review:** [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · **Plan:** [CAIRN harness](plans/2026-11-22-0.9-cairn-harness.md) · **Decision:** [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md) · **Tracks:** AN. CAIRN agent (V0.9.0 to V0.9.32, built) then AO to AU (V0.9.33 to V0.9.54 built, V0.9.55 to V0.9.70 proposed)
+> **Index:** [every 0.9 release](RELEASES_0.9.md) · **Review:** [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · **Plan:** [CAIRN harness](plans/2026-11-22-0.9-cairn-harness.md) · **Decision:** [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md) · **Tracks:** AN. CAIRN agent (V0.9.0 to V0.9.32, built) then AO to AU (V0.9.33 to V0.9.55 built, V0.9.56 to V0.9.70 proposed)
 
 **Line change (2026-11-22):** the 0.9 line was the pilot line. It became the CAIRN line, and its pilot rows moved unchanged to [the 0.10.x line](#the-010x-line-pilot-proof-and-public-release-candidate) (V0.9.33 to V0.9.45 are now V0.10.0 to V0.10.12).
 
@@ -2066,7 +2066,7 @@ The documentation sequence is deliberately after the feature and interface track
 | **V0.9.52** 🧪 2026-11-24 | ✨ | Search past chats | Index a person's chats and give CAIRN a tool to find what was said in their earlier chats, with links | — | "What did we decide about retries last week" finds the earlier chat, a deleted chat is gone, and another person's chat is never returned |
 | **V0.9.53** 🧪 2026-11-24 | ✨ | Corrections and memory candidates | Record a correction when the person says an answer was wrong, offer to save the corrected fact or a stated decision as a memory card, and read open corrections into later runs | — | A correction is recorded against the turn, one memory proposal follows it, a dismissed offer stops offers in that chat, and the next run sees the correction as unreviewed |
 | **V0.9.54** 🧪 2026-11-24 | ✨ | Playbooks | Let a workspace keep procedures as notes in a Playbooks folder that CAIRN follows on demand once they are verified, and let templates ship some | — | A verified playbook is listed to CAIRN and loaded when it fits, an unverified one is not offered, and a playbook never grants a tool the role lacks |
-| **V0.9.55** 🔜 | ✨ | Playbooks from runs | After a multi-step run the person found helpful, offer to save how it was done as a playbook that waits for review | — | The proposal creates a playbook needing review linked to the run, and it is used only after a writer verifies it |
+| **V0.9.55** 🧪 2026-11-24 | ✨ | Playbooks from runs | After a multi-step run the person found helpful, offer to save how it was done as a playbook that waits for review | — | The proposal creates a playbook needing review linked to the run, and it is used only after a writer verifies it |
 | **V0.9.56** 🔜 | ✨ | Memory upkeep | Add an opt-in weekly job that finds cards citing changed or trashed files, contradicting cards, unanswered questions and unused playbooks, and puts them in the review queue | — | Each finding is a review item with its evidence, nothing is edited, and the job has its own call cap and is off by default |
 | **V0.9.57** 🔜 | ✨ | Shared chats | Let a chat's owner share it read-only with the workspace, and let readers continue it in a chat of their own | — | A reader opens a shared chat and continues it in a copy, only the owner can confirm its proposals, and unsharing removes access at once |
 | **V0.9.58** 🔜 | ✨ | Projects and tasks as tools | Give CAIRN read tools for tasks, projects, milestones and the evidence they link | — | "What is blocking the migration project" answers from its tasks and dependencies with links to them |

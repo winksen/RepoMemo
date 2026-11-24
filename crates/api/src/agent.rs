@@ -33,6 +33,7 @@ mod proposals;
 mod run;
 mod summary;
 mod team_memory;
+pub use playbooks::{playbook_from_run, PlaybookDraft};
 pub use run::{AgentLoopSetup, AgentOutcome, ProgressHook};
 #[cfg(test)]
 use summary::fit_history;

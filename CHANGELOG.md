@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.55 (2026-11-24)
+
+CAIRN can keep how it did a task as a playbook.
+
+### Added
+- **Save how it was done.** Under an answer whose run took at least three working tool steps, *What CAIRN did* now offers *Save how CAIRN did this as a playbook* to people who can change the workspace. It adds a proposal to that answer: a note for the `Playbooks` folder whose steps are the run's tool steps with what they looked at taken out ("1. Search evidence for what the request is about."), the tools used, and the run it was learned from.
+- **Reviewed before use.** Confirming the proposal creates the folder if needed and the note, indexed like any note. It is not verified, so no run offers it until a writer reads, edits and verifies it (V0.9.54).
+- The steps are written from the run's recorded steps, not by a model, so they are plain: edit them before verifying. The offer is made by the person asking for it, never unasked. A turn that already has proposals or a set of changes waiting cannot be offered one until they are settled.
+- New route `POST /v1/agent/turns/{turn_id}/playbook` and a proposal kind `save_playbook`. No migration or setting changes.
+
+### Checks
+- Unit tests that a run of three working steps becomes a playbook without its specifics and that it reads back as a playbook, and that fewer than three is refused; formatted and linted for the touched crates; types and typecheck pass; tests not run. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.54 (2026-11-24)
 
 A team keeps procedures CAIRN follows once they are verified.

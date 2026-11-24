@@ -3,7 +3,7 @@
 //! offered: its name and description go in the prompt and `load_playbook` returns its steps. A playbook is instructions to follow
 //! with the tools the person's role already gives CAIRN; it never grants a tool, and it is not evidence.
 
-use repomemo_domain::{ArtifactSummary, ArtifactType};
+use repomemo_domain::{AgentStep, ArtifactSummary, ArtifactType};
 
 use super::shorten;
 use crate::RepoMemoCore;
@@ -107,6 +107,78 @@ pub(in crate::agent) fn offered<'a>(
         .collect();
     found.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
     found
+}
+
+/// The fewest tool steps a run has to have for CAIRN to offer to keep how it was done.
+pub const PLAYBOOK_MIN_STEPS: usize = 3;
+
+/// A playbook written from a run (V0.9.55): what the run did with the specifics taken out, for a writer to read, edit and verify.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlaybookDraft {
+    /// The file name of the note.
+    pub file_name: String,
+    /// The note's whole text: header and steps.
+    pub text: String,
+    pub name: String,
+}
+
+/// A name made of what the person asked, within what a playbook name may hold.
+fn playbook_name(question: &str) -> String {
+    let words = question
+        .split_whitespace()
+        .map(|word| {
+            word.chars()
+                .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+                .collect::<String>()
+        })
+        .filter(|word| !word.is_empty())
+        .take(6)
+        .collect::<Vec<_>>()
+        .join(" ");
+    let name = shorten(&words, 52);
+    let name = name.trim_end_matches('…').trim().to_owned();
+    if name.is_empty() {
+        "Playbook from a run".to_owned()
+    } else {
+        format!("How to {name}")
+    }
+}
+
+/// The playbook a run suggests: its tool steps without their arguments, the tools it used and a link to the run. None when the run
+/// had fewer than three tool steps that worked.
+pub fn playbook_from_run(question: &str, run_id: &str, steps: &[AgentStep]) -> Option<PlaybookDraft> {
+    let worked = steps
+        .iter()
+        .filter(|step| step.kind == "tool" && step.error.is_none() && step.tool.is_some())
+        .collect::<Vec<_>>();
+    if worked.len() < PLAYBOOK_MIN_STEPS {
+        return None;
+    }
+    let mut tools: Vec<String> = Vec::new();
+    let mut lines = Vec::new();
+    for (index, step) in worked.iter().enumerate() {
+        let tool = step.tool.clone().unwrap_or_default();
+        if !tools.contains(&tool) {
+            tools.push(tool);
+        }
+        // "Search evidence: retries" becomes "Search evidence for what the request is about": the specifics stay behind.
+        let label = step.summary.split(':').next().unwrap_or(&step.summary).trim();
+        lines.push(format!("{}. {label} for what the request is about.", index + 1));
+    }
+    let name = playbook_name(question);
+    let first_line = shorten(&question.split_whitespace().collect::<Vec<_>>().join(" "), 120);
+    let text = format!(
+        "---\nname: {name}\ndescription: How CAIRN worked through a request like \"{first_line}\"\nwhen: A request like \"{first_line}\"\ntools: [{}]\n---\n{}\n\nLearned from CAIRN run {run_id}. Read and edit these steps before verifying this playbook; until a writer verifies it, CAIRN does not use it.\n",
+        tools.join(", "),
+        lines.join("\n")
+    );
+    // The header must read back as a playbook.
+    parse_playbook(&text).ok()?;
+    Some(PlaybookDraft {
+        file_name: format!("{name}.md"),
+        text,
+        name,
+    })
 }
 
 /// How the playbooks go into the prompt.
@@ -254,6 +326,37 @@ mod tests {
         let found = offered(&files, &|id| id != "c", &|id| id != "a");
         assert_eq!(found.iter().map(|f| f.id.as_str()).collect::<Vec<_>>(), vec!["b"]);
         assert!(offered(&files, &|_| true, &|_| false).is_empty());
+    }
+
+    fn tool_step(position: i64, tool: &str, summary: &str, error: Option<&str>) -> AgentStep {
+        AgentStep {
+            position,
+            kind: "tool".to_owned(),
+            tool: Some(tool.to_owned()),
+            summary: summary.to_owned(),
+            evidence: Vec::new(),
+            duration_ms: 1,
+            error: error.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn a_run_of_three_tool_steps_becomes_a_playbook_without_its_specifics() {
+        let steps = [
+            tool_step(1, "search_evidence", "Search evidence: secret-project retries", None),
+            tool_step(2, "read_file", "Read file: plan.md", None),
+            tool_step(3, "read_file", "Read file: notes.md", Some("failed")),
+            tool_step(4, "list_files", "List files: Plans", None),
+        ];
+        let draft = playbook_from_run("How do we handle retries?", "run1", &steps).unwrap();
+        assert_eq!(draft.name, "How to How do we handle retries");
+        assert!(!draft.text.contains("secret-project") && !draft.text.contains("plan.md"));
+        assert!(draft.text.contains("1. Search evidence for what the request is about."));
+        assert!(draft.text.contains("tools: [search_evidence, read_file, list_files]"));
+        assert!(draft.text.contains("run run1"));
+        assert_eq!(parse_playbook(&draft.text).unwrap().name, draft.name);
+        // Two steps that worked are not enough.
+        assert!(playbook_from_run("q", "run1", &steps[..2]).is_none());
     }
 
     #[test]
