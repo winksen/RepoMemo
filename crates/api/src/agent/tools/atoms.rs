@@ -13,6 +13,9 @@ pub(in crate::agent) const EVIDENCE_SEARCH_MAX: usize = 12;
 pub(in crate::agent) const READ_FILE_CHUNKS_MAX: usize = 6;
 /// The most files one listing names.
 pub(in crate::agent) const LIST_FILES_MAX: usize = 40;
+/// The most earlier exchanges one chat search returns, and the most files each names.
+pub(in crate::agent) const CHAT_HITS_MAX: i64 = 5;
+const CHAT_FILES_MAX: usize = 5;
 /// A passage is cut to this many characters in a result.
 const PASSAGE_CHARS: usize = 600;
 
@@ -620,6 +623,88 @@ impl RepoMemoCore {
         Ok(ToolOutput {
             for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
             handles: vec![handle],
+        })
+    }
+
+    /// What was said in the person's own earlier chats in this workspace (V0.9.52): each hit with the chat's title, date and link,
+    /// what was asked, the matching part of the answer (quoted, since it is an earlier answer and not a source) and the files that
+    /// answer named, which are still in the workspace and get handles. Another person's chats are never searched.
+    pub(in crate::agent) async fn tool_search_chats(
+        &self,
+        ledger: &mut EvidenceLedger,
+        user_id: &str,
+        query: &str,
+    ) -> Result<ToolOutput> {
+        let Some(fts_query) = repomemo_retrieval::prepare_question_fts_query(query) else {
+            return Ok(ToolOutput::text(
+                "Say what to look for in your earlier chats.".to_owned(),
+            ));
+        };
+        if user_id.is_empty() {
+            return Ok(ToolOutput::text(
+                "Your earlier chats are not available to this request.".to_owned(),
+            ));
+        }
+        let hits = self
+            .storage
+            .search_agent_chats(user_id, ledger.workspace_id(), &fts_query, CHAT_HITS_MAX)
+            .await?;
+        if hits.is_empty() {
+            return Ok(ToolOutput::text(format!(
+                "None of your earlier chats in this workspace mention \"{query}\"."
+            )));
+        }
+        let mut handles = Vec::new();
+        let mut lines = Vec::new();
+        for hit in &hits {
+            let date = hit.created_at.get(..10).unwrap_or(&hit.created_at);
+            let mut named = Vec::new();
+            if let Ok(turn) = self.storage.get_agent_turn(&hit.turn_id).await {
+                for file in turn.reply.files.iter().take(CHAT_FILES_MAX) {
+                    // Only a file that still exists in this workspace, as it is now.
+                    let Ok(current) = self.storage.get_artifact_summary(&file.id).await else {
+                        continue;
+                    };
+                    if current.workspace_id != ledger.workspace_id() {
+                        continue;
+                    }
+                    let handle = ledger.handle_for(
+                        EvidenceKind::File,
+                        &current.id,
+                        None,
+                        &current.title,
+                        &current.path,
+                        None,
+                    );
+                    named.push(format!("[{handle}] {}", current.path));
+                    handles.push(handle);
+                }
+            }
+            let answer = shorten(
+                &hit.snippet.split_whitespace().collect::<Vec<_>>().join(" "),
+                PASSAGE_CHARS,
+            );
+            let mut text = format!(
+                "Chat \"{}\" on {date} (/cairn/{})
+You asked: {}
+{}",
+                hit.conversation_title,
+                hit.conversation_id,
+                shorten(&hit.label, 200),
+                quote_untrusted("an earlier answer in your chat", &answer)
+            );
+            if !named.is_empty() {
+                text.push_str(&format!(
+                    "
+Files it named: {}",
+                    named.join(", ")
+                ));
+            }
+            lines.push(text);
+        }
+        Ok(ToolOutput {
+            for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
+            handles,
         })
     }
 

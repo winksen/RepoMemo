@@ -3429,3 +3429,105 @@ async fn a_chat_keeps_a_summary_of_its_older_turns_until_it_is_cleared_or_the_ch
     assert!(storage.get_agent_summary("no-such-chat").await.unwrap().is_none());
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_person_finds_their_own_earlier_chats_and_nothing_deleted_or_anyone_elses() {
+    use repomemo_domain::{AgentMessage, AgentReply, AgentRouting};
+    let (storage, data_dir) = temp_storage("chat-search").await;
+    let ana = storage.create_user("ana@example.com", "Ana", "hash").await.unwrap();
+    let ben = storage.create_user("ben@example.com", "Ben", "hash").await.unwrap();
+    let workspace = storage.create_workspace("Chats").await.unwrap();
+    let reply = |text: &str| AgentReply {
+        capability: None,
+        routing: AgentRouting::Unmatched,
+        subject: String::new(),
+        reply_markdown: text.to_owned(),
+        generated: false,
+        files: Vec::new(),
+        matches: Vec::new(),
+        citations: Vec::new(),
+        warnings: Vec::new(),
+        context_turns: 0,
+        proposals: Vec::new(),
+        file_set: None,
+        memory_cards: Vec::new(),
+        changeset: None,
+        trust: None,
+    };
+    let anas = storage
+        .create_agent_conversation(&workspace.id, &ana.id, "Retries")
+        .await
+        .unwrap();
+    let bens = storage
+        .create_agent_conversation(&workspace.id, &ben.id, "Retries too")
+        .await
+        .unwrap();
+    let turn = storage
+        .append_agent_turn(
+            &anas.id,
+            "What did we decide about retries?",
+            &AgentMessage::default(),
+            &reply("We decided to retry five times with backoff."),
+        )
+        .await
+        .unwrap();
+    storage
+        .append_agent_turn(
+            &bens.id,
+            "Retries again",
+            &AgentMessage::default(),
+            &reply("Ben's own note about retries."),
+        )
+        .await
+        .unwrap();
+
+    let hits = storage
+        .search_agent_chats(&ana.id, &workspace.id, "\"retries\"*", 10)
+        .await
+        .unwrap();
+    assert_eq!(hits.len(), 1, "only Ana's own chat is returned");
+    assert_eq!(hits[0].conversation_id, anas.id);
+    assert!(hits[0].snippet.contains("backoff") || hits[0].snippet.contains("retry"));
+    // The words of the reply are searched too, and a replaced reply is searched as it now reads.
+    assert_eq!(
+        storage
+            .search_agent_chats(&ana.id, &workspace.id, "\"backoff\"*", 10)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    storage
+        .update_agent_turn_reply(&turn.id, &reply("Changed to ten attempts."))
+        .await
+        .unwrap();
+    assert!(storage
+        .search_agent_chats(&ana.id, &workspace.id, "\"backoff\"*", 10)
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        storage
+            .search_agent_chats(&ana.id, &workspace.id, "\"attempts\"*", 10)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    // A deleted chat is gone.
+    storage.delete_agent_conversation(&anas.id, &ana.id).await.unwrap();
+    assert!(storage
+        .search_agent_chats(&ana.id, &workspace.id, "\"retries\"*", 10)
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        storage
+            .search_agent_chats(&ben.id, &workspace.id, "\"retries\"*", 10)
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

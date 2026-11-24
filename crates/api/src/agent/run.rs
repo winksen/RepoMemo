@@ -45,6 +45,8 @@ pub struct AgentLoopSetup {
     pub max_seconds: u64,
     /// Whether the person may change the workspace: a viewer's tool list holds no proposing tool.
     pub can_write: bool,
+    /// The person the run is for: what is found in chats is theirs alone (V0.9.52).
+    pub user_id: String,
     /// Told of each step as it is taken, so a chat can show the run as it happens (V0.9.43).
     pub progress: Option<ProgressHook>,
     /// Set by the person's Stop; the run ends `cancelled` at the next step.
@@ -200,6 +202,17 @@ fn loop_tools(can_write: bool) -> Vec<LoopTool> {
         job(AgentCapability::FindSymbol),
         job(AgentCapability::RecallMemory),
     ];
+    // What the person said in their own earlier chats in this workspace (V0.9.52).
+    tools.push(atom(
+        "search_chats",
+        "Search your earlier chats",
+        "Find what was said in the person's own earlier chats with you in this workspace, such as a decision or a question they asked last week. Returns the chat's title, date and link, what was asked, the matching part of the answer and the files that answer named. An earlier answer is a pointer, not evidence: check a claim in the files before relying on it.",
+        json!({
+            "type": "object",
+            "properties": { "query": { "type": "string", "description": "The words to look for" } },
+            "required": ["query"]
+        }),
+    ));
     // Remembering something about the person changes only their own memory, so every role may propose it.
     tools.push(LoopTool {
         name: "propose_personal_memory",
@@ -453,12 +466,14 @@ fn partial_markdown(why: &str, ran: &[String], draft: &str) -> String {
 impl RepoMemoCore {
     /// Runs one tool of the loop and says what the model should read. A tool that does not exist, that a viewer may not use or
     /// that fails is answered to the model as an error it can recover from.
+    #[allow(clippy::too_many_arguments)] // the request, what it carries and the run's three pieces of state
     async fn call_loop_tool(
         &self,
         tools: &[LoopTool],
         call: &ToolCall,
         request: &AgentRequest,
         history: &[AgentHistoryTurn],
+        user_id: &str,
         ledger: &mut EvidenceLedger,
         gathered: &mut Gathered,
     ) -> (String, Vec<AgentStepEvidence>, Option<String>, String) {
@@ -478,6 +493,7 @@ impl RepoMemoCore {
             "search_evidence" => arg_text(arguments, "query"),
             "read_file" | "file_facts" => arg_text(arguments, "file"),
             "list_files" => arg_text(arguments, "filter"),
+            "search_chats" => arg_text(arguments, "query"),
             "workspace_brief" => String::new(),
             _ => subject.clone(),
         };
@@ -516,6 +532,10 @@ impl RepoMemoCore {
             }
             "file_facts" => self.tool_file_facts(ledger, &arg_text(arguments, "file")).await,
             "workspace_brief" => self.tool_workspace_brief(ledger).await,
+            "search_chats" => {
+                self.tool_search_chats(ledger, user_id, &arg_text(arguments, "query"))
+                    .await
+            }
             "propose_personal_memory" => {
                 let text = arg_text(arguments, "text");
                 if text.is_empty() {
@@ -845,7 +865,15 @@ impl RepoMemoCore {
             for call in &turn.tool_calls {
                 let called = Instant::now();
                 let (for_model, evidence, error, summary) = self
-                    .call_loop_tool(&tools, call, &request, &history, &mut ledger, &mut gathered)
+                    .call_loop_tool(
+                        &tools,
+                        call,
+                        &request,
+                        &history,
+                        &setup.user_id,
+                        &mut ledger,
+                        &mut gathered,
+                    )
                     .await;
                 let is_proposal = tools.iter().any(|tool| tool.name == call.name && tool.proposes) && error.is_none();
                 gathered.step(
@@ -931,6 +959,7 @@ mod tests {
             max_steps,
             max_seconds: 60,
             can_write,
+            user_id: String::new(),
             progress: None,
             cancel: None,
             consume_quota: Arc::new(|| Ok(())),
@@ -1123,6 +1152,87 @@ mod tests {
         );
         assert_eq!(outcome.reply.proposals[0].payload["text"], "Prefers answers in French");
         assert_eq!(outcome.trace.unwrap().state, "awaiting_confirmation");
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_person_finds_what_was_said_in_their_own_earlier_chats_and_never_someone_elses() {
+        let (core, data_dir) = core("chats").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let ana = core
+            .storage
+            .create_user("ana@example.com", "Ana", "hash")
+            .await
+            .unwrap();
+        let ben = core
+            .storage
+            .create_user("ben@example.com", "Ben", "hash")
+            .await
+            .unwrap();
+        let reply = |text: &str| AgentReply {
+            capability: None,
+            routing: repomemo_domain::AgentRouting::Unmatched,
+            subject: String::new(),
+            reply_markdown: text.to_owned(),
+            generated: false,
+            files: Vec::new(),
+            matches: Vec::new(),
+            citations: Vec::new(),
+            warnings: Vec::new(),
+            context_turns: 0,
+            proposals: Vec::new(),
+            file_set: None,
+            memory_cards: Vec::new(),
+            changeset: None,
+            trust: None,
+        };
+        for (user, title, answer) in [
+            (
+                &ana,
+                "Retry decision",
+                "We decided on five attempts with doubling waits.",
+            ),
+            (&ben, "Ben's retries", "Ben's private plan for doubling waits."),
+        ] {
+            let chat = core
+                .storage
+                .create_agent_conversation(&workspace_id, &user.id, title)
+                .await
+                .unwrap();
+            core.storage
+                .append_agent_turn(
+                    &chat.id,
+                    "What about retries?",
+                    &repomemo_domain::AgentMessage::default(),
+                    &reply(answer),
+                )
+                .await
+                .unwrap();
+        }
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call("search_chats", json!({ "query": "retries doubling" })),
+            ChatResponse::text("You decided on five attempts."),
+        ]);
+        let mut running = setup(8, false);
+        running.user_id = ana.id.clone();
+        core.loop_with(
+            &provider,
+            request(&workspace_id, "What did we decide about retries?"),
+            running,
+        )
+        .await
+        .unwrap();
+        let requests = provider.requests();
+        assert!(requests[0].tools.iter().any(|tool| tool.name == "search_chats"));
+        let result = requests[1]
+            .messages
+            .iter()
+            .find(|message| message.role == ChatRole::Tool)
+            .unwrap();
+        assert!(result.content.contains("Retry decision"), "{}", result.content);
+        assert!(result.content.contains("/cairn/"), "{}", result.content);
+        assert!(result.content.contains("quoted data"), "{}", result.content);
+        assert!(!result.content.contains("Ben"), "{}", result.content);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

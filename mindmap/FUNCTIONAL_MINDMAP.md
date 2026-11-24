@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.51` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.52` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.52 — CAIRN finds what was said in your earlier chats.
+
+- **Search my past chats.** CAIRN can look through your own earlier chats in the workspace and answer from what was said there, with a link to the chat. It never searches anyone else's chats, and a deleted chat is no longer found.
+
+Checks: fmt and clippy for the touched crates pass; nothing was run.
 
 ## V0.9.51 — CAIRN remembers what you ask it to remember about you.
 

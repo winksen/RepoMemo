@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.52 (2026-11-24)
+
+CAIRN finds what was said in your earlier chats.
+
+### Added
+- **Search your past chats.** In Agent mode CAIRN has a *Search your earlier chats* tool: ask "what did we decide about retries last week" and it finds the earlier exchange, with the chat's title, date and link, what you asked, the matching part of the answer and the files that answer named. Those files are kept only if they still exist in the workspace, and they can be cited like any file.
+- **Yours alone.** Only your own chats in the workspace you are asking in are searched; another person's chat is never returned, and a chat you delete is gone from the results at once. An earlier answer is shown as quoted data and as a pointer, not as evidence: CAIRN is told to check a claim in the files before relying on it.
+- A migration (`0091_agent_chat_search.sql`) adds a full-text index over each exchange's question and answer, filled for the exchanges that exist and kept current when an exchange is stored, its answer is replaced or it is deleted. Matching is by the words of the question; no model or embedding is used.
+
+### Checks
+- A storage test that a person finds their own chat by a word of the question or of the answer, that a replaced answer is searched as it now reads, that a deleted chat is gone and that another person's chat is never returned; a loop test that the tool is offered to a viewer, returns the title, the link and a quoted answer and none of another person's chat; formatted and linted for the touched crates; tests not run. Nothing was built or run.
+
+### Upgrading
+- The migration runs on start and indexes the chats that exist. Nothing else to do.
+
 ## V0.9.51 (2026-11-24)
 
 CAIRN remembers what you ask it to remember about you.

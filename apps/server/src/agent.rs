@@ -191,6 +191,7 @@ pub(crate) async fn run_message(
                 max_steps: runtime.cairn_max_steps.clamp(1, 30) as usize,
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
                 can_write: !matches!(role, WorkspaceRole::Viewer),
+                user_id: subject.user_id.clone(),
                 progress: live.progress.clone(),
                 cancel: live.cancel.clone(),
                 consume_quota: std::sync::Arc::new(move || {
