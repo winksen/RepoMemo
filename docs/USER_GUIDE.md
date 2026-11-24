@@ -430,6 +430,8 @@ The chat is a small set of jobs that CAIRN picks from what you write, in three k
 
 **Answers across workspaces.** A chat across workspaces may write an answer, but only from passages of workspaces where your role may use AI and that use the same AI provider as the chat. What was left out is listed as *found in W, not sent to the AI*.
 
+**Analyze many files.** In Agent mode CAIRN can analyze a large set (up to 200 files by default) in batches and shows *24 of 60 files read* while it works. Stop ends it; if your AI allowance runs out it analyzes what it has read and lists the files it did not.
+
 **Telling CAIRN how your team works.** Write a note named `CAIRN.md` at the root of the workspace (not in a folder): how you want CAIRN to answer, what to cite, what to put first. In Agent mode CAIRN reads up to 2,000 characters of it before every request. It can change how CAIRN works and words things, never the rules, your rights or the AI policy, and a note marked outdated is ignored. Some templates start a workspace with one.
 
 **Long chats.** CAIRN reads as many of the latest turns as its model can hold (40% of its context window) and keeps a short summary of the older ones, with the files they were about, so "summarize that file" still means the file you discussed far back. The summary is private to you and goes with the chat.

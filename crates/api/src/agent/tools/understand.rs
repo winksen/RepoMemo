@@ -143,8 +143,21 @@ impl RepoMemoCore {
     }
 
     /// Analyzing several files together (V0.9.27): notes on each file's indexed text for what was asked, then one analysis over
-    /// the notes. At most `analyze::MAX_FILES` are read; a file with no indexed text is named as not read.
+    /// the notes. In Jobs mode at most `analyze::MAX_FILES` are read; a file with no indexed text is named as not read.
     pub(in crate::agent) async fn agent_analyze_files(&self, request: &AgentRequest, text: &str) -> Result<AgentReply> {
+        self.analyze_with(request, text, None).await
+    }
+
+    /// The same over a large set (V0.9.62), run as the loop's tool: the files are read in batches of eight, each batch is noted and
+    /// summarized on its own with fresh context, and one last step writes the analysis over the batch summaries. Before each call
+    /// the person's AI allowance is checked, the person's Stop is looked for, and progress is told; if the allowance runs out or
+    /// the person stops, what was read so far is analyzed and the files not read are listed.
+    pub(in crate::agent) async fn analyze_with(
+        &self,
+        request: &AgentRequest,
+        text: &str,
+        gate: Option<&analyze::AnalyzeGate>,
+    ) -> Result<AgentReply> {
         let lower = text.to_ascii_lowercase();
         let asked = analyze::analyze_request(text, &lower).unwrap_or_else(|| analyze::split_request(text));
         let wanted = if !asked.files.is_empty() {
@@ -165,6 +178,7 @@ impl RepoMemoCore {
         }
         let provider = provider_from_settings(settings)?;
         let total = resolved.files.len();
+        let cap = gate.map_or(analyze::MAX_FILES, |gate| gate.max_files.max(analyze::MAX_FILES));
         let focus = asked.focus.clone();
         let question = if focus.is_empty() {
             String::new()
@@ -172,8 +186,26 @@ impl RepoMemoCore {
             format!(" Question: {focus}")
         };
         let mut notes: Vec<(ArtifactSummary, String, repomemo_domain::Citation)> = Vec::new();
+        let mut batch_summaries: Vec<String> = Vec::new();
+        let mut batch_start = 0;
         let mut skipped: Vec<String> = Vec::new();
-        for file in resolved.files.iter().take(analyze::MAX_FILES) {
+        let mut stopped: Option<&str> = None;
+        let mut not_read: Vec<String> = Vec::new();
+        let mut read = 0;
+        let files = resolved.files.iter().take(cap).collect::<Vec<_>>();
+        'files: for (index, file) in files.iter().enumerate() {
+            if let Some(gate) = gate {
+                if gate.stopped() {
+                    stopped = Some("you asked me to stop");
+                    not_read = files[index..].iter().map(|file| file.title.clone()).collect();
+                    break 'files;
+                }
+                if gate.allow().is_err() {
+                    stopped = Some("your AI allowance is used up");
+                    not_read = files[index..].iter().map(|file| file.title.clone()).collect();
+                    break 'files;
+                }
+            }
             let detail = self.storage.get_artifact(&file.id).await?;
             let sections = detail
                 .chunks
@@ -209,21 +241,46 @@ impl RepoMemoCore {
                 last_author: None,
                 last_changed_at: None,
             };
-            notes.push((file.clone(), written.trim().to_owned(), cite));
+            notes.push(((*file).clone(), written.trim().to_owned(), cite));
+            read += 1;
+            if let Some(gate) = gate {
+                gate.told(format!("{read} of {} files read", files.len()));
+            }
+            // A batch is done: its notes are summarized on their own, so the last step reads a few summaries and not every note.
+            let in_batch = notes.len() - batch_start;
+            if gate.is_some() && files.len() > analyze::MAX_FILES && in_batch >= analyze::MAX_FILES {
+                let summary = self.summarize_notes(&provider, &notes[batch_start..], &focus).await?;
+                batch_summaries.push(summary);
+                batch_start = notes.len();
+            }
         }
         if notes.is_empty() {
             let mut none = reply(format!(
-                "I could not read any of those files yet: {}. A file is read once it is indexed and has text; try again in a moment.",
-                skipped.join(", ")
+                "I could not read any of those files{}: {}. A file is read once it is indexed and has text; try again in a moment.",
+                stopped.map(|why| format!(" ({why})")).unwrap_or_default(),
+                skipped.iter().chain(not_read.iter()).cloned().collect::<Vec<_>>().join(", ")
             ));
             with_file_set(&mut none, resolved.description, resolved.files);
             return Ok(none);
         }
-        let context = notes
-            .iter()
-            .map(|(file, text, _)| format!("## {} ({})\n{text}", file.title, file.path))
-            .collect::<Vec<_>>()
-            .join("\n\n");
+        if gate.is_some() && batch_start < notes.len() && !batch_summaries.is_empty() {
+            let summary = self.summarize_notes(&provider, &notes[batch_start..], &focus).await?;
+            batch_summaries.push(summary);
+        }
+        let context = if batch_summaries.is_empty() {
+            notes
+                .iter()
+                .map(|(file, text, _)| format!("## {} ({})\n{text}", file.title, file.path))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        } else {
+            batch_summaries
+                .iter()
+                .enumerate()
+                .map(|(index, summary)| format!("## Group {} of the files\n{summary}", index + 1))
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        };
         let prompt = if focus.is_empty() {
             "Analyze these files together.".to_owned()
         } else {
@@ -251,10 +308,21 @@ impl RepoMemoCore {
             &result.citations,
             "analysis",
         )];
-        if total > analyze::MAX_FILES {
+        if total > cap {
             result.warnings.push(format!(
-                "I read the first {} of {total} files. Narrow the request, by a folder or a name, to cover the rest.",
-                analyze::MAX_FILES
+                "I read the first {cap} of {total} files, which is the most one request reads. Narrow the request, by a folder or a name, to cover the rest."
+            ));
+        }
+        if let Some(why) = stopped {
+            result.warnings.push(format!(
+                "I stopped after {read} of {} files because {why}. Not read: {}.",
+                files.len(),
+                not_read.iter().take(20).cloned().collect::<Vec<_>>().join(", ")
+                    + &if not_read.len() > 20 {
+                        format!(" and {} more", not_read.len() - 20)
+                    } else {
+                        String::new()
+                    }
             ));
         }
         if !skipped.is_empty() {
@@ -265,5 +333,34 @@ impl RepoMemoCore {
         }
         with_file_set(&mut result, resolved.description, resolved.files);
         Ok(result)
+    }
+
+    /// A batch's notes written up as one short summary, so the last step reads the batches and not every file's notes.
+    async fn summarize_notes(
+        &self,
+        provider: &repomemo_ai::ConfiguredProvider,
+        batch: &[(ArtifactSummary, String, repomemo_domain::Citation)],
+        focus: &str,
+    ) -> Result<String> {
+        let context = batch
+            .iter()
+            .map(|(file, text, _)| format!("## {} ({})\n{text}", file.title, file.path))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let prompt = if focus.is_empty() {
+            "Summarize what these notes say, keeping the file names.".to_owned()
+        } else {
+            format!("Summarize what these notes say about: {focus}. Keep the file names.")
+        };
+        Ok(provider
+            .generate(GenerateRequest {
+                system: Some(format!("{} {}", cairn_persona(), analyze::ANALYSIS_RULES)),
+                prompt,
+                context,
+                options: json!({ "temperature": 0.2 }),
+            })
+            .await?
+            .trim()
+            .to_owned())
     }
 }

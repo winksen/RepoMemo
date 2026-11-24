@@ -263,6 +263,7 @@ async fn the_scripted_cases_pass_and_meet_the_thresholds() {
                     max_seconds: 60,
                     can_write: case.role.as_deref() != Some("viewer"),
                     user_id: String::new(),
+                    background_max_files: 8,
                     progress: None,
                     cancel: None,
                     consume_quota: Arc::new(|| Ok(())),

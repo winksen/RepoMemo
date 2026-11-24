@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.61` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.62` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.62 — CAIRN can analyze large sets of files, and says how far it got.
+
+- **Large analyses.** CAIRN can analyze hundreds of files in a request by reading them in batches, shows how far it has got, can be stopped, and says which files it did not read when its AI allowance runs out.
+
+Checks: fmt and clippy for the touched crates pass; nothing was run.
 
 ## V0.9.61 — Answers across workspaces respect each workspace's AI rules.
 

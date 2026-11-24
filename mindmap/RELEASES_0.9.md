@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.61` (2026-11-24)
+> **Current:** `V0.9.62` (2026-11-24)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md)
 
@@ -85,7 +85,7 @@
 | **V0.9.59** | 🧪 2026-11-24 | AR. CAIRN teams | ✨ | Task proposals | Let CAIRN propose creating tasks, commenting and changing a task's status, applied as the person with the version they read | "Turn this chat's open questions into tasks" gives one changeset, a task changed since is refused, and a viewer gets none |
 | **V0.9.60** | 🧪 2026-11-24 | AR. CAIRN teams | ✨ | Chats across workspaces | Let a chat cover all the person's workspaces, with each result labelled by its workspace and every proposal bound to one | An all-workspaces chat finds files and cards across workspaces with no AI needed, and a change asks which workspace when it is unclear |
 | **V0.9.61** | 🧪 2026-11-24 | AR. CAIRN teams | 🔒 | Provider boundary across workspaces | Send a workspace's passages only to a provider that workspace allows for the person, and list the others as found but not sent | A passage from a workspace without that provider or role never reaches the request, and the reply names what was held back |
-| **V0.9.62** | 🔜 | AS. CAIRN autonomy | ✨ | Background runs over large sets | Analyze sets larger than one run can read in batches of fresh sub-runs and one reduce step, with progress and cancel | Sixty files are analyzed with progress shown, cancel stops between batches, and an exhausted quota ends partial with the unread files listed |
+| **V0.9.62** | 🧪 2026-11-24 | AS. CAIRN autonomy | ✨ | Background runs over large sets | Analyze sets larger than one run can read in batches of fresh sub-runs and one reduce step, with progress and cancel | Sixty files are analyzed with progress shown, cancel stops between batches, and an exhausted quota ends partial with the unread files listed |
 | **V0.9.63** | 🔜 | AS. CAIRN autonomy | ✨ | Routines | Let a writer schedule a CAIRN prompt that runs as them with read tools only, posts into its own chat and notifies them | A weekly routine posts its answer and a notification, its proposals wait for the owner, and it pauses when the owner loses access or it fails three times |
 | **V0.9.64** | 🔜 | AS. CAIRN autonomy | ✨ | Event routines | Let a routine run when files arrive in a folder, a connector brings items, a file is marked outdated or a review is overdue | The event's items reach the run, runs are debounced to one per 15 minutes per routine, and the routine limits apply |
 | **V0.9.65** | 🔜 | AS. CAIRN autonomy | ✨ | Review assistant | Draft for a file or card due for review what changed since it was verified, and propose a state with its reasons | The review queue offers the draft, the proposal sets the state as the person, and the draft cites what changed |

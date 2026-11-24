@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.62 (2026-11-24)
+
+CAIRN can analyze large sets of files, and says how far it got.
+
+### Changed
+- **Beyond eight files.** In Agent mode, "analyze the Word documents" is no longer limited to eight files. The files are read in batches of eight; each batch's notes are summarized on their own, and one last step writes the analysis over the batch summaries, so the last step never has to read every file's notes. The limit is `REPOMEMO_CAIRN_BACKGROUND_MAX_FILES` (200 by default, 8 to 1000). Jobs mode keeps its limit of eight.
+- **Progress and Stop.** While it works the chat shows *24 of 60 files read*, and Stop ends it between files.
+- **The allowance is checked before each call.** Each file's notes, each batch summary and the last analysis use one of your AI requests, so a set of 60 files uses about 60 plus 8 plus 1. When the allowance runs out, or you press Stop, CAIRN analyzes what it has read so far and lists the files it did not read.
+- A set larger than the limit still reads the first files up to it and says so. No migration. New setting `REPOMEMO_CAIRN_BACKGROUND_MAX_FILES`.
+
+### Checks
+- A test of the gate the analysis runs under (the allowance, Stop and progress); formatted and linted for the touched crates; tests not run. Nothing was built or run, and the batching itself was not exercised against a provider.
+- Not as the plan wrote it: the batches run one after another in the same request, not as separate sub-runs, so the progress is shown in the live run but is not a step of the saved trace.
+
+### Upgrading
+- Nothing to do. Set `REPOMEMO_CAIRN_BACKGROUND_MAX_FILES` to change the limit.
+
 ## V0.9.61 (2026-11-24)
 
 Answers across workspaces respect each workspace's AI rules.

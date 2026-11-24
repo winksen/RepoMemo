@@ -33,6 +33,45 @@ const FOCUS_MARKERS: &[&str] = &[
 
 /// The most files one analysis reads: each is a call to the AI, so the number is kept to what an answer can wait for.
 pub(crate) const MAX_FILES: usize = 8;
+/// What a large analysis is run under inside the loop (V0.9.62): how many files it may read, the person's AI allowance, their Stop and
+/// where progress is told.
+#[derive(Clone)]
+pub(in crate::agent) struct AnalyzeGate {
+    pub max_files: usize,
+    pub quota: std::sync::Arc<dyn Fn() -> std::result::Result<(), String> + Send + Sync>,
+    pub cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    pub progress: Option<super::run::ProgressHook>,
+}
+
+impl AnalyzeGate {
+    /// Whether the person pressed Stop.
+    pub fn stopped(&self) -> bool {
+        self.cancel
+            .as_ref()
+            .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Relaxed))
+    }
+
+    /// Spends one AI request, or says it cannot.
+    pub fn allow(&self) -> std::result::Result<(), String> {
+        (self.quota)()
+    }
+
+    /// Tells the person how far the analysis is.
+    pub fn told(&self, summary: String) {
+        if let Some(progress) = &self.progress {
+            progress(&repomemo_domain::AgentStep {
+                position: 0,
+                kind: "note".to_owned(),
+                tool: None,
+                summary,
+                evidence: Vec::new(),
+                duration_ms: 0,
+                error: None,
+            });
+        }
+    }
+}
+
 /// The most characters of one file sent to the AI.
 pub(crate) const PER_FILE_CHARS: usize = 6_000;
 
@@ -166,5 +205,37 @@ mod tests {
     fn the_prompts_forbid_adding_to_what_the_files_say() {
         assert!(NOTES_RULES.contains("Never add anything that is not in the text"));
         assert!(ANALYSIS_RULES.contains("never add anything that is not in the notes"));
+    }
+
+    #[test]
+    fn a_large_analysis_stops_when_the_allowance_runs_out_or_the_person_stops_it_and_tells_its_progress() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        use std::sync::{Arc, Mutex};
+        let calls = Arc::new(AtomicUsize::new(0));
+        let counted = calls.clone();
+        let told = Arc::new(Mutex::new(Vec::<String>::new()));
+        let heard = told.clone();
+        let stop = Arc::new(AtomicBool::new(false));
+        let gate = AnalyzeGate {
+            max_files: 60,
+            quota: Arc::new(move || {
+                if counted.fetch_add(1, Ordering::Relaxed) < 2 {
+                    Ok(())
+                } else {
+                    Err("used up".to_owned())
+                }
+            }),
+            cancel: Some(stop.clone()),
+            progress: Some(Arc::new(move |step: &repomemo_domain::AgentStep| {
+                heard.lock().unwrap().push(step.summary.clone())
+            })),
+        };
+        assert!(gate.allow().is_ok() && gate.allow().is_ok());
+        assert!(gate.allow().is_err(), "the third call is over the allowance");
+        assert!(!gate.stopped());
+        stop.store(true, Ordering::Relaxed);
+        assert!(gate.stopped());
+        gate.told("24 of 60 files read".to_owned());
+        assert_eq!(told.lock().unwrap().as_slice(), ["24 of 60 files read"]);
     }
 }

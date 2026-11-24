@@ -54,6 +54,8 @@ pub struct AgentLoopSetup {
     pub progress: Option<ProgressHook>,
     /// Set by the person's Stop; the run ends `cancelled` at the next step.
     pub cancel: Option<Arc<std::sync::atomic::AtomicBool>>,
+    /// The most files one analysis reads in the loop, in batches of eight (V0.9.62).
+    pub background_max_files: usize,
     /// Called before each model call. An error (the person's AI allowance is used up) ends the run as partial with that message.
     pub consume_quota: Arc<dyn Fn() -> std::result::Result<(), String> + Send + Sync>,
 }
@@ -658,6 +660,7 @@ impl RepoMemoCore {
         request: &AgentRequest,
         history: &[AgentHistoryTurn],
         user_id: &str,
+        gate: &super::analyze::AnalyzeGate,
         ledger: &mut EvidenceLedger,
         gathered: &mut Gathered,
     ) -> (String, Vec<AgentStepEvidence>, Option<String>, String) {
@@ -866,7 +869,12 @@ impl RepoMemoCore {
                     let problem = format!("A request proposes at most {MAX_CHANGESET_ACTIONS} changes. Stop proposing and say what is left.");
                     return (problem.clone(), Vec::new(), Some(problem), summary);
                 }
-                match self.run_tool(job.capability, request, &subject, history).await {
+                let ran = if job.capability == AgentCapability::AnalyzeFiles {
+                    self.analyze_with(request, &subject, Some(gate)).await
+                } else {
+                    self.run_tool(job.capability, request, &subject, history).await
+                };
+                match ran {
                     Ok(reply) => {
                         for file in reply.files {
                             if !gathered.files.iter().any(|known| known.id == file.id) {
@@ -1008,6 +1016,12 @@ impl RepoMemoCore {
         if let Some(block) = self.team_memory(&mut ledger, &request.workspace_id, &message).await {
             messages[0].content = format!("{}\n\n{block}", messages[0].content);
         }
+        let gate = super::analyze::AnalyzeGate {
+            max_files: setup.background_max_files,
+            quota: setup.consume_quota.clone(),
+            cancel: setup.cancel.clone(),
+            progress: setup.progress.clone(),
+        };
         let mut gathered = Gathered {
             progress: setup.progress.clone(),
             ..Gathered::default()
@@ -1173,6 +1187,7 @@ impl RepoMemoCore {
                         &request,
                         &history,
                         &setup.user_id,
+                        &gate,
                         &mut ledger,
                         &mut gathered,
                     )
@@ -1264,6 +1279,7 @@ mod tests {
             max_seconds: 60,
             can_write,
             user_id: String::new(),
+            background_max_files: 8,
             progress: None,
             cancel: None,
             consume_quota: Arc::new(|| Ok(())),

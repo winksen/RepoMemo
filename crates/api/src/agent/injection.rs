@@ -101,6 +101,7 @@ fn setup() -> AgentLoopSetup {
         max_seconds: 60,
         can_write: true,
         user_id: String::new(),
+        background_max_files: 8,
         progress: None,
         cancel: None,
         consume_quota: Arc::new(|| Ok(())),

@@ -195,6 +195,7 @@ pub(crate) async fn run_message(
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
                 can_write: !matches!(role, WorkspaceRole::Viewer),
                 user_id: subject.user_id.clone(),
+                background_max_files: runtime.cairn_background_max_files.clamp(8, 1000) as usize,
                 progress: live.progress.clone(),
                 cancel: live.cancel.clone(),
                 consume_quota: std::sync::Arc::new(move || {
