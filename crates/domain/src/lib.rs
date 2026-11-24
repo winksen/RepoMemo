@@ -2955,6 +2955,12 @@ pub enum AgentProposalKind {
     SavePersonalMemory,
     /// Save how a run was done as a note in the workspace's Playbooks folder, unverified until a writer verifies it (V0.9.55).
     SavePlaybook,
+    /// Make a task (V0.9.59), applied through the task handlers as the person.
+    CreateTask,
+    /// Comment on a task (V0.9.59), refused when the task changed since CAIRN read it.
+    CommentTask,
+    /// Change a task's status (V0.9.59), refused when the task changed since CAIRN read it.
+    SetTaskStatus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

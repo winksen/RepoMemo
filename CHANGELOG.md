@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.59 (2026-11-24)
+
+CAIRN can propose tasks, comments and status changes.
+
+### Added
+- **Three proposing tools** for people who can change the workspace: *Propose a task* (title, description, project and assignee by name, due date, priority, and the files it cites by handle), *Propose a task comment* and *Propose a task status*, the last two by the task's key. Like every proposal they wait for you; "turn the open questions of this chat into tasks" gives one set of changes to tick and apply together.
+- **Made as you.** Confirming runs the task handlers themselves as you, so the role check, the activity feed, the notices to the assignee and to people mentioned, and the quota all apply as if you had done it by hand. A project or person CAIRN cannot find, a date that is not a date and a file handle it was not given are refused to CAIRN, which can correct and propose again.
+- **Only against what CAIRN read.** A comment or status proposal remembers the version of the task it was written against. If the task changed after that, confirming it is refused with a message and nothing is changed; a status change is also saved with that version, so a change made at the same moment is refused too.
+- A viewer is offered none of them. New proposal kinds `create_task`, `comment_task` and `set_task_status`. No migration or setting changes.
+
+### Checks
+- A loop test that a good task proposal stands while a handle never given, a bad date, an unknown task and an unknown status are each refused, that the result is one set of changes and that a viewer has none of the tools; formatted and linted for the touched crates; types and typecheck pass; tests not run. Nothing was built or run, and applying a confirmed proposal through the task handlers was not exercised.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.58 (2026-11-24)
 
 CAIRN can read your tasks and projects.

@@ -2577,7 +2577,10 @@ export type AgentProposalKind =
   | "delete_memory"
   | "save_note"
   | "save_personal_memory"
-  | "save_playbook";
+  | "save_playbook"
+  | "create_task"
+  | "comment_task"
+  | "set_task_status";
 
 export type AgentProposalState =
   | "pending"

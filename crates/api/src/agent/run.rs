@@ -75,6 +75,10 @@ enum Source {
     Correction,
     /// A decision the person stated (V0.9.53): offered once as a decision card.
     Decision,
+    /// A task, a comment on one or a change of its status, proposed for the person to confirm (V0.9.59).
+    Task,
+    TaskComment,
+    TaskStatus,
     Job(&'static CairnTool),
 }
 
@@ -330,6 +334,60 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         proposes: true,
         source: Source::Personal,
     });
+    if can_write {
+        let proposing =
+            |name: &'static str, label: &'static str, description: &str, parameters: Value, source: Source| LoopTool {
+                name,
+                label,
+                description: description.to_owned(),
+                parameters,
+                proposes: true,
+                source,
+            };
+        tools.extend([
+            proposing(
+                "propose_task",
+                "Propose a task",
+                "Propose making a task. The project and the assignee are named as people write them; files are handles you were given (E1). The person confirms it, and it is made as them.",
+                json!({
+                    "type": "object",
+                    "properties": {
+                        "title": { "type": "string" },
+                        "description": { "type": "string" },
+                        "project": { "type": "string", "description": "A project's name" },
+                        "assignee": { "type": "string", "description": "A person's name" },
+                        "due": { "type": "string", "description": "A date, 2026-12-31" },
+                        "priority": { "type": "string", "description": "low, medium, high or urgent" },
+                        "files": { "type": "array", "items": { "type": "string" }, "description": "Handles of files the task cites" }
+                    },
+                    "required": ["title"]
+                }),
+                Source::Task,
+            ),
+            proposing(
+                "propose_task_comment",
+                "Propose a task comment",
+                "Propose a comment on a task, by its key. It is refused if the task changed after you read it.",
+                json!({
+                    "type": "object",
+                    "properties": { "key": { "type": "string" }, "comment": { "type": "string" } },
+                    "required": ["key", "comment"]
+                }),
+                Source::TaskComment,
+            ),
+            proposing(
+                "propose_task_status",
+                "Propose a task status",
+                "Propose changing a task's status (open, in_progress, blocked or done), by its key. It is refused if the task changed after you read it.",
+                json!({
+                    "type": "object",
+                    "properties": { "key": { "type": "string" }, "status": { "type": "string" } },
+                    "required": ["key", "status"]
+                }),
+                Source::TaskStatus,
+            ),
+        ]);
+    }
     if can_write && offer_decisions {
         tools.push(LoopTool {
             name: "offer_decision_card",
@@ -420,7 +478,7 @@ fn fit_to_budget(messages: &mut [ChatMessage], context_tokens: u32) {
     }
 }
 
-fn arg_text(arguments: &Value, key: &str) -> String {
+pub(in crate::agent) fn arg_text(arguments: &Value, key: &str) -> String {
     arguments
         .get(key)
         .and_then(Value::as_str)
@@ -440,7 +498,7 @@ fn arg_number(arguments: &Value, key: &str, default: usize) -> usize {
         .map_or(default, |value| value as usize)
 }
 
-fn arg_list(arguments: &Value, key: &str) -> Vec<String> {
+pub(in crate::agent) fn arg_list(arguments: &Value, key: &str) -> Vec<String> {
     match arguments.get(key) {
         Some(Value::Array(items)) => items.iter().filter_map(Value::as_str).map(str::to_owned).collect(),
         Some(Value::String(text)) if !text.trim().is_empty() => vec![text.trim().to_owned()],
@@ -620,7 +678,8 @@ impl RepoMemoCore {
             "read_file" | "file_facts" => arg_text(arguments, "file"),
             "list_files" => arg_text(arguments, "filter"),
             "search_chats" => arg_text(arguments, "query"),
-            "get_task" => arg_text(arguments, "key"),
+            "get_task" | "propose_task_comment" | "propose_task_status" => arg_text(arguments, "key"),
+            "propose_task" => arg_text(arguments, "title"),
             "get_project" => arg_text(arguments, "name"),
             "list_tasks" => arg_text(arguments, "project"),
             "load_playbook" => arg_text(arguments, "name"),
@@ -667,6 +726,23 @@ impl RepoMemoCore {
             "search_chats" => {
                 self.tool_search_chats(ledger, user_id, &arg_text(arguments, "query"))
                     .await
+            }
+            "propose_task" | "propose_task_comment" | "propose_task_status" => {
+                if gathered.proposals.len() >= MAX_CHANGESET_ACTIONS {
+                    Err(anyhow::anyhow!(
+                        "A request proposes at most {MAX_CHANGESET_ACTIONS} changes. Stop proposing and say what is left."
+                    ))
+                } else {
+                    let made = match tool.name {
+                        "propose_task" => self.proposal_for_task(ledger, arguments).await,
+                        "propose_task_comment" => self.proposal_for_task_change(ledger, arguments, true).await,
+                        _ => self.proposal_for_task_change(ledger, arguments, false).await,
+                    };
+                    made.map(|proposal| {
+                        gathered.proposals.push(proposal);
+                        ToolOutput::text("Proposed. Nothing changes until the person confirms it.")
+                    })
+                }
             }
             "list_tasks" => {
                 self.tool_list_tasks(
@@ -1560,6 +1636,56 @@ mod tests {
         assert!(results[2].contains("No project is named like"), "{}", results[2]);
         assert!(results[3].contains("No task matches"), "{}", results[3]);
         assert!(outcome.reply.proposals.is_empty());
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn task_proposals_wait_for_the_person_and_a_viewer_is_offered_none() {
+        let (core, data_dir) = core("task-proposals").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call(
+                "propose_task",
+                json!({ "title": "Write the retry runbook", "priority": "high", "due": "2026-12-31", "files": ["E9"] }),
+            ),
+            ChatResponse::call(
+                "propose_task",
+                json!({ "title": "Write the retry runbook", "priority": "urgent", "due": "soon" }),
+            ),
+            ChatResponse::call(
+                "propose_task",
+                json!({ "title": "Write the retry runbook", "priority": "high", "due": "2026-12-31" }),
+            ),
+            ChatResponse::call("propose_task_comment", json!({ "key": "T-404", "comment": "Done" })),
+            ChatResponse::call("propose_task_status", json!({ "key": "T-1", "status": "finished" })),
+            ChatResponse::text("Proposed."),
+        ]);
+        let outcome = core
+            .loop_with(
+                &provider,
+                request(&workspace_id, "Turn the open question into a task"),
+                setup(10, true),
+            )
+            .await
+            .unwrap();
+        let trace = outcome.trace.unwrap();
+        // A handle never given, a bad date, an unknown task and an unknown status are refused to the model; the good one stands.
+        assert_eq!(outcome.reply.proposals.len(), 1);
+        assert_eq!(
+            outcome.reply.proposals[0].kind,
+            repomemo_domain::AgentProposalKind::CreateTask
+        );
+        assert_eq!(outcome.reply.proposals[0].payload["priority"], "high");
+        assert_eq!(trace.steps.iter().filter(|step| step.error.is_some()).count(), 4);
+        assert!(outcome.reply.changeset.is_some());
+        let viewer = ScriptedProvider::new(vec![ChatResponse::text("Nothing to propose.")]);
+        core.loop_with(&viewer, request(&workspace_id, "Make a task"), setup(4, false))
+            .await
+            .unwrap();
+        assert!(viewer.requests()[0]
+            .tools
+            .iter()
+            .all(|tool| !tool.name.starts_with("propose_task")));
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

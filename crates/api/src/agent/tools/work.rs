@@ -2,9 +2,11 @@
 //! in the workspace, change nothing, and give the model text with task keys (`T-12`) that it can quote and that the person can find.
 //! A task's description is shown as quoted data, since a task made from an import or a tracker can hold words from outside.
 
-use repomemo_domain::{CollaborationTask, TaskQuery};
+use repomemo_domain::{AgentProposal, AgentProposalKind, AgentProposalState, CollaborationTask, Project, TaskQuery};
+use serde_json::{json, Value};
 
 use super::atoms::{bounded, quote_untrusted, EvidenceKind, EvidenceLedger, ToolOutput, TOOL_OUTPUT_CHARS};
+use crate::agent::run::{arg_list, arg_text};
 use crate::agent::*;
 
 /// The most tasks a listing names, and the most of a project's tasks and links shown.
@@ -132,6 +134,152 @@ impl RepoMemoCore {
         )];
         lines.extend(page.tasks.iter().map(task_line));
         Ok(ToolOutput::text(bounded(&lines, TOOL_OUTPUT_CHARS)))
+    }
+
+    /// The project a name means: the exact name, else the one that holds it.
+    async fn project_named(&self, workspace_id: &str, name: &str) -> Result<Option<Project>> {
+        let projects = self.storage.list_projects(workspace_id, None).await?;
+        let lower = name.trim().to_lowercase();
+        Ok(projects
+            .iter()
+            .find(|known| known.name.to_lowercase() == lower)
+            .or_else(|| projects.iter().find(|known| known.name.to_lowercase().contains(&lower)))
+            .cloned())
+    }
+
+    /// A task to make, as a proposal (V0.9.59): the project and the assignee are looked up by name now, so a wrong one is
+    /// the model's to correct, and the files it should cite are the ones this run read.
+    pub(in crate::agent) async fn proposal_for_task(
+        &self,
+        ledger: &EvidenceLedger,
+        arguments: &Value,
+    ) -> Result<AgentProposal> {
+        let workspace_id = ledger.workspace_id();
+        let title = shorten(arg_text(arguments, "title").trim(), 180);
+        if title.is_empty() {
+            anyhow::bail!("Give the task a title.");
+        }
+        let priority = Some(arg_text(arguments, "priority"))
+            .map(|priority| priority.to_lowercase())
+            .filter(|priority| ["low", "medium", "high", "urgent"].contains(&priority.as_str()))
+            .unwrap_or_else(|| "medium".to_owned());
+        let mut details = Vec::new();
+        let project = arg_text(arguments, "project");
+        let project_id = if project.trim().is_empty() {
+            None
+        } else {
+            let Some(found) = self.project_named(workspace_id, &project).await? else {
+                anyhow::bail!("No project is named like \"{project}\". Use get_project or leave the project out.");
+            };
+            details.push(format!("Project: {}", found.name));
+            Some(found.id)
+        };
+        let assignee = arg_text(arguments, "assignee");
+        let assignee_id = if assignee.trim().is_empty() {
+            None
+        } else {
+            let Some(id) = self.person_in_workspace(workspace_id, &assignee).await else {
+                anyhow::bail!("Nobody in this workspace is named like \"{assignee}\".");
+            };
+            details.push(format!("Assigned to: {assignee}"));
+            Some(id)
+        };
+        let due = arg_text(arguments, "due");
+        let due_at = (!due.trim().is_empty()).then(|| due.trim().to_owned());
+        if let Some(date) = &due_at {
+            if chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_err() {
+                anyhow::bail!("The due date is a calendar date such as 2026-12-31.");
+            }
+            details.push(format!("Due: {date}"));
+        }
+        let mut references = Vec::new();
+        for handle in arg_list(arguments, "files") {
+            let Some(item) = ledger.get(&handle) else {
+                anyhow::bail!("{handle} is not a handle you were given.");
+            };
+            references.push(json!({ "kind": "evidence", "target_id": item.artifact_id, "note": "" }));
+            details.push(format!("Cites: {}", item.title));
+        }
+        let description = shorten(arg_text(arguments, "description").trim(), 2_000);
+        let detail = format!(
+            "**{title}**\n\n{}\n\nPriority: {priority}{}",
+            if description.is_empty() {
+                "No description."
+            } else {
+                &description
+            },
+            details.iter().map(|line| format!("\n{line}")).collect::<String>()
+        );
+        Ok(AgentProposal {
+            id: "p1".to_owned(),
+            kind: AgentProposalKind::CreateTask,
+            state: AgentProposalState::Pending,
+            title: format!("Create the task “{}”", shorten(&title, 80)),
+            detail,
+            payload: json!({
+                "title": title, "description": description, "status": "open", "priority": priority,
+                "assignee_user_id": assignee_id, "project_id": project_id, "due_at": due_at, "references": references
+            }),
+            outcome: None,
+            untrusted_sources: Vec::new(),
+        })
+    }
+
+    /// A comment or a status change on a task, as a proposal that remembers the version of the task it was written against.
+    pub(in crate::agent) async fn proposal_for_task_change(
+        &self,
+        ledger: &EvidenceLedger,
+        arguments: &Value,
+        comment: bool,
+    ) -> Result<AgentProposal> {
+        let key = arg_text(arguments, "key");
+        let found = match task_number(&key) {
+            Some(number) => {
+                self.storage
+                    .get_collaboration_task_by_number(ledger.workspace_id(), number)
+                    .await?
+            }
+            None => None,
+        };
+        let Some(task) = found else {
+            anyhow::bail!("This workspace has no task {key}.");
+        };
+        if comment {
+            let body = shorten(arg_text(arguments, "comment").trim(), 2_000);
+            if body.is_empty() {
+                anyhow::bail!("Write the comment.");
+            }
+            return Ok(AgentProposal {
+                id: "p1".to_owned(),
+                kind: AgentProposalKind::CommentTask,
+                state: AgentProposalState::Pending,
+                title: format!("Comment on {}", task.key),
+                detail: format!("**{} {}**\n\n> {body}", task.key, task.title),
+                payload: json!({ "task_id": task.id, "key": task.key, "expected_version": task.version, "body": body }),
+                outcome: None,
+                untrusted_sources: Vec::new(),
+            });
+        }
+        let status = arg_text(arguments, "status").to_lowercase().replace(' ', "_");
+        if !["open", "in_progress", "blocked", "done"].contains(&status.as_str()) {
+            anyhow::bail!("The status is open, in_progress, blocked or done.");
+        }
+        Ok(AgentProposal {
+            id: "p1".to_owned(),
+            kind: AgentProposalKind::SetTaskStatus,
+            state: AgentProposalState::Pending,
+            title: format!("Set {} to {}", task.key, status.replace('_', " ")),
+            detail: format!(
+                "**{} {}**\n\nStatus: {} → {}",
+                task.key,
+                task.title,
+                task.status.replace('_', " "),
+                status.replace('_', " ")
+            ),
+            payload: json!({ "task_id": task.id, "key": task.key, "expected_version": task.version, "status": status }),
+            outcome: None,
+            untrusted_sources: Vec::new(),
+        })
     }
 
     /// A workspace member whose name or email matches, by id.

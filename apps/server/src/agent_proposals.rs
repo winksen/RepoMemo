@@ -188,6 +188,81 @@ async fn apply(
                 .map_err(map_storage_error)?;
             Ok(format!("I will remember: {text}"))
         }
+        AgentProposalKind::CreateTask => {
+            let body: crate::requests::SaveCollaborationTaskRequest = serde_json::from_value(proposal.payload.clone())
+                .map_err(|_| ApiError::bad_request("This proposal can no longer be applied."))?;
+            let (_, Json(task)) = crate::collaboration::create_collaboration_task(
+                subject.clone(),
+                State(state.clone()),
+                Path(workspace_id.to_owned()),
+                Json(body),
+            )
+            .await?;
+            Ok(format!("Created the task {} “{}”.", task.key, task.title))
+        }
+        AgentProposalKind::CommentTask | AgentProposalKind::SetTaskStatus => {
+            let task_id = payload_text(proposal, "task_id");
+            let task = state
+                .storage
+                .get_collaboration_task(&task_id)
+                .await
+                .map_err(map_storage_error)?;
+            // Only against the task as CAIRN read it: a task someone changed since is left alone.
+            let read_version = proposal
+                .payload
+                .get("expected_version")
+                .and_then(|version| version.as_i64());
+            if task.workspace_id != workspace_id || read_version != Some(task.version) {
+                return Err(ApiError::conflict(format!(
+                    "{} changed since CAIRN read it. Ask again to work from its current state.",
+                    task.key
+                )));
+            }
+            if proposal.kind == AgentProposalKind::CommentTask {
+                let _ = crate::task_discussion::add_task_comment(
+                    subject.clone(),
+                    State(state.clone()),
+                    Path(task_id),
+                    Json(crate::requests::SaveTaskCommentRequest {
+                        body: payload_text(proposal, "body"),
+                    }),
+                )
+                .await?;
+                Ok(format!("Commented on {}.", task.key))
+            } else {
+                let status = payload_text(proposal, "status");
+                let request = crate::requests::SaveCollaborationTaskRequest {
+                    title: task.title.clone(),
+                    description: task.description.clone(),
+                    status: status.clone(),
+                    state_id: None,
+                    priority: task.priority.clone(),
+                    assignee_user_id: task.assignee.as_ref().map(|member| member.id.clone()),
+                    artifact_id: task.artifact_id.clone(),
+                    project_id: task.project_id.clone(),
+                    milestone_id: task.milestone_id.clone(),
+                    parent_task_id: task.parent_task_id.clone(),
+                    expected_version: Some(task.version),
+                    references: Vec::new(),
+                    due_at: task.due_at.clone(),
+                };
+                match crate::collaboration::update_collaboration_task(
+                    subject.clone(),
+                    State(state.clone()),
+                    Path(task_id),
+                    Json(request),
+                )
+                .await
+                {
+                    Ok(_) => Ok(format!("Set {} to {}.", task.key, status.replace('_', " "))),
+                    Err(crate::collaboration::TaskSaveError::Api(error)) => Err(error),
+                    Err(crate::collaboration::TaskSaveError::Stale(_)) => Err(ApiError::conflict(format!(
+                        "{} changed while it was being saved. Ask again.",
+                        task.key
+                    ))),
+                }
+            }
+        }
         AgentProposalKind::SavePlaybook => {
             let (file_name, text) = (payload_text(proposal, "file_name"), payload_text(proposal, "text"));
             let folders = state
