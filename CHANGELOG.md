@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.60 (2026-11-24)
+
+A chat can look across all your workspaces.
+
+### Added
+- **All my workspaces.** When you start a new CAIRN chat you can tick *Look across all my workspaces in this chat*. The chat then looks up what you ask in every workspace you can read, with no AI and no provider, and answers with the files and memory cards it found grouped by workspace, each group linked to its workspace and each file or card labelled with it. It is the search of the cross-workspace search page run as you, so each workspace's rights, the search's cap on workspaces and a token's workspaces apply exactly as there.
+- **A chat keeps its scope.** The scope is chosen when the chat is made; an existing chat is not changed by it, and a chat made this way says so when it is opened. It stays in the workspace it was started in for sharing and deleting.
+- **Read-only on purpose.** Across workspaces CAIRN neither asks the model nor proposes changes: asking a question or changing something happens in a chat of that workspace, which the answer says. Sending other workspaces' passages to a model, and proposals that name one workspace, wait for the provider boundary of V0.9.61.
+- A migration (`0095_agent_conversation_scope.sql`) adds the scope to a chat; a new-chat request may carry `all_workspaces`.
+
+### Checks
+- Formatted and linted for the touched crates; generated types and typecheck pass; tests not run, and no test covers the new lookup. Nothing was built or run.
+
+### Upgrading
+- The migration runs on start. Nothing else to do.
+
 ## V0.9.59 (2026-11-24)
 
 CAIRN can propose tasks, comments and status changes.

@@ -219,6 +219,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
       const detail = await getSharedAgentConversation(accessToken, conversationId);
       if (token !== view.current) return;
       setTurns(detail.turns.map(storedTurn));
+      setScopeAll(Boolean(detail.conversation.all_workspaces));
       upsertConversation(detail.conversation);
     } catch (error) {
       if (token !== view.current) return;
@@ -232,6 +233,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   function startNewChat() {
     view.current += 1;
     setActiveId(null);
+    setScopeAll(false);
     rememberChat(workspaceId, null);
     setTurns([]);
     setIsLoadingChat(false);
@@ -239,6 +241,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     onChatChange?.(null);
   }
 
+  const [scopeAll, setScopeAll] = useState(false);
   const [sharedWithMe, setSharedWithMe] = useState<SharedConversation[]>([]);
   useEffect(() => {
     if (!showChats) return;
@@ -279,14 +282,14 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     setTurns((current) => [...current.filter((entry) => entry.key !== turn.key), { ...turn, status: "pending", reply: undefined }]);
     try {
       // In Agent mode a message is followed live: each step as it is taken, and a Stop (V0.9.43).
-      const live = Boolean(capabilities?.agent_mode) && !turn.request.capability && !turn.request.artifact_id;
+      const live = Boolean(capabilities?.agent_mode) && !scopeAll && !turn.request.capability && !turn.request.artifact_id;
       let response: AgentTurnResponse;
       if (live) {
-        const started = await startSharedAgentRun(accessToken, workspaceId, turn.request, conversationId ?? undefined);
+        const started = await startSharedAgentRun(accessToken, workspaceId, turn.request, conversationId ?? undefined, scopeAll);
         setTurns((current) => current.map((entry) => entry.key === turn.key ? { ...entry, runId: started.run_id, steps: [] } : entry));
         response = await streamSharedAgentRun(accessToken, started.run_id, (step: AgentStep) => setTurns((current) => current.map((entry) => entry.key === turn.key ? { ...entry, steps: [...(entry.steps ?? []), step.summary] } : entry)), new AbortController().signal);
       } else {
-        response = await sendSharedAgentMessage(accessToken, workspaceId, turn.request, conversationId ?? undefined);
+        response = await sendSharedAgentMessage(accessToken, workspaceId, turn.request, conversationId ?? undefined, scopeAll);
       }
       const { conversation, turn: saved } = response;
       upsertConversation(conversation);
@@ -549,6 +552,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
       </> : null}
     </nav> : null}
     <div className="shared-assistant-main">
+      {!activeId && !turns.length ? <Checkbox checked={scopeAll} description="It looks things up in every workspace you can read, with no AI, and labels each result with its workspace." label="Look across all my workspaces in this chat" onCheckedChange={setScopeAll} /> : null}
       <div className="shared-assistant-thread" role="log" aria-live="polite" aria-busy={isBusy || isLoadingChat}>
         {isLoadingChat ? <LoadingState label="Loading chat" /> : turns.length ? turns.map((turn) => <article className="shared-assistant-turn" key={turn.key}>
           <div className="shared-assistant-request"><p>{turn.label}</p>{turn.request.capability ? <span>{capabilityLabel(capabilities, turn.request.capability)}</span> : null}</div>

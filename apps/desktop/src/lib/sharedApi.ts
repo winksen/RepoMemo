@@ -746,10 +746,10 @@ export function getSharedAgentCapabilities(accessToken: string, workspaceId: str
 }
 
 /** Sends a message; without `conversationId` the server starts a new conversation. */
-export function sendSharedAgentMessage(accessToken: string, workspaceId: string, message: AgentMessage, conversationId?: string): Promise<AgentTurnResponse> {
+export function sendSharedAgentMessage(accessToken: string, workspaceId: string, message: AgentMessage, conversationId?: string, allWorkspaces = false): Promise<AgentTurnResponse> {
   return request<AgentTurnResponse>(`/v1/workspaces/${workspaceId}/agent/messages`, {
     method: "POST",
-    body: JSON.stringify({ ...message, conversation_id: conversationId }),
+    body: JSON.stringify({ ...message, conversation_id: conversationId, all_workspaces: allWorkspaces }),
   }, accessToken);
 }
 
@@ -762,10 +762,10 @@ export function attachSharedAgentFile(accessToken: string, workspaceId: string, 
 }
 
 /** Starts answering a message in the background (V0.9.43). The run is followed with `streamSharedAgentRun`. */
-export function startSharedAgentRun(accessToken: string, workspaceId: string, message: AgentMessage, conversationId?: string): Promise<{ run_id: string }> {
+export function startSharedAgentRun(accessToken: string, workspaceId: string, message: AgentMessage, conversationId?: string, allWorkspaces = false): Promise<{ run_id: string }> {
   return request<{ run_id: string }>(`/v1/workspaces/${workspaceId}/agent/runs`, {
     method: "POST",
-    body: JSON.stringify({ message: message.message, capability: message.capability ?? null, artifact_id: message.artifact_id ?? null, artifact_ids: message.artifact_ids ?? [], conversation_id: conversationId ?? null }),
+    body: JSON.stringify({ message: message.message, capability: message.capability ?? null, artifact_id: message.artifact_id ?? null, artifact_ids: message.artifact_ids ?? [], conversation_id: conversationId ?? null, all_workspaces: allWorkspaces }),
   }, accessToken);
 }
 

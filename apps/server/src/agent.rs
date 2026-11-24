@@ -46,6 +46,9 @@ pub(crate) struct AgentMessageRequest {
     artifact_ids: Vec<String>,
     /// Continue this conversation; a new one is started when omitted.
     conversation_id: Option<String>,
+    /// Start the chat across all the person's workspaces (V0.9.60). Only a new chat takes it: a chat keeps the scope it was made with.
+    #[serde(default)]
+    all_workspaces: bool,
 }
 
 /// A file the person uploaded in the chat, which the upload route has already stored (V0.9.12).
@@ -255,29 +258,41 @@ pub(crate) async fn run_message(
     )
     .await;
     let started_at = chrono::Utc::now();
-    let outcome = state
-        .core
-        .run_agent_with(
-            AgentRequest {
-                workspace_id: workspace_id.clone(),
-                message: message.message.clone(),
-                capability: message.capability,
-                artifact_id: message.artifact_id.clone(),
-                artifact_ids: message.artifact_ids.clone(),
-                provider_id,
-                ai_unavailable_reason,
-                history,
-                summary,
-                personal_memory,
-                corrections,
-                decision_offers_off,
-                history_tokens,
-                exchanges,
-            },
-            agent_setup,
-        )
-        .await
-        .map_err(map_core_error)?;
+    let all_workspaces = existing
+        .as_ref()
+        .map_or(request.all_workspaces, |conversation| conversation.all_workspaces);
+    let outcome = if all_workspaces {
+        // Across workspaces the chat only looks things up, with no AI: each result is labelled with its own workspace (V0.9.60).
+        repomemo_api::AgentOutcome {
+            reply: all_workspaces_reply(state, subject, &message.message).await?,
+            correction: None,
+            trace: None,
+        }
+    } else {
+        state
+            .core
+            .run_agent_with(
+                AgentRequest {
+                    workspace_id: workspace_id.clone(),
+                    message: message.message.clone(),
+                    capability: message.capability,
+                    artifact_id: message.artifact_id.clone(),
+                    artifact_ids: message.artifact_ids.clone(),
+                    provider_id,
+                    ai_unavailable_reason,
+                    history,
+                    summary,
+                    personal_memory,
+                    corrections,
+                    decision_offers_off,
+                    history_tokens,
+                    exchanges,
+                },
+                agent_setup,
+            )
+            .await
+            .map_err(map_core_error)?
+    };
     let (mut reply, loop_trace, correction) = (outcome.reply, outcome.trace, outcome.correction);
     // A viewer is not offered what would change the workspace (V0.9.10).
     // Being remembered is not a change to the workspace, so a viewer is still offered that (V0.9.51).
@@ -302,12 +317,19 @@ pub(crate) async fn run_message(
     let conversation_id = match existing {
         Some(conversation) => conversation.id,
         None => {
-            state
+            let created = state
                 .storage
                 .create_agent_conversation(&workspace_id, &subject.user_id, &agent_conversation_title(&label))
                 .await
-                .map_err(map_storage_error)?
-                .id
+                .map_err(map_storage_error)?;
+            if all_workspaces {
+                state
+                    .storage
+                    .set_agent_conversation_all_workspaces(&created.id)
+                    .await
+                    .map_err(map_storage_error)?;
+            }
+            created.id
         }
     };
     let turn = state
@@ -441,6 +463,76 @@ pub(crate) async fn attach_agent_file(
 
 /// What CAIRN did for one answer: the steps of its run. Only the person whose chat it is may read it, and an older answer, or one
 /// whose trace expired, has none.
+/// What a chat across all the person's workspaces answers (V0.9.60): the files and memory cards the search over every workspace they
+/// can read finds, grouped by workspace, with no AI. It is the search of `POST /v1/search` run as the person, so each workspace's
+/// rights and the token's workspaces apply exactly as there.
+async fn all_workspaces_reply(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    message: &str,
+) -> Result<repomemo_domain::AgentReply, ApiError> {
+    let query: String = message
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(512)
+        .collect();
+    let request: crate::requests::SearchAllRequest =
+        serde_json::from_value(serde_json::json!({ "query": query, "limit": 12 }))
+            .map_err(|_| ApiError::bad_request("That could not be searched."))?;
+    let (_, Json(found)) = crate::retrieval::search_all_workspaces(
+        crate::access_control::ReadingSubject(subject.clone()),
+        State(state.clone()),
+        Json(request),
+    )
+    .await?;
+    let mut names: Vec<(String, String)> = Vec::new();
+    for hit in &found.results {
+        if !names.iter().any(|(id, _)| *id == hit.workspace_id) {
+            names.push((hit.workspace_id.clone(), hit.workspace_name.clone()));
+        }
+    }
+    for card in &found.memory_cards {
+        if !names.iter().any(|(id, _)| *id == card.workspace_id) {
+            names.push((card.workspace_id.clone(), card.workspace_name.clone()));
+        }
+    }
+    if names.is_empty() {
+        return Ok(repomemo_api::lookup_reply(format!(
+            "Nothing matched “{query}” in any of your {} workspaces.",
+            found.workspaces.len()
+        )));
+    }
+    let mut text = format!("Found in {} of your workspaces, with no AI:\n", names.len());
+    for (workspace_id, name) in &names {
+        text.push_str(&format!("\n**[{name}](/spaces/{workspace_id})**\n"));
+        for hit in found
+            .results
+            .iter()
+            .filter(|hit| hit.workspace_id == *workspace_id)
+            .take(4)
+        {
+            let snippet = hit.result.snippet.split_whitespace().collect::<Vec<_>>().join(" ");
+            let snippet: String = snippet.chars().take(160).collect();
+            text.push_str(&format!("- {} (`{}`): {snippet}\n", hit.result.title, hit.result.path));
+        }
+        for card in found
+            .memory_cards
+            .iter()
+            .filter(|card| card.workspace_id == *workspace_id)
+            .take(3)
+        {
+            text.push_str(&format!(
+                "- Memory card **{}**: {}\n",
+                card.card.title, card.card.body_excerpt
+            ));
+        }
+    }
+    text.push_str("\nThis chat looks things up across your workspaces. To ask a question or to change something, open a chat in that workspace.");
+    Ok(repomemo_api::lookup_reply(text))
+}
+
 pub(crate) async fn get_agent_turn_run(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,

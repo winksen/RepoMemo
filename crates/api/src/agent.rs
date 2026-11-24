@@ -491,6 +491,13 @@ Reply with JSON only, no prose: {{\"capability\": \"<id>\", \"subject\": \"<the 
     }
 }
 
+/// A reply made of what a lookup found, with no AI behind it (V0.9.60).
+pub fn lookup_reply(markdown: impl Into<String>) -> AgentReply {
+    let mut found = reply(markdown);
+    found.routing = AgentRouting::Rules;
+    found
+}
+
 fn reply(markdown: impl Into<String>) -> AgentReply {
     AgentReply {
         capability: None,

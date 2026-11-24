@@ -24,6 +24,15 @@ pub fn neutralize_for_copy(reply: &AgentReply) -> AgentReply {
 }
 
 impl StorageEngine {
+    /// Makes a chat one that looks across all the person's workspaces (V0.9.60); set when the chat is made.
+    pub async fn set_agent_conversation_all_workspaces(&self, conversation_id: &str) -> Result<()> {
+        sqlx::query("UPDATE assistant_conversations SET all_workspaces = 1 WHERE id = ?1")
+            .bind(conversation_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Shares one of the caller's chats with its workspace.
     pub async fn share_agent_conversation(&self, conversation_id: &str, user_id: &str) -> Result<()> {
         let conversation = self.get_agent_conversation(conversation_id, user_id).await?;

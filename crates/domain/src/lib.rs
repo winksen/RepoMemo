@@ -3032,6 +3032,9 @@ pub struct AgentConversation {
     /// Whether its owner shares it with the workspace (V0.9.57).
     #[serde(default)]
     pub shared: bool,
+    /// Whether it looks across all the person's workspaces rather than the one it was started in (V0.9.60).
+    #[serde(default)]
+    pub all_workspaces: bool,
 }
 
 /// A chat shared with the workspace (V0.9.57), as the others see it in the list.

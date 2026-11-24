@@ -2635,6 +2635,8 @@ export interface AgentConversation {
   updated_at: string;
   /** Whether its owner shares it with the workspace (V0.9.57). */
   shared: boolean;
+  /** Whether it looks across all the person's workspaces rather than the one it was started in (V0.9.60). */
+  all_workspaces: boolean;
 }
 
 /** A chat shared with the workspace (V0.9.57), as the others see it in the list. */
