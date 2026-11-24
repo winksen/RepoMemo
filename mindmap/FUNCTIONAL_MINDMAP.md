@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.62` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.63` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.63 — CAIRN can run a saved request on a schedule.
+
+- **Routines.** A writer can have CAIRN run a saved request every week as them, read-only, into a chat of its own with a notification. It pauses when its owner loses write access, when AI is off, or after three failures in a row.
+
+Checks: fmt and clippy for the touched crates, generated types and typecheck pass; nothing was run.
 
 ## V0.9.62 — CAIRN can analyze large sets of files, and says how far it got.
 

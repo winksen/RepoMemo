@@ -99,3 +99,4 @@
 0.9.56  0093_agent_upkeep.sql  2a5c5af942a8798d78640708db1f157a28adae2782e66d1a682a7447d3215a22
 0.9.57  0094_agent_conversation_shares.sql  d42ac8becbaf27ac1e2adf63feb864716b8b390dec8d378e368199fc3dab7302
 0.9.60  0095_agent_conversation_scope.sql  8df1aa77b2aaa7f1b09afdccd61a1f60a5f4d15e3e60249176a4a383d500286c
+0.9.63  0096_agent_routines.sql  bd1de23eb59782c099d8609102c81d06d70a35be978c275b0930c3c1ca231fa6

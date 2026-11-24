@@ -7,6 +7,7 @@ import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyin
 import { continueSharedConversation, listSharedWithWorkspace, shareSharedAgentConversation, offerSharedAgentPlaybook, attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, confirmSharedAgentChangeset, dismissSharedAgentChangeset, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentRun, AgentStep, AgentTurn, AgentTurnResponse, MemoryCardSummary } from "../types";
 import type { SharedConversation } from "../generated/domain";
+import { RoutinesPanel } from "./RoutinesPanel";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
@@ -550,6 +551,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           <Button disabled={isBusy} onClick={() => void continueShared(shared)} type="button" variant="secondary">Continue in my chat</Button>
         </li>)}</ul>
       </> : null}
+      <RoutinesPanel accessToken={accessToken} canWrite={canUpload} workspaceId={workspaceId} />
     </nav> : null}
     <div className="shared-assistant-main">
       {!activeId && !turns.length ? <Checkbox checked={scopeAll} description="It looks things up in every workspace you can read, with no AI, and labels each result with its workspace." label="Look across all my workspaces in this chat" onCheckedChange={setScopeAll} /> : null}

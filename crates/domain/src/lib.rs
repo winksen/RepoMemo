@@ -3117,6 +3117,28 @@ pub struct AgentConversationDetail {
     pub turns: Vec<AgentTurn>,
 }
 
+/// A prompt CAIRN runs on a schedule as its owner, with read tools only (V0.9.63).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRoutine {
+    pub id: String,
+    pub workspace_id: String,
+    pub owner_id: String,
+    pub owner_name: String,
+    pub title: String,
+    pub prompt: String,
+    pub schedule: RecurringSchedule,
+    /// The date (YYYY-MM-DD, UTC) of the next run.
+    pub next_run_date: String,
+    /// `active` or `paused`.
+    pub state: String,
+    pub pause_reason: Option<String>,
+    /// Failed runs in a row; the third pauses the routine.
+    pub failures: i64,
+    pub last_run_at: Option<String>,
+    /// The chat the routine posts into, once it has run.
+    pub conversation_id: Option<String>,
+}
+
 /// Whether a workspace's weekly memory upkeep is on, and when it last ran (V0.9.56).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpkeepSettings {

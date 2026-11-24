@@ -6,6 +6,7 @@ mod agent;
 mod agent_live;
 mod agent_memory;
 mod agent_proposals;
+mod agent_routines;
 mod agent_shares;
 mod agent_upkeep;
 mod ai;
@@ -950,6 +951,26 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/agent/shared-conversations/{conversation_id}/continue",
             post(agent_shares::continue_shared_agent_conversation),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/routines",
+            get(agent_routines::list_routines).post(agent_routines::create_routine),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/routines/{routine_id}",
+            delete(agent_routines::delete_routine),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/routines/{routine_id}/pause",
+            post(agent_routines::pause_routine),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/routines/{routine_id}/resume",
+            post(agent_routines::resume_routine),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/routines/{routine_id}/run",
+            post(agent_routines::run_routine_now),
         )
         .route(
             "/v1/agent/personal-memory",

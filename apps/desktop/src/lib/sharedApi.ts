@@ -1,5 +1,5 @@
 import { clearAllDrafts } from "./drafts";
-import type { PersonalMemory, PersonalMemoryEntry, SharedConversation, UpkeepSettings } from "../generated/domain";
+import type { AgentRoutine, PersonalMemory, PersonalMemoryEntry, RecurringSchedule, SharedConversation, UpkeepSettings } from "../generated/domain";
 import type {
   ArchiveImportReport,
   ServerSetupStatus,
@@ -2399,4 +2399,26 @@ export function listSharedWithWorkspace(accessToken: string, workspaceId: string
 }
 export function continueSharedConversation(accessToken: string, workspaceId: string, conversationId: string): Promise<AgentConversation> {
   return request<AgentConversation>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/agent/shared-conversations/${encodeURIComponent(conversationId)}/continue`, { method: "POST", body: "{}" }, accessToken);
+}
+
+/** CAIRN routines (V0.9.63): prompts run on a schedule as their owner, with read tools only. */
+const routinePath = (workspaceId: string, routineId?: string, action?: string) =>
+  `/v1/workspaces/${encodeURIComponent(workspaceId)}/agent/routines${routineId ? `/${encodeURIComponent(routineId)}` : ""}${action ? `/${action}` : ""}`;
+export function listSharedRoutines(accessToken: string, workspaceId: string): Promise<AgentRoutine[]> {
+  return request<AgentRoutine[]>(routinePath(workspaceId), {}, accessToken);
+}
+export function createSharedRoutine(accessToken: string, workspaceId: string, input: { title: string; prompt: string; schedule: RecurringSchedule }): Promise<AgentRoutine> {
+  return request<AgentRoutine>(routinePath(workspaceId), { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+export function deleteSharedRoutine(accessToken: string, workspaceId: string, routineId: string): Promise<void> {
+  return request<void>(routinePath(workspaceId, routineId), { method: "DELETE" }, accessToken);
+}
+export function pauseSharedRoutine(accessToken: string, workspaceId: string, routineId: string): Promise<AgentRoutine> {
+  return request<AgentRoutine>(routinePath(workspaceId, routineId, "pause"), { method: "POST", body: "{}" }, accessToken);
+}
+export function resumeSharedRoutine(accessToken: string, workspaceId: string, routineId: string): Promise<AgentRoutine> {
+  return request<AgentRoutine>(routinePath(workspaceId, routineId, "resume"), { method: "POST", body: "{}" }, accessToken);
+}
+export function runSharedRoutine(accessToken: string, workspaceId: string, routineId: string): Promise<AgentRoutine> {
+  return request<AgentRoutine>(routinePath(workspaceId, routineId, "run"), { method: "POST", body: "{}" }, accessToken);
 }

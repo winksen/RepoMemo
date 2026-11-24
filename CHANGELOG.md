@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.63 (2026-11-24)
+
+CAIRN can run a saved request on a schedule.
+
+### Added
+- **Routines.** In the chat list, *Routines* lets someone who can change the workspace save a request ("which files changed this week and what do they say?") to run every week on a weekday they choose, up to 10 a workspace. Each routine can be paused, resumed, deleted and run now by its owner, and a workspace administrator can pause, resume or delete any of them.
+- **Run as its owner, reading only.** The maintenance pass runs a routine on or after its date as its owner, in Agent mode with read tools only: it proposes nothing, since nobody is there to confirm it. Each run is posted into one chat named after the routine and the owner gets a notification that links to it.
+- **It stops by itself.** A routine is paused, with the reason shown and a notification, when its owner can no longer change the workspace, when the workspace has no AI provider turned on, and after three failed runs in a row. A failed run is not tried again before its next date; resuming clears the failures.
+- The schedule is the weekly one of recurring tasks. New routes under `/v1/workspaces/{id}/agent/routines`, and a migration (`0096_agent_routines.sql`).
+- Not in this release: making a routine from a chat message ("run this every Monday"), daily and monthly schedules in the screen (the API takes them), and the mail digest. Event routines are V0.9.64.
+
+### Checks
+- A test of the next run date of a weekly schedule; formatted and linted for the touched crates; types and typecheck pass; tests not run. Nothing was built or run, and a run was not exercised.
+
+### Upgrading
+- The migration runs on start. There are no routines until someone makes one.
+
 ## V0.9.62 (2026-11-24)
 
 CAIRN can analyze large sets of files, and says how far it got.

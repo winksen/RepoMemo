@@ -60,7 +60,7 @@ pub(crate) struct AgentAttachmentRequest {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct AgentTurnResponse {
-    conversation: AgentConversation,
+    pub(crate) conversation: AgentConversation,
     turn: AgentTurn,
 }
 
@@ -125,6 +125,37 @@ pub(crate) async fn send_agent_message(
 pub(crate) struct LiveHooks {
     pub(crate) progress: Option<repomemo_api::ProgressHook>,
     pub(crate) cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// A run nobody is watching, such as a routine's (V0.9.63): it has read tools only and proposes nothing.
+    pub(crate) read_only: bool,
+}
+
+/// Runs a routine's prompt as its owner into the routine's chat, with read tools only (V0.9.63).
+pub(crate) async fn run_routine_message(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: String,
+    prompt: String,
+    conversation_id: Option<String>,
+) -> Result<AgentTurnResponse, ApiError> {
+    let request = AgentMessageRequest {
+        message: prompt,
+        capability: None,
+        artifact_id: None,
+        artifact_ids: Vec::new(),
+        conversation_id,
+        all_workspaces: false,
+    };
+    run_message(
+        state,
+        subject,
+        workspace_id,
+        request,
+        LiveHooks {
+            read_only: true,
+            ..LiveHooks::default()
+        },
+    )
+    .await
 }
 
 /// Answers one message and stores the exchange: the work of the synchronous route and of a live run alike.
@@ -193,7 +224,7 @@ pub(crate) async fn run_message(
                 context_tokens: traits.context_tokens,
                 max_steps: runtime.cairn_max_steps.clamp(1, 30) as usize,
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
-                can_write: !matches!(role, WorkspaceRole::Viewer),
+                can_write: !matches!(role, WorkspaceRole::Viewer) && !live.read_only,
                 user_id: subject.user_id.clone(),
                 background_max_files: runtime.cairn_background_max_files.clamp(8, 1000) as usize,
                 progress: live.progress.clone(),
@@ -295,6 +326,11 @@ pub(crate) async fn run_message(
             .map_err(map_core_error)?
     };
     let (mut reply, loop_trace, correction) = (outcome.reply, outcome.trace, outcome.correction);
+    // A routine proposes nothing: nobody is there to confirm it (V0.9.63).
+    if live.read_only {
+        reply.proposals.clear();
+        reply.changeset = None;
+    }
     // A viewer is not offered what would change the workspace (V0.9.10).
     // Being remembered is not a change to the workspace, so a viewer is still offered that (V0.9.51).
     if matches!(role, WorkspaceRole::Viewer) && !reply.proposals.is_empty() {

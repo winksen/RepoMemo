@@ -102,6 +102,7 @@ pub(crate) async fn start_agent_run(
                 progress_run.push("step", json!(step));
             })),
             cancel: Some(task_run.cancel.clone()),
+            read_only: false,
         };
         match run_message(&state, &subject, workspace_id, request, hooks).await {
             Ok(turn) => task_run.push("done", json!(turn)),

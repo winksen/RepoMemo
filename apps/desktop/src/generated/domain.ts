@@ -2708,6 +2708,27 @@ export interface AgentConversationDetail {
   turns: AgentTurn[];
 }
 
+/** A prompt CAIRN runs on a schedule as its owner, with read tools only (V0.9.63). */
+export interface AgentRoutine {
+  id: string;
+  workspace_id: string;
+  owner_id: string;
+  owner_name: string;
+  title: string;
+  prompt: string;
+  schedule: RecurringSchedule;
+  /** The date (YYYY-MM-DD, UTC) of the next run. */
+  next_run_date: string;
+  /** `active` or `paused`. */
+  state: string;
+  pause_reason: string | null;
+  /** Failed runs in a row; the third pauses the routine. */
+  failures: number;
+  last_run_at: string | null;
+  /** The chat the routine posts into, once it has run. */
+  conversation_id: string | null;
+}
+
 /** Whether a workspace's weekly memory upkeep is on, and when it last ran (V0.9.56). */
 export interface UpkeepSettings {
   enabled: boolean;
