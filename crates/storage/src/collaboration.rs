@@ -95,6 +95,22 @@ impl StorageEngine {
         Ok(rows.into_iter().map(CollaborationTask::from).collect())
     }
 
+    /// A task by its number in the workspace (the 12 of `T-12`), or none.
+    pub async fn get_collaboration_task_by_number(
+        &self,
+        workspace_id: &str,
+        number: i64,
+    ) -> Result<Option<CollaborationTask>> {
+        let row = sqlx::query_as::<_, CollaborationTaskRow>(&format!(
+            "{TASK_SELECT} WHERE task.workspace_id = ?1 AND task.number = ?2"
+        ))
+        .bind(workspace_id)
+        .bind(number)
+        .fetch_optional(self.reader())
+        .await?;
+        Ok(row.map(CollaborationTask::from))
+    }
+
     pub async fn get_collaboration_task(&self, task_id: &str) -> Result<CollaborationTask> {
         let row = sqlx::query_as::<_, CollaborationTaskRow>(&format!("{TASK_SELECT} WHERE task.id = ?1"))
             .bind(task_id)

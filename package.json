@@ -1,6 +1,6 @@
 {
   "name": "repomemo",
-  "version": "0.9.57",
+  "version": "0.9.58",
   "private": true,
   "description": "Local-first technical memory workspace for teams.",
   "workspaces": [

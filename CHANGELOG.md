@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.58 (2026-11-24)
+
+CAIRN can read your tasks and projects.
+
+### Added
+- **Three read tools.** In Agent mode CAIRN can *List tasks* (open ones unless a status is named; filter by project name, assignee, status, overdue or words in the title), *Read a task* by its key (`T-12`) and *Read a project* by name. A task shows its status, priority, assignee, due date, project and milestone, its description as quoted data, what blocks it and what it blocks, and the files it links; a project shows its goal, owner, target date and health, its milestones, its open tasks with which of them wait for which, and what it links.
+- **Answers from the work.** "What is blocking the migration project?" is answered from the project's open tasks and their dependencies, naming each by its key.
+- The tools only read, and give a viewer the same as anyone else: they show what anyone who can read the workspace can already read in Tasks and Projects. Files they link get handles and can be cited like any file; memory cards are named by title.
+- Tasks and projects are named by their keys and names, not by handles (the plan's `T` handles are not used), so a task is quoted as written and the answer's citations remain files and memory cards. No migration or setting changes.
+
+### Checks
+- A unit test of the task key as people write it and a loop test that the three tools are offered to a viewer without a proposing tool and say plainly when nothing matches; formatted and linted for the touched crates; tests not run. Nothing was built or run, and the listing and project reading were not exercised against stored tasks.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.57 (2026-11-24)
 
 A chat can be shared with the workspace.

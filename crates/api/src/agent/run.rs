@@ -251,6 +251,44 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
             }),
         ));
     }
+    // Tasks and projects, read-only (V0.9.58).
+    tools.extend([
+        atom(
+            "list_tasks",
+            "List tasks",
+            "List the workspace's tasks, open ones unless a status is given. Filter by project name, assignee (a name, \"me\" or \"none\"), status (open, in_progress, blocked or done), overdue, or words in the title. Each task is named by its key, such as T-12; quote the key when you mention one.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "project": { "type": "string", "description": "A project's name" },
+                    "assignee": { "type": "string", "description": "A person's name, me or none" },
+                    "status": { "type": "string", "description": "open, in_progress, blocked or done" },
+                    "overdue": { "type": "boolean", "description": "Only tasks past their due date" },
+                    "words": { "type": "string", "description": "Words in the title" }
+                }
+            }),
+        ),
+        atom(
+            "get_task",
+            "Read a task",
+            "Read one task by its key (T-12): its status, assignee, description (quoted data), what blocks it and what it blocks, and the files it links.",
+            json!({
+                "type": "object",
+                "properties": { "key": { "type": "string", "description": "The task's key, such as T-12" } },
+                "required": ["key"]
+            }),
+        ),
+        atom(
+            "get_project",
+            "Read a project",
+            "Read one project by name: its goal, owner, milestones, its open tasks, which of them wait for which, and the files it links. Use it to answer what blocks a project.",
+            json!({
+                "type": "object",
+                "properties": { "name": { "type": "string", "description": "The project's name" } },
+                "required": ["name"]
+            }),
+        ),
+    ]);
     // A correction is the person's own record, kept for them, so every role may record one (V0.9.53).
     tools.push(LoopTool {
         name: "record_correction",
@@ -582,6 +620,9 @@ impl RepoMemoCore {
             "read_file" | "file_facts" => arg_text(arguments, "file"),
             "list_files" => arg_text(arguments, "filter"),
             "search_chats" => arg_text(arguments, "query"),
+            "get_task" => arg_text(arguments, "key"),
+            "get_project" => arg_text(arguments, "name"),
+            "list_tasks" => arg_text(arguments, "project"),
             "load_playbook" => arg_text(arguments, "name"),
             "record_correction" => arg_text(arguments, "statement"),
             "offer_decision_card" => arg_text(arguments, "title"),
@@ -627,6 +668,23 @@ impl RepoMemoCore {
                 self.tool_search_chats(ledger, user_id, &arg_text(arguments, "query"))
                     .await
             }
+            "list_tasks" => {
+                self.tool_list_tasks(
+                    ledger,
+                    user_id,
+                    &arg_text(arguments, "project"),
+                    &arg_text(arguments, "assignee"),
+                    &arg_text(arguments, "status"),
+                    arguments
+                        .get("overdue")
+                        .and_then(|value| value.as_bool())
+                        .unwrap_or(false),
+                    &arg_text(arguments, "words"),
+                )
+                .await
+            }
+            "get_task" => self.tool_get_task(ledger, &arg_text(arguments, "key")).await,
+            "get_project" => self.tool_get_project(ledger, &arg_text(arguments, "name")).await,
             "load_playbook" => {
                 let wanted = arg_text(arguments, "name");
                 let playbooks = self.workspace_playbooks(&request.workspace_id).await;
@@ -1460,6 +1518,48 @@ mod tests {
             .tools
             .iter()
             .all(|tool| tool.name != "offer_decision_card"));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn the_task_and_project_tools_are_read_only_and_say_when_nothing_matches() {
+        let (core, data_dir) = core("work").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call("get_task", json!({ "key": "T-99" })),
+            ChatResponse::call("get_project", json!({ "name": "Migration" })),
+            ChatResponse::call("list_tasks", json!({ "project": "Migration" })),
+            ChatResponse::call("list_tasks", json!({})),
+            ChatResponse::text("There is nothing about that."),
+        ]);
+        let outcome = core
+            .loop_with(
+                &provider,
+                request(&workspace_id, "What blocks the migration project?"),
+                setup(8, false),
+            )
+            .await
+            .unwrap();
+        let requests = provider.requests();
+        for name in ["list_tasks", "get_task", "get_project"] {
+            let tool = requests[0].tools.iter().find(|tool| tool.name == name).unwrap();
+            assert!(!tool.name.starts_with("propose_"));
+        }
+        let results = requests[4]
+            .messages
+            .iter()
+            .filter(|message| message.role == ChatRole::Tool)
+            .map(|message| message.content.clone())
+            .collect::<Vec<_>>();
+        assert!(results[0].contains("no task T-99"), "{}", results[0]);
+        assert!(
+            results[1].contains("No project is named like \"Migration\""),
+            "{}",
+            results[1]
+        );
+        assert!(results[2].contains("No project is named like"), "{}", results[2]);
+        assert!(results[3].contains("No task matches"), "{}", results[3]);
+        assert!(outcome.reply.proposals.is_empty());
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

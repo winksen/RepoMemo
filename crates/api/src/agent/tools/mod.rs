@@ -18,6 +18,7 @@ pub(in crate::agent) mod atoms;
 mod change;
 pub(in crate::agent) mod find;
 mod understand;
+pub(in crate::agent) mod work;
 
 /// What running a tool does. `External` (sending something out of RepoMemo) is not representable in this line on purpose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

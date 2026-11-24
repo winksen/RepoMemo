@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.57` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.58` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.58 — CAIRN can read your tasks and projects.
+
+- **Tasks and projects in CAIRN.** CAIRN can list tasks, read one, and read a project with its milestones, open tasks and what blocks them, then answer from them with the task keys.
+
+Checks: fmt and clippy for the touched crates pass; nothing was run.
 
 ## V0.9.57 — A chat can be shared with the workspace.
 
