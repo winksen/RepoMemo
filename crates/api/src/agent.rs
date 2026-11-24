@@ -28,6 +28,7 @@ use files::{
 };
 mod instructions;
 mod ledger;
+mod playbooks;
 mod proposals;
 mod run;
 mod summary;

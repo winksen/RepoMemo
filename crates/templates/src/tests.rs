@@ -1217,7 +1217,7 @@ fn search_ranks_as_it_always_has_unless_a_template_chooses() {
     let chosen = parse(&with_ranking(r#"{ "verified": 1.15 }"#)).unwrap();
     assert_eq!(chosen.ranking().verified, 1.15);
     assert_eq!(parse(&serde_json::to_string(&chosen).unwrap()).unwrap(), chosen);
-    assert!(serde_json::to_value(&general()).unwrap().get("ranking").is_none());
+    assert!(serde_json::to_value(general()).unwrap().get("ranking").is_none());
 }
 
 #[test]
@@ -2349,4 +2349,29 @@ fn a_template_may_ship_a_starting_cairn_md_of_up_to_two_thousand_characters() {
         assert_eq!(parse(&instructions(bad)).unwrap_err()[0].path, "assistant.instructions");
     }
     assert!(general().assistant().instructions.is_none());
+}
+
+#[test]
+fn a_template_ships_up_to_five_playbooks_that_are_checked() {
+    use crate::assistant::PLAYBOOKS_MAX;
+    let one = |name: &str, steps: &str| {
+        with_assistant(&format!(
+            r#"{{ "playbooks": [{{ "name": "{name}", "description": "Review it", "when": "after an outage", "tools": ["search_evidence"], "steps": "{steps}" }}] }}"#
+        ))
+    };
+    let ok = parse(&one("Incident review", "1. Find the timeline.")).unwrap();
+    let playbook = &ok.assistant().playbooks[0];
+    assert!(playbook.note_text().starts_with("---\nname: Incident review\n"));
+    assert!(playbook.note_text().contains("tools: [search_evidence]"));
+    assert_eq!(
+        parse(&one("Bad/name", "x")).unwrap_err()[0].path,
+        "assistant.playbooks[0]"
+    );
+    assert_eq!(parse(&one("Name", " ")).unwrap_err()[0].path, "assistant.playbooks[0]");
+    assert!(general().assistant().playbooks.is_empty());
+    let many = (0..=PLAYBOOKS_MAX)
+        .map(|n| format!(r#"{{ "name": "P{n}", "description": "d", "when": "w", "steps": "s" }}"#))
+        .collect::<Vec<_>>()
+        .join(",");
+    assert!(parse(&with_assistant(&format!(r#"{{ "playbooks": [{many}] }}"#))).is_err());
 }

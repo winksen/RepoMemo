@@ -199,7 +199,7 @@ pub(in crate::agent) struct ToolOutput {
 }
 
 impl ToolOutput {
-    fn text(for_model: impl Into<String>) -> Self {
+    pub(in crate::agent) fn text(for_model: impl Into<String>) -> Self {
         Self {
             for_model: for_model.into(),
             handles: Vec::new(),

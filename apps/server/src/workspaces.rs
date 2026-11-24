@@ -24,6 +24,11 @@ pub(crate) async fn create_workspace(
         .template_id
         .as_deref()
         .and_then(|id| state.core.starter_instructions(id));
+    let starter_playbooks = request
+        .template_id
+        .as_deref()
+        .map(|id| state.core.starter_playbooks(id))
+        .unwrap_or_default();
     let workspace = state
         .storage
         .create_shared_workspace_with_policy(
@@ -55,6 +60,38 @@ pub(crate) async fn create_workspace(
             }
             Err(error) => {
                 tracing::warn!(error = %format!("{error:#}"), "The CAIRN.md of a new workspace could not be made");
+            }
+        }
+    }
+    // A template may ship playbooks for CAIRN as notes in a Playbooks folder (V0.9.54). They start unverified, so CAIRN offers none of
+    // them until a writer has read and verified it.
+    if !starter_playbooks.is_empty() {
+        match state
+            .storage
+            .create_folder(&workspace.workspace.id, None, "Playbooks", Some(&subject.user_id))
+            .await
+        {
+            Ok(folder) => {
+                for (file_name, text) in starter_playbooks {
+                    match state
+                        .core
+                        .import_text(workspace.workspace.id.clone(), file_name, text, Some("Note".to_owned()))
+                        .await
+                    {
+                        Ok(note) => {
+                            let _ = state.storage.move_artifact_to_folder(&note.id, Some(&folder.id)).await;
+                            if let Err(error) = state.core.index_artifact(note.id).await {
+                                tracing::warn!(error = %format!("{error:#}"), "A starting playbook could not be indexed");
+                            }
+                        }
+                        Err(error) => {
+                            tracing::warn!(error = %format!("{error:#}"), "A starting playbook could not be made");
+                        }
+                    }
+                }
+            }
+            Err(error) => {
+                tracing::warn!(error = %format!("{error:#}"), "The Playbooks folder of a new workspace could not be made");
             }
         }
     }

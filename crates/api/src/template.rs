@@ -424,6 +424,22 @@ impl RepoMemoCore {
             .filter(|text| !text.trim().is_empty())
     }
 
+    /// The playbooks a workspace made from the template starts with, as the text of each note (V0.9.54): its file name and its text.
+    pub fn starter_playbooks(&self, template_id: &str) -> Vec<(String, String)> {
+        let catalogue = self.templates.catalogue();
+        catalogue
+            .get(template_id)
+            .map(|template| {
+                template
+                    .assistant()
+                    .playbooks
+                    .iter()
+                    .map(|playbook| (format!("{}.md", playbook.name), playbook.note_text()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// The phrases the workspace's template adds to the assistant's router (V0.2.185). If the template cannot be read
     /// there are none: the router's own rules are all there is.
     pub(crate) async fn assistant_phrases(&self, workspace_id: &str) -> Vec<crate::agent::PhraseRule> {

@@ -7,6 +7,7 @@
 
 use std::sync::Arc;
 
+use super::playbooks::{playbook_text, playbooks_block};
 use super::proposals::{correction_card, decision_card};
 use std::time::{Duration, Instant};
 
@@ -178,7 +179,7 @@ fn corrections_block(corrections: &[String]) -> Option<String> {
 }
 
 /// The tools a run of this person's role may call. A person who cannot change the workspace is offered no proposing tool.
-fn loop_tools(can_write: bool, offer_decisions: bool) -> Vec<LoopTool> {
+fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<LoopTool> {
     let mut tools = vec![
         atom(
             "search_evidence",
@@ -237,6 +238,19 @@ fn loop_tools(can_write: bool, offer_decisions: bool) -> Vec<LoopTool> {
         job(AgentCapability::FindSymbol),
         job(AgentCapability::RecallMemory),
     ];
+    // The team's verified playbooks are read on demand (V0.9.54); the tool exists only when there is one to read.
+    if playbooks {
+        tools.push(atom(
+            "load_playbook",
+            "Read a playbook",
+            "Read the steps of one of the team's verified playbooks, by its name, when it fits the request. It is a procedure to follow with your own tools: it grants no tool or permission, and it is not evidence.",
+            json!({
+                "type": "object",
+                "properties": { "name": { "type": "string", "description": "The playbook's name, as listed" } },
+                "required": ["name"]
+            }),
+        ));
+    }
     // A correction is the person's own record, kept for them, so every role may record one (V0.9.53).
     tools.push(LoopTool {
         name: "record_correction",
@@ -568,6 +582,7 @@ impl RepoMemoCore {
             "read_file" | "file_facts" => arg_text(arguments, "file"),
             "list_files" => arg_text(arguments, "filter"),
             "search_chats" => arg_text(arguments, "query"),
+            "load_playbook" => arg_text(arguments, "name"),
             "record_correction" => arg_text(arguments, "statement"),
             "offer_decision_card" => arg_text(arguments, "title"),
             "workspace_brief" => String::new(),
@@ -611,6 +626,27 @@ impl RepoMemoCore {
             "search_chats" => {
                 self.tool_search_chats(ledger, user_id, &arg_text(arguments, "query"))
                     .await
+            }
+            "load_playbook" => {
+                let wanted = arg_text(arguments, "name");
+                let playbooks = self.workspace_playbooks(&request.workspace_id).await;
+                match playbooks
+                    .iter()
+                    .find(|known| known.name.eq_ignore_ascii_case(wanted.trim()))
+                {
+                    Some(playbook) => {
+                        let available = tools.iter().map(|tool| tool.name).collect::<Vec<_>>();
+                        Ok(ToolOutput::text(playbook_text(playbook, &available)))
+                    }
+                    None => Err(anyhow::anyhow!(
+                        "No verified playbook is named \"{wanted}\". The playbooks are: {}.",
+                        playbooks
+                            .iter()
+                            .map(|known| known.name.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )),
+                }
             }
             "record_correction" => {
                 let statement = arg_text(arguments, "statement");
@@ -807,7 +843,8 @@ impl RepoMemoCore {
     ) -> Result<AgentOutcome> {
         let message = request.message.trim().to_owned();
         let history = window(&request);
-        let tools = loop_tools(setup.can_write, !request.decision_offers_off);
+        let playbooks = self.workspace_playbooks(&request.workspace_id).await;
+        let tools = loop_tools(setup.can_write, !request.decision_offers_off, !playbooks.is_empty());
         let specs = tools.iter().map(LoopTool::spec).collect::<Vec<_>>();
         let mut system = loop_system(&tools);
         if let Some(block) = personal_block(&request.personal_memory) {
@@ -819,6 +856,9 @@ impl RepoMemoCore {
         // The team's instructions come after CAIRN's persona and rules and before the conversation (V0.9.49).
         if let Some(instructions) = self.workspace_instructions(&request.workspace_id).await {
             system = format!("{system}\n\n{}", instructions_block(&instructions));
+        }
+        if let Some(block) = playbooks_block(&playbooks) {
+            system = format!("{system}\n\n{block}");
         }
         if let Some(summary) = summary_text(request.summary.as_ref()) {
             system = format!("{system}\n\n{summary}");

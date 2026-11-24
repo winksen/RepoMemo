@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.54 (2026-11-24)
+
+A team keeps procedures CAIRN follows once they are verified.
+
+### Added
+- **Playbooks.** A note in a `Playbooks` folder at the root of the workspace is a playbook when it starts with a header between two `---` lines giving `name`, `description` and `when`, and optionally `tools`, then its steps. A header with an unknown key, a missing field or no steps is not a playbook and is ignored.
+- **Only verified playbooks are offered.** In Agent mode CAIRN is told the names, descriptions and `when` lines of the verified playbooks (up to 20, newest first) and has a *Read a playbook* tool that returns the steps of one by name. A playbook that was not verified, or was superseded, is neither listed nor readable.
+- **A playbook grants nothing.** It is read as instructions to follow with the tools CAIRN already has: a tool it names that the person's role does not give is reported as missing, and the steps are not evidence and are not cited.
+- **Templates can ship playbooks.** A template's `assistant` block may carry up to 5 `playbooks`; a workspace made from it gets them as notes in its `Playbooks` folder, unverified until a writer verifies them. `docs/TEMPLATES.md` and the template check know the new key.
+- No migration or setting changes.
+
+### Checks
+- Unit tests for the header and its unknown keys, the files that are offered, the missing-tool note and the prompt block; a template test for the playbook limits and the note text; formatted and linted for the touched crates; tests not run. Nothing was built or run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.53 (2026-11-24)
 
 CAIRN keeps your corrections and offers to save decisions.

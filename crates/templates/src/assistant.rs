@@ -33,6 +33,47 @@ pub const FOCUS_MAX: usize = 160;
 /// The most characters of the starting `CAIRN.md` a template ships, and of the note CAIRN reads (V0.9.49).
 pub const INSTRUCTIONS_MAX: usize = 2000;
 
+/// The most playbooks a template ships, and the limits of one (V0.9.54).
+pub const PLAYBOOKS_MAX: usize = 5;
+pub const PLAYBOOK_NAME_MAX: usize = 60;
+pub const PLAYBOOK_DESCRIPTION_MAX: usize = 200;
+pub const PLAYBOOK_WHEN_MAX: usize = 300;
+pub const PLAYBOOK_STEPS_MAX: usize = 4000;
+
+/// A procedure a template ships for CAIRN (V0.9.54). A workspace made from the template gets it as a note in its `Playbooks` folder,
+/// which CAIRN offers only once a writer has verified it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlaybookStarter {
+    pub name: String,
+    pub description: String,
+    /// When CAIRN should use it.
+    pub when: String,
+    /// The tools it expects, by name; it grants none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tools: Vec<String>,
+    /// The steps, in Markdown.
+    pub steps: String,
+}
+
+impl PlaybookStarter {
+    /// The note a workspace gets: a header between two `---` lines, then the steps.
+    pub fn note_text(&self) -> String {
+        let tools = if self.tools.is_empty() {
+            String::new()
+        } else {
+            format!("tools: [{}]\n", self.tools.join(", "))
+        };
+        format!(
+            "---\nname: {}\ndescription: {}\nwhen: {}\n{tools}---\n{}\n",
+            self.name,
+            self.description,
+            self.when,
+            self.steps.trim()
+        )
+    }
+}
+
 /// A phrase the assistant's keyword router recognises (V0.2.185) and the job it maps onto. It is tried after the
 /// router's own rules and before the AI provider is asked, so it can only add: it never takes a message from a rule.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,6 +105,9 @@ pub struct AssistantBlock {
     /// at most 2,000 characters.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instructions: Option<String>,
+    /// Playbooks a workspace made from the template starts with (V0.9.54), at most 5.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub playbooks: Vec<PlaybookStarter>,
 }
 
 pub(crate) fn validate(block: &AssistantBlock, issues: &mut Vec<TemplateIssue>) {
@@ -142,6 +186,60 @@ pub(crate) fn validate(block: &AssistantBlock, issues: &mut Vec<TemplateIssue>) 
             None
         };
         issues.extend(problem.map(|problem| TemplateIssue::new("assistant.focus", problem)));
+    }
+    if block.playbooks.len() > PLAYBOOKS_MAX {
+        issues.push(TemplateIssue::new(
+            "assistant.playbooks",
+            format!(
+                "there are {} playbooks; a template gives at most {PLAYBOOKS_MAX}",
+                block.playbooks.len()
+            ),
+        ));
+    }
+    let mut named = HashSet::new();
+    for (index, playbook) in block.playbooks.iter().enumerate() {
+        let path = format!("assistant.playbooks[{index}]");
+        let problem = if playbook.name.trim().is_empty()
+            || playbook.name.chars().count() > PLAYBOOK_NAME_MAX
+            || playbook.name.trim() != playbook.name
+            || !playbook
+                .name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == ' ' || c == '-' || c == '_')
+        {
+            Some(format!(
+                "the name is at most {PLAYBOOK_NAME_MAX} letters, digits, spaces, - or _"
+            ))
+        } else if !named.insert(playbook.name.to_lowercase()) {
+            Some("the name is given twice".to_owned())
+        } else if playbook.description.trim().is_empty()
+            || playbook.description.chars().count() > PLAYBOOK_DESCRIPTION_MAX
+            || playbook.description.contains('\n')
+        {
+            Some(format!(
+                "the description is one line of at most {PLAYBOOK_DESCRIPTION_MAX} characters"
+            ))
+        } else if playbook.when.trim().is_empty()
+            || playbook.when.chars().count() > PLAYBOOK_WHEN_MAX
+            || playbook.when.contains('\n')
+        {
+            Some(format!("`when` is one line of at most {PLAYBOOK_WHEN_MAX} characters"))
+        } else if playbook.steps.trim().is_empty() || playbook.steps.chars().count() > PLAYBOOK_STEPS_MAX {
+            Some(format!(
+                "the steps are not empty and at most {PLAYBOOK_STEPS_MAX} characters"
+            ))
+        } else if playbook
+            .tools
+            .iter()
+            .any(|tool| tool.is_empty() || !tool.chars().all(|c| c.is_ascii_lowercase() || c == '_'))
+        {
+            Some("a tool is named in lower case letters and _".to_owned())
+        } else {
+            None
+        };
+        if let Some(problem) = problem {
+            issues.push(TemplateIssue::new(path, problem));
+        }
     }
     if let Some(instructions) = &block.instructions {
         let length = instructions.chars().count();

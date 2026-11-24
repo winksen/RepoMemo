@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.53` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.54` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.54 — A team keeps procedures CAIRN follows once they are verified.
+
+- **Playbooks.** A team keeps procedures as notes in a Playbooks folder. Once a writer has verified one, CAIRN knows when to use it, reads its steps on demand and follows them with the tools the person already has. Templates can start a workspace with some.
+
+Checks: fmt and clippy for the touched crates pass; nothing was run.
 
 ## V0.9.53 — CAIRN keeps your corrections and offers to save decisions.
 

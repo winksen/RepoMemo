@@ -39,7 +39,7 @@ A workspace template is a small JSON file. It does not add anything to RepoMemo:
 | `labels` | display names for `sections` and `artifact_types` | the section and artifact-type ids; 24 characters each |
 | `overview` | `cards` of the Overview in order; `headline` for the dashboard card | 1 to 8 of the 15 pulse cards (the four added in V0.3.18 are `repositories_in_sync`, `reviewed_90_days`, `needing_review` and `duplicates`); a headline is `memory_cards`, `active_tasks`, `code_symbols` or `sources` |
 | `evidence` | `default_view` (`grid` or `list`), `types_first` | the 12 file types of the ledger |
-| `assistant` | `order` of its jobs, up to 6 `suggestions`, up to 12 `phrases`, a `focus` line, the `instructions` a new workspace's `CAIRN.md` note starts with | its 6 jobs; 120 characters a suggestion, 60 a phrase, 160 the focus, 2,000 the instructions |
+| `assistant` | `order` of its jobs, up to 6 `suggestions`, up to 12 `phrases`, a `focus` line, the `instructions` a new workspace's `CAIRN.md` note starts with, up to 5 `playbooks` (`name`, `description`, `when`, `tools`, `steps`) that start as unverified notes in its `Playbooks` folder | its 6 jobs; 120 characters a suggestion, 60 a phrase, 160 the focus, 2,000 the instructions; 60, 200, 300 and 4,000 characters for a playbook's name, description, `when` and steps |
 | `retrieval` | `type_chips` offered on the Retrieval page | up to 6 kinds of evidence |
 | `ranking` | `verified` factor, `boosts` by kind, document kind or folder pattern, a `recency` preference | each factor 0.8 to 1.3; 16 boosts; recency up to 1.2 |
 | `health` | which `detectors` run and in what order, `stale_after_days` | 8 checks; the days are required exactly when `stale_evidence` is listed (7 to 3650) |

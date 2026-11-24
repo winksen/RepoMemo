@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.53` (2026-11-24)
+> **Current:** `V0.9.54` (2026-11-24)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md)
 
@@ -77,7 +77,7 @@
 | **V0.9.51** | 🧪 2026-11-24 | AQ. CAIRN memory | ✨ | Personal memory | Let CAIRN propose remembering a person's preferences, confirmed and edited by that person in Profile, and load them into their own runs only | "Remember that I prefer French" is proposed and confirmed, later runs follow it, Profile lists, edits, deletes and turns it off, and no one else's run sees it |
 | **V0.9.52** | 🧪 2026-11-24 | AQ. CAIRN memory | ✨ | Search past chats | Index a person's chats and give CAIRN a tool to find what was said in their earlier chats, with links | "What did we decide about retries last week" finds the earlier chat, a deleted chat is gone, and another person's chat is never returned |
 | **V0.9.53** | 🧪 2026-11-24 | AQ. CAIRN memory | ✨ | Corrections and memory candidates | Record a correction when the person says an answer was wrong, offer to save the corrected fact or a stated decision as a memory card, and read open corrections into later runs | A correction is recorded against the turn, one memory proposal follows it, a dismissed offer stops offers in that chat, and the next run sees the correction as unreviewed |
-| **V0.9.54** | 🔜 | AQ. CAIRN memory | ✨ | Playbooks | Let a workspace keep procedures as notes in a Playbooks folder that CAIRN follows on demand once they are verified, and let templates ship some | A verified playbook is listed to CAIRN and loaded when it fits, an unverified one is not offered, and a playbook never grants a tool the role lacks |
+| **V0.9.54** | 🧪 2026-11-24 | AQ. CAIRN memory | ✨ | Playbooks | Let a workspace keep procedures as notes in a Playbooks folder that CAIRN follows on demand once they are verified, and let templates ship some | A verified playbook is listed to CAIRN and loaded when it fits, an unverified one is not offered, and a playbook never grants a tool the role lacks |
 | **V0.9.55** | 🔜 | AQ. CAIRN memory | ✨ | Playbooks from runs | After a multi-step run the person found helpful, offer to save how it was done as a playbook that waits for review | The proposal creates a playbook needing review linked to the run, and it is used only after a writer verifies it |
 | **V0.9.56** | 🔜 | AQ. CAIRN memory | ✨ | Memory upkeep | Add an opt-in weekly job that finds cards citing changed or trashed files, contradicting cards, unanswered questions and unused playbooks, and puts them in the review queue | Each finding is a review item with its evidence, nothing is edited, and the job has its own call cap and is off by default |
 | **V0.9.57** | 🔜 | AR. CAIRN teams | ✨ | Shared chats | Let a chat's owner share it read-only with the workspace, and let readers continue it in a chat of their own | A reader opens a shared chat and continues it in a copy, only the owner can confirm its proposals, and unsharing removes access at once |
