@@ -43,7 +43,7 @@ A workspace template is a small JSON file. It does not add anything to RepoMemo:
 | `retrieval` | `type_chips` offered on the Retrieval page | up to 6 kinds of evidence |
 | `ranking` | `verified` factor, `boosts` by kind, document kind or folder pattern, a `recency` preference | each factor 0.8 to 1.3; 16 boosts; recency up to 1.2 |
 | `health` | which `detectors` run and in what order, `stale_after_days` | 8 checks; the days are required exactly when `stale_evidence` is listed (7 to 3650) |
-| `review` | the order of the queue's three kinds of item | `evidence`, `memory_card`, `health_finding` |
+| `review` | the order of the queue's four kinds of item | `evidence`, `memory_card`, `health_finding`, `upkeep` |
 | `map` | `coverage_first` file types, `relations_first` links | the file types; `similar` and `cites` |
 | `repositories` | `include` and `exclude` patterns the link form starts with | 16 patterns in each list |
 

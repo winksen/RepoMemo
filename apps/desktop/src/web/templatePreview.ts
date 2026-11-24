@@ -43,7 +43,7 @@ function mapFirst(map: TemplateDetail["map"]): string {
 }
 
 /** What the review queue calls its three kinds of item, in the plural. */
-const REVIEW_NAMES: Record<string, string> = { evidence: "files", memory_card: "memory cards", health_finding: "open health findings" };
+const REVIEW_NAMES: Record<string, string> = { evidence: "files", memory_card: "memory cards", health_finding: "open health findings", upkeep: "memory upkeep findings" };
 
 /** What each health check is called on the Health page. */
 export const HEALTH_NAMES: Record<string, string> = {

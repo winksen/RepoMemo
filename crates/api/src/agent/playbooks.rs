@@ -26,6 +26,9 @@ pub(in crate::agent) struct Playbook {
     /// The tools it expects, when it names any.
     pub tools: Vec<String>,
     pub body: String,
+    /// The note it was read from and when that note last changed; empty for a playbook read from text alone.
+    pub artifact_id: String,
+    pub updated_at: String,
 }
 
 /// A playbook read from a note's text, or why the note is not one. An unknown key is a mistake, not something to ignore.
@@ -85,6 +88,8 @@ pub(in crate::agent) fn parse_playbook(raw: &str) -> Result<Playbook, String> {
         when,
         tools,
         body,
+        artifact_id: String::new(),
+        updated_at: String::new(),
     })
 }
 
@@ -267,9 +272,11 @@ impl RepoMemoCore {
             let Ok(bytes) = self.storage.read_artifact_blob(&file.id).await else {
                 continue;
             };
-            let Ok(playbook) = parse_playbook(&String::from_utf8_lossy(&bytes)) else {
+            let Ok(mut playbook) = parse_playbook(&String::from_utf8_lossy(&bytes)) else {
                 continue;
             };
+            playbook.artifact_id = file.id.clone();
+            playbook.updated_at = file.updated_at.clone();
             if !playbooks
                 .iter()
                 .any(|known| known.name.eq_ignore_ascii_case(&playbook.name))

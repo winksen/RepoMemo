@@ -2579,6 +2579,8 @@ pub enum ReviewItemKind {
     MemoryCard,
     /// An open Workspace Health finding.
     HealthFinding,
+    /// A finding of CAIRN's weekly memory upkeep (V0.9.56).
+    Upkeep,
 }
 
 /// Who can resolve a review item.
@@ -3090,6 +3092,28 @@ pub struct AgentRun {
 pub struct AgentConversationDetail {
     pub conversation: AgentConversation,
     pub turns: Vec<AgentTurn>,
+}
+
+/// Whether a workspace's weekly memory upkeep is on, and when it last ran (V0.9.56).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpkeepSettings {
+    pub enabled: bool,
+    pub last_run_at: Option<String>,
+}
+
+/// What the weekly memory upkeep found and left for a person to look at (V0.9.56).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpkeepFinding {
+    pub id: String,
+    pub workspace_id: String,
+    /// `possible_contradiction`, `unanswered_question` or `unused_playbook`.
+    pub kind: String,
+    pub title: String,
+    pub detail: String,
+    /// What the finding rests on, as lines of text.
+    pub evidence: String,
+    pub artifact_id: Option<String>,
+    pub created_at: String,
 }
 
 /// One thing CAIRN remembers about a person (V0.9.51).

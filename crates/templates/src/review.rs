@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::TemplateIssue;
 
-/// The three things that can wait in a workspace's review queue, by the id the API uses for the kind of item
+/// The four things that can wait in a workspace's review queue, by the id the API uses for the kind of item
 /// (`ReviewItemKind` in the domain crate; a test in the server matches on every one), in the order they have
 /// always been mixed.
-pub const REVIEW_SOURCES: [&str; 3] = ["evidence", "memory_card", "health_finding"];
+pub const REVIEW_SOURCES: [&str; 4] = ["evidence", "memory_card", "health_finding", "upkeep"];
 
 /// What the review queue lists first (V0.2.183).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

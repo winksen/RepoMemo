@@ -189,6 +189,13 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         Err(error) => failed(&mut report, "review reminders", error),
     }
 
+    // CAIRN's weekly memory upkeep, for the workspaces that turned it on (V0.9.56).
+    match crate::agent_upkeep::run_due(state).await {
+        Ok(0) => {}
+        Ok(count) => tracing::info!(count, "Memory upkeep added findings to the review queue"),
+        Err(error) => failed(&mut report, "memory upkeep", error),
+    }
+
     // Recurring tasks make the tasks that are owed, once for each occurrence date.
     match crate::recurring::make_due(state).await {
         Ok(0) => {}

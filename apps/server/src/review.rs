@@ -56,6 +56,7 @@ fn source_of(kind: ReviewItemKind) -> &'static str {
         ReviewItemKind::Evidence => "evidence",
         ReviewItemKind::MemoryCard => "memory_card",
         ReviewItemKind::HealthFinding => "health_finding",
+        ReviewItemKind::Upkeep => "upkeep",
     }
 }
 
@@ -138,7 +139,7 @@ pub(crate) fn parse_snooze_until(text: &str, now: DateTime<Utc>) -> Result<Strin
 }
 
 fn known_kind(kind: &str) -> bool {
-    matches!(kind, "evidence" | "memory_card" | "health_finding")
+    matches!(kind, "evidence" | "memory_card" | "health_finding" | "upkeep")
 }
 
 fn check_item(kind: &str, id: &str) -> Result<(), ApiError> {
@@ -225,6 +226,11 @@ pub(crate) async fn review_queue(
     let assignments = state
         .storage
         .review_assignments(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let upkeep = state
+        .storage
+        .open_upkeep_findings(&workspace_id)
         .await
         .map_err(map_storage_error)?;
     let due = state
@@ -320,6 +326,25 @@ pub(crate) async fn review_queue(
             artifact_id: finding.files.first().map(|file| file.artifact_id.clone()),
             since: None,
             resolver: ReviewResolver::Admin,
+            snoozed_until: None,
+        });
+    }
+    // What the weekly memory upkeep found (V0.9.56): a hint with its evidence, resolved by someone who can change the workspace.
+    for finding in upkeep {
+        items.push(ReviewItem {
+            cause: "upkeep".to_owned(),
+            reviewer: None,
+            reviewer_departed: false,
+            next_review_at: None,
+            overdue: false,
+            kind: ReviewItemKind::Upkeep,
+            id: finding.id,
+            title: finding.title,
+            reason: finding.detail,
+            detail: finding.evidence,
+            artifact_id: finding.artifact_id,
+            since: Some(finding.created_at),
+            resolver: ReviewResolver::Writer,
             snoozed_until: None,
         });
     }
@@ -498,6 +523,7 @@ mod tests {
             ReviewItemKind::Evidence,
             ReviewItemKind::MemoryCard,
             ReviewItemKind::HealthFinding,
+            ReviewItemKind::Upkeep,
         ];
         let named: Vec<&str> = every.iter().map(|kind| source_of(*kind)).collect();
         assert_eq!(named, repomemo_templates::REVIEW_SOURCES);
@@ -506,7 +532,10 @@ mod tests {
         }
         // Adding a kind stops this from compiling until it is listed.
         let _ = |kind: ReviewItemKind| match kind {
-            ReviewItemKind::Evidence | ReviewItemKind::MemoryCard | ReviewItemKind::HealthFinding => (),
+            ReviewItemKind::Evidence
+            | ReviewItemKind::MemoryCard
+            | ReviewItemKind::HealthFinding
+            | ReviewItemKind::Upkeep => (),
         };
     }
 

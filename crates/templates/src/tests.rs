@@ -2035,19 +2035,19 @@ fn the_review_queue_is_mixed_unless_a_template_names_the_kinds_to_list_first() {
     let health_first = parse(&with_review(r#"{ "order": ["health_finding"] }"#)).unwrap();
     assert_eq!(
         health_first.review_order(),
-        ["health_finding", "evidence", "memory_card"]
+        ["health_finding", "evidence", "memory_card", "upkeep"]
     );
     let cards_then_files = parse(&with_review(r#"{ "order": ["memory_card", "evidence"] }"#)).unwrap();
     assert_eq!(
         cards_then_files.review_order(),
-        ["memory_card", "evidence", "health_finding"]
+        ["memory_card", "evidence", "health_finding", "upkeep"]
     );
     assert_eq!(
         parse(&serde_json::to_string(&cards_then_files).unwrap()).unwrap(),
         cards_then_files
     );
     assert!(!serde_json::to_string(&general()).unwrap().contains("review"));
-    assert_eq!(REVIEW_SOURCES, ["evidence", "memory_card", "health_finding"]);
+    assert_eq!(REVIEW_SOURCES, ["evidence", "memory_card", "health_finding", "upkeep"]);
 }
 
 #[test]
@@ -2074,7 +2074,7 @@ fn operations_lists_health_findings_first_and_software_engineering_keeps_the_mix
     let catalogue = Catalogue::builtin();
     assert_eq!(
         catalogue.get("operations").unwrap().review_order(),
-        ["health_finding", "evidence", "memory_card"]
+        ["health_finding", "evidence", "memory_card", "upkeep"]
     );
     assert_eq!(
         catalogue.get("product-decisions").unwrap().review_order()[0],

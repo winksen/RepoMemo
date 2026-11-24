@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.56 (2026-11-24)
+
+CAIRN's memory gets a weekly check that edits nothing.
+
+### Added
+- **Memory upkeep, off by default.** An owner or administrator can turn on *Weekly memory upkeep* under the workspace's AI settings. Once a week the maintenance pass then looks at the workspace's memory and puts what it finds in the review queue as *Memory upkeep* items, each with the evidence it rests on. It edits no file and no card, and it asks no AI model, so it spends none of anyone's AI allowance; it is bounded by at most 20 new findings a pass and 100 open ones.
+- **What it looks for.** (1) Pairs of current memory cards on the same topic (two or more shared words in their titles) that give different figures: a hint, not a finding that either is wrong. (2) Questions that at least two people asked, three times or more in 30 days, and that CAIRN answered with "found nothing"; the item shows the question's text, so it is meant for a workspace whose members accept that. (3) Verified playbooks, older than 90 days, that no run has read for 90 days.
+- **Not repeated.** A card whose evidence changed, was trashed or was retired is already in the review queue and is not listed again. A finding someone resolved is not raised again for the same facts.
+- A writer resolves an item with *Resolve* in the review queue. New routes `GET/PUT /v1/workspaces/{id}/agent/upkeep` and `POST /v1/workspaces/{id}/agent/upkeep/findings/{finding_id}/resolve`, a migration (`0093_agent_upkeep.sql`) and a review item kind `upkeep`. A template's review order lists the four kinds in this order and the new one follows the others.
+
+### Checks
+- Unit tests for the cards that may disagree (the same figure and cards already needing review do not count), the questions that count, and the figures of a text; formatted and linted for the touched crates; types, template tests' expectations and typecheck updated; tests not run. Nothing was built or run.
+- Not as the plan wrote it: the plan's own call cap is not needed because no model is used, and the contradiction check compares figures in the cards' titles and excerpts, so it can miss a disagreement in words.
+
+### Upgrading
+- The migration runs on start. The upkeep is off until someone turns it on.
+
 ## V0.9.55 (2026-11-24)
 
 CAIRN can keep how it did a task as a playbook.

@@ -7,6 +7,7 @@ import { Dropdown } from "./ui/dropdown";
 import { Field } from "./ui/field";
 import { Toast } from "./ui/toast";
 import { apiMessage } from "../web/format";
+import { UpkeepSetting } from "./UpkeepSetting";
 
 const OPTIONS: { label: string; value: AiMinRole }[] = [
   { label: "Everyone in the workspace", value: "viewer" },
@@ -57,6 +58,7 @@ export function AiPolicySettings({ accessToken, onSaved, workspaceId }: {
         <Toast kind="error" message={error} />
         <Toast kind="success" message={notice} />
       </div>
+      <UpkeepSetting accessToken={accessToken} workspaceId={workspaceId} />
     </section>
   );
 }

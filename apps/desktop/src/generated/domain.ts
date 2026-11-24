@@ -2250,7 +2250,8 @@ export interface VersionComparison {
 export type ReviewItemKind =
   | "evidence"
   | "memory_card"
-  | "health_finding";
+  | "health_finding"
+  | "upkeep";
 
 /** Who can resolve a review item. */
 export type ReviewResolver =
@@ -2688,6 +2689,26 @@ export interface AgentRun {
 export interface AgentConversationDetail {
   conversation: AgentConversation;
   turns: AgentTurn[];
+}
+
+/** Whether a workspace's weekly memory upkeep is on, and when it last ran (V0.9.56). */
+export interface UpkeepSettings {
+  enabled: boolean;
+  last_run_at: string | null;
+}
+
+/** What the weekly memory upkeep found and left for a person to look at (V0.9.56). */
+export interface UpkeepFinding {
+  id: string;
+  workspace_id: string;
+  /** `possible_contradiction`, `unanswered_question` or `unused_playbook`. */
+  kind: string;
+  title: string;
+  detail: string;
+  /** What the finding rests on, as lines of text. */
+  evidence: string;
+  artifact_id: string | null;
+  created_at: string;
 }
 
 /** One thing CAIRN remembers about a person (V0.9.51). */

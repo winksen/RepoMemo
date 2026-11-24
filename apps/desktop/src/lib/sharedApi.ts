@@ -1,5 +1,5 @@
 import { clearAllDrafts } from "./drafts";
-import type { PersonalMemory, PersonalMemoryEntry } from "../generated/domain";
+import type { PersonalMemory, PersonalMemoryEntry, UpkeepSettings } from "../generated/domain";
 import type {
   ArchiveImportReport,
   ServerSetupStatus,
@@ -2377,4 +2377,15 @@ export function deletePersonalMemory(accessToken: string, entryId: string): Prom
 }
 export function setPersonalMemoryEnabled(accessToken: string, enabled: boolean): Promise<void> {
   return request<void>("/v1/agent/personal-memory/settings", { method: "PUT", body: JSON.stringify({ enabled }) }, accessToken);
+}
+
+/** The weekly memory upkeep of a workspace (V0.9.56): whether it is on, set by an owner or administrator. */
+export function getSharedUpkeep(accessToken: string, workspaceId: string): Promise<UpkeepSettings> {
+  return request<UpkeepSettings>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/agent/upkeep`, {}, accessToken);
+}
+export function setSharedUpkeep(accessToken: string, workspaceId: string, enabled: boolean): Promise<UpkeepSettings> {
+  return request<UpkeepSettings>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/agent/upkeep`, { method: "PUT", body: JSON.stringify({ enabled }) }, accessToken);
+}
+export function resolveSharedUpkeepFinding(accessToken: string, workspaceId: string, findingId: string): Promise<void> {
+  return request<void>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/agent/upkeep/findings/${encodeURIComponent(findingId)}/resolve`, { method: "POST", body: "{}" }, accessToken);
 }

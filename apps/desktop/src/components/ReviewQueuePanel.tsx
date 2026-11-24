@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Eye as EyeCheck, FileX as FileAlert, Notebook, ArrowsClockwise as Refresh, Stethoscope } from "@phosphor-icons/react";
-import { bringBackSharedReviewItem, getSharedReviewQueue, snoozeSharedReviewItem } from "../lib/sharedApi";
+import { bringBackSharedReviewItem, getSharedReviewQueue, resolveSharedUpkeepFinding, snoozeSharedReviewItem } from "../lib/sharedApi";
 import type { ReviewItem, ReviewItemKind, ReviewQueue } from "../types";
 import { useLiveRefresh } from "../lib/liveEvents";
 import { queryClient, workspaceKeys } from "../lib/queryClient";
@@ -15,6 +15,7 @@ const KINDS: Record<ReviewItemKind, { label: string; open: string; icon: JSX.Ele
   evidence: { label: "File marked for review", open: "Open file", icon: <FileAlert size={ICON_SIZE.md} /> },
   memory_card: { label: "Memory card gone stale", open: "Open card", icon: <Notebook size={ICON_SIZE.md} /> },
   health_finding: { label: "Health finding", open: "Open in Health", icon: <Stethoscope size={ICON_SIZE.md} /> },
+  upkeep: { label: "Memory upkeep", open: "Open file", icon: <Notebook size={ICON_SIZE.md} /> },
 };
 
 /** Activity that can add to or clear the queue. */
@@ -112,6 +113,16 @@ export function ReviewQueuePanel({
     }
   }
 
+  async function resolveUpkeep(item: ReviewItem) {
+    try {
+      await resolveSharedUpkeepFinding(accessToken, workspaceId, item.id);
+      showToast("success", "Marked as resolved.");
+      await load();
+    } catch (error) {
+      showToast("error", apiMessage(error, "That finding could not be resolved."));
+    }
+  }
+
   async function bringBack(item: ReviewItem) {
     try {
       await bringBackSharedReviewItem(accessToken, workspaceId, item);
@@ -146,7 +157,8 @@ export function ReviewQueuePanel({
             {ownershipLine(item) ? <p className="rm-map-muted">{ownershipLine(item)}</p> : null}
           </div>
           <div className="rm-health-actions">
-            <Button onClick={() => open(item)} type="button" variant="secondary">{kind.open}</Button>
+            {item.kind !== "upkeep" || item.artifact_id ? <Button onClick={() => open(item)} type="button" variant="secondary">{kind.open}</Button> : null}
+            {item.kind === "upkeep" && !cannotResolve ? <Button onClick={() => void resolveUpkeep(item)} type="button" variant="secondary">Resolve</Button> : null}
             <Dropdown aria-label={`Snooze ${item.title}`} className="rm-review-snooze" onValueChange={(days) => void snooze(item, Number(days))} options={SNOOZE_CHOICES.map((choice) => ({ label: choice.label, value: String(choice.days) }))} placeholder="Snooze" value="" />
             {cannotResolve ? <span className="rm-map-muted">{item.resolver === "admin" ? "Only an owner or administrator can resolve this." : "You can read this; someone who can edit the workspace resolves it."}</span> : null}
           </div>

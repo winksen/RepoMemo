@@ -6,6 +6,7 @@ mod agent;
 mod agent_live;
 mod agent_memory;
 mod agent_proposals;
+mod agent_upkeep;
 mod ai;
 mod ai_access;
 mod ai_admin;
@@ -924,6 +925,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/workspaces/{workspace_id}/agent/runs",
             post(agent_live::start_agent_run),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/upkeep",
+            get(agent_upkeep::get_upkeep).put(agent_upkeep::set_upkeep),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/agent/upkeep/findings/{finding_id}/resolve",
+            post(agent_upkeep::resolve_upkeep_finding),
         )
         .route(
             "/v1/agent/personal-memory",

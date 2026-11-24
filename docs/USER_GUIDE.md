@@ -418,6 +418,8 @@ The chat is a small set of jobs that CAIRN picks from what you write, in three k
 
 **Keep how CAIRN did something.** Open *What CAIRN did* under an answer that took several steps and choose *Save how CAIRN did this as a playbook*. Confirm the proposal and the steps are saved as a note in *Playbooks*; read and edit it, then verify it so CAIRN uses it.
 
+**Weekly memory upkeep.** An owner or administrator can turn it on under the workspace's AI settings. Each week it adds to the review queue the memory cards that may disagree, the questions people asked three times without an answer and the playbooks nobody used for 90 days. It changes nothing: someone who can edit the workspace reads each item and chooses *Resolve*.
+
 **Telling CAIRN how your team works.** Write a note named `CAIRN.md` at the root of the workspace (not in a folder): how you want CAIRN to answer, what to cite, what to put first. In Agent mode CAIRN reads up to 2,000 characters of it before every request. It can change how CAIRN works and words things, never the rules, your rights or the AI policy, and a note marked outdated is ignored. Some templates start a workspace with one.
 
 **Long chats.** CAIRN reads as many of the latest turns as its model can hold (40% of its context window) and keeps a short summary of the older ones, with the files they were about, so "summarize that file" still means the file you discussed far back. The summary is private to you and goes with the chat.

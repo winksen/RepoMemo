@@ -33,6 +33,7 @@ mod proposals;
 mod run;
 mod summary;
 mod team_memory;
+mod upkeep;
 pub use playbooks::{playbook_from_run, PlaybookDraft};
 pub use run::{AgentLoopSetup, AgentOutcome, ProgressHook};
 #[cfg(test)]
