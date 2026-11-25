@@ -2,6 +2,23 @@
 
 The path an administrator follows, in order, with **who does each step**. Details live in the guides it links; this page says what to do next and which account can do it.
 
+## CAIRN (0.9)
+
+What an administrator decides about CAIRN, the assistant, and where.
+
+| Decision | Where | What it does |
+|---|---|---|
+| **CAIRN mode** | *Settings › AI* for the workspace | *Jobs* (the router picks one job a message) or *Agent* (CAIRN calls tools in a loop). Agent mode needs a text provider with native tool calling; a workspace whose model is listed in `REPOMEMO_CAIRN_EVAL_PASSED_MODELS` starts in Agent mode unless you chose |
+| **Who may use AI** | *Settings › AI*, *Who can use AI* | The role below which CAIRN answers without a model. It also decides who a routine, a chat across workspaces and an analysis can spend AI for |
+| **Budgets** | server settings | `REPOMEMO_CAIRN_MAX_STEPS` (model calls in one request, 8), `REPOMEMO_CAIRN_MAX_RUN_SECONDS` (90), `REPOMEMO_CAIRN_BACKGROUND_MAX_FILES` (files one analysis reads, 200) and each person's `REPOMEMO_AI_REQUESTS_PER_HOUR`. Every model call counts against the hour |
+| **Retention** | server settings | `REPOMEMO_CAIRN_TRACE_DAYS` (90): how long *What CAIRN did* is kept. Chats stay until their owner deletes them; personal memory until its owner deletes it or the account goes |
+| **Weekly memory upkeep** | *Settings › AI* | Off by default. When on, once a week it adds to the review queue cards that may disagree, questions asked three times with no answer (it shows the question's text) and verified playbooks unused for 90 days. It changes nothing and uses no model |
+| **Routines** | The chat list, *Routines* | At most 10 a workspace, run as their owner, read-only. A routine pauses when its owner loses write access, is deactivated, is no longer allowed AI, when AI is off, or after three failures in a row. An administrator can pause, resume or delete any |
+| **MCP tokens** | *Profile › Access tokens* | An *MCP* token lets another AI agent read chosen workspaces and propose to its owner's inbox, and reaches nothing else. Revoke it there; the activity feed shows `mcp_read` and `mcp_proposed`. See [MCP](MCP.md) |
+| **Team instructions and playbooks** | `CAIRN.md` at the workspace root, and the `Playbooks` folder | Notes writers edit; the workspace's review rules apply. A playbook is used only once verified, and grants no tool |
+
+The open findings of the latest review are in [the CAIRN security review](../mindmap/security/2026-11-25-cairn-review.md). Reference: [API](../mindmap/technical/api-reference.md) · [settings](DEVELOPMENT_COMMANDS.md).
+
 ## AI usage and limits (0.8)
 
 The calls the server makes on its own for a workspace (embedding batches and image descriptions) are counted **in the database**, so a limit stops them the same way before and after a restart. **API:** `GET /v1/workspaces/{id}/ai-usage` shows the limit and where it comes from (the workspace's own, the server's default or none), today's calls, the calls a limit refused, what is left, the last days by kind, how many files, passages and stored vectors the workspace holds, and which providers are on for text, embedding and vision. `PUT /v1/workspaces/{id}/ai-limit` with `{"daily_calls": 200}` sets the workspace's own daily limit, `0` removes the limit, and `null` returns to the server's default. At the limit, embedding and image description stop (and say why on the job) and resume the next UTC day. **Keyword search never calls an AI provider**, so it keeps working when AI is off, not configured, over its limit or failing; only semantic matching, Ask and summaries need a provider. No screen yet.

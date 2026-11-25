@@ -252,6 +252,27 @@
 | POST | `/v1/agent/turns/{turn_id}/proposals/{proposal_id}/dismiss` | auth | the caller's own conversation | — | AgentTurn |
 | PUT | `/v1/agent/conversations/{conversation_id}` | auth | require_workspace_read | RenameConversationRequest | AgentConversation |
 | DELETE | `/v1/agent/conversations/{conversation_id}` | auth | require_workspace_read | — | status |
+| GET | `/v1/workspaces/{workspace_id}/agent/upkeep` | auth | require_workspace_read | — | UpkeepSettings |
+| PUT | `/v1/workspaces/{workspace_id}/agent/upkeep` | auth | require_workspace_admin | UpkeepRequest | UpkeepSettings |
+| POST | `/v1/workspaces/{workspace_id}/agent/upkeep/findings/{finding_id}/resolve` | auth | require_workspace_write | — | status |
+| POST | `/v1/agent/conversations/{conversation_id}/share` | auth | the caller's own conversation (refuses a chat across workspaces and the inbox) | — | status |
+| DELETE | `/v1/agent/conversations/{conversation_id}/share` | auth | the caller's own conversation | — | status |
+| GET | `/v1/workspaces/{workspace_id}/agent/shared-conversations` | auth | require_workspace_read | — | Vec<SharedConversation |
+| GET | `/v1/workspaces/{workspace_id}/agent/shared-conversations/{conversation_id}` | auth | require_workspace_read | — | AgentConversationDetail |
+| POST | `/v1/workspaces/{workspace_id}/agent/shared-conversations/{conversation_id}/continue` | auth | require_workspace_read | — | AgentConversation |
+| GET | `/v1/workspaces/{workspace_id}/agent/routines` | auth | require_workspace_read | — | Vec<AgentRoutine |
+| POST | `/v1/workspaces/{workspace_id}/agent/routines` | auth | require_workspace_write | RoutineRequest | AgentRoutine |
+| DELETE | `/v1/workspaces/{workspace_id}/agent/routines/{routine_id}` | auth | its owner, or a workspace administrator | — | status |
+| POST | `/v1/workspaces/{workspace_id}/agent/routines/{routine_id}/pause` | auth | its owner, or a workspace administrator | — | AgentRoutine |
+| POST | `/v1/workspaces/{workspace_id}/agent/routines/{routine_id}/resume` | auth | its owner, or a workspace administrator | — | AgentRoutine |
+| POST | `/v1/workspaces/{workspace_id}/agent/routines/{routine_id}/run` | auth | its owner only | — | AgentRoutine |
+| GET | `/v1/agent/personal-memory` | auth | — | — | PersonalMemory |
+| POST | `/v1/agent/personal-memory` | managing | — | EntryRequest | PersonalMemoryEntry |
+| PUT | `/v1/agent/personal-memory/settings` | managing | — | EnabledRequest | status |
+| PUT | `/v1/agent/personal-memory/{entry_id}` | managing | — | EntryRequest | status |
+| DELETE | `/v1/agent/personal-memory/{entry_id}` | managing | — | — | status |
+| POST | `/v1/agent/turns/{turn_id}/playbook` | auth | require_workspace_write | — | AgentTurn |
+| POST | `/v1/mcp` | reading | a token with the `mcp` scope only; require_workspace_read for each workspace a tool call names; consume_heavy_quota | JSON-RPC request (initialize, ping, tools/list, tools/call) | JSON-RPC reply (see [MCP](../../docs/MCP.md)) |
 | GET | `/v1/workspaces/{workspace_id}/retrieval-facets` | auth | require_workspace_read | — | RetrievalFacetsResponse |
 | POST | `/v1/search` | reading | effective_workspace_role (per workspace) | SearchAllRequest | CrossSearchResponse |
 | POST | `/v1/workspaces/{workspace_id}/search` | reading | require_workspace_read | SearchWorkspaceRequest | Vec<SearchResult |

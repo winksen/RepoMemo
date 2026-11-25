@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.69 (2026-11-24)
+
+The CAIRN guides, API reference and settings are complete.
+
+### Documentation
+- **Administrator guide.** A *CAIRN (0.9)* section lists what an administrator decides: the mode, who may use AI, the budgets and settings, retention, memory upkeep, routines, MCP tokens and the team's instructions and playbooks, with a link to the security review's open findings.
+- **User guide.** *CAIRN in Agent mode at a glance* gathers what CAIRN can do in Agent mode and where each part is explained.
+- **API reference.** `mindmap/technical/api-reference.md` has a row for each route added since V0.9.50: shared chats, routines, memory upkeep, personal memory, playbook offers and `POST /v1/mcp`, with who may call each. `npm run docs:check` passes again, which also needed a stale paragraph about the removed assistant dock in the technical mindmap to be corrected.
+- **Settings.** Every `REPOMEMO_CAIRN_*` setting was already in `docs/DEVELOPMENT_COMMANDS.md`; none was added here.
+- **Postman.** A *CAIRN (0.9)* folder with the new routes was added to the local v5 collection, but `docs/api` is not tracked by git (it is in `.gitignore`), so that change is on this machine only.
+
+### Checks
+- `npm run docs:check` passes (398 routes, 99 settings, all links). No code changed. The guides describe the features as built and as read from the code; nothing was run, so a description may differ from how a feature behaves.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.68 (2026-11-24)
 
 The CAIRN line is reviewed; three medium findings are fixed.
