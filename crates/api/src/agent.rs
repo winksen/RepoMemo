@@ -19,6 +19,7 @@ mod chatter;
 mod cross;
 mod evidence;
 mod filters;
+mod inbox;
 mod memory;
 mod notes;
 use filters::{parse_filter, FileFilter};
@@ -36,6 +37,7 @@ mod summary;
 mod team_memory;
 mod upkeep;
 pub use cross::{answer_from, held_back_lines, same_provider, split_by_boundary, CrossPassage};
+pub use inbox::{inbox_turn, INBOX_PENDING_MAX};
 pub use playbooks::{playbook_from_run, PlaybookDraft};
 pub use run::{mcp_tool_specs, AgentLoopSetup, AgentOutcome, ProgressHook};
 #[cfg(test)]

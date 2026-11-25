@@ -2637,6 +2637,8 @@ export interface AgentConversation {
   shared: boolean;
   /** Whether it looks across all the person's workspaces rather than the one it was started in (V0.9.60). */
   all_workspaces: boolean;
+  /** `chat`, or `inbox` for the chat where an outside agent's proposals wait (V0.9.67). */
+  origin: string;
 }
 
 /** A chat shared with the workspace (V0.9.57), as the others see it in the list. */

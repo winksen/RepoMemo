@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.66` (2026-11-24)
+> **Current:** `V0.9.67` (2026-11-24)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md)
 
@@ -90,7 +90,7 @@
 | **V0.9.64** | 🧪 2026-11-24 | AS. CAIRN autonomy | ✨ | Event routines | Let a routine run when files arrive in a folder, a connector brings items, a file is marked outdated or a review is overdue | The event's items reach the run, runs are debounced to one per 15 minutes per routine, and the routine limits apply |
 | **V0.9.65** | 🧪 2026-11-24 | AS. CAIRN autonomy | ✨ | Review assistant | Draft for a file or card due for review what changed since it was verified, and propose a state with its reasons | The review queue offers the draft, the proposal sets the state as the person, and the draft cites what changed |
 | **V0.9.66** | 🧪 2026-11-24 | AT. CAIRN for other agents | ✨ | MCP endpoint | Serve CAIRN's read tools over MCP to tokens with a new mcp scope, with the owner's rights, recorded in the activity feed | An MCP client searches and reads evidence with RepoMemo links and trust states, a token without the scope or the workspace is refused, and every call is recorded |
-| **V0.9.67** | 🔜 | AT. CAIRN for other agents | ✨ | CAIRN inbox | Let an outside agent propose a memory card or a note over MCP, waiting in the owner's CAIRN inbox for confirmation | A proposal from an MCP client shows in the inbox with its client and untrusted provenance, nothing is applied until confirmed, and pending proposals are bounded |
+| **V0.9.67** | 🧪 2026-11-24 | AT. CAIRN for other agents | ✨ | CAIRN inbox | Let an outside agent propose a memory card or a note over MCP, waiting in the owner's CAIRN inbox for confirmation | A proposal from an MCP client shows in the inbox with its client and untrusted provenance, nothing is applied until confirmed, and pending proposals are bounded |
 | **V0.9.68** | 🔜 | AU. CAIRN closing | 🔒 | CAIRN security review | Review injection, cross-workspace leakage, the provider boundary, MCP scopes, routines, inbox abuse and the retention of traces and personal memory | No open high or medium finding remains, and fixes are rows inserted before the guides |
 | **V0.9.69** | 🔜 | AU. CAIRN closing | 📘 | CAIRN guides | Document the loop, memory layers, playbooks, routines, shared and cross-workspace chats, MCP and every new setting in the user, admin, API and command guides and the mindmaps | A reader can turn on Agent mode, set budgets, write CAIRN.md and a playbook, and connect an MCP client from the guides |
 | **V0.9.70** | 🔜 | AU. CAIRN closing | 📘 | CAIRN line evidence | Walk through every unvalidated CAIRN row with a real provider, and record a live evaluation per supported model and the release evidence | Every row since V0.9.0 is ✅ or narrowed in the guides, each claimed model has a passing report, and the 0.10 pilot starts from this candidate |

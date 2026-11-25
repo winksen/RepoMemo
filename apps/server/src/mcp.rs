@@ -12,7 +12,10 @@ use axum::{
 };
 use serde_json::{json, Value};
 
-use crate::{access_control::ReadingSubject, record_workspace_activity, require_workspace_read, AppState};
+use crate::{
+    access_control::ReadingSubject, record_workspace_activity, require_workspace_read, require_workspace_write,
+    AppState, AuthenticatedSubject,
+};
 
 const PROTOCOL_VERSION: &str = "2025-03-26";
 
@@ -62,6 +65,17 @@ pub(crate) async fn mcp(
                 "description": "List the workspaces this token can read, with their ids.",
                 "inputSchema": { "type": "object", "properties": {} }
             })];
+            for (name, what) in [("propose_memory", "a memory card"), ("propose_note", "a note")] {
+                tools.push(json!({
+                    "name": name,
+                    "description": format!("Propose {what} for the workspace. It waits in the token owner's CAIRN inbox and nothing is saved until they confirm it; at most 50 wait at once. What you write is shown to them as quoted data."),
+                    "inputSchema": { "type": "object", "properties": {
+                        "workspace": { "type": "string", "description": "The workspace's id" },
+                        "title": { "type": "string" },
+                        "body": { "type": "string", "description": "The text, up to 4000 characters" }
+                    }, "required": ["workspace", "title", "body"] }
+                }));
+            }
             tools.extend(repomemo_api::mcp_tool_specs().into_iter().map(
                 |spec| json!({ "name": spec.name, "description": spec.description, "inputSchema": spec.parameters }),
             ));
@@ -100,6 +114,9 @@ pub(crate) async fn mcp(
                     ),
                 );
             }
+            if name == "propose_memory" || name == "propose_note" {
+                return reply(&id, propose(&state, &subject, &name, &arguments).await);
+            }
             let workspace_id = arguments
                 .get("workspace")
                 .and_then(Value::as_str)
@@ -129,5 +146,85 @@ pub(crate) async fn mcp(
             }
         }
         _ => failure(&id, -32601, "That method is not supported."),
+    }
+}
+
+/// An outside agent's proposal (V0.9.67): a pending turn in the owner's inbox chat for the workspace. It needs the owner to be able to
+/// change the workspace, and at most 50 may wait. The agent is named by the token's name; nothing is applied here.
+async fn propose(state: &AppState, subject: &AuthenticatedSubject, tool: &str, arguments: &Value) -> Value {
+    let text = |key: &str| {
+        arguments
+            .get(key)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    let workspace_id = text("workspace");
+    if require_workspace_write(state, subject, &workspace_id).await.is_err() {
+        return text_result(
+            "The token's owner cannot change that workspace, so nothing can be proposed there.".to_owned(),
+            true,
+        );
+    }
+    match state.storage.pending_inbox_proposals(&subject.user_id).await {
+        Ok(count) if count >= repomemo_api::INBOX_PENDING_MAX => {
+            return text_result(
+                "The owner's inbox is full. Nothing more can be proposed until they confirm or dismiss some."
+                    .to_owned(),
+                true,
+            );
+        }
+        Ok(_) => {}
+        Err(_) => return text_result("The inbox could not be read.".to_owned(), true),
+    }
+    let client = match subject.token.as_ref() {
+        Some(grant) => state
+            .storage
+            .personal_token_name(&grant.token_id)
+            .await
+            .unwrap_or_default(),
+        None => String::new(),
+    };
+    let (label, reply) = match repomemo_api::inbox_turn(&client, tool == "propose_note", &text("title"), &text("body"))
+    {
+        Ok(made) => made,
+        Err(problem) => return text_result(problem, true),
+    };
+    let stored = async {
+        let inbox = state
+            .storage
+            .inbox_conversation(&workspace_id, &subject.user_id)
+            .await?;
+        state
+            .storage
+            .append_agent_turn(&inbox.id, &label, &repomemo_domain::AgentMessage::default(), &reply)
+            .await
+    }
+    .await;
+    match stored {
+        Ok(_) => {
+            record_workspace_activity(
+                state,
+                &workspace_id,
+                &subject.user_id,
+                "mcp_proposed",
+                "workspace",
+                Some(&workspace_id),
+                format!(
+                    "An outside agent proposed {}.",
+                    if tool == "propose_note" {
+                        "a note"
+                    } else {
+                        "a memory card"
+                    }
+                ),
+            )
+            .await;
+            text_result(
+                "Proposed. It waits in the owner's CAIRN inbox; nothing is saved until they confirm it.".to_owned(),
+                false,
+            )
+        }
+        Err(_) => text_result("The proposal could not be stored.".to_owned(), true),
     }
 }

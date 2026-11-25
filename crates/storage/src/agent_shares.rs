@@ -33,6 +33,49 @@ impl StorageEngine {
         Ok(())
     }
 
+    /// The person's inbox chat in a workspace, made when there is none (V0.9.67).
+    pub async fn inbox_conversation(&self, workspace_id: &str, user_id: &str) -> Result<AgentConversation> {
+        let found: Option<String> = sqlx::query_scalar(
+            "SELECT id FROM assistant_conversations WHERE workspace_id = ?1 AND user_id = ?2 AND origin = 'inbox' LIMIT 1",
+        )
+        .bind(workspace_id)
+        .bind(user_id)
+        .fetch_optional(self.reader())
+        .await?;
+        if let Some(id) = found {
+            return self.get_agent_conversation(&id, user_id).await;
+        }
+        let created = self
+            .create_agent_conversation(workspace_id, user_id, "CAIRN inbox")
+            .await?;
+        sqlx::query("UPDATE assistant_conversations SET origin = 'inbox' WHERE id = ?1")
+            .bind(&created.id)
+            .execute(&self.pool)
+            .await?;
+        self.get_agent_conversation(&created.id, user_id).await
+    }
+
+    /// How many proposals wait for the person across their inbox chats.
+    pub async fn pending_inbox_proposals(&self, user_id: &str) -> Result<i64> {
+        Ok(sqlx::query_scalar(
+            "SELECT COUNT(*) FROM assistant_conversations c JOIN assistant_turns t ON t.conversation_id = c.id, json_each(t.reply_json, '$.proposals') p WHERE c.user_id = ?1 AND c.origin = 'inbox' AND json_extract(p.value, '$.state') = 'pending'",
+        )
+        .bind(user_id)
+        .fetch_one(self.reader())
+        .await?)
+    }
+
+    /// The name a person gave a token, which is how an outside agent is named in their inbox.
+    pub async fn personal_token_name(&self, token_id: &str) -> Result<String> {
+        Ok(
+            sqlx::query_scalar("SELECT name FROM personal_access_tokens WHERE id = ?1")
+                .bind(token_id)
+                .fetch_optional(self.reader())
+                .await?
+                .unwrap_or_else(|| "An outside agent".to_owned()),
+        )
+    }
+
     /// Shares one of the caller's chats with its workspace.
     pub async fn share_agent_conversation(&self, conversation_id: &str, user_id: &str) -> Result<()> {
         let conversation = self.get_agent_conversation(conversation_id, user_id).await?;

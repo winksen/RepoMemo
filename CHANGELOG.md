@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.67 (2026-11-24)
+
+Other agents can propose, and you decide in your CAIRN inbox.
+
+### Added
+- **Proposals from outside agents.** Over MCP an agent can now call `propose_memory` and `propose_note` for a workspace. Nothing is saved: the proposal appears as a message in a chat named *CAIRN inbox* (one for each person and workspace, in the chat list), saying which agent proposed it, quoting what it wrote as data and warning that it may be wrong or steered by something it read. You confirm or dismiss it exactly like any CAIRN proposal.
+- **Who proposed.** The agent is named by the name you gave its token. The proposal lists that name among its untrusted sources, a note it makes says it was proposed by that agent over MCP, and a card's source reads *Outside agent: <name>*.
+- **Bounded and checked.** A proposal needs a title and a body of at most 4,000 characters, the token's owner must be able to change the workspace, and at most 50 proposals may wait in a person's inbox; past that the agent is told the inbox is full. Each proposal is written to the workspace's activity as `mcp_proposed`.
+- A migration (`0099_agent_inbox.sql`) marks a chat's origin (`chat` or `inbox`). An MCP token is still read-only for the workspace itself: proposing changes nothing until a person confirms.
+
+### Checks
+- A test of the proposal an agent's text becomes (client named, text quoted, pending, untrusted source, limits); formatted and linted for the touched crates; types pass; tests not run. Nothing was built or run, and storing a proposal and counting the inbox were not exercised.
+- Not in this release: a badge or separate group for the inbox in the chat list, and notifying the owner of a new proposal.
+
+### Upgrading
+- The migration runs on start. Existing chats are unchanged.
+
 ## V0.9.66 (2026-11-24)
 
 Other AI agents can read a workspace over MCP.

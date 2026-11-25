@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.66` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.67` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.67 — Other agents can propose, and you decide in your CAIRN inbox.
+
+- **CAIRN inbox.** Another AI agent connected over MCP can suggest a memory card or a note. It waits in your inbox chat, labelled with the agent, and nothing is saved until you confirm it. At most 50 can wait.
+
+Checks: fmt and clippy for the touched crates and generated types pass; nothing was run.
 
 ## V0.9.66 — Other AI agents can read a workspace over MCP.
 
