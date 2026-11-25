@@ -85,7 +85,7 @@ mod vectors;
 mod workflow;
 pub use access::{PasswordReset, PersonalTokenGrant, StoredInvitation, PERSONAL_TOKEN_PREFIX};
 pub use accounts::{Anonymization, Deactivation, OwnedPlace, FORMER_MEMBER};
-pub use agent_routines::{next_run_on_or_after, NewRoutine, ROUTINES_MAX};
+pub use agent_routines::{next_run_on_or_after, NewRoutine, EVENT_DEBOUNCE_MINUTES, ROUTINES_MAX};
 pub use agent_runs::NewAgentRun;
 pub use agent_shares::neutralize_for_copy;
 pub use agent_upkeep::{AskedQuestion, NewUpkeepFinding, UPKEEP_OPEN_MAX, UPKEEP_PER_PASS_MAX};

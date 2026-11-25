@@ -196,6 +196,13 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         Err(error) => failed(&mut report, "routines", error),
     }
 
+    // Routines that run on an event (V0.9.64): files indexed or marked outdated since they last looked.
+    match crate::agent_routines::run_due_events(state).await {
+        Ok(0) => {}
+        Ok(count) => tracing::info!(count, "CAIRN event routines ran"),
+        Err(error) => failed(&mut report, "event routines", error),
+    }
+
     // CAIRN's weekly memory upkeep, for the workspaces that turned it on (V0.9.56).
     match crate::agent_upkeep::run_due(state).await {
         Ok(0) => {}

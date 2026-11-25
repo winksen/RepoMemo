@@ -20,7 +20,15 @@ pub struct NewRoutine {
     pub title: String,
     pub prompt: String,
     pub schedule: RecurringSchedule,
+    /// Run on an event instead of a date (V0.9.64): `files_indexed` or `file_outdated`.
+    pub event_kind: Option<String>,
+    pub event_folder_id: Option<String>,
 }
+
+/// An event routine runs at most once in this many minutes.
+pub const EVENT_DEBOUNCE_MINUTES: i64 = 15;
+/// The most files one event run is told about.
+pub const EVENT_ITEMS_MAX: i64 = 20;
 
 /// The first date on or after `from` that a schedule falls on, as `YYYY-MM-DD`.
 pub fn next_run_on_or_after(schedule: &RecurringSchedule, from: NaiveDate) -> Option<String> {
@@ -52,6 +60,8 @@ fn routine_from(row: &SqliteRow) -> AgentRoutine {
         failures: row.get("failures"),
         last_run_at: row.get("last_run_at"),
         conversation_id: row.get("conversation_id"),
+        event_kind: row.get("event_kind"),
+        event_folder_id: row.get("event_folder_id"),
     }
 }
 
@@ -77,12 +87,24 @@ impl StorageEngine {
         if count >= ROUTINES_MAX {
             repomemo_domain::bail_conflict!("A workspace has at most {ROUTINES_MAX} routines. Delete one first.");
         }
-        let Some(next) = next_run_on_or_after(&routine.schedule, Utc::now().date_naive()) else {
+        if let Some(kind) = routine.event_kind.as_deref() {
+            if !["files_indexed", "file_outdated"].contains(&kind) {
+                repomemo_domain::bail_invalid!("An event is files_indexed or file_outdated.");
+            }
+        } else if routine.event_folder_id.is_some() {
+            repomemo_domain::bail_invalid!("A folder only goes with an event.");
+        }
+        let next = if routine.event_kind.is_some() {
+            Some(Utc::now().format("%Y-%m-%d").to_string())
+        } else {
+            next_run_on_or_after(&routine.schedule, Utc::now().date_naive())
+        };
+        let Some(next) = next else {
             repomemo_domain::bail_invalid!("That schedule never runs.");
         };
         let id = Uuid::new_v4().to_string();
         sqlx::query(
-            "INSERT INTO agent_routines (id, workspace_id, owner_id, title, prompt, schedule_json, next_run_date, state, failures, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'active', 0, ?8)",
+            "INSERT INTO agent_routines (id, workspace_id, owner_id, title, prompt, schedule_json, next_run_date, state, failures, created_at, event_kind, event_folder_id, event_checked_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'active', 0, ?8, ?9, ?10, ?8)",
         )
         .bind(&id)
         .bind(&routine.workspace_id)
@@ -92,6 +114,8 @@ impl StorageEngine {
         .bind(serde_json::to_string(&routine.schedule)?)
         .bind(&next)
         .bind(Utc::now().to_rfc3339())
+        .bind(&routine.event_kind)
+        .bind(&routine.event_folder_id)
         .execute(&self.pool)
         .await?;
         self.get_agent_routine(&id).await
@@ -127,12 +151,85 @@ impl StorageEngine {
     /// The active routines whose date has come, oldest first.
     pub async fn due_agent_routines(&self, today: &str) -> Result<Vec<AgentRoutine>> {
         let rows = sqlx::query(&format!(
-            "{SELECT} WHERE routine.state = 'active' AND routine.next_run_date <= ?1 ORDER BY routine.next_run_date, routine.created_at LIMIT 50"
+            "{SELECT} WHERE routine.state = 'active' AND routine.event_kind IS NULL AND routine.next_run_date <= ?1 ORDER BY routine.next_run_date, routine.created_at LIMIT 50"
         ))
         .bind(today)
         .fetch_all(self.reader())
         .await?;
         Ok(rows.iter().map(routine_from).collect())
+    }
+
+    /// The active routines that run on an event.
+    pub async fn event_agent_routines(&self) -> Result<Vec<AgentRoutine>> {
+        let rows = sqlx::query(&format!(
+            "{SELECT} WHERE routine.state = 'active' AND routine.event_kind IS NOT NULL ORDER BY routine.created_at LIMIT 200"
+        ))
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows.iter().map(routine_from).collect())
+    }
+
+    /// When an event routine last looked, so the next run is told only what came after.
+    pub async fn agent_routine_event_checked_at(&self, routine_id: &str) -> Result<String> {
+        Ok(
+            sqlx::query_scalar::<_, Option<String>>("SELECT event_checked_at FROM agent_routines WHERE id = ?1")
+                .bind(routine_id)
+                .fetch_optional(self.reader())
+                .await?
+                .flatten()
+                .unwrap_or_default(),
+        )
+    }
+
+    pub async fn set_agent_routine_event_checked_at(&self, routine_id: &str, at: &str) -> Result<()> {
+        sqlx::query("UPDATE agent_routines SET event_checked_at = ?2 WHERE id = ?1")
+            .bind(routine_id)
+            .bind(at)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// The files an event routine is about: indexed since a time (in its folder, when it names one), or marked outdated since then.
+    /// Newest first, at most `EVENT_ITEMS_MAX`, with how many there are in all.
+    pub async fn routine_event_files(
+        &self,
+        workspace_id: &str,
+        kind: &str,
+        folder_id: Option<&str>,
+        since: &str,
+    ) -> Result<(Vec<(String, String, String)>, i64)> {
+        let (from, time) = if kind == "file_outdated" {
+            (
+                "artifacts a JOIN artifact_lifecycle l ON l.artifact_id = a.id AND l.status = 'outdated'",
+                "l.updated_at",
+            )
+        } else {
+            ("artifacts a", "a.indexed_at")
+        };
+        let filter =
+            format!("FROM {from} WHERE a.workspace_id = ?1 AND {time} > ?2 AND (?3 IS NULL OR a.folder_id = ?3)");
+        let total: i64 = sqlx::query_scalar(&format!("SELECT COUNT(*) {filter}"))
+            .bind(workspace_id)
+            .bind(since)
+            .bind(folder_id)
+            .fetch_one(self.reader())
+            .await?;
+        let rows = sqlx::query(&format!(
+            "SELECT a.id, a.title, a.path {filter} ORDER BY {time} DESC LIMIT ?4"
+        ))
+        .bind(workspace_id)
+        .bind(since)
+        .bind(folder_id)
+        .bind(EVENT_ITEMS_MAX)
+        .fetch_all(self.reader())
+        .await?;
+        Ok((
+            rows.iter()
+                .map(|row| (row.get("id"), row.get("title"), row.get("path")))
+                .collect(),
+            total,
+        ))
     }
 
     /// Pauses a routine and says why; a person resumes it.

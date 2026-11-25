@@ -2407,7 +2407,7 @@ const routinePath = (workspaceId: string, routineId?: string, action?: string) =
 export function listSharedRoutines(accessToken: string, workspaceId: string): Promise<AgentRoutine[]> {
   return request<AgentRoutine[]>(routinePath(workspaceId), {}, accessToken);
 }
-export function createSharedRoutine(accessToken: string, workspaceId: string, input: { title: string; prompt: string; schedule: RecurringSchedule }): Promise<AgentRoutine> {
+export function createSharedRoutine(accessToken: string, workspaceId: string, input: { title: string; prompt: string; schedule: RecurringSchedule; event_kind?: string | null; event_folder_id?: string | null }): Promise<AgentRoutine> {
   return request<AgentRoutine>(routinePath(workspaceId), { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 export function deleteSharedRoutine(accessToken: string, workspaceId: string, routineId: string): Promise<void> {

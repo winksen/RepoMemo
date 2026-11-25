@@ -2727,6 +2727,10 @@ export interface AgentRoutine {
   last_run_at: string | null;
   /** The chat the routine posts into, once it has run. */
   conversation_id: string | null;
+  /** For a routine that runs on an event (V0.9.64): `files_indexed` or `file_outdated`; none for one that runs on a date. */
+  event_kind: string | null;
+  /** Only files in this folder count for `files_indexed`. */
+  event_folder_id: string | null;
 }
 
 /** Whether a workspace's weekly memory upkeep is on, and when it last ran (V0.9.56). */

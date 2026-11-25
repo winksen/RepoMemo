@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.64 (2026-11-24)
+
+A routine can run when files arrive or become outdated.
+
+### Added
+- **Event routines.** When making a routine, *Run* now offers *When files are indexed* and *When a file is marked outdated* besides every week. An event routine runs as its owner with read tools only, like a dated one, and is told what happened: how many files were indexed or marked outdated since it last looked, and the names and paths of the newest 20, quoted as data so a file name cannot instruct it.
+- **Debounced.** An event routine runs at most once every 15 minutes, and only when there is something new; what it was told about is not repeated. A run that fails looks at the same files again next time, and the third failure in a row pauses the routine, as for dated routines. Events are noticed by the maintenance pass, so a run follows an event by up to one pass.
+- The API also takes a folder for *files indexed*, so only files in it count; the screen does not offer it yet. A migration (`0097_agent_routine_events.sql`) adds the event to a routine.
+- Not in this release: the events *a connector sync brings new items* (files it indexes do count) and *a review becomes overdue*. The run is given the files' names in its prompt, not as handles; it reads them with its tools. Example templates are not added.
+
+### Checks
+- A test of the prompt an event run is given (what happened, the names quoted, the count of the rest); formatted and linted for the touched crates; types and typecheck pass; tests not run. Nothing was built or run, and the event queries were not exercised against stored files.
+
+### Upgrading
+- The migration runs on start. Existing routines are unchanged.
+
 ## V0.9.63 (2026-11-24)
 
 CAIRN can run a saved request on a schedule.

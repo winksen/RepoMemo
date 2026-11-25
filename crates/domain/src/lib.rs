@@ -3137,6 +3137,12 @@ pub struct AgentRoutine {
     pub last_run_at: Option<String>,
     /// The chat the routine posts into, once it has run.
     pub conversation_id: Option<String>,
+    /// For a routine that runs on an event (V0.9.64): `files_indexed` or `file_outdated`; none for one that runs on a date.
+    #[serde(default)]
+    pub event_kind: Option<String>,
+    /// Only files in this folder count for `files_indexed`.
+    #[serde(default)]
+    pub event_folder_id: Option<String>,
 }
 
 /// Whether a workspace's weekly memory upkeep is on, and when it last ran (V0.9.56).
