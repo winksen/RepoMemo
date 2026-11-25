@@ -806,6 +806,11 @@ impl RepoMemoCore {
                 let fact = arg_text(arguments, "corrected_fact");
                 if statement.is_empty() {
                     Err(anyhow::anyhow!("Say what was wrong."))
+                } else if !gathered.untrusted.is_empty() {
+                    // Text from an issue, a mail or a file could have asked for this; it would then sit in later runs (CR-3).
+                    Err(anyhow::anyhow!(
+                        "A correction is not recorded in a request that read content from outside the workspace. Ask the person to say it again in a new message."
+                    ))
                 } else if gathered.correction.is_some() {
                     Err(anyhow::anyhow!("A correction is already recorded for this request."))
                 } else {

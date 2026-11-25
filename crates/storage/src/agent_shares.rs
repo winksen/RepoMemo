@@ -79,6 +79,15 @@ impl StorageEngine {
     /// Shares one of the caller's chats with its workspace.
     pub async fn share_agent_conversation(&self, conversation_id: &str, user_id: &str) -> Result<()> {
         let conversation = self.get_agent_conversation(conversation_id, user_id).await?;
+        // A chat across workspaces holds what other workspaces returned; the readers of this one may not read those (CR-1).
+        if conversation.all_workspaces {
+            repomemo_domain::bail_conflict!(
+                "A chat across all your workspaces cannot be shared: it holds files of other workspaces."
+            );
+        }
+        if conversation.origin == "inbox" {
+            repomemo_domain::bail_conflict!("The CAIRN inbox is yours alone and cannot be shared.");
+        }
         sqlx::query(
             "INSERT OR IGNORE INTO agent_conversation_shares (conversation_id, workspace_id, shared_by, shared_at) VALUES (?1, ?2, ?3, ?4)",
         )

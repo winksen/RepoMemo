@@ -163,12 +163,24 @@ pub(crate) async fn run_routine_now(
 
 /// Why a routine may not run: its owner can no longer change the workspace, or the workspace has no AI provider.
 async fn reason_not_to_run(state: &AppState, routine: &AgentRoutine) -> Option<String> {
+    // A deactivated account runs nothing (security review V0.9.68, CR-2).
+    if !matches!(state.storage.user_access(&routine.owner_id).await, Ok(Some(_))) {
+        return Some("Its owner's account is no longer active.".to_owned());
+    }
     match state
         .storage
         .workspace_role_for_user(&routine.owner_id, &routine.workspace_id)
         .await
     {
-        Ok(Some(role)) if !matches!(role, WorkspaceRole::Viewer) => {}
+        Ok(Some(role)) if !matches!(role, WorkspaceRole::Viewer) => {
+            // The workspace's AI policy applies to its owner as to anyone (CR-2).
+            if !matches!(
+                crate::ai_access::role_may_use_ai(state, &routine.workspace_id, &role).await,
+                Ok(true)
+            ) {
+                return Some("The workspace's AI policy no longer lets its owner use AI.".to_owned());
+            }
+        }
         _ => return Some("Its owner can no longer change this workspace.".to_owned()),
     }
     match state.storage.list_provider_settings(&routine.workspace_id).await {

@@ -442,6 +442,8 @@ The chat is a small set of jobs that CAIRN picks from what you write, in three k
 
 **Your CAIRN inbox.** When an agent you connected over MCP suggests a memory card or a note, it waits in a chat named *CAIRN inbox*, labelled with the agent, with its text quoted. Nothing is saved until you confirm it, and you can dismiss it. At most 50 wait at once.
 
+**What CAIRN will not do.** It does not share a chat that looks across workspaces, it stops a routine when its owner is deactivated or no longer allowed to use AI, and it will not record a correction from a request that read content from outside the workspace.
+
 **Telling CAIRN how your team works.** Write a note named `CAIRN.md` at the root of the workspace (not in a folder): how you want CAIRN to answer, what to cite, what to put first. In Agent mode CAIRN reads up to 2,000 characters of it before every request. It can change how CAIRN works and words things, never the rules, your rights or the AI policy, and a note marked outdated is ignored. Some templates start a workspace with one.
 
 **Long chats.** CAIRN reads as many of the latest turns as its model can hold (40% of its context window) and keeps a short summary of the older ones, with the files they were about, so "summarize that file" still means the file you discussed far back. The summary is private to you and goes with the chat.

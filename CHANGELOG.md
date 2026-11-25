@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.68 (2026-11-24)
+
+The CAIRN line is reviewed; three medium findings are fixed.
+
+### Security
+- **Review.** `mindmap/security/2026-11-25-cairn-review.md` reviews the CAIRN line (V0.9.40 to V0.9.67) by reading the code: injection and persistence, leakage between people, workspaces and roles, the provider boundary, MCP scopes and rate limits, routines running as people who lost access, retention, and inbox abuse. No high finding; three medium findings fixed, three low or medium findings open, one accepted.
+- **A chat across workspaces or the inbox can no longer be shared** (CR-1). Sharing such a chat would have shown the home workspace's readers files of workspaces they may not read.
+- **A routine pauses when its owner's account is deactivated or the workspace's AI policy no longer lets the owner's role use AI** (CR-2), with the reason and a notification. Before, it kept running.
+- **A correction is not recorded in a request that read content from outside the workspace** (CR-3), so an issue, mail or file cannot make CAIRN keep a sentence in the person's later prompts.
+
+### Open
+- CR-4: memory upkeep lists the text of a question several people asked in the review queue, though chats are private; CR-5: a shared chat may restate the owner's personal memory without telling them; CR-7: no daily cap on event routine runs. They are described in the review with a proposed fix each, and left for the maintainer to place before V0.9.69 or in 0.10.
+- Not reviewed: the injection corpus was not extended or run, and the MCP handshake and the cross-workspace decision have no driving test; V0.9.70's live evaluation is where they are tried.
+
+### Checks
+- A storage test that a chat across workspaces and the inbox cannot be shared, and that the inbox is made once; formatted and linted for the touched crates; tests not run. The review itself is reading and reasoning only: nothing was run and no scanner or penetration test was used.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.67 (2026-11-24)
 
 Other agents can propose, and you decide in your CAIRN inbox.

@@ -3626,3 +3626,25 @@ async fn a_shared_chat_is_read_searched_and_copied_by_others_until_it_is_unshare
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_chat_across_workspaces_and_the_inbox_cannot_be_shared() {
+    let (storage, data_dir) = temp_storage("chat-share-refused").await;
+    let ana = storage.create_user("ana@example.com", "Ana", "hash").await.unwrap();
+    let workspace = storage.create_workspace("Home").await.unwrap();
+    let wide = storage
+        .create_agent_conversation(&workspace.id, &ana.id, "Everywhere")
+        .await
+        .unwrap();
+    storage.set_agent_conversation_all_workspaces(&wide.id).await.unwrap();
+    assert!(storage.share_agent_conversation(&wide.id, &ana.id).await.is_err());
+    let inbox = storage.inbox_conversation(&workspace.id, &ana.id).await.unwrap();
+    assert_eq!(inbox.origin, "inbox");
+    assert_eq!(
+        storage.inbox_conversation(&workspace.id, &ana.id).await.unwrap().id,
+        inbox.id
+    );
+    assert!(storage.share_agent_conversation(&inbox.id, &ana.id).await.is_err());
+    assert_eq!(storage.pending_inbox_proposals(&ana.id).await.unwrap(), 0);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
