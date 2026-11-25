@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.66 (2026-11-24)
+
+Other AI agents can read a workspace over MCP.
+
+### Added
+- **MCP endpoint.** `POST /v1/mcp` speaks the Model Context Protocol (JSON-RPC over HTTP, one reply for each request) so an outside agent such as Claude Code or Cursor can read a workspace. It lists and runs five read tools: `list_workspaces`, and CAIRN's own `search_evidence`, `read_file`, `list_files` and `file_facts`, each taking the workspace's id.
+- **A new token scope, `mcp`.** *Profile › Access tokens* offers *MCP: lets another AI agent read chosen workspaces, nothing else*. An MCP token reaches only `/v1/mcp` (every other route refuses it), is read-only, and is limited to the workspaces chosen for it; a workspace the token or its owner cannot read answers that it cannot be read. A migration (`0098_mcp_token_scope.sql`) adds a flag to tokens, so existing tokens are untouched and no table is rebuilt.
+- **Trust travels with the answer.** Each result ends with a *Sources* list: handle, path, workspace and file ids, and whether the file is verified, in another state, not reviewed, or content from outside the workspace that the agent must treat as data.
+- **Counted and recorded.** Each call uses the API's rate limit and is written to the workspace's activity as `mcp_read` under the token owner's name.
+- **Docs.** `docs/MCP.md` explains the token and the tools and gives configurations for Claude Code, Cursor, Codex, Hermes Agent and OpenClaw, marked as untested.
+
+### Checks
+- A test that MCP lists only the four read tools and gives each a required workspace; formatted and linted for the touched crates; typecheck passes; tests not run. Nothing was built or run, and no client was tried against the endpoint, so the protocol handshake and the configurations are unverified.
+- Not in this release: `ask` over MCP, memory recall, symbol lookup, links that open in the app (the sources give ids and paths), and proposals from outside agents (V0.9.67).
+
+### Upgrading
+- The migration runs on start. No MCP token exists until someone makes one.
+
 ## V0.9.65 (2026-11-24)
 
 CAIRN can draft a review of a file that is due.

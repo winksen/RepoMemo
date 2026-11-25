@@ -2194,7 +2194,7 @@ export function listPersonalTokens(accessToken: string): Promise<PersonalAccessT
 }
 
 /** Creates a personal access token; its secret is returned only now. */
-export function createPersonalToken(accessToken: string, input: { name: string; scope: "read" | "write" | "admin" | "system"; expiresInDays: number; workspaceIds?: string[] }): Promise<CreatedPersonalToken> {
+export function createPersonalToken(accessToken: string, input: { name: string; scope: "read" | "write" | "admin" | "system" | "mcp"; expiresInDays: number; workspaceIds?: string[] }): Promise<CreatedPersonalToken> {
   return request<CreatedPersonalToken>("/v1/profile/tokens", {
     method: "POST",
     body: JSON.stringify({ name: input.name, scope: input.scope, expires_in_days: input.expiresInDays, ...(input.workspaceIds ? { workspace_ids: input.workspaceIds } : {}) }),

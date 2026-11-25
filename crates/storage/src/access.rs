@@ -385,9 +385,10 @@ impl StorageEngine {
         if name.is_empty() || name.chars().count() > 80 {
             repomemo_domain::bail_invalid!("Token name must be between 1 and 80 characters.");
         }
-        if !matches!(scope, "read" | "write" | "admin" | "system") {
-            repomemo_domain::bail_invalid!("Token scope must be read, write, admin or system.");
+        if !matches!(scope, "read" | "write" | "admin" | "system" | "mcp") {
+            repomemo_domain::bail_invalid!("Token scope must be read, write, admin, system or mcp.");
         }
+        let (stored_scope, mcp) = if scope == "mcp" { ("read", 1) } else { (scope, 0) };
         let id = Uuid::new_v4().to_string();
         let secret = new_secret();
         let raw = format!("{PERSONAL_TOKEN_PREFIX}{secret}");
@@ -405,17 +406,18 @@ impl StorageEngine {
         };
         let mut tx = self.pool.begin().await?;
         sqlx::query(
-            "INSERT INTO personal_access_tokens (id, user_id, name, token_hash, prefix, scope, created_at, expires_at, restricted) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO personal_access_tokens (id, user_id, name, token_hash, prefix, scope, created_at, expires_at, restricted, mcp) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         )
         .bind(&id)
         .bind(user_id)
         .bind(&token.name)
         .bind(hash_secret(&raw))
         .bind(&prefix)
-        .bind(scope)
+        .bind(stored_scope)
         .bind(&token.created_at)
         .bind(&token.expires_at)
         .bind(i64::from(workspaces.is_some()))
+        .bind(mcp)
         .execute(&mut *tx)
         .await?;
         for workspace in workspaces.unwrap_or_default() {
@@ -492,7 +494,7 @@ impl StorageEngine {
             i64,
         );
         let rows: Vec<Row> = sqlx::query_as(
-            "SELECT t.id, u.id, u.email, u.display_name, t.name, t.prefix, t.scope, t.expires_at, t.last_used_at, t.restricted FROM personal_access_tokens t JOIN users u ON u.id = t.user_id WHERE t.revoked_at IS NULL AND t.expires_at > ?1 ORDER BY t.expires_at LIMIT 1000",
+            "SELECT t.id, u.id, u.email, u.display_name, t.name, t.prefix, CASE WHEN t.mcp = 1 THEN 'mcp' ELSE t.scope END, t.expires_at, t.last_used_at, t.restricted FROM personal_access_tokens t JOIN users u ON u.id = t.user_id WHERE t.revoked_at IS NULL AND t.expires_at > ?1 ORDER BY t.expires_at LIMIT 1000",
         )
         .bind(Utc::now().to_rfc3339())
         .fetch_all(self.reader())
@@ -527,7 +529,7 @@ impl StorageEngine {
     /// owner sees that they expired), newest first.
     pub async fn list_personal_tokens(&self, user_id: &str) -> Result<Vec<PersonalAccessToken>> {
         let rows = sqlx::query_as::<_, TokenRow>(
-            "SELECT id, name, prefix, scope, created_at, expires_at, last_used_at FROM personal_access_tokens WHERE user_id = ?1 AND revoked_at IS NULL ORDER BY created_at DESC",
+            "SELECT id, name, prefix, CASE WHEN mcp = 1 THEN 'mcp' ELSE scope END, created_at, expires_at, last_used_at FROM personal_access_tokens WHERE user_id = ?1 AND revoked_at IS NULL ORDER BY created_at DESC",
         )
         .bind(user_id)
         .fetch_all(self.reader())
@@ -584,7 +586,7 @@ impl StorageEngine {
         }
         let now = Utc::now();
         let row = sqlx::query_as::<_, (String, String, String, String, Option<String>)>(
-            "SELECT id, user_id, scope, expires_at, last_used_at FROM personal_access_tokens WHERE token_hash = ?1 AND revoked_at IS NULL",
+            "SELECT id, user_id, CASE WHEN mcp = 1 THEN 'mcp' ELSE scope END, expires_at, last_used_at FROM personal_access_tokens WHERE token_hash = ?1 AND revoked_at IS NULL",
         )
         .bind(hash_secret(raw))
         .fetch_optional(self.reader())

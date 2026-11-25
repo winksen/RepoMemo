@@ -809,6 +809,8 @@ pub(crate) struct TokenGrant {
     pub(crate) admin: bool,
     /// The `system` scope: also changes in the System area.
     pub(crate) system: bool,
+    /// An MCP token (V0.9.66): it reaches the MCP endpoint and nothing else.
+    pub(crate) mcp: bool,
     /// The only workspaces the token reaches; `None` when it is not limited to chosen ones.
     pub(crate) workspaces: Option<Vec<String>>,
 }

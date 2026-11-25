@@ -312,6 +312,12 @@ pub(crate) async fn authenticate_personal_token(
         .await
         .map_err(ApiError::internal)?;
     let read_only = !matches!(grant.scope.as_str(), "write" | "admin" | "system");
+    let mcp = grant.scope == "mcp";
+    if mcp && parts.uri.path() != "/v1/mcp" {
+        return Err(ApiError::forbidden_because(
+            "This token has the mcp scope: it reaches only the MCP endpoint. Make a token with another scope for the API.",
+        ));
+    }
     let admin = grant.scope == "admin";
     let system = grant.scope == "system";
     tracing::debug!(target: "audit", user_id = %grant.user_id, token_id = %grant.token_id, method = %parts.method, path = parts.uri.path(), "Personal access token used");
@@ -329,6 +335,7 @@ pub(crate) async fn authenticate_personal_token(
             read_only,
             admin,
             system,
+            mcp,
             workspaces,
         }),
     })

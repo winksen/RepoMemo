@@ -44,6 +44,7 @@ mod load;
 mod logs;
 mod mail;
 mod maintenance;
+mod mcp;
 mod memory_history;
 mod mfa;
 mod milestones;
@@ -1441,6 +1442,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(get_retrieval_facets),
         )
         .route("/v1/search", post(search_all_workspaces))
+        .route("/v1/mcp", post(mcp::mcp))
         .route("/v1/workspaces/{workspace_id}/search", post(search_workspace))
         .route("/v1/workspaces/{workspace_id}/artifacts/bulk", post(bulk_artifacts))
         .route(

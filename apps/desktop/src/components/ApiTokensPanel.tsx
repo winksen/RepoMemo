@@ -33,6 +33,7 @@ const SCOPE_OPTIONS = [
 /** Also grants access, deletes, repoints, links and exports: a token that leaks can do all of it, so it is a deliberate choice. */
 const ADMIN_SCOPE_OPTION = { label: "Admin: read, write and manage access, links and exports", value: "admin" };
 /** Only for system and app administrators: also changes in the System area (maintenance, sessions, lockouts). */
+const MCP_SCOPE_OPTION = { label: "MCP: lets another AI agent read chosen workspaces, nothing else", value: "mcp" };
 const SYSTEM_SCOPE_OPTION = { label: "System: read, write and System changes", value: "system" };
 
 /**
@@ -43,7 +44,7 @@ const SYSTEM_SCOPE_OPTION = { label: "System: read, write and System changes", v
 export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: string; isAdministrator: boolean }) {
   const [tokens, setTokens] = useState<PersonalAccessToken[] | null>(null);
   const [name, setName] = useState("");
-  const [scope, setScope] = useState<"read" | "write" | "admin" | "system">("read");
+  const [scope, setScope] = useState<"read" | "write" | "admin" | "system" | "mcp">("read");
   const [expiry, setExpiry] = useState("90");
   const [secret, setSecret] = useState<string | null>(null);
   const [revoking, setRevoking] = useState<PersonalAccessToken | null>(null);
@@ -106,7 +107,7 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
     <p className="shared-muted-copy">For scripts, CI and the terminal console: send <code>Authorization: Bearer &lt;token&gt;</code>, or set <code>REPOMEMO_TOKEN</code> for <code>repomemo-console</code>. A token acts as you, so it only reaches what you can. It cannot manage tokens or change your password; granting access, deleting, linking and exporting need the admin scope. It keeps working when you change your password; revoke it here, or ask an administrator to sign you out everywhere.</p>
     <form className="rm-tokens-form" onSubmit={create}>
       <Field label="Name" required><Input maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="CI release notes" value={name} /></Field>
-      <Field label="Access">{(control) => <Dropdown id={control.id} onValueChange={(value) => setScope(value as "read" | "write" | "admin" | "system")} options={isAdministrator ? [...SCOPE_OPTIONS, ADMIN_SCOPE_OPTION, SYSTEM_SCOPE_OPTION] : [...SCOPE_OPTIONS, ADMIN_SCOPE_OPTION]} value={scope} />}</Field>
+      <Field label="Access">{(control) => <Dropdown id={control.id} onValueChange={(value) => setScope(value as "read" | "write" | "admin" | "system" | "mcp")} options={isAdministrator ? [...SCOPE_OPTIONS, ADMIN_SCOPE_OPTION, MCP_SCOPE_OPTION, SYSTEM_SCOPE_OPTION] : [...SCOPE_OPTIONS, ADMIN_SCOPE_OPTION, MCP_SCOPE_OPTION]} value={scope} />}</Field>
       <Field label="Expires after">{(control) => <Dropdown id={control.id} onValueChange={setExpiry} options={EXPIRY_OPTIONS} value={expiry} />}</Field>
       {scope === "system" ? null : <Switch checked={limited} label="Limit to chosen workspaces" onCheckedChange={setLimited} />}
       {limited && scope !== "system" ? <TokenWorkspacePicker chosen={chosen} onChange={setChosen} workspaces={workspaces} /> : null}
@@ -116,7 +117,7 @@ export function ApiTokensPanel({ accessToken, isAdministrator }: { accessToken: 
     {tokens?.length ? <ul className="rm-tokens-list">{tokens.map((token) => {
       const expired = token.expires_at <= now;
       return <li className={expired ? "expired" : ""} key={token.id}>
-        <span className="rm-tokens-text"><strong>{token.name} <Badge>{token.scope === "system" ? "system" : token.scope === "admin" ? "admin" : token.scope === "write" ? "read and write" : "read only"}</Badge>{expired ? <Badge tone="danger">expired</Badge> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at, "never")} · {expired ? "expired" : "expires"} {formatDate(token.expires_at, "never")} · last used {formatDate(token.last_used_at, "never")} · {token.workspaces ? `limited to ${token.workspaces.map((id) => workspaces.find((entry) => entry.workspace.id === id)?.workspace.name ?? "a workspace you can no longer open").join(", ")}` : "reaches every workspace you can open"}</small></span>
+        <span className="rm-tokens-text"><strong>{token.name} <Badge>{token.scope === "system" ? "system" : token.scope === "mcp" ? "MCP" : token.scope === "admin" ? "admin" : token.scope === "write" ? "read and write" : "read only"}</Badge>{expired ? <Badge tone="danger">expired</Badge> : null}</strong><small><code>{token.prefix}…</code> · created {formatDate(token.created_at, "never")} · {expired ? "expired" : "expires"} {formatDate(token.expires_at, "never")} · last used {formatDate(token.last_used_at, "never")} · {token.workspaces ? `limited to ${token.workspaces.map((id) => workspaces.find((entry) => entry.workspace.id === id)?.workspace.name ?? "a workspace you can no longer open").join(", ")}` : "reaches every workspace you can open"}</small></span>
         {!expired && !token.workspaces && token.scope !== "system" ? <Button aria-label={`Limit ${token.name} to workspaces`} disabled={isBusy} onClick={() => { setLimitChosen([]); setLimiting(token); }} variant="secondary">Limit…</Button> : null}
         <Button aria-label={`Revoke ${token.name}`} disabled={isBusy} onClick={() => setRevoking(token)} variant="secondary"><Trash size={ICON_SIZE.sm} /> {expired ? "Remove" : "Revoke"}</Button>
       </li>;
