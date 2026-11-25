@@ -63,6 +63,7 @@ export function RoutinesPanel({ accessToken, canWrite, workspaceId }: { accessTo
       <Button disabled={busy} onClick={() => void act(() => deleteSharedRoutine(accessToken, workspaceId, routine.id), "The routine could not be deleted.")} type="button" variant="secondary">Delete</Button>
     </li>)}</ul> : <p className="shared-muted-copy">No routine yet.</p>}
     {canWrite ? <form onSubmit={(event) => { event.preventDefault(); create(); }}>
+      <Button onClick={() => { setTitle("Review what is waiting"); setPrompt("Look at the files marked as needing review. For each of the first five, review it and tell me what changed since it was last verified and which state you would give it, with your reasons."); setWhen("weekly"); }} type="button" variant="secondary">Use the review template</Button>
       <Field label="Title"><Input maxLength={80} onChange={(event) => setTitle(event.target.value)} value={title} /></Field>
       <Field label="What to ask"><Textarea maxLength={2000} onChange={(event) => setPrompt(event.target.value)} rows={3} value={prompt} /></Field>
       <Field label="Run">{(control) => <Dropdown id={control.id} onValueChange={setWhen} options={[{ label: "Every week", value: "weekly" }, { label: "When files are indexed", value: "files_indexed" }, { label: "When a file is marked outdated", value: "file_outdated" }]} value={when} />}</Field>

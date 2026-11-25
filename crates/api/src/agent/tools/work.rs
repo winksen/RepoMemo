@@ -2,7 +2,9 @@
 //! in the workspace, change nothing, and give the model text with task keys (`T-12`) that it can quote and that the person can find.
 //! A task's description is shown as quoted data, since a task made from an import or a tracker can hold words from outside.
 
-use repomemo_domain::{AgentProposal, AgentProposalKind, AgentProposalState, CollaborationTask, Project, TaskQuery};
+use repomemo_domain::{
+    AgentProposal, AgentProposalKind, AgentProposalState, CollaborationTask, Project, SearchRequest, TaskQuery,
+};
 use serde_json::{json, Value};
 
 use super::atoms::{bounded, quote_untrusted, EvidenceKind, EvidenceLedger, ToolOutput, TOOL_OUTPUT_CHARS};
@@ -510,6 +512,137 @@ impl RepoMemoCore {
             }
         }
         format!("Links {} {}", kind.replace('_', " "), title.unwrap_or("(untitled)"))
+    }
+}
+
+impl RepoMemoCore {
+    /// What changed around a file since it was last verified (V0.9.65), for CAIRN to draft a review from: its state and who last
+    /// reviewed it and when, its versions since, newer files that mention its name, and open corrections that do. Facts only: the
+    /// model weighs them and proposes a state with the status job, which the person confirms.
+    pub(in crate::agent) async fn tool_review_file(
+        &self,
+        ledger: &mut EvidenceLedger,
+        user_id: &str,
+        file: &str,
+    ) -> Result<ToolOutput> {
+        let summary = match self.tool_file(ledger, file).await? {
+            Ok(summary) => summary,
+            Err(problem) => return Ok(ToolOutput::text(problem)),
+        };
+        let lifecycle = self.storage.get_artifact_lifecycle(&summary.id).await.ok();
+        let state = lifecycle
+            .as_ref()
+            .map_or("active", |found| found.status.as_str())
+            .to_owned();
+        let handle = ledger.handle_for(
+            EvidenceKind::File,
+            &summary.id,
+            None,
+            &summary.title,
+            &summary.path,
+            Some(&state),
+        );
+        let mut lines = vec![format!("[{handle}] {} is {state}.", summary.path)];
+        let reviewed_at = lifecycle.as_ref().and_then(|found| found.reviewed_at.clone());
+        match (
+            &reviewed_at,
+            lifecycle.as_ref().and_then(|found| found.reviewed_by.as_ref()),
+        ) {
+            (Some(at), Some(by)) => lines.push(format!(
+                "Last verified by {} on {}.",
+                by.display_name,
+                at.get(..10).unwrap_or(at)
+            )),
+            (Some(at), None) => lines.push(format!("Last verified on {}.", at.get(..10).unwrap_or(at))),
+            _ => lines.push("It has never been verified.".to_owned()),
+        }
+        if let Some(note) = lifecycle
+            .as_ref()
+            .map(|found| found.review_note.trim())
+            .filter(|note| !note.is_empty())
+        {
+            lines.push(format!(
+                "Review note: {}",
+                quote_untrusted("a review note", &shorten(note, 300))
+            ));
+        }
+        if let Some(successor) = lifecycle
+            .as_ref()
+            .and_then(|found| found.superseded_by_artifact_id.clone())
+        {
+            lines.push(format!("It was superseded by the file {successor}."));
+        }
+        let since = reviewed_at.clone().unwrap_or_default();
+        lines.push(format!(
+            "It was last changed on {}.",
+            summary.updated_at.get(..10).unwrap_or(&summary.updated_at)
+        ));
+        let versions = self.storage.list_artifact_versions(&summary.id).await?;
+        let newer = versions.iter().filter(|version| version.created_at > since).count();
+        lines.push(format!(
+            "{} {} in all; {newer} since it was verified.",
+            versions.len(),
+            plural(versions.len(), "version", "versions")
+        ));
+        // Newer files that mention it by name.
+        let name = summary
+            .title
+            .trim_end_matches(|c: char| c != '.' && !c.is_alphanumeric())
+            .to_owned();
+        if name.chars().count() >= 4 {
+            let found = self
+                .search_workspace(SearchRequest {
+                    workspace_id: ledger.workspace_id().to_owned(),
+                    query: format!("\"{}\"", name.replace('"', " ")),
+                    artifact_types: Vec::new(),
+                    languages: Vec::new(),
+                    source_ids: Vec::new(),
+                    limit: Some(12),
+                    lifecycle_statuses: Vec::new(),
+                    folder_id: None,
+                    modified_after: reviewed_at.as_deref().map(|at| at.get(..10).unwrap_or(at).to_owned()),
+                    modified_before: None,
+                })
+                .await
+                .unwrap_or_default();
+            let mut seen = Vec::new();
+            for hit in found.iter().filter(|hit| hit.artifact_id != summary.id) {
+                if seen.contains(&hit.artifact_id) || seen.len() >= 5 {
+                    continue;
+                }
+                seen.push(hit.artifact_id.clone());
+                let mention = ledger.handle_for(
+                    EvidenceKind::Passage,
+                    &hit.artifact_id,
+                    Some(&hit.chunk_id),
+                    &hit.title,
+                    &hit.path,
+                    hit.status.as_deref(),
+                );
+                lines.push(format!("Mentioned since in [{mention}] {}.", hit.path));
+            }
+            if seen.is_empty() {
+                lines.push("No newer file in the workspace mentions it by name.".to_owned());
+            }
+        }
+        // What was said was wrong, in the person's own words, about this file's name.
+        let corrections = self
+            .storage
+            .open_agent_corrections(ledger.workspace_id(), user_id, 20)
+            .await
+            .unwrap_or_default();
+        for correction in corrections
+            .iter()
+            .filter(|text| text.to_lowercase().contains(&summary.title.to_lowercase()))
+            .take(3)
+        {
+            lines.push(format!("Your correction (not reviewed): {}", shorten(correction, 200)));
+        }
+        lines.push("Weigh these, say what you could not check, and propose verified, needs review or outdated with the reasons; the person confirms.".to_owned());
+        Ok(ToolOutput {
+            for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
+            handles: vec![handle],
+        })
     }
 }
 

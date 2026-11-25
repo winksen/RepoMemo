@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.65 (2026-11-24)
+
+CAIRN can draft a review of a file that is due.
+
+### Added
+- **Review a file.** In Agent mode CAIRN has a *Review a file* tool that gathers the facts around a file since it was last verified: its state and who verified it and when, any review note (quoted as data), whether it was superseded, how many versions it has and how many came after the last verification, up to five newer files that mention it by name (as handles it can cite), and your open corrections that name it. The tool only gathers; CAIRN weighs the facts, says what it could not check, and proposes *verified*, *needs review* or *outdated* with its reasons through the status change it already has, which you confirm.
+- **As a routine.** The routines screen has a *Use the review template* button that fills a weekly routine asking CAIRN to review the first five files waiting for review.
+- No migration or setting changes.
+
+### Checks
+- Formatted and linted for the touched crates; typecheck passes; tests not run, and no test covers the new tool. Nothing was built or run.
+- Not in this release: a button in the review queue itself. Ask in a chat ("review the files waiting for review") or use the routine. Memory cards are not covered, only files.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.64 (2026-11-24)
 
 A routine can run when files arrive or become outdated.

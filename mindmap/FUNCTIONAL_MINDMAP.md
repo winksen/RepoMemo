@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.64` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.65` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.65 — CAIRN can draft a review of a file that is due.
+
+- **Review assistant.** CAIRN can look at a file waiting for review, gather what changed since it was last verified, and propose a state with reasons for you to confirm. A routine template does it weekly.
+
+Checks: fmt and clippy for the touched crates and typecheck pass; nothing was run.
 
 ## V0.9.64 — A routine can run when files arrive or become outdated.
 

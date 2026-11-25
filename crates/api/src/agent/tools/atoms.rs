@@ -366,7 +366,7 @@ impl RepoMemoCore {
     }
 
     /// The file a name, a path or an id means in this workspace: the one file, or what to say instead.
-    async fn tool_file(
+    pub(in crate::agent) async fn tool_file(
         &self,
         ledger: &EvidenceLedger,
         file: &str,

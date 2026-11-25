@@ -257,6 +257,17 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
             }),
         ));
     }
+    // Review assistance (V0.9.65): the facts around a file that is due for review.
+    tools.push(atom(
+        "review_file",
+        "Review a file",
+        "Gather what changed around a file since it was last verified: its state and last review, its versions since, newer files that mention it by name, and your open corrections about it. Use it when asked to review a file or the items waiting for review, then weigh the facts, say what you could not check, and propose verified, needs review or outdated with the reasons.",
+        json!({
+            "type": "object",
+            "properties": { "file": { "type": "string", "description": "A handle you were given (E1) or the file's name" } },
+            "required": ["file"]
+        }),
+    ));
     // Tasks and projects, read-only (V0.9.58).
     tools.extend([
         atom(
@@ -681,6 +692,7 @@ impl RepoMemoCore {
             "read_file" | "file_facts" => arg_text(arguments, "file"),
             "list_files" => arg_text(arguments, "filter"),
             "search_chats" => arg_text(arguments, "query"),
+            "review_file" => arg_text(arguments, "file"),
             "get_task" | "propose_task_comment" | "propose_task_status" => arg_text(arguments, "key"),
             "propose_task" => arg_text(arguments, "title"),
             "get_project" => arg_text(arguments, "name"),
@@ -761,6 +773,10 @@ impl RepoMemoCore {
                     &arg_text(arguments, "words"),
                 )
                 .await
+            }
+            "review_file" => {
+                self.tool_review_file(ledger, user_id, &arg_text(arguments, "file"))
+                    .await
             }
             "get_task" => self.tool_get_task(ledger, &arg_text(arguments, "key")).await,
             "get_project" => self.tool_get_project(ledger, &arg_text(arguments, "name")).await,
