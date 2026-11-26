@@ -2,13 +2,15 @@
 
 > **Current:** `V0.9.32` (2026-11-21); no 0.10 row is built yet.
 
-> **Theme:** Pilot proof and public release candidate · **Baseline:** the CAIRN line's closing candidate (V0.9.70) · **Related:** [Roadmap](ROADMAP.md#the-010x-line-pilot-proof-and-public-release-candidate) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
+> **Theme:** Pilot proof and public release candidate · **Baseline:** the CAIRN line's closing candidate (V0.9.119) · **Related:** [Roadmap](ROADMAP.md#the-010x-line-pilot-proof-and-public-release-candidate) · [Functional readiness report](analysis/2026-10-29-team-readiness.md)
 
 **Status:** proposed on 2026-10-29 as the 0.9 pilot rows; moved here unchanged on 2026-11-22 when the 0.9 line became the [CAIRN line](RELEASES_0.9.md). Formerly V0.9.33 to V0.9.45, and V0.9.0 to V0.9.12 in the readiness report: V0.10.N is the report's 0.9.N. No row below is shipped or a release commitment. One intended commit per row, named `Update V0.N.P`, with a short body describing the change. Split oversized rows before implementation and renumber only unshipped rows. Update the changelog, user/API guides, mindmaps, archive compatibility and focused checks with the implementation, not in this planning change. No product version is bumped by this plan.
 
-**Entry:** Required 0.5–0.8 outcomes are implemented; conditional deferrals and supported integrations/platforms are explicit; the CAIRN line has closed with its evaluation and security review (V0.9.68 to V0.9.70). This line freezes features and closes observed failures.
+**Entry:** Required 0.5–0.8 outcomes are implemented; conditional deferrals and supported integrations/platforms are explicit; the CAIRN line has closed with its evaluation and security review (V0.9.68, V0.9.117 to V0.9.119). This line freezes features and closes observed failures.
 
-**Exit:** Named pilots and exact-candidate release evidence satisfy the non-waivable access, data integrity, accessibility and recoverability gates, including CAIRN's journeys; the maintainer can approve a concrete 1.0 artifact set.
+**Exit:** Named pilots and exact-candidate release evidence satisfy the non-waivable access, data integrity, accessibility and recoverability gates, including CAIRN's journeys; the pilot's findings are handed to the [0.11 polish line](RELEASES_0.11.md), which ends with the release candidate.
+
+**Moved on 2026-11-25:** V0.10.12 *Release candidate* is now [V0.11.68](RELEASES_0.11.md): the 0.11 polish line follows the pilot, and a candidate frozen before it would be invalidated by its first commit. The [polish plan](plans/2026-11-25-0.11-polish.md#decisions-to-agree-before-v0111) also proposes running the pilot's observation rows (V0.10.4 onwards) after the 0.11 project screens (decision D1).
 
 **Scope control:** local OCR (0.6.22), a second tracker (0.8.7) and a second chat adapter (0.8.10) require a pilot owner before implementation. Jira/Slack are the default first choices; pilot evidence may select Linear/Teams instead before work starts. Record a deferral and narrow the supported feature list when a conditional item is not justified. Access boundaries, trustworthy evidence, recovery and publication isolation are mandatory. The pilot observes CAIRN in Agent mode as part of the promise; a CAIRN feature without evidence is narrowed rather than claimed. Full details and pilot thresholds are in the [readiness report](analysis/2026-10-29-team-readiness.md).
 
@@ -31,7 +33,6 @@
 | **V0.10.9** | 🔜 | AM. Public readiness | 📘 | Distribution rehearsal | Validate downloadable candidate images/installers and signatures for each claimed platform | A clean machine installs, upgrades and removes the real artifacts; digests, SBOM, provenance, signing and update behavior are recorded where claimed |
 | **V0.10.10** | 🔜 | AM. Public readiness | 📘 | Support contract | Publish supported versions/platforms, upgrade policy, backup expectations and support/incident routes | A new operator knows what is supported and how to recover or report a problem; API/archive compatibility commitments, the write-precondition rule (V0.6.18) and deprecation policy are explicit |
 | **V0.10.11** | 🔜 | AM. Public readiness | 📘 | Pilot acceptance | Review week-two usage and the full readiness matrix, then close observed product blockers | All required report gates pass with linked evidence; unresolved failures produce focused pre-1.0 fix rows rather than an assumed waiver |
-| **V0.10.12** | 🔜 | AM. Public readiness | 📘 | Release candidate | Freeze the final candidate and repeat affected checks on its exact commit | Documentation, release notes, migrations, CI and manual records name the same candidate; a subsequent code change invalidates affected sign-offs |
 
 ## Verification and handoff
 

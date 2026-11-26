@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.69` (2026-10-29). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.70` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.70 — The administration of CAIRN is planned; nothing changes for people yet.
+
+- **Plan.** CAIRN's administration is recorded as rows V0.9.70 to V0.9.119: a model catalog kept once per server, models chosen per organization and narrowed per workspace, a model picker in the chat, guardrails, abilities and personal preferences. [ADR 0007](../docs/decisions/0007-cairn-models-are-a-system-catalog-chosen-per-organization.md) records the decision.
+
+Checks: docs only; no code changed; nothing was run.
 
 ## V0.9.69 — The CAIRN guides, API reference and settings are complete.
 

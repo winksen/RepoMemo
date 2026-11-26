@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.70 (2026-11-26)
+
+CAIRN's administration is planned; nothing changes for people yet.
+
+### Documentation
+- **Plan.** `mindmap/plans/2026-11-26-0.9-cairn-administration.md` plans rows V0.9.70 to V0.9.119: administrators of CAIRN, an administration page, a model catalog kept once per server, models chosen per organization and narrowed per workspace, a model picker, guardrails and limits, abilities, memory and preferences, and the closing review, guides and evidence.
+- **Decision.** [ADR 0007](docs/decisions/0007-cairn-models-are-a-system-catalog-chosen-per-organization.md) records that models are a system catalog chosen per organization.
+- **Indexes.** The roadmap and the 0.9 index name the new rows, the line evidence row moves from V0.9.70 to V0.9.119, and a 0.11 index exists for the polish line.
+
+### Checks
+- Docs only; no code changed and nothing was run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.69 (2026-11-24)
 
 The CAIRN guides, API reference and settings are complete.
