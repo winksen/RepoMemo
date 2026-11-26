@@ -3325,3 +3325,58 @@ async fn a_workspace_chooses_its_embedding_and_vision_models_from_what_its_organ
     assert!(audit.contains("workspace_cairn_model_chosen"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn the_old_workspace_provider_route_is_read_only_on_a_real_server() {
+    let data_dir = temp_data_dir("provider-forms-retired");
+    let mut config = ServerConfig::for_test(data_dir.clone());
+    config.legacy_provider_forms = false;
+    let app = router(config).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "retired-root@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &root,
+            json!({"name": "Retired Org"}),
+        )
+        .await,
+    )
+    .await;
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "Retired Space", "organization_id": organization["id"]}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+    let uri = format!("/v1/workspaces/{workspace_id}/ai-providers");
+    assert_eq!(
+        send("GET", uri.clone(), &root, Value::Null).await.status(),
+        200,
+        "the resolved view stays readable"
+    );
+    let refused = send(
+        "PUT",
+        uri,
+        &root,
+        json!({"provider_type": "ollama", "name": "Local", "base_url": "http://127.0.0.1:11434", "model": "llama3.1:8b", "enabled": true}),
+    )
+    .await;
+    assert_eq!(refused.status(), 410);
+    let message = response_json(refused).await.to_string();
+    assert!(
+        message.contains("CAIRN administration page") && message.contains("Settings › AI"),
+        "{message}"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

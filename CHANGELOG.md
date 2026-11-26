@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.90 (2026-11-26)
+
+The workspace provider forms are retired.
+
+### Changed
+- **No provider forms in Settings › AI.** The three forms (text, vision and embedding) are gone. Settings › AI now shows the models of the workspace's organization with the workspace's choices (V0.9.85), the embedding and vision model choices (V0.9.89) with the embedding progress line that used to sit in the embedding form, and the AI policy, repositories and the rest as before. Models are added by a CAIRN administrator on the CAIRN administration page, chosen by the organization and then by the workspace.
+- **The old route says where to go.** `PUT /v1/workspaces/{id}/ai-providers` now answers `410 Gone` with a message that names the administration page, Settings › AI and the routes `PUT /v1/workspaces/{id}/cairn` and `/cairn/models/{purpose}`. `GET /v1/workspaces/{id}/ai-providers` still lists the workspace's providers, including the ones made from the catalog, read only, and the connection test on a provider stays.
+- **The API guide.** The routes page says so (see `mindmap/technical/api-reference.md`), and the user guide no longer tells a workspace owner to configure a provider in Settings › AI integration: a CAIRN administrator and the organization decide which models exist, and the workspace chooses among them.
+- **A switch for the tests.** The tests of this repository that set up a mock model server through the old route could not do it any more, so `ServerConfig::for_test` keeps the route writable (`legacy_provider_forms`); no environment variable turns it on in a real server. Moving those tests to the catalog is left for later.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (a real configuration answers `410` with the pointer and the read stays open) was added; tests not run. Two client tests of the removed form went with it. The tests that configure a mock provider through the old route were not changed and rely on the test-only switch.
+
+### Upgrading
+- A script that wrote providers per workspace must use the catalog: ask a CAIRN administrator to add the connection and model, have the organization enable it, and choose it in the workspace. Providers already set up keep working, and were moved into the catalog when the server started (V0.9.78).
+
 ## V0.9.89 (2026-11-26)
 
 A workspace chooses its embedding and vision models from the catalog.

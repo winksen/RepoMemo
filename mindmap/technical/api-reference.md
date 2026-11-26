@@ -490,7 +490,7 @@
 | GET | `/v1/workspaces/{workspace_id}/metrics` | auth | require_workspace_read | — | WorkspaceMetricsResponse |
 | GET | `/v1/workspaces/{workspace_id}/capabilities` | auth | require_workspace_read | — | WorkspaceCapabilities |
 | GET | `/v1/workspaces/{workspace_id}/ai-providers` | auth | require_workspace_admin | — | Vec<SharedAiProviderSettings |
-| PUT | `/v1/workspaces/{workspace_id}/ai-providers` | managing | require_workspace_admin | SaveAiProviderRequest | SharedAiProviderSettings |
+| PUT | `/v1/workspaces/{workspace_id}/ai-providers` | managing | require_workspace_admin | SaveAiProviderRequest | `410 Gone` since V0.9.90: models are chosen from the catalog (see the `/cairn` routes) |
 | GET | `/v1/workspaces/{workspace_id}/ai-policy` | auth | require_workspace_read | — | AiPolicyResponse |
 | PUT | `/v1/workspaces/{workspace_id}/ai-policy` | managing | require_workspace_admin | UpdateAiPolicyRequest | AiPolicyResponse |
 | POST | `/v1/workspaces/{workspace_id}/ai-providers/{provider_id}/test` | auth | require_workspace_admin | — | ProviderTestResult |

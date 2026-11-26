@@ -529,7 +529,7 @@ See the [team-access reference](TEAM_ACCESS.md) for how each works.
 
 ## 10. AI: optional, explicit, safe
 
-Nothing goes to an AI service until a workspace owner or admin configures one in **Settings › AI integration**.
+Nothing goes to an AI service until a CAIRN administrator has added a connection and model, the organization has chosen to use it and a workspace owner or admin has chosen among its models in **Settings › AI**.
 
 | Provider | Where your text goes |
 |---|---|
@@ -653,5 +653,5 @@ To set expectations:
 | Check what has gone stale | **Health** and **Map** |
 | Hand work to someone | **Tasks**, or `@mention` in a comment or a task |
 | Bring in a codebase | **Settings › Repositories** *(admins)* |
-| Turn on AI | **Settings › AI integration** *(admins)* |
+| Choose the AI models | **Settings › AI** *(admins)*, after a CAIRN administrator adds them and the organization chooses |
 | Run the server | **System** *(system admins)* |

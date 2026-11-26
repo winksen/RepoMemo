@@ -1,7 +1,6 @@
 import { type FormEvent, useEffect } from "react";
 import { PencilSimple as Pencil, Gear as Settings, Trash } from "@phosphor-icons/react";
 import { deleteSharedWorkspace, getSharedWorkspaceMetrics, updateSharedWorkspace } from "../../lib/sharedApi";
-import { type SharedAiProviderSettings } from "../../types";
 import { Button } from "../../components/ui/button";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { useConfirm } from "../../components/ui/confirm-dialog";
@@ -9,7 +8,6 @@ import { EmptyState } from "../../components/ui/empty-state";
 import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { AiPolicySettings } from "../../components/AiPolicySettings";
-import { AiProviderForm } from "../../components/AiProviderForm";
 import { WorkspaceCairnPanel } from "./WorkspaceCairnPanel";
 import { ConnectorSettings } from "../../components/ConnectorsPanel";
 import { WorkspaceExportSettings } from "../../components/WorkspaceExportSettings";
@@ -22,7 +20,7 @@ import { INDEX_POLL_ATTEMPTS, INDEX_POLL_INTERVAL_MS } from "../constants";
 import { apiMessage } from "../format";
 import { useUnsavedChanges } from "../../lib/unsavedChanges";
 import { parseRoute } from "../router";
-import { useAiProviders, useMetrics } from "./data";
+import { useMetrics } from "./data";
 import { type WorkspacePage, sectionState } from "./page";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { showToast } from "../../components/ui/toast";
@@ -33,7 +31,6 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
   const useS = sectionState(page.store, "settings");
   const confirm = useConfirm();
   const [workspaceName, setWorkspaceName] = useS("workspaceName", workspace.workspace.name);
-  const [aiProviders, setAiProviders] = useAiProviders(accessToken, workspaceId, canManageMembers);
   const [workspaceMetrics, setWorkspaceMetrics] = useMetrics(accessToken, workspaceId);
   const embeddedChunks = workspaceMetrics?.embedded_chunk_count ?? null;
   const totalChunks = workspaceMetrics?.chunk_count ?? 0;
@@ -86,22 +83,13 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
     } catch (requestError) { setError(apiMessage(requestError)); } finally { setIsSubmitting(false); }
   }
 
-  function onProviderSaved(saved: SharedAiProviderSettings) {
-    setAiProviders((current) => [saved, ...current.filter((entry) => entry.id !== saved.id)]);
-    // Saving an image provider makes the server retry images that were waiting.
-    void load();
-  }
-
   return (
           <section className="shared-settings-section">
             {canManageMembers ? <>
               <WorkspaceCustomization accessToken={accessToken} onSaved={onWorkspaceUpdated} workspace={workspace.workspace}>
                 <TemplateSettings accessToken={accessToken} embedded key={`template-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
               </WorkspaceCustomization>
-              <WorkspaceCairnPanel accessToken={accessToken} key={`cairn-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
-              <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="text" workspaceId={workspace.workspace.id} />
-              <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="vision" workspaceId={workspace.workspace.id} />
-              <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="embedding" status={embeddingStatus} workspaceId={workspace.workspace.id} />
+              <WorkspaceCairnPanel accessToken={accessToken} embeddingStatus={embeddingStatus} key={`cairn-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
               <AiPolicySettings accessToken={accessToken} key={`ai-policy-${workspace.workspace.id}`} onSaved={() => void load()} workspaceId={workspace.workspace.id} />
               <RepositorySettings accessToken={accessToken} key={`repositories-${workspace.workspace.id}`} onChanged={() => void load()} workspaceId={workspace.workspace.id} />
               <ConnectorSettings accessToken={accessToken} key={`connectors-${workspace.workspace.id}`} onChanged={() => void load()} workspaceId={workspace.workspace.id} />

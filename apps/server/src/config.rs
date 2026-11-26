@@ -195,6 +195,9 @@ pub struct ServerConfig {
     pub cairn_max_run_tokens: i64,
     /// The most files one analysis reads in a CAIRN run, in batches of eight (V0.9.62).
     pub cairn_background_max_files: i64,
+    /// Keeps the old workspace provider route writable (V0.9.90). Off on a real server, where a write answers `410` and says where
+    /// models are chosen now; only the tests that set up a mock provider through it turn it on.
+    pub legacy_provider_forms: bool,
     /// What is logged, how it is printed and whether it is kept in files.
     pub logging: LogSettings,
     /// A new server shows an onboarding that creates its first system
@@ -513,6 +516,7 @@ impl ServerConfig {
             cairn_max_run_seconds: env_parse("REPOMEMO_CAIRN_MAX_RUN_SECONDS", 90)?,
             cairn_max_run_tokens: env_parse("REPOMEMO_CAIRN_MAX_RUN_TOKENS", 0)?,
             cairn_background_max_files: env_parse("REPOMEMO_CAIRN_BACKGROUND_MAX_FILES", 200)?,
+            legacy_provider_forms: false,
             logging: LogSettings::from_env()?,
             setup_wizard: env_flag("REPOMEMO_SETUP_WIZARD", true)?,
             web_dir,
@@ -613,6 +617,7 @@ impl ServerConfig {
             cairn_max_run_seconds: 90,
             cairn_max_run_tokens: 0,
             cairn_background_max_files: 200,
+            legacy_provider_forms: true,
             logging: LogSettings {
                 to_file: false,
                 ..LogSettings::default()
@@ -865,6 +870,7 @@ pub(crate) struct RuntimeSettings {
     pub(crate) cairn_max_run_seconds: i64,
     pub(crate) cairn_max_run_tokens: i64,
     pub(crate) cairn_background_max_files: i64,
+    pub(crate) legacy_provider_forms: bool,
     pub(crate) system_admin_emails: Vec<String>,
     pub(crate) logging: LogSettings,
 }
@@ -915,6 +921,7 @@ impl RuntimeSettings {
             cairn_max_run_seconds: config.cairn_max_run_seconds,
             cairn_max_run_tokens: config.cairn_max_run_tokens,
             cairn_background_max_files: config.cairn_background_max_files,
+            legacy_provider_forms: config.legacy_provider_forms,
             system_admin_emails: config.system_admin_emails.clone(),
             logging: config.logging.clone(),
         }

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.89` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.90` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.90 — The workspace provider forms are retired.
+
+- **Settings › AI no longer has provider forms.** A workspace shows the models its organization offers, the workspace's own default, and its embedding and vision models, all chosen from the catalog. An old script that writes a provider to a workspace is told, with a `410`, where models are chosen now; reading the workspace's providers still works.
+
+Checks: formatted, linted and type-checked; docs:check; test added, not run.
 
 ## V0.9.89 — A workspace chooses its embedding and vision models from the catalog.
 

@@ -108,6 +108,13 @@ pub(crate) async fn save_workspace_ai_provider(
     Json(request): Json<SaveAiProviderRequest>,
 ) -> Result<Json<SharedAiProviderSettings>, ApiError> {
     require_workspace_admin(&state, &subject, &workspace_id).await?;
+    // Models are chosen from the catalog now (V0.9.90): connections and models by a CAIRN administrator, the organization's choice and
+    // then the workspace's. The route stays readable, so a script can still see what each purpose resolves to.
+    if !state.settings().legacy_provider_forms {
+        return Err(ApiError::gone(format!(
+            "AI providers are no longer set up per workspace. A CAIRN administrator adds connections and models on the CAIRN administration page (Models), the organization chooses which it uses, and a workspace chooses among them in Settings › AI or with PUT /v1/workspaces/{workspace_id}/cairn and /v1/workspaces/{workspace_id}/cairn/models/{{purpose}}."
+        )));
+    }
     let provider_id = request.id.unwrap_or_default();
     let existing = if provider_id.trim().is_empty() {
         None
