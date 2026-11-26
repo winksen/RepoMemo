@@ -540,6 +540,20 @@ impl StorageEngine {
         Ok(paused)
     }
 
+    /// The organization's knowledge workspace for a workspace of it: none when the organization has not chosen one, and none for the
+    /// knowledge workspace itself. The server still checks that the person can read it.
+    pub async fn knowledge_workspace_for(&self, workspace_id: &str) -> Result<Option<String>> {
+        let Some(organization_id) = self.workspace_organization(workspace_id).await? else {
+            return Ok(None);
+        };
+        let chosen = self
+            .get_organization_cairn_settings(&organization_id)
+            .await?
+            .policy
+            .knowledge_workspace_id;
+        Ok(chosen.filter(|knowledge| knowledge != workspace_id))
+    }
+
     /// The organization's instructions for CAIRN that apply in a workspace, with the version of the settings they were saved in.
     pub async fn organization_instructions_for_workspace(&self, workspace_id: &str) -> Result<Option<(String, i64)>> {
         let Some(organization_id) = self.workspace_organization(workspace_id).await? else {
@@ -1049,6 +1063,7 @@ mod tests {
                     model_roles: Default::default(),
                     guardrails: Default::default(),
                     instructions: String::new(),
+                    knowledge_workspace_id: None,
                 },
                 &setup.actor,
             )

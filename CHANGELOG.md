@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.110 (2026-11-26)
+
+An organization's knowledge workspace is offered in all of its workspaces.
+
+### Added
+- **Knowledge workspace.** A dropdown in the organization's CAIRN settings chooses one of its workspaces, or none. Choosing is a versioned change to the settings, and the audit event holds the choice before and after.
+- **Memory cards.** In every other workspace of the organization, an Agent-mode run is also given up to three current memory cards of the knowledge workspace that match the message, after the workspace's own five. A card that needs review is never offered from there. In the prompt each is marked "current, from the organization's knowledge workspace".
+- **Playbooks.** Its verified playbooks join the workspace's own in the prompt and in `load_playbook`, up to the usual 20. When both have a playbook of one name, the workspace's own is used.
+- **Only for people who can read it.** The server gives a run the knowledge workspace only when the person can read it (a member of it, or a system administrator) and a personal access token reaches it. Anyone else gets the run they had before; nothing from it is named or hinted.
+- **Not itself.** The knowledge workspace does not offer itself to itself.
+
+### Not yet
+- **Jobs mode** and the other ways to read memory (the + menu's memory jobs, search) do not include the knowledge workspace.
+- **Opening a card.** A card from the knowledge workspace is cited by its handle; opening it in the chat uses its own workspace, which the person can read, but this was not tried.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. One existing unit test (the team memory block) was adjusted for the new marker. No test was run and nothing was tried against a model or with two people.
+
+### Upgrading
+- Nothing to do. No migration: the choice is part of the stored settings and an organization with none reads as no knowledge workspace.
+
 ## V0.9.109 (2026-11-26)
 
 An organization's instructions are read into every run in its workspaces.

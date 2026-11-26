@@ -11,6 +11,8 @@ use crate::RepoMemoCore;
 
 /// The most cards a run starts with.
 pub const TEAM_MEMORY_CARDS: usize = 5;
+/// The most cards of the organization's knowledge workspace added to a run's (V0.9.110).
+pub const KNOWLEDGE_CARDS: usize = 3;
 /// The most characters of a card's text given to the model.
 const CARD_CHARS: usize = 220;
 
@@ -61,11 +63,15 @@ pub(in crate::agent) fn rank_cards(cards: Vec<MemoryCardSummary>, words: &[Strin
 }
 
 /// The *Team memory* block of the system message, one line a card.
-pub(in crate::agent) fn team_memory_block(cards: &[(String, MemoryCardSummary)]) -> String {
+pub(in crate::agent) fn team_memory_block(cards: &[(String, MemoryCardSummary)], own_workspace_id: &str) -> String {
     let lines = cards
         .iter()
         .map(|(handle, card)| {
-            let state = if card.needs_review { "needs review" } else { "current" };
+            let state = match (card.needs_review, card.workspace_id == own_workspace_id) {
+                (true, _) => "needs review",
+                (false, true) => "current",
+                (false, false) => "current, from the organization's knowledge workspace",
+            };
             let text = card.body_excerpt.split_whitespace().collect::<Vec<_>>().join(" ");
             let text: String = text.chars().take(CARD_CHARS).collect();
             format!("[{handle}] {} ({state}): {text}", card.title)
@@ -87,7 +93,20 @@ impl RepoMemoCore {
         message: &str,
     ) -> Option<String> {
         let cards = self.storage.list_memory_cards(workspace_id).await.ok()?;
-        let found = rank_cards(cards, &significant_words(message));
+        let words = significant_words(message);
+        let mut found = rank_cards(cards, &words);
+        // The organization's knowledge workspace adds its current cards, after the workspace's own (V0.9.110).
+        if let Some(knowledge) = ledger.knowledge_workspace().map(str::to_owned) {
+            if let Ok(shared) = self.storage.list_memory_cards(&knowledge).await {
+                let current = shared.into_iter().filter(|card| !card.needs_review).collect();
+                let added: Vec<MemoryCardSummary> = rank_cards(current, &words)
+                    .into_iter()
+                    .take(KNOWLEDGE_CARDS)
+                    .filter(|card| !found.iter().any(|known| known.id == card.id))
+                    .collect();
+                found.extend(added);
+            }
+        }
         if found.is_empty() {
             return None;
         }
@@ -95,7 +114,7 @@ impl RepoMemoCore {
             .into_iter()
             .map(|card| (ledger.card_handle_for(&card), card))
             .collect::<Vec<_>>();
-        Some(team_memory_block(&with_handles))
+        Some(team_memory_block(&with_handles, workspace_id))
     }
 }
 
@@ -155,14 +174,19 @@ mod tests {
 
     #[test]
     fn the_block_marks_a_card_that_needs_review_and_tells_cairn_to_prefer_a_current_one() {
-        let block = team_memory_block(&[
-            (
-                "M1".to_owned(),
-                card("a", "Retry decision", "Capped at five.", false, 1),
-            ),
-            ("M2".to_owned(), card("b", "Old rule", "Three retries.", true, 1)),
-        ]);
-        assert!(block.contains("[M1] Retry decision (current): Capped at five."));
+        let block = team_memory_block(
+            &[
+                (
+                    "M1".to_owned(),
+                    card("a", "Retry decision", "Capped at five.", false, 1),
+                ),
+                ("M2".to_owned(), card("b", "Old rule", "Three retries.", true, 1)),
+                ("M3".to_owned(), card("c", "Shared rule", "Reviewed yearly.", false, 1)),
+            ],
+            "w2",
+        );
+        assert!(block
+            .contains("[M1] Retry decision (current, from the organization's knowledge workspace): Capped at five."));
         assert!(block.contains("[M2] Old rule (needs review): Three retries."));
         assert!(block.contains("Prefer a card that is current"));
         assert!(block.contains("say when they disagree"));

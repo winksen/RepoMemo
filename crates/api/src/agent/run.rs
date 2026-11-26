@@ -75,6 +75,9 @@ Write the answer in this shape:
 /// What the server gives a run: how the model takes tools, the budgets, what the person may do and how to pay for a model call.
 #[derive(Clone)]
 pub struct AgentLoopSetup {
+    /// The organization's knowledge workspace the person may read (V0.9.110): its current memory cards and verified playbooks join
+    /// the run's. The server sets it only after checking that the person can read that workspace.
+    pub knowledge_workspace: Option<String>,
     /// The organization's instructions for CAIRN and the version of the settings they are in (V0.9.109).
     pub organization_instructions: Option<(String, i64)>,
     /// The ability the run follows, when the message ran one.
@@ -834,7 +837,9 @@ impl RepoMemoCore {
             "get_project" => self.tool_get_project(ledger, &arg_text(arguments, "name")).await,
             "load_playbook" => {
                 let wanted = arg_text(arguments, "name");
-                let playbooks = self.workspace_playbooks(&request.workspace_id).await;
+                let playbooks = self
+                    .playbooks_for_run(&request.workspace_id, ledger.knowledge_workspace())
+                    .await;
                 match playbooks
                     .iter()
                     .find(|known| known.name.eq_ignore_ascii_case(wanted.trim()))
@@ -1109,7 +1114,9 @@ impl RepoMemoCore {
     ) -> Result<AgentOutcome> {
         let message = request.message.trim().to_owned();
         let history = window(&request);
-        let playbooks = self.workspace_playbooks(&request.workspace_id).await;
+        let playbooks = self
+            .playbooks_for_run(&request.workspace_id, setup.knowledge_workspace.as_deref())
+            .await;
         let mut tools = loop_tools(setup.can_write, !request.decision_offers_off, !playbooks.is_empty());
         tools.retain(|tool| !setup.disabled_tools.iter().any(|off| off == tool.name));
         // An ability keeps only the tools it names, of the tools the run already has.
@@ -1151,6 +1158,7 @@ impl RepoMemoCore {
         let started = Instant::now();
         let limit = Duration::from_secs(setup.max_seconds.max(1));
         let mut ledger = EvidenceLedger::new(&request.workspace_id);
+        ledger.set_knowledge_workspace(setup.knowledge_workspace.clone());
         // The team's own memory comes first: the cards that match the message, in the prompt as handles (V0.9.50).
         if let Some(block) = self.team_memory(&mut ledger, &request.workspace_id, &message).await {
             messages[0].content = format!("{}\n\n{block}", messages[0].content);
@@ -1521,6 +1529,7 @@ mod tests {
             disabled_tools: Vec::new(),
             ability: None,
             organization_instructions: None,
+            knowledge_workspace: None,
             fallback: None,
             can_write,
             user_id: String::new(),

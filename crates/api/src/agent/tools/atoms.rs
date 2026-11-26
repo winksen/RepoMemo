@@ -76,6 +76,8 @@ pub(in crate::agent) struct EvidenceLedger {
     items: Vec<EvidenceItem>,
     /// The memory cards the run was given, with handles `M1`, `M2`, … (V0.9.50).
     cards: Vec<(String, repomemo_domain::MemoryCardSummary)>,
+    /// The organization's knowledge workspace whose memory cards and playbooks the run may use (V0.9.110).
+    knowledge_workspace: Option<String>,
 }
 
 impl EvidenceLedger {
@@ -84,7 +86,16 @@ impl EvidenceLedger {
             workspace_id: workspace_id.to_owned(),
             items: Vec::new(),
             cards: Vec::new(),
+            knowledge_workspace: None,
         }
+    }
+
+    pub fn set_knowledge_workspace(&mut self, workspace_id: Option<String>) {
+        self.knowledge_workspace = workspace_id;
+    }
+
+    pub fn knowledge_workspace(&self) -> Option<&str> {
+        self.knowledge_workspace.as_deref()
     }
 
     pub fn workspace_id(&self) -> &str {

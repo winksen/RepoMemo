@@ -103,6 +103,7 @@ fn setup() -> AgentLoopSetup {
         disabled_tools: Vec::new(),
         ability: None,
         organization_instructions: None,
+        knowledge_workspace: None,
         fallback: None,
         can_write: true,
         user_id: String::new(),

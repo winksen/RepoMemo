@@ -266,6 +266,30 @@ impl RepoMemoCore {
             .collect()
     }
 
+    /// The playbooks a run is offered: the workspace's own, then those of the organization's knowledge workspace whose names the
+    /// workspace does not already use (V0.9.110), at most [`PLAYBOOKS_MAX`].
+    pub(in crate::agent) async fn playbooks_for_run(
+        &self,
+        workspace_id: &str,
+        knowledge: Option<&str>,
+    ) -> Vec<Playbook> {
+        let mut playbooks = self.workspace_playbooks(workspace_id).await;
+        if let Some(knowledge) = knowledge {
+            for playbook in self.workspace_playbooks(knowledge).await {
+                if playbooks.len() >= PLAYBOOKS_MAX {
+                    break;
+                }
+                if !playbooks
+                    .iter()
+                    .any(|known| known.name.eq_ignore_ascii_case(&playbook.name))
+                {
+                    playbooks.push(playbook);
+                }
+            }
+        }
+        playbooks
+    }
+
     /// The workspace's playbooks that are verified and well formed, as the header and steps CAIRN is offered.
     pub(in crate::agent) async fn workspace_playbooks(&self, workspace_id: &str) -> Vec<Playbook> {
         let Ok(folders) = self.storage.list_folders(workspace_id).await else {

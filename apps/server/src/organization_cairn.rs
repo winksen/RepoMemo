@@ -35,6 +35,9 @@ pub(crate) struct SettingsRequest {
     /// The organization's instructions for CAIRN (V0.9.109).
     #[serde(default)]
     instructions: String,
+    /// The organization's knowledge workspace (V0.9.110).
+    #[serde(default)]
+    knowledge_workspace_id: Option<String>,
     /// The version the caller read; 0 for an organization that never saved any.
     expected_version: i64,
 }
@@ -327,6 +330,21 @@ pub(crate) async fn update_settings(
     }
     let model_roles = crate::workspace_cairn::checked_model_roles(request.model_roles, &enabled)?;
     let guardrails = checked_guardrails(request.guardrails)?;
+    // The knowledge workspace is a workspace of the organization.
+    let knowledge_workspace_id = request.knowledge_workspace_id.filter(|id| !id.trim().is_empty());
+    if let Some(workspace) = &knowledge_workspace_id {
+        let belongs = state
+            .storage
+            .workspace_organization(workspace)
+            .await
+            .map_err(map_storage_error)?
+            .is_some_and(|organization| organization == organization_id);
+        if !belongs {
+            return Err(ApiError::bad_request(
+                "The knowledge workspace is one of the organization's workspaces.",
+            ));
+        }
+    }
     let instructions = request.instructions.trim().to_owned();
     if instructions.chars().count() > repomemo_storage::ORGANIZATION_INSTRUCTIONS_CHARS {
         return Err(ApiError::bad_request(format!(
@@ -346,6 +364,7 @@ pub(crate) async fn update_settings(
         model_roles,
         guardrails,
         instructions,
+        knowledge_workspace_id,
     };
     let saved = state
         .storage
@@ -400,7 +419,9 @@ pub(crate) async fn update_settings(
             before.policy.agent_mode,
             saved.policy.agent_mode
         ) + &format!(
-            " Instructions from {:?} to {:?}. Guardrails from {} to {}. Role limits from {} to {}.",
+            " Knowledge workspace from {:?} to {:?}. Instructions from {:?} to {:?}. Guardrails from {} to {}. Role limits from {} to {}.",
+            before.policy.knowledge_workspace_id,
+            saved.policy.knowledge_workspace_id,
             before.policy.instructions,
             saved.policy.instructions,
             serde_json::to_string(&before.policy.guardrails).unwrap_or_default(),

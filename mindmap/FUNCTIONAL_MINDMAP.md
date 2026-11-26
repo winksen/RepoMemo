@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.109` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.110` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.110 — An organization's knowledge workspace is offered in all of its workspaces.
+
+- **Organization knowledge workspace.** An organization's administrators choose one of its workspaces as its knowledge workspace. Its current memory cards and its verified playbooks are then offered in every other workspace of the organization, in Agent-mode runs, but only to people who can read the knowledge workspace itself. A workspace's own playbook of the same name wins, and a card from the knowledge workspace is marked as coming from it.
+
+Checks: formatted, linted and type-checked; docs:check; one existing test adjusted, not run.
 
 ## V0.9.109 — An organization's instructions are read into every run in its workspaces.
 

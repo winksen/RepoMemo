@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Cloud, HardDrives, Sparkle } from "@phosphor-icons/react";
-import { getOrganizationCairn, listOrganizationCairnModels, saveOrganizationCairn } from "../../lib/sharedApi";
+import { getOrganizationCairn, getSharedOrganizationOverview, listOrganizationCairnModels, saveOrganizationCairn } from "../../lib/sharedApi";
 import { cairnAdminKeys } from "../../lib/queryClient";
 import type { CairnModel, OrganizationCairnSettings } from "../../types";
 import { Badge } from "../../components/ui/badge";
@@ -54,16 +54,18 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
   const toolsOff = guardrails.tools_off;
   const setToolsOff = (tools_off: string[]) => setGuardrails((current) => ({ ...current, tools_off }));
   const [instructions, setInstructions] = useState<string>(settings.instructions ?? "");
+  const [knowledgeId, setKnowledgeId] = useState<string>(settings.knowledge_workspace_id ?? "none");
+  const [workspaces] = useSystemData<{ workspace_id: string; name: string }[]>(cairnAdminKeys.organizationWorkspaces(organizationId), async () => (await getSharedOrganizationOverview(accessToken, organizationId)).workspaces, { failure: "The organization's workspaces could not be loaded.", silentError: true });
   const [isBusy, setIsBusy] = useState(false);
   const textModels = models;
   const defaultChoices = models.filter((model) => model.purpose === "text");
   const defaultId = chosen.includes(fallbackDefault) ? fallbackDefault : (defaultChoices.find((model) => chosen.includes(model.id))?.id ?? "");
-  const dirty = instructions.trim() !== (settings.instructions ?? "").trim() || JSON.stringify([[...chosen].sort(), defaultId || null, mode, limitsFor(roles, chosen), { ...guardrails, tools_off: [...toolsOff].sort() }]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode, settings.model_roles ?? {}, { ...(settings.guardrails ?? { tools_off: [] }), tools_off: [...(settings.guardrails?.tools_off ?? [])].sort() }]);
+  const dirty = instructions.trim() !== (settings.instructions ?? "").trim() || knowledgeId !== (settings.knowledge_workspace_id ?? "none") || JSON.stringify([[...chosen].sort(), defaultId || null, mode, limitsFor(roles, chosen), { ...guardrails, tools_off: [...toolsOff].sort() }]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode, settings.model_roles ?? {}, { ...(settings.guardrails ?? { tools_off: [] }), tools_off: [...(settings.guardrails?.tools_off ?? [])].sort() }]);
 
   async function save() {
     setIsBusy(true);
     try {
-      await saveOrganizationCairn(accessToken, organizationId, { enabled_model_ids: chosen, default_model_id: defaultId || null, agent_mode: mode, model_roles: limitsFor(roles, chosen), guardrails, instructions, expected_version: settings.version });
+      await saveOrganizationCairn(accessToken, organizationId, { enabled_model_ids: chosen, default_model_id: defaultId || null, agent_mode: mode, model_roles: limitsFor(roles, chosen), guardrails, instructions, knowledge_workspace_id: knowledgeId === "none" ? null : knowledgeId, expected_version: settings.version });
       showToast("success", "The organization's CAIRN settings were saved.");
       onSaved();
     } catch (error) { showToast("error", apiMessage(error, "The settings could not be saved.")); }
@@ -88,6 +90,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
     <Field hint="The model the organization's workspaces use unless they choose another of those above." label="Default model"><Dropdown aria-label="Default model" disabled={!canChange || chosen.length === 0} onValueChange={setDefault} options={defaultChoices.filter((model) => chosen.includes(model.id)).map((model) => ({ label: model.display_name, value: model.id }))} placeholder="Choose models first" value={defaultId} /></Field>
     <Field hint="A workspace that chose its own mode keeps it." label="Agent mode"><Dropdown aria-label="Agent mode" disabled={!canChange} onValueChange={setMode} options={MODES} value={mode} /></Field>
     <Field hint={`Read into every run in the organization's workspaces, after the rules and before a workspace's own CAIRN.md. They never change the rules or what a person may do. Each save is a new version, named in the run's trace. At most 4,000 characters.`} label="Instructions for CAIRN"><Textarea disabled={!canChange} maxLength={4000} onChange={(event) => setInstructions(event.target.value)} rows={5} value={instructions} /></Field>
+    <Field hint="Its current memory cards and verified playbooks are offered in the organization's other workspaces, only to the people who can read it." label="Knowledge workspace"><Dropdown aria-label="Knowledge workspace" disabled={!canChange} onValueChange={setKnowledgeId} options={[{ label: "None", value: "none" }, ...(workspaces ?? []).map((workspace) => ({ label: workspace.name, value: workspace.workspace_id }))]} value={knowledgeId} /></Field>
     <ToolSwitches accessToken={accessToken} disabled={!canChange} off={toolsOff} onChange={setToolsOff} />
     <ChangeLimitFields disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     <SecretsSetting disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />

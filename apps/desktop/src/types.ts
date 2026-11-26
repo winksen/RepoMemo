@@ -942,6 +942,8 @@ export interface OrganizationCairnSettings {
   guardrails: Guardrails;
   /** The organization's instructions for CAIRN, read into every run in its workspaces (V0.9.109). */
   instructions?: string;
+  /** The organization's knowledge workspace: its current memory cards and verified playbooks are offered in the other workspaces (V0.9.110). */
+  knowledge_workspace_id?: string | null;
   updated_at: string | null;
   updated_by: string | null;
 }

@@ -335,6 +335,20 @@ pub(crate) async fn run_message(
         .organization_instructions_for_workspace(&workspace_id)
         .await
         .map_err(map_storage_error)?;
+    // The organization's knowledge workspace, only for a person who can read it (V0.9.110).
+    let knowledge_workspace = match state
+        .storage
+        .knowledge_workspace_for(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+    {
+        Some(knowledge) if subject.token_reaches(&knowledge) => {
+            crate::effective_workspace_role(state, &subject.user_id, subject.is_system_admin, &knowledge)
+                .await?
+                .map(|_| knowledge)
+        }
+        _ => None,
+    };
     let instructions_version = organization_instructions.as_ref().map(|(_, version)| *version);
     // The model's fallback, when it has one and may be used (V0.9.80).
     let fallback = match provider.as_ref() {
@@ -361,6 +375,7 @@ pub(crate) async fn run_message(
                 disabled_tools: tools_off.iter().map(|(name, _)| name.clone()).collect(),
                 ability: None,
                 organization_instructions: organization_instructions.clone(),
+                knowledge_workspace,
                 fallback,
                 can_write: !matches!(role, WorkspaceRole::Viewer) && !live.read_only,
                 user_id: subject.user_id.clone(),

@@ -265,6 +265,7 @@ async fn the_scripted_cases_pass_and_meet_the_thresholds() {
                     disabled_tools: Vec::new(),
                     ability: None,
                     organization_instructions: None,
+                    knowledge_workspace: None,
                     fallback: None,
                     can_write: case.role.as_deref() != Some("viewer"),
                     user_id: String::new(),

@@ -125,6 +125,10 @@ pub struct OrganizationCairnPolicy {
     /// instructions' version: a save that changes them is a new version, and the trace of a run names it.
     #[serde(default)]
     pub instructions: String,
+    /// The organization's knowledge workspace (V0.9.110): its current memory cards and verified playbooks are offered in every other
+    /// workspace of the organization, to the people who can read it. None until the organization chooses one.
+    #[serde(default)]
+    pub knowledge_workspace_id: Option<String>,
 }
 
 /// The most characters of the organization's instructions.
@@ -143,6 +147,7 @@ impl Default for OrganizationCairnPolicy {
             model_roles: Default::default(),
             guardrails: Default::default(),
             instructions: String::new(),
+            knowledge_workspace_id: None,
         }
     }
 }
@@ -281,6 +286,7 @@ mod tests {
             model_roles: Default::default(),
             guardrails: Default::default(),
             instructions: String::new(),
+            knowledge_workspace_id: None,
         };
         let CairnSaved::Saved(first) = storage
             .save_organization_cairn_settings(&organization.id, 0, &policy, &owner.id)
