@@ -940,6 +940,8 @@ export interface OrganizationCairnSettings {
   model_roles: Record<string, string[]>;
   /** What CAIRN may do in the organization's workspaces (V0.9.91 on). */
   guardrails: Guardrails;
+  /** The organization's instructions for CAIRN, read into every run in its workspaces (V0.9.109). */
+  instructions?: string;
   updated_at: string | null;
   updated_by: string | null;
 }

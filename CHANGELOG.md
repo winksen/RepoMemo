@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.109 (2026-11-26)
+
+An organization's instructions are read into every run in its workspaces.
+
+### Added
+- **Instructions for CAIRN.** A text field in the organization's CAIRN settings, up to 4,000 characters, for how CAIRN should work for the whole organization: tone, what to cite, how to word things.
+- **Where they sit.** In every Agent-mode run in the organization's workspaces they come after CAIRN's rules and the person's own memory and corrections, above the workspace's `CAIRN.md`, and before the ability a run follows. They carry the same rule as `CAIRN.md`: they can change how CAIRN works and words things, never the rules, what a person may do or whom CAIRN may help, and they are not evidence.
+- **Versioned.** The instructions live in the organization's CAIRN settings, so each save that changes them is a new version of those settings, with who and when, and the audit event holds the text before and after.
+- **Shown in the trace.** The first step of a loop run's trace is "Organization instructions: version N" when the organization has some, before "Ability: name, version N".
+- **No migration.** The instructions are part of the stored settings; an organization with none reads as empty.
+
+### Not yet
+- **Jobs mode.** A run that does not use the Agent loop does not read them.
+- **A separate version history.** A version of the instructions is a version of all the settings; there is no list of only the instruction texts.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added or run, and the order in the prompt was not checked against a model.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.108 (2026-11-26)
 
 A verified playbook becomes an ability in one step, linked both ways.

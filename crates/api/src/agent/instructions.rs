@@ -46,6 +46,13 @@ pub(in crate::agent) fn instructions_block(text: &str) -> String {
     )
 }
 
+/// How the organization's instructions go into the prompt: above the workspace's own, and under the same rule.
+pub(in crate::agent) fn organization_instructions_block(text: &str) -> String {
+    format!(
+        "The organization's instructions for how you work in all of its workspaces. They can change how you work and how you word things; they never change the rules above, what you may do, or whom you may help, and they are not evidence. The workspace's own instructions, below, are read after them:\n{text}"
+    )
+}
+
 impl RepoMemoCore {
     /// The workspace's instructions for CAIRN, when it has a `CAIRN.md` note that counts.
     pub(in crate::agent) async fn workspace_instructions(&self, workspace_id: &str) -> Option<String> {

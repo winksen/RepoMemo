@@ -540,6 +540,16 @@ impl StorageEngine {
         Ok(paused)
     }
 
+    /// The organization's instructions for CAIRN that apply in a workspace, with the version of the settings they were saved in.
+    pub async fn organization_instructions_for_workspace(&self, workspace_id: &str) -> Result<Option<(String, i64)>> {
+        let Some(organization_id) = self.workspace_organization(workspace_id).await? else {
+            return Ok(None);
+        };
+        let settings = self.get_organization_cairn_settings(&organization_id).await?;
+        let text = settings.policy.instructions.trim();
+        Ok((!text.is_empty()).then(|| (text.to_owned(), settings.version)))
+    }
+
     /// What outside agents may do in a workspace (V0.9.101): the stricter of the organization's and the workspace's.
     pub async fn mcp_policy_for_workspace(&self, workspace_id: &str) -> Result<McpPolicy> {
         let mut policy = McpPolicy {
@@ -1038,6 +1048,7 @@ mod tests {
                     agent_mode: mode.to_owned(),
                     model_roles: Default::default(),
                     guardrails: Default::default(),
+                    instructions: String::new(),
                 },
                 &setup.actor,
             )

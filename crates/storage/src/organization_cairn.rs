@@ -121,7 +121,14 @@ pub struct OrganizationCairnPolicy {
     /// What CAIRN may do in the organization's workspaces (V0.9.91 on).
     #[serde(default)]
     pub guardrails: Guardrails,
+    /// The organization's instructions for CAIRN (V0.9.109), read into every run in its workspaces. The settings' version is the
+    /// instructions' version: a save that changes them is a new version, and the trace of a run names it.
+    #[serde(default)]
+    pub instructions: String,
 }
+
+/// The most characters of the organization's instructions.
+pub const ORGANIZATION_INSTRUCTIONS_CHARS: usize = 4_000;
 
 fn auto_mode() -> String {
     "auto".to_owned()
@@ -135,6 +142,7 @@ impl Default for OrganizationCairnPolicy {
             agent_mode: auto_mode(),
             model_roles: Default::default(),
             guardrails: Default::default(),
+            instructions: String::new(),
         }
     }
 }
@@ -272,6 +280,7 @@ mod tests {
             agent_mode: "jobs".to_owned(),
             model_roles: Default::default(),
             guardrails: Default::default(),
+            instructions: String::new(),
         };
         let CairnSaved::Saved(first) = storage
             .save_organization_cairn_settings(&organization.id, 0, &policy, &owner.id)

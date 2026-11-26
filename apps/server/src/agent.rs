@@ -329,6 +329,13 @@ pub(crate) async fn run_message(
         .tools_off_for_workspace(&workspace_id)
         .await
         .map_err(map_storage_error)?;
+    // The organization's instructions for every run in its workspaces (V0.9.109).
+    let organization_instructions = state
+        .storage
+        .organization_instructions_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let instructions_version = organization_instructions.as_ref().map(|(_, version)| *version);
     // The model's fallback, when it has one and may be used (V0.9.80).
     let fallback = match provider.as_ref() {
         Some(provider) if crate::ai::cairn_mode_of(provider) == "agent" => {
@@ -353,6 +360,7 @@ pub(crate) async fn run_message(
                 max_run_tokens: runtime.cairn_max_run_tokens.max(0) as u64,
                 disabled_tools: tools_off.iter().map(|(name, _)| name.clone()).collect(),
                 ability: None,
+                organization_instructions: organization_instructions.clone(),
                 fallback,
                 can_write: !matches!(role, WorkspaceRole::Viewer) && !live.read_only,
                 user_id: subject.user_id.clone(),
@@ -696,24 +704,33 @@ _Ability: {name}, version {version}_",
     }
     // How the message was answered, kept for the person who asked (V0.9.39). A trace that cannot be stored never fails the answer.
     let ended_at = chrono::Utc::now();
+    let ran_loop = loop_trace.is_some();
     let mut trace = loop_trace
         .unwrap_or_else(|| agent_run_trace(&message, &reply, (ended_at - started_at).num_milliseconds().max(0)));
+    // What steered the run is the first thing its trace says: the organization's instructions, then the ability.
+    let mut notes: Vec<String> = Vec::new();
+    if let (Some(version), true) = (instructions_version, ran_loop) {
+        notes.push(format!("Organization instructions: version {version}"));
+    }
     if let Some((name, version)) = &ran_ability {
+        notes.push(format!("Ability: {name}, version {version}"));
+    }
+    for (index, summary) in notes.into_iter().enumerate() {
         trace.steps.insert(
-            0,
+            index,
             repomemo_domain::AgentStep {
-                position: 1,
+                position: 0,
                 kind: "note".to_owned(),
                 tool: None,
-                summary: format!("Ability: {name}, version {version}"),
+                summary,
                 evidence: Vec::new(),
                 duration_ms: 0,
                 error: None,
             },
         );
-        for (index, step) in trace.steps.iter_mut().enumerate() {
-            step.position = index as i64 + 1;
-        }
+    }
+    for (index, step) in trace.steps.iter_mut().enumerate() {
+        step.position = index as i64 + 1;
     }
     let (model, tool_mode) = match (&provider_for_run, provider_model) {
         (Some(_), Some((model, tool_mode))) => (model, Some(tool_mode)),

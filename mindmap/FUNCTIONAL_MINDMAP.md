@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.108` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.109` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.109 — An organization's instructions are read into every run in its workspaces.
+
+- **Organization instructions.** An organization's administrators write instructions for CAIRN (up to 4,000 characters) in its CAIRN settings. They are read into every Agent-mode run in the organization's workspaces, after the rules and before the workspace's own CAIRN.md, under the same rule: they steer how CAIRN works and words things, never what it may do. Each save is a new version, and the run's trace begins with "Organization instructions: version N".
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.108 — A verified playbook becomes an ability in one step, linked both ways.
 

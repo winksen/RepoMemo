@@ -32,6 +32,9 @@ pub(crate) struct SettingsRequest {
     /// What CAIRN may do in the organization's workspaces (V0.9.91 on).
     #[serde(default)]
     guardrails: repomemo_storage::Guardrails,
+    /// The organization's instructions for CAIRN (V0.9.109).
+    #[serde(default)]
+    instructions: String,
     /// The version the caller read; 0 for an organization that never saved any.
     expected_version: i64,
 }
@@ -324,6 +327,13 @@ pub(crate) async fn update_settings(
     }
     let model_roles = crate::workspace_cairn::checked_model_roles(request.model_roles, &enabled)?;
     let guardrails = checked_guardrails(request.guardrails)?;
+    let instructions = request.instructions.trim().to_owned();
+    if instructions.chars().count() > repomemo_storage::ORGANIZATION_INSTRUCTIONS_CHARS {
+        return Err(ApiError::bad_request(format!(
+            "The instructions are at most {} characters.",
+            repomemo_storage::ORGANIZATION_INSTRUCTIONS_CHARS
+        )));
+    }
     if !guardrails.closed_folder_ids.is_empty() {
         return Err(ApiError::bad_request(
             "Folders are closed to CAIRN by each workspace: an organization has no folders of its own.",
@@ -335,6 +345,7 @@ pub(crate) async fn update_settings(
         agent_mode,
         model_roles,
         guardrails,
+        instructions,
     };
     let saved = state
         .storage
@@ -389,7 +400,9 @@ pub(crate) async fn update_settings(
             before.policy.agent_mode,
             saved.policy.agent_mode
         ) + &format!(
-            " Guardrails from {} to {}. Role limits from {} to {}.",
+            " Instructions from {:?} to {:?}. Guardrails from {} to {}. Role limits from {} to {}.",
+            before.policy.instructions,
+            saved.policy.instructions,
             serde_json::to_string(&before.policy.guardrails).unwrap_or_default(),
             serde_json::to_string(&saved.policy.guardrails).unwrap_or_default(),
             serde_json::to_string(&before.policy.model_roles).unwrap_or_default(),

@@ -75,6 +75,8 @@ Write the answer in this shape:
 /// What the server gives a run: how the model takes tools, the budgets, what the person may do and how to pay for a model call.
 #[derive(Clone)]
 pub struct AgentLoopSetup {
+    /// The organization's instructions for CAIRN and the version of the settings they are in (V0.9.109).
+    pub organization_instructions: Option<(String, i64)>,
     /// The ability the run follows, when the message ran one.
     pub ability: Option<AgentAbility>,
     pub tool_mode: ToolMode,
@@ -1122,6 +1124,13 @@ impl RepoMemoCore {
         if let Some(block) = corrections_block(&request.corrections) {
             system = format!("{system}\n\n{block}");
         }
+        // The organization's instructions come after the rules and before the workspace's own CAIRN.md (V0.9.109).
+        if let Some((text, _)) = &setup.organization_instructions {
+            system = format!(
+                "{system}\n\n{}",
+                super::instructions::organization_instructions_block(text)
+            );
+        }
         // The team's instructions come after CAIRN's persona and rules and before the conversation (V0.9.49).
         if let Some(instructions) = self.workspace_instructions(&request.workspace_id).await {
             system = format!("{system}\n\n{}", instructions_block(&instructions));
@@ -1511,6 +1520,7 @@ mod tests {
             max_run_tokens: 0,
             disabled_tools: Vec::new(),
             ability: None,
+            organization_instructions: None,
             fallback: None,
             can_write,
             user_id: String::new(),
