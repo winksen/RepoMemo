@@ -54,6 +54,8 @@ export type PaletteInput = {
   files: ArtifactSummary[];
   cards: MemoryCardSummary[];
   canAdministerSystem: boolean;
+  /** The person may open the CAIRN administration page (V0.9.73). */
+  canAdministerCairn?: boolean;
   /** How the current workspace's template arranges its sections: the palette lists them in that order (V0.2.172). */
   sections?: WorkspaceTemplateView["sections"] | null;
   /** The names the template gives to sections (V0.2.173): the palette lists and matches them under that name. */
@@ -182,6 +184,7 @@ export function paletteEntries(input: PaletteInput): PaletteEntry[] {
   [
     { id: "dashboard", label: "Dashboard", hint: "Search all workspaces", to: routePath({ name: "dashboard" }) },
     { id: "cairn", label: ASSISTANT_NAME, hint: "Chat on a page of its own", to: routePath({ name: "cairn", chatId: null }) },
+    ...(input.canAdministerCairn ? [{ id: "cairn-admin", label: `${ASSISTANT_NAME} administration`, hint: "Models, limits and settings", to: routePath({ name: "cairn-admin", section: "overview" }) }] : []),
     { id: "orgs", label: "Organizations", hint: "Manage every organization", to: routePath({ name: "orgs" }) },
     { id: "notifications", label: "Notifications", hint: "Mentions and assignments", to: routePath({ name: "notifications" }) },
     { id: "profile", label: "Profile and security", hint: "Your account, password and tokens", to: routePath({ name: "profile" }) },

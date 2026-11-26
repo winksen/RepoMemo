@@ -21,10 +21,12 @@ const FILE_SEARCH_LIMIT = 50;
  * action, without the mouse. Files and memory cards come from the open
  * workspace's searches as the person types, both read with the person's own access.
  */
-export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministerSystem, currentWorkspaceId, userId = "", workspaces }: {
+export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministerCairn = false, canAdministerSystem, currentWorkspaceId, userId = "", workspaces }: {
   accessToken: string;
   /** The workspace CAIRN would work on from here: the open workspace, else the one it worked on last. */
   assistantWorkspaceId: string | null;
+  /** The person may open the CAIRN administration page (V0.9.73). */
+  canAdministerCairn?: boolean;
   canAdministerSystem: boolean;
   /** The workspace the open page belongs to, if any. */
   currentWorkspaceId: string | null;
@@ -93,8 +95,8 @@ export function CommandPalette({ accessToken, assistantWorkspaceId, canAdministe
   const labels = template?.labels.sections;
   const assistantOrder = template?.assistant.order;
   const entries = useMemo(
-    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels, assistantOrder, recents }),
-    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, sections, labels, assistantOrder, recents],
+    () => paletteEntries({ query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, canAdministerCairn, sections, labels, assistantOrder, recents }),
+    [query, workspaces, assistantWorkspace, currentWorkspace, files, cards, canAdministerSystem, canAdministerCairn, sections, labels, assistantOrder, recents],
   );
   const activeIndex = Math.min(active, Math.max(entries.length - 1, 0));
 

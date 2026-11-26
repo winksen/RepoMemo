@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.73 (2026-11-26)
+
+CAIRN's sidebar has an Administration tab.
+
+### Added
+- **Chats and Administration.** For people who may open the CAIRN administration page, CAIRN's sidebar shows two tabs. *Chats* is what it was. *Administration* lists the page's sections as links, only the ones the person may open: eight for system, CAIRN and app administrators, five for owners and admins of an organization. A member sees no tabs and the sidebar is unchanged. The page's own tab row is gone, since the sidebar carries the sections.
+- **Command palette.** *CAIRN administration* is offered under Pages to the same people.
+
+### Checks
+- Type-checked; `npm run docs:check` passes. Tests were added for who gets which sections and for the palette entry; tests not run. No Rust changed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.72 (2026-11-26)
 
 CAIRN has an administration page.

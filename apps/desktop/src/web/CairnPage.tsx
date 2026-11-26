@@ -19,7 +19,10 @@ import { type AgentCapabilities, type Organization, type SharedSession, type Sha
 import { formatRecentTime } from "./format";
 import { RailSection } from "./Organization";
 import { type CairnChat, cairnContextWorkspace, groupCairnChats, onCairnWorkspaceChange, rememberCairnWorkspace, rememberedCairnWorkspace, useCairnChats } from "./cairn";
-import { cairnPath, navigate, routePath } from "./router";
+import { cairnAdminPath, cairnPath, navigate, routePath } from "./router";
+import { cairnAdminSections } from "../lib/cairnAdminAccess";
+import { CAIRN_ADMIN_LABELS } from "./cairn-admin/labels";
+import type { CairnAdminSection } from "./constants";
 import { WorkspaceIcon } from "./workspaceIcons";
 
 /** One workspace's chats in the sidebar: its name folds them away, and its + starts a chat in it. */
@@ -43,11 +46,36 @@ function CairnGroup({ activeId, chats, workspace }: { activeId: string | null; c
 
 const GROUP_LIMIT = 6;
 
-/** The sidebar of Cairn's page: the person's chats, grouped by the workspace each belongs to, with *New chat* above them. Nothing else. */
-export function CairnRail({ accessToken, chatId, workspaces }: { accessToken: string; chatId: string | null; workspaces: SharedWorkspace[] }) {
+/**
+ * The sidebar of Cairn's page: the person's chats, grouped by the workspace each belongs to, with *New chat* above them. People who
+ * may open the CAIRN administration (V0.9.73) get two tabs, *Chats* and *Administration*; the second lists the page's sections.
+ */
+export function CairnRail({ accessToken, chatId, organizations = [], section, session, workspaces }: {
+  accessToken: string;
+  chatId: string | null;
+  organizations?: Organization[];
+  /** The section of the administration page that is open; none when the person is in a chat. */
+  section?: CairnAdminSection;
+  session?: SharedSession;
+  workspaces: SharedWorkspace[];
+}) {
   const { chats, loaded } = useCairnChats(accessToken, workspaces);
   const groups = groupCairnChats(chats);
+  const sections = session ? cairnAdminSections(session, organizations) : [];
+  const tabs = sections.length > 0 ? <div aria-label="CAIRN" className="shared-rail-tabs" role="group">
+    <Button aria-current={section ? undefined : "page"} className={section ? "" : "active"} onClick={() => navigate(cairnPath(null))} type="button" variant="secondary">Chats</Button>
+    <Button aria-current={section ? "page" : undefined} className={section ? "active" : ""} onClick={() => navigate(cairnAdminPath(section ?? sections[0]))} type="button" variant="secondary">Administration</Button>
+  </div> : null;
+  if (section && sections.length > 0) {
+    return <div className="shared-rail-navigation">
+      {tabs}
+      <RailSection label="Administration" name="chats">
+        {sections.map((entry) => <Button aria-current={entry === section ? "page" : undefined} className={`shared-cairn-chat${entry === section ? " active" : ""}`} key={entry} onClick={() => navigate(cairnAdminPath(entry))} type="button" variant="secondary">{CAIRN_ADMIN_LABELS[entry]}</Button>)}
+      </RailSection>
+    </div>;
+  }
   return <div className="shared-rail-navigation">
+    {tabs}
     <RailSection label="Chats" name="chats">
       <Button className="shared-rail-new-chat" onClick={() => navigate(cairnPath(null))} type="button" variant="secondary"><Plus size={ICON_SIZE.md} /> New chat</Button>
       {groups.length ? groups.map((group) => <CairnGroup activeId={chatId} chats={group.chats} key={group.workspace.workspace.id} workspace={group.workspace} />) : <p className="shared-rail-empty">{loaded ? "Your chats appear here. Only you can see them." : "Loading chats…"}</p>}

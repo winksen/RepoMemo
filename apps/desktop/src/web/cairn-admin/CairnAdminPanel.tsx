@@ -4,7 +4,6 @@ import { getCairnAdmin } from "../../lib/sharedApi";
 import { cairnAdminKeys } from "../../lib/queryClient";
 import type { CairnAdminView } from "../../types";
 import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
 import { EmptyState } from "../../components/ui/empty-state";
 import { ICON_SIZE } from "../../components/ui/icon";
 import { PageHeader } from "../../components/ui/page-header";
@@ -27,18 +26,6 @@ const SECTION_LABELS: Record<CairnAdminSection, { label: string; icon: ReactNode
   usage: { label: "Usage", icon: <ChartBar size={ICON_SIZE.md} />, intro: "How much CAIRN is used and how often it fails, in figures only.", empty: "Usage and health arrive in a later release." },
   history: { label: "History", icon: <ClockCounterClockwise size={ICON_SIZE.md} />, intro: "Every change made to how CAIRN is administered.", empty: "The administration history arrives in a later release." },
 };
-
-/** Tabs of the CAIRN administration page: only the sections the person may open. */
-export function CairnAdminNavigation({ active, onNavigate, sections }: { active: CairnAdminSection; onNavigate: (section: CairnAdminSection) => void; sections: CairnAdminSection[] }) {
-  return <nav aria-label="CAIRN administration sections" className="shared-workspace-topbar">
-    <div className="shared-workspace-tabs">
-      {sections.map((section) => {
-        const isActive = section === active;
-        return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} key={section} onClick={() => onNavigate(section)} type="button" variant="secondary">{SECTION_LABELS[section].icon}<span className="shared-tab-label">{SECTION_LABELS[section].label}</span></Button>;
-      })}
-    </div>
-  </nav>;
-}
 
 /** The sections of the page that a view allows, in the page's order. */
 export function allowedSections(view: CairnAdminView | null | undefined): CairnAdminSection[] {

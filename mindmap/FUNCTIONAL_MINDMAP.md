@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.72` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.73` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.73 — CAIRN's sidebar has an Administration tab.
+
+- **Administration tab.** People who may open the CAIRN administration see *Chats* and *Administration* tabs in CAIRN's sidebar; the second lists the sections they may open. CAIRN administration is also in the command palette. A member sees no change.
+
+Checks: type-checked; docs:check; tests added, not run.
 
 ## V0.9.72 — CAIRN has an administration page.
 
