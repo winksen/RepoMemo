@@ -781,6 +781,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             post(cairn_connections::test_connection),
         )
         .route(
+            "/v1/cairn/connections/{connection_id}/acknowledgement",
+            put(cairn_connections::set_acknowledgement),
+        )
+        .route(
             "/v1/cairn/connections/{connection_id}/available-models",
             get(cairn_models::available_models),
         )

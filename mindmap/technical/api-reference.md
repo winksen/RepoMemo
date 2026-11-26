@@ -97,6 +97,7 @@
 | PUT | `/v1/cairn/connections/{connection_id}` | auth | require_cairn_admin | ConnectionRequest with `expected_version` | CairnConnection |
 | DELETE | `/v1/cairn/connections/{connection_id}` | auth | require_cairn_admin | — | status |
 | POST | `/v1/cairn/connections/{connection_id}/test` | auth | require_cairn_admin | — | ConnectionTest (reachable, key_accepted, model_count) |
+| PUT | `/v1/cairn/connections/{connection_id}/acknowledgement` | auth | require_cairn_admin | `{acknowledged}` | CairnConnection |
 | GET | `/v1/cairn/connections/{connection_id}/available-models` | auth | require_cairn_admin | — | Vec<AvailableModel> |
 | GET | `/v1/cairn/models` | auth | require_cairn_reader | `?connection_id` | Vec<ModelView> |
 | POST | `/v1/cairn/models` | auth | require_cairn_admin | AddModelRequest | ModelView |

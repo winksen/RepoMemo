@@ -2273,3 +2273,121 @@ async fn a_local_model_is_never_given_a_cloud_fallback() {
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_cloud_model_cannot_be_chosen_until_its_connection_is_confirmed_and_every_model_says_where_it_runs() {
+    let data_dir = temp_data_dir("cairn-locality");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "locality-root@example.com").await;
+    let (member, _) = register_account(&app, "locality-member@example.com").await;
+    let local = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &admin,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let cloud = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &admin,
+            json!({"kind": "openrouter", "name": "OpenRouter", "api_key": "sk-or-locality", "cloud_content_acknowledged": true}),
+        )
+        .await,
+    )
+    .await;
+    let add = |connection: &Value, name: &str| {
+        let body = json!({"connection_id": connection["id"], "model_id": name, "purpose": "text"});
+        let (send, admin) = (&send, admin.clone());
+        async move { response_json(send("POST", "/v1/cairn/models".to_owned(), &admin, body).await).await }
+    };
+    let (near, far) = (
+        add(&local, "llama3.1:8b").await,
+        add(&cloud, "openai/gpt-4o-mini").await,
+    );
+    assert_eq!(
+        (near["locality"].clone(), near["selectable"].clone()),
+        (json!("local"), json!(true))
+    );
+    assert_eq!(
+        (far["locality"].clone(), far["selectable"].clone()),
+        (json!("cloud"), json!(true))
+    );
+
+    // A member cannot confirm or withdraw; an administrator withdrawing turns the connection off, and no model of it is selectable.
+    let uri = format!(
+        "/v1/cairn/connections/{}/acknowledgement",
+        cloud["id"].as_str().unwrap()
+    );
+    assert_eq!(
+        send("PUT", uri.clone(), &member, json!({"acknowledged": false}))
+            .await
+            .status(),
+        403
+    );
+    assert_eq!(
+        send(
+            "PUT",
+            format!(
+                "/v1/cairn/connections/{}/acknowledgement",
+                local["id"].as_str().unwrap()
+            ),
+            &admin,
+            json!({"acknowledged": true})
+        )
+        .await
+        .status(),
+        400,
+        "a local connection needs none"
+    );
+    let withdrawn = response_json(send("PUT", uri.clone(), &admin, json!({"acknowledged": false})).await).await;
+    assert_eq!(
+        (withdrawn["enabled"].clone(), withdrawn["cloud_acknowledged_at"].clone()),
+        (json!(false), Value::Null)
+    );
+    let listed = response_json(send("GET", "/v1/cairn/models".to_owned(), &admin, Value::Null).await).await;
+    let selectable = |name: &str| {
+        listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|model| model["model_id"] == name)
+            .map(|model| model["selectable"].clone())
+    };
+    assert_eq!(selectable("openai/gpt-4o-mini"), Some(json!(false)));
+    assert_eq!(selectable("llama3.1:8b"), Some(json!(true)));
+
+    // It cannot be turned on again without the confirmation, and can with it.
+    let turn_on = json!({"name": "OpenRouter", "enabled": true, "expected_version": withdrawn["version"]});
+    let connection_uri = format!("/v1/cairn/connections/{}", cloud["id"].as_str().unwrap());
+    assert_eq!(
+        send("PUT", connection_uri.clone(), &admin, turn_on.clone())
+            .await
+            .status(),
+        400
+    );
+    let confirmed = response_json(send("PUT", uri, &admin, json!({"acknowledged": true})).await).await;
+    assert!(confirmed["cloud_acknowledged_at"].is_string());
+    let mut again = turn_on;
+    again["expected_version"] = confirmed["version"].clone();
+    assert_eq!(send("PUT", connection_uri, &admin, again).await.status(), 200);
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &admin))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    assert!(audit.contains("cairn_connection_acknowledgement_withdrawn"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

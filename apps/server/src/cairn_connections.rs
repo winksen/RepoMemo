@@ -234,6 +234,44 @@ pub(crate) async fn update_connection(
     Ok(Json(saved))
 }
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct AcknowledgementRequest {
+    acknowledged: bool,
+}
+
+/// Records or withdraws the confirmation that what CAIRN sends to a cloud connection leaves the network (V0.9.81). Without it a cloud
+/// connection stays off and none of its models can be chosen by an organization; withdrawing it turns the connection off.
+pub(crate) async fn set_acknowledgement(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<AcknowledgementRequest>,
+) -> Result<Json<CairnConnection>, ApiError> {
+    require_cairn_admin(&subject)?;
+    let connection = state
+        .storage
+        .set_cairn_connection_acknowledgement(&id, request.acknowledged, &subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    audit(
+        &state,
+        &subject,
+        if request.acknowledged {
+            "cairn_connection_acknowledged"
+        } else {
+            "cairn_connection_acknowledgement_withdrawn"
+        },
+        format!(
+            "{} the confirmation that what CAIRN sends to the connection {} at {} leaves the network.",
+            if request.acknowledged { "Gave" } else { "Withdrew" },
+            connection.name,
+            connection.base_url
+        ),
+    )
+    .await;
+    Ok(Json(connection))
+}
+
 pub(crate) async fn delete_connection(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,

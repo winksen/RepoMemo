@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.80` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.81` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.81 — Every model says whether it is local or cloud, and a cloud model needs a confirmed connection.
+
+- **Local or cloud.** Every model in the catalog shows *Local* or *Cloud*, from the address of its connection. A connection that leaves your network has to be confirmed by an administrator before it is on, and its models cannot be chosen by an organization until it is. Withdrawing the confirmation turns the connection off.
+
+Checks: formatted, linted and type-checked; docs:check; tests added, not run.
 
 ## V0.9.80 — A catalog model can name a fallback that answers when it fails.
 

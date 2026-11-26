@@ -113,6 +113,13 @@ pub enum CairnSaved<T> {
     Stale(T),
 }
 
+impl CairnConnection {
+    /// Whether the connection's models may be chosen: it is on, and one that leaves the network has the confirmation (V0.9.81).
+    pub fn is_usable(&self) -> bool {
+        self.enabled && (self.locality == "local" || self.cloud_acknowledged_at.is_some())
+    }
+}
+
 fn connection_secret_context(connection_id: &str) -> String {
     format!("cairn_connections:{connection_id}:api_key")
 }
@@ -345,6 +352,33 @@ impl StorageEngine {
         if saved.rows_affected() == 0 {
             repomemo_domain::bail_not_found!("The connection was not found.");
         }
+        self.get_cairn_connection(id).await
+    }
+
+    /// Records or withdraws the confirmation that what CAIRN sends to a cloud connection leaves the network (V0.9.81). Withdrawing it
+    /// also turns the connection off, so none of its models can be chosen until it is confirmed again.
+    pub async fn set_cairn_connection_acknowledgement(
+        &self,
+        id: &str,
+        acknowledged: bool,
+        actor: &str,
+    ) -> Result<CairnConnection> {
+        let connection = self.get_cairn_connection(id).await?;
+        if connection.locality != "cloud" {
+            repomemo_domain::bail_invalid!("Only a connection that leaves your network needs this confirmation.");
+        }
+        if acknowledged {
+            return self.acknowledge_cairn_connection(id, actor).await;
+        }
+        sqlx::query(
+            "UPDATE cairn_connections SET cloud_acknowledged_at = NULL, cloud_acknowledged_by = NULL, enabled = 0, version = version + 1,
+               updated_at = ?1, updated_by = ?2 WHERE id = ?3",
+        )
+        .bind(Utc::now().to_rfc3339())
+        .bind(actor)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
         self.get_cairn_connection(id).await
     }
 
@@ -936,6 +970,59 @@ mod fallback_tests {
                 .await
         )
         .contains("falls back once"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}
+
+#[cfg(test)]
+mod acknowledgement_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_cloud_connection_is_usable_only_while_it_is_on_and_confirmed() {
+        let dir = std::env::temp_dir().join(format!("repomemo-ack-{}", Uuid::new_v4()));
+        let storage = StorageEngine::open(crate::StorageConfig::new(dir.clone()))
+            .await
+            .unwrap();
+        let actor = storage
+            .create_user("admin@example.com", "Admin", "hash")
+            .await
+            .unwrap()
+            .id;
+        let new = |kind: &str, locality: &str| NewCairnConnection {
+            kind: kind.to_owned(),
+            name: locality.to_owned(),
+            base_url: format!("https://{locality}.example"),
+            api_key: None,
+            locality: locality.to_owned(),
+            enabled: true,
+        };
+        let local = storage
+            .create_cairn_connection(new("ollama", "local"), &actor)
+            .await
+            .unwrap();
+        let cloud = storage
+            .create_cairn_connection(new("openrouter", "cloud"), &actor)
+            .await
+            .unwrap();
+        assert!(local.is_usable(), "a local connection needs no confirmation");
+        assert!(!cloud.is_usable(), "a cloud connection that was never confirmed is not");
+        assert!(storage
+            .set_cairn_connection_acknowledgement(&local.id, true, &actor)
+            .await
+            .is_err());
+
+        let confirmed = storage
+            .set_cairn_connection_acknowledgement(&cloud.id, true, &actor)
+            .await
+            .unwrap();
+        assert!(confirmed.is_usable());
+        assert_eq!(confirmed.cloud_acknowledged_by.as_deref(), Some(actor.as_str()));
+        let withdrawn = storage
+            .set_cairn_connection_acknowledgement(&cloud.id, false, &actor)
+            .await
+            .unwrap();
+        assert!(!withdrawn.is_usable() && !withdrawn.enabled && withdrawn.cloud_acknowledged_at.is_none());
         let _ = std::fs::remove_dir_all(dir);
     }
 }

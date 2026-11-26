@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cpu, MagnifyingGlass, PencilSimple, Play, Trash } from "@phosphor-icons/react";
+import { Cloud, Cpu, HardDrives, MagnifyingGlass, PencilSimple, Play, Trash } from "@phosphor-icons/react";
 import { addCairnModel, changeCairnModel, deleteCairnModel, findCairnModels, listCairnConnections, listCairnModels, testCairnModel } from "../../lib/sharedApi";
 import { cairnAdminKeys } from "../../lib/queryClient";
 import type { AvailableCairnModel, CairnConnection, CairnModel } from "../../types";
@@ -82,15 +82,16 @@ export function ModelsPanel({ accessToken, canChange }: { accessToken: string; c
   return <section className="shared-settings-group">
     <PanelHeading actions={canChange && usable.length ? <Dropdown aria-label="Find the models of a connection" onValueChange={(id) => setFinding(usable.find((connection) => connection.id === id) ?? null)} options={usable.map((connection) => ({ label: `Find models on ${connection.name}`, value: connection.id }))} placeholder="Find models…" value="" /> : undefined} description={models ? `${models.length} model${models.length === 1 ? "" : "s"}` : undefined} icon={Cpu} title="Models" />
     {models ? models.length ? <Table className="rm-dense-table">
-      <thead><tr><th scope="col">Name</th><th scope="col">Connection</th><th scope="col">Purpose</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">Evaluation</th><th scope="col">State</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+      <thead><tr><th scope="col">Name</th><th scope="col">Connection</th><th scope="col">Where</th><th scope="col">Purpose</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">Evaluation</th><th scope="col">State</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{models.map((model) => <tr key={model.id}>
         <th scope="row">{model.display_name}<small className="shared-muted-copy"> · <code>{model.model_id}</code></small></th>
         <td>{nameOf(model.connection_id)}</td>
+        <td><Tooltip content={model.locality === "cloud" ? "Runs on a server outside your network" : "Runs on your own network"}><span><Badge icon={model.locality === "cloud" ? <Cloud size={ICON_SIZE.sm} /> : <HardDrives size={ICON_SIZE.sm} />}>{model.locality === "cloud" ? "Cloud" : "Local"}</Badge></span></Tooltip></td>
         <td><Badge>{model.purpose}{model.vision && model.purpose !== "vision" ? " · sees images" : ""}</Badge></td>
         <td>{model.purpose === "text" ? (TOOL_LABELS[model.tool_mode] ?? model.tool_mode) : <span className="shared-muted-copy">—</span>}</td>
         <td>{model.context_tokens ? model.context_tokens.toLocaleString() : <span className="shared-muted-copy">Not tested</span>}</td>
         <td>{model.purpose === "text" ? <Evaluation model={model} /> : <span className="shared-muted-copy">—</span>}</td>
-        <td>{model.enabled ? "On" : <span className="shared-muted-copy">Off</span>}{model.uses ? ` · used ${model.uses}×` : ""}{model.fallback_model_id ? <small className="shared-muted-copy"> · falls back to {models?.find((other) => other.id === model.fallback_model_id)?.display_name ?? "another model"}</small> : null}</td>
+        <td>{model.enabled ? "On" : <span className="shared-muted-copy">Off</span>}{model.enabled && !model.selectable ? <small className="shared-muted-copy"> · connection off or not confirmed</small> : null}{model.uses ? ` · used ${model.uses}×` : ""}{model.fallback_model_id ? <small className="shared-muted-copy"> · falls back to {models?.find((other) => other.id === model.fallback_model_id)?.display_name ?? "another model"}</small> : null}</td>
         <td>{canChange ? <ActionMenu items={[
           { label: "Test", icon: <Play size={ICON_SIZE.sm} />, onSelect: () => void test(model) },
           { label: "Edit", icon: <PencilSimple size={ICON_SIZE.sm} />, onSelect: () => setDraft({ model, displayName: model.display_name, toolMode: model.tool_mode, contextTokens: String(model.context_tokens), vision: model.vision, enabled: model.enabled, fallbackId: model.fallback_model_id ?? NO_FALLBACK }) },

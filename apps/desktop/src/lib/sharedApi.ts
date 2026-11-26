@@ -1795,6 +1795,10 @@ export function updateCairnConnection(accessToken: string, id: string, input: Ca
   return request<CairnConnection>(`/v1/cairn/connections/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
+export function setCairnConnectionAcknowledgement(accessToken: string, id: string, acknowledged: boolean): Promise<CairnConnection> {
+  return request<CairnConnection>(`/v1/cairn/connections/${encodeURIComponent(id)}/acknowledgement`, { method: "PUT", body: JSON.stringify({ acknowledged }) }, accessToken);
+}
+
 export function deleteCairnConnection(accessToken: string, id: string): Promise<void> {
   return request<void>(`/v1/cairn/connections/${encodeURIComponent(id)}`, { method: "DELETE" }, accessToken);
 }

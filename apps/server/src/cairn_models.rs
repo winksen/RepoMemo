@@ -22,6 +22,11 @@ pub(crate) struct ModelView {
     model: CairnModel,
     /// In how many places the model is used; a model in use cannot be deleted.
     uses: i64,
+    /// `local` or `cloud`, from the connection it runs on: shown wherever a model is listed or chosen (V0.9.81).
+    locality: String,
+    /// The model and its connection are on, and a connection that leaves the network has its confirmation: only then can an
+    /// organization choose the model.
+    selectable: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -166,7 +171,17 @@ async fn view(state: &AppState, model: CairnModel) -> Result<ModelView, ApiError
         .cairn_model_uses(&model.id)
         .await
         .map_err(map_storage_error)?;
-    Ok(ModelView { model, uses })
+    let connection = state
+        .storage
+        .get_cairn_connection(&model.connection_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(ModelView {
+        uses,
+        locality: connection.locality.clone(),
+        selectable: model.enabled && connection.is_usable(),
+        model,
+    })
 }
 
 pub(crate) async fn list_models(

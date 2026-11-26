@@ -930,6 +930,10 @@ export interface CairnModel {
   updated_by: string | null;
   /** In how many places the model is used; a model in use cannot be deleted. */
   uses: number;
+  /** Where the model runs, from its connection: shown wherever a model is listed or chosen (V0.9.81). */
+  locality: "local" | "cloud";
+  /** The model and its connection are on, and a connection that leaves the network has its confirmation. */
+  selectable: boolean;
 }
 
 /** A model a connection's server offers, and the purposes it is already in the catalog for. */

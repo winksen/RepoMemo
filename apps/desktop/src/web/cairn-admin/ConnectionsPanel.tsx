@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Cloud, HardDrives, PencilSimple, Plugs, Plus, Trash } from "@phosphor-icons/react";
-import { createCairnConnection, deleteCairnConnection, listCairnConnections, testCairnConnection, updateCairnConnection } from "../../lib/sharedApi";
+import { createCairnConnection, deleteCairnConnection, listCairnConnections, setCairnConnectionAcknowledgement, testCairnConnection, updateCairnConnection } from "../../lib/sharedApi";
 import { cairnAdminKeys } from "../../lib/queryClient";
 import type { CairnConnection } from "../../types";
 import { ActionMenu } from "../../components/ui/action-menu";
@@ -70,6 +70,14 @@ export function ConnectionsPanel({ accessToken, canChange }: { accessToken: stri
     } catch (error) { showToast("error", apiMessage(error, "The connection could not be tested.")); }
   }
 
+  async function acknowledge(connection: CairnConnection, acknowledged: boolean) {
+    try {
+      await setCairnConnectionAcknowledgement(accessToken, connection.id, acknowledged);
+      showToast("success", acknowledged ? `${connection.name} is confirmed: what CAIRN sends there leaves your network.` : `${connection.name} is turned off until it is confirmed again.`);
+      await reload();
+    } catch (error) { showToast("error", apiMessage(error, "The confirmation could not be changed.")); }
+  }
+
   async function remove() {
     if (!removing) return;
     try {
@@ -91,10 +99,13 @@ export function ConnectionsPanel({ accessToken, canChange }: { accessToken: stri
         <td><code>{connection.base_url}</code></td>
         <td><Badge icon={connection.locality === "cloud" ? <Cloud size={ICON_SIZE.sm} /> : <HardDrives size={ICON_SIZE.sm} />}>{connection.locality === "cloud" ? "Cloud" : "Local"}</Badge></td>
         <td>{connection.has_key ? "Set" : <span className="shared-muted-copy">None</span>}</td>
-        <td>{connection.enabled ? "On" : <span className="shared-muted-copy">Off</span>}</td>
+        <td>{connection.enabled ? "On" : <span className="shared-muted-copy">Off</span>}{connection.locality === "cloud" && !connection.cloud_acknowledged_at ? <small className="shared-muted-copy"> · not confirmed</small> : null}</td>
         <td>{canChange ? <ActionMenu items={[
           { label: "Test connection", icon: <Plugs size={ICON_SIZE.sm} />, onSelect: () => void test(connection) },
           { label: "Edit", icon: <PencilSimple size={ICON_SIZE.sm} />, onSelect: () => setDraft({ id: connection.id, version: connection.version, kind: connection.kind, name: connection.name, baseUrl: connection.base_url, apiKey: "", enabled: connection.enabled, acknowledged: Boolean(connection.cloud_acknowledged_at), hadKey: connection.has_key }) },
+          ...(connection.locality === "cloud" ? [connection.cloud_acknowledged_at
+            ? { label: "Withdraw cloud confirmation", icon: <Cloud size={ICON_SIZE.sm} />, onSelect: () => void acknowledge(connection, false), destructive: true }
+            : { label: "Confirm cloud use", icon: <Cloud size={ICON_SIZE.sm} />, onSelect: () => void acknowledge(connection, true) }] : []),
           { label: "Delete", icon: <Trash size={ICON_SIZE.sm} />, onSelect: () => setRemoving(connection), destructive: true },
         ]} label={`Actions for ${connection.name}`} /> : null}</td>
       </tr>)}</tbody>

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.81 (2026-11-26)
+
+Every model says whether it is local or cloud, and a cloud model needs a confirmed connection.
+
+### Added
+- **Local or cloud, everywhere.** Models › Models has a *Where* column that says *Local* or *Cloud* for each model, from the address of its connection: loopback and private addresses are local, as V0.9.36 decided, and everything else is cloud. Connections already said so. Each model in `GET /v1/cairn/models` carries `locality` and `selectable`.
+- **The confirmation is a step of its own.** *Confirm cloud use* on a cloud connection records that what CAIRN sends there leaves the network, who confirmed it and when; *Withdraw cloud confirmation* removes it and turns the connection off, so none of its models can be chosen. A cloud connection cannot be turned on without the confirmation, and a model whose connection is off or unconfirmed is shown as not usable (`selectable` is false). A local connection needs none and refuses it. Both changes are audit events (`PUT /v1/cairn/connections/{id}/acknowledgement`).
+- **For the next rows.** `selectable` is the test an organization's model list will apply: no organization can enable a cloud model before the confirmation.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A storage test and a server test (a cloud connection is usable only while on and confirmed, a member cannot confirm, withdrawing turns it off, it cannot be turned on without the confirmation, and the audit) were added; tests not run.
+
+### Upgrading
+- Nothing to do. Connections made from workspace providers keep the confirmation their provider had.
+
 ## V0.9.80 (2026-11-26)
 
 A catalog model can name a fallback that answers when it fails.
