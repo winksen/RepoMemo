@@ -71,6 +71,46 @@ pub(crate) struct ModelTest {
     model: ModelView,
 }
 
+/// The catalog models that take tools natively and have a passing report: Agent mode is offered by default to a workspace whose
+/// provider is linked to one. Read again whenever a report is attached or a model changes.
+pub(crate) async fn refresh_agent_defaults(storage: &repomemo_storage::StorageEngine) {
+    match storage.list_cairn_models(None).await {
+        Ok(models) => repomemo_ai::set_catalog_passed_models(
+            models
+                .into_iter()
+                .filter(|model| {
+                    model.enabled
+                        && model.purpose == "text"
+                        && model.tool_mode == "native"
+                        && model
+                            .evaluation
+                            .as_ref()
+                            .and_then(|report| report.get("passed"))
+                            .and_then(serde_json::Value::as_bool)
+                            == Some(true)
+                })
+                .map(|model| model.id)
+                .collect(),
+        ),
+        Err(error) => tracing::error!(error = %error, "The models with a passing evaluation could not be read"),
+    }
+}
+
+/// A live evaluation report, as `npm run cairn:eval` measures it (V0.9.79).
+#[derive(Debug, Deserialize)]
+pub(crate) struct EvaluationRequest {
+    passed: bool,
+    /// The day the run was made, `YYYY-MM-DD`.
+    run_on: String,
+    citation_precision: f64,
+    tool_accuracy: f64,
+    forbidden_actions: i64,
+    cases_run: i64,
+    /// The RepoMemo version the report was made at.
+    #[serde(default)]
+    version: Option<String>,
+}
+
 async fn view(state: &AppState, model: CairnModel) -> Result<ModelView, ApiError> {
     let uses = state
         .storage
@@ -238,6 +278,7 @@ pub(crate) async fn change_model(
     if existing.enabled != saved.enabled {
         changes.push(format!("turned {}", if saved.enabled { "on" } else { "off" }));
     }
+    refresh_agent_defaults(&state.storage).await;
     audit(
         &state,
         &subject,
@@ -256,6 +297,83 @@ pub(crate) async fn change_model(
     Ok(Json(view(&state, saved).await?))
 }
 
+/// Attaches a live evaluation report to a model: the Models table shows passed, failed or not evaluated with the date, and a text
+/// model that takes tools natively and passed is offered Agent mode by default. A newer report replaces the older one.
+pub(crate) async fn attach_evaluation(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<EvaluationRequest>,
+) -> Result<Json<ModelView>, ApiError> {
+    require_cairn_admin(&subject)?;
+    if chrono::NaiveDate::parse_from_str(&request.run_on, "%Y-%m-%d").is_err() {
+        return Err(ApiError::bad_request("run_on is a date like 2026-11-26."));
+    }
+    if !(0.0..=1.0).contains(&request.citation_precision) || !(0.0..=1.0).contains(&request.tool_accuracy) {
+        return Err(ApiError::bad_request(
+            "Citation precision and tool accuracy are between 0 and 1.",
+        ));
+    }
+    if request.forbidden_actions < 0 || request.cases_run < 0 {
+        return Err(ApiError::bad_request("The counts cannot be negative."));
+    }
+    let existing = state.storage.get_cairn_model(&id).await.map_err(map_storage_error)?;
+    let report = serde_json::json!({
+        "passed": request.passed,
+        "run_on": request.run_on,
+        "citation_precision": request.citation_precision,
+        "tool_accuracy": request.tool_accuracy,
+        "forbidden_actions": request.forbidden_actions,
+        "cases_run": request.cases_run,
+        "version": request.version,
+        "attached_at": chrono::Utc::now().to_rfc3339(),
+    });
+    let saved = state
+        .storage
+        .update_cairn_model(
+            &id,
+            existing.version,
+            CairnModelChange {
+                display_name: existing.display_name.clone(),
+                tool_mode: existing.tool_mode.clone(),
+                context_tokens: existing.context_tokens,
+                vision: existing.vision,
+                evaluation: Some(report),
+                fallback_model_id: existing.fallback_model_id.clone(),
+                roles: existing.roles.clone(),
+                enabled: existing.enabled,
+            },
+            &subject.user_id,
+        )
+        .await
+        .map_err(map_storage_error)?;
+    let saved = match saved {
+        CairnSaved::Saved(model) => model,
+        CairnSaved::Stale(_) => {
+            return Err(ApiError::conflict(
+                "The model was changed meanwhile. Attach the report again.",
+            ))
+        }
+    };
+    refresh_agent_defaults(&state.storage).await;
+    audit(
+        &state,
+        &subject,
+        "cairn_model_evaluated",
+        format!(
+            "Attached a {} evaluation report to the model {} (run on {}, citation precision {:.2}, tool accuracy {:.2}, {} forbidden actions).",
+            if request.passed { "passing" } else { "failing" },
+            saved.display_name,
+            request.run_on,
+            request.citation_precision,
+            request.tool_accuracy,
+            request.forbidden_actions
+        ),
+    )
+    .await;
+    Ok(Json(view(&state, saved).await?))
+}
+
 pub(crate) async fn delete_model(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
@@ -264,6 +382,7 @@ pub(crate) async fn delete_model(
     require_cairn_admin(&subject)?;
     let existing = state.storage.get_cairn_model(&id).await.map_err(map_storage_error)?;
     state.storage.delete_cairn_model(&id).await.map_err(map_storage_error)?;
+    refresh_agent_defaults(&state.storage).await;
     audit(
         &state,
         &subject,
@@ -334,6 +453,7 @@ pub(crate) async fn test_model(
     } else {
         model
     };
+    refresh_agent_defaults(&state.storage).await;
     audit(
         &state,
         &subject,

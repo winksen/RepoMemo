@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.79 (2026-11-26)
+
+Evaluation reports are attached to catalog models, and Agent mode follows them.
+
+### Added
+- **Reports on models.** `npm run cairn:eval` takes `--catalog-model <id>` and attaches its measures (citation precision, tool accuracy, forbidden actions, cases run, the day and the version) to that model through `PUT /v1/cairn/models/{id}/evaluation`; the token needs the system scope and its owner must be a CAIRN or system administrator. A newer report replaces the older one, a bad date or measure is refused, and the attach is an audit event.
+- **The table says so.** Models › Models has an *Evaluation* column: *Passed*, *Failed* or *Not evaluated* with the date, and the measures in a tooltip. A passing model that takes tools natively is marked *Agent by default*.
+- **Agent mode reads the catalog.** A workspace whose provider is linked to a catalog model (V0.9.78) starts in Agent mode only when that model is an enabled text model that takes tools natively and has a passing report: the rule of V0.9.47, now read from the catalog. `REPOMEMO_CAIRN_EVAL_PASSED_MODELS` stays as an override by model name, and a mode an administrator chose for a workspace still wins. A save of a provider keeps its link to its catalog model.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (an evaluation attached, replaced and refused, and the audit) and a test of the Agent-mode rule were added; tests not run, and no live evaluation was run to attach a real report.
+
+### Upgrading
+- Nothing to do. No model has a report until one is attached, so every workspace keeps the mode it has.
+
 ## V0.9.78 (2026-11-26)
 
 Workspace providers are moved into the model catalog.

@@ -103,6 +103,7 @@
 | PUT | `/v1/cairn/models/{model_id}` | auth | require_cairn_admin | ChangeModelRequest with `expected_version` | ModelView |
 | DELETE | `/v1/cairn/models/{model_id}` | auth | require_cairn_admin | — | status |
 | POST | `/v1/cairn/models/{model_id}/test` | auth | require_cairn_admin | — | ModelTest |
+| PUT | `/v1/cairn/models/{model_id}/evaluation` | auth (write token needs the system scope) | require_cairn_admin | EvaluationRequest | ModelView |
 | POST | `/v1/system/users/{user_id}/sessions/end` | auth | require_full_system_admin, require_system_change | — | status |
 | POST | `/v1/system/users/{user_id}/unlock` | auth | require_full_system_admin, require_system_change | — | Value |
 | GET | `/v1/system/users/{user_id}/offboarding` | session | full system administrator | — | What the account owns and holds (owned places, open tasks and reviews, sessions, tokens, sent invitations) and whether it is the last system administrator |

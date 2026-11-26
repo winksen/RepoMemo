@@ -897,6 +897,18 @@ export interface CairnConnection {
   updated_by: string | null;
 }
 
+/** A live evaluation report attached to a model (V0.9.79), as `npm run cairn:eval` measures it. */
+export interface CairnEvaluation {
+  passed: boolean;
+  /** The day the run was made, `YYYY-MM-DD`. */
+  run_on: string;
+  citation_precision: number;
+  tool_accuracy: number;
+  forbidden_actions: number;
+  cases_run: number;
+  version: string | null;
+}
+
 /** A model of a connection in the catalog (V0.9.77). */
 export interface CairnModel {
   id: string;
@@ -908,7 +920,7 @@ export interface CairnModel {
   tool_mode: "none" | "json" | "native";
   context_tokens: number;
   vision: boolean;
-  evaluation: unknown | null;
+  evaluation: CairnEvaluation | null;
   fallback_model_id: string | null;
   roles: string[] | null;
   enabled: boolean;

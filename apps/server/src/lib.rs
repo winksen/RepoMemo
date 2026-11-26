@@ -363,6 +363,8 @@ async fn build_state(
         }
     }
 
+    cairn_models::refresh_agent_defaults(&storage).await;
+
     // Jobs a previous process left running will never finish; close them
     // before new work starts so no progress bar spins forever.
     let interrupted = storage
@@ -791,6 +793,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             put(cairn_models::change_model).delete(cairn_models::delete_model),
         )
         .route("/v1/cairn/models/{model_id}/test", post(cairn_models::test_model))
+        .route(
+            "/v1/cairn/models/{model_id}/evaluation",
+            put(cairn_models::attach_evaluation),
+        )
         .route(
             "/v1/system/users/{user_id}/sessions/end",
             post(system::end_user_sessions),

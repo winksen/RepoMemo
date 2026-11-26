@@ -17,6 +17,7 @@ import { Input } from "../../components/ui/input";
 import { PanelHeading } from "../../components/ui/panel-heading";
 import { SkeletonList } from "../../components/ui/skeleton";
 import { Table } from "../../components/ui/table";
+import { Tooltip } from "../../components/ui/tooltip";
 import { showToast } from "../../components/ui/toast";
 import { apiMessage } from "../format";
 import { useSystemData } from "../system/shared";
@@ -79,13 +80,14 @@ export function ModelsPanel({ accessToken, canChange }: { accessToken: string; c
   return <section className="shared-settings-group">
     <PanelHeading actions={canChange && usable.length ? <Dropdown aria-label="Find the models of a connection" onValueChange={(id) => setFinding(usable.find((connection) => connection.id === id) ?? null)} options={usable.map((connection) => ({ label: `Find models on ${connection.name}`, value: connection.id }))} placeholder="Find models…" value="" /> : undefined} description={models ? `${models.length} model${models.length === 1 ? "" : "s"}` : undefined} icon={Cpu} title="Models" />
     {models ? models.length ? <Table className="rm-dense-table">
-      <thead><tr><th scope="col">Name</th><th scope="col">Connection</th><th scope="col">Purpose</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">State</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
+      <thead><tr><th scope="col">Name</th><th scope="col">Connection</th><th scope="col">Purpose</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">Evaluation</th><th scope="col">State</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{models.map((model) => <tr key={model.id}>
         <th scope="row">{model.display_name}<small className="shared-muted-copy"> · <code>{model.model_id}</code></small></th>
         <td>{nameOf(model.connection_id)}</td>
         <td><Badge>{model.purpose}{model.vision && model.purpose !== "vision" ? " · sees images" : ""}</Badge></td>
         <td>{model.purpose === "text" ? (TOOL_LABELS[model.tool_mode] ?? model.tool_mode) : <span className="shared-muted-copy">—</span>}</td>
         <td>{model.context_tokens ? model.context_tokens.toLocaleString() : <span className="shared-muted-copy">Not tested</span>}</td>
+        <td>{model.purpose === "text" ? <Evaluation model={model} /> : <span className="shared-muted-copy">—</span>}</td>
         <td>{model.enabled ? "On" : <span className="shared-muted-copy">Off</span>}{model.uses ? ` · used ${model.uses}×` : ""}</td>
         <td>{canChange ? <ActionMenu items={[
           { label: "Test", icon: <Play size={ICON_SIZE.sm} />, onSelect: () => void test(model) },
@@ -106,6 +108,14 @@ export function ModelsPanel({ accessToken, canChange }: { accessToken: string; c
     </Dialog>
     <ConfirmDialog action="Delete model" danger description={removing?.uses ? `It is used in ${removing.uses} place${removing.uses === 1 ? "" : "s"} and cannot be deleted until it is not.` : "It leaves the catalog. The server keeps the model."} onCancel={() => setRemoving(null)} onConfirm={() => void remove()} open={Boolean(removing)} title={`Delete ${removing?.display_name ?? "the model"}?`} />
   </section>;
+}
+
+/** Whether a model passed the live evaluation, and when; a passing model that takes tools natively starts in Agent mode (V0.9.79). */
+function Evaluation({ model }: { model: CairnModel }) {
+  const report = model.evaluation;
+  if (!report) return <span className="shared-muted-copy">Not evaluated</span>;
+  const detail = `Citation precision ${report.citation_precision.toFixed(2)}, tool accuracy ${report.tool_accuracy.toFixed(2)}, ${report.forbidden_actions} forbidden action${report.forbidden_actions === 1 ? "" : "s"}, ${report.cases_run} cases${report.version ? ` at V${report.version}` : ""}`;
+  return <Tooltip content={detail}><span><Badge>{report.passed ? "Passed" : "Failed"} · {report.run_on}</Badge>{report.passed && model.tool_mode === "native" ? <small className="shared-muted-copy"> · Agent by default</small> : null}</span></Tooltip>;
 }
 
 /** What a server offers: the administrator chooses, and gives each model a purpose. */

@@ -5,6 +5,10 @@
 //   REPOMEMO_URL=http://localhost:8080 REPOMEMO_TOKEN=<personal access token> \
 //     npm run cairn:eval -- --workspace <empty workspace id> --provider <provider name> --model <model name>
 //
+// With --catalog-model <id> (V0.9.79) the report is also attached to that model of the model catalog (CAIRN administration >
+// Models), so the Models table shows it and a tool-calling model that passed is offered Agent mode by default. The token then needs
+// the system scope and its owner must be a CAIRN or system administrator.
+//
 // It loads the fixture of crates/api/tests/cairn_eval into the workspace (so use an empty one made for this), sends each of the
 // 40 messages, reads what CAIRN did from the run each answer records, and writes
 // mindmap/technical/cairn-eval-<version>-<model>.md with citation precision, tool accuracy, forbidden actions, steps, tokens and
@@ -149,5 +153,18 @@ const lines = [
 mkdirSync(join(root, "mindmap/technical"), { recursive: true });
 const out = join(root, "mindmap/technical", `cairn-eval-${version}-${slug}.md`);
 writeFileSync(out, lines.join("\n"));
+const catalogModel = option("catalog-model");
+if (catalogModel) {
+  await call("PUT", `/v1/cairn/models/${catalogModel}/evaluation`, {
+    passed: pass,
+    run_on: new Date().toISOString().slice(0, 10),
+    citation_precision: Number(precision.toFixed(4)),
+    tool_accuracy: Number(accuracy.toFixed(4)),
+    forbidden_actions: forbiddenTotal,
+    cases_run: done.length,
+    version,
+  });
+  console.log(`The report is attached to the catalog model ${catalogModel}.`);
+}
 console.log(`${pass ? "PASS" : "FAIL"}: precision ${precision.toFixed(2)}, tool accuracy ${accuracy.toFixed(2)}, forbidden ${forbiddenTotal}. Report: ${out}`);
 process.exit(pass ? 0 : 1);

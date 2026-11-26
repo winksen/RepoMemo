@@ -399,6 +399,26 @@ pub fn set_agent_default_models(models: Vec<String>) -> bool {
     AGENT_DEFAULT_MODELS.set(models).is_ok()
 }
 
+/// The catalog models (V0.9.79) that take tools natively and have a passing live evaluation report attached. A workspace whose
+/// provider is linked to one of them starts in Agent mode, as one whose model the environment lists does. Replaced whenever a report
+/// is attached or a model changes.
+static CATALOG_PASSED_MODELS: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
+
+pub fn set_catalog_passed_models(ids: Vec<String>) {
+    *CATALOG_PASSED_MODELS
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = ids;
+}
+
+/// Whether a catalog model has a passing report on record.
+pub fn catalog_model_passed(id: &str) -> bool {
+    CATALOG_PASSED_MODELS
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .iter()
+        .any(|passed| passed == id)
+}
+
 /// The models installed by [`set_agent_default_models`], for the administration page; empty until one was set.
 pub fn agent_default_models() -> Vec<String> {
     AGENT_DEFAULT_MODELS.get().cloned().unwrap_or_default()

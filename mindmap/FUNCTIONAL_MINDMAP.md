@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.78` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.79` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.79 — Evaluation reports are attached to catalog models, and Agent mode follows them.
+
+- **Evaluation per model.** The Models table shows each text model as passed, failed or not evaluated, with the date of its live evaluation. A model that takes tools natively and passed starts its workspaces in Agent mode; one without a passing report starts in Jobs mode, as before. What an administrator chose for a workspace still wins.
+
+Checks: formatted, linted and type-checked; docs:check; tests added, not run, and no live evaluation was run.
 
 ## V0.9.78 — Workspace providers are moved into the model catalog.
 

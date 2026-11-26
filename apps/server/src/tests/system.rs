@@ -2117,3 +2117,74 @@ async fn cairn_administrators_add_models_to_a_connection_and_correct_what_a_test
     }
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_evaluation_report_is_attached_to_a_model_and_only_a_native_model_that_passed_counts() {
+    let data_dir = temp_data_dir("cairn-evaluation");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "eval-root@example.com").await;
+    let (member, _) = register_account(&app, "eval-member@example.com").await;
+    let connection = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &admin,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let model = response_json(
+        send(
+            "POST",
+            "/v1/cairn/models".to_owned(),
+            &admin,
+            json!({"connection_id": connection["id"], "model_id": "llama3.1:8b", "purpose": "text", "tool_mode": "native"}),
+        )
+        .await,
+    )
+    .await;
+    let uri = format!("/v1/cairn/models/{}/evaluation", model["id"].as_str().unwrap());
+    assert_eq!(
+        model["evaluation"],
+        Value::Null,
+        "not evaluated until a report is attached"
+    );
+    let report = json!({"passed": true, "run_on": "2026-11-26", "citation_precision": 0.93, "tool_accuracy": 0.9, "forbidden_actions": 0, "cases_run": 34, "version": "0.9.79"});
+    assert_eq!(send("PUT", uri.clone(), &member, report.clone()).await.status(), 403);
+    for bad in [
+        json!({"passed": true, "run_on": "yesterday", "citation_precision": 0.9, "tool_accuracy": 0.9, "forbidden_actions": 0, "cases_run": 1}),
+        json!({"passed": true, "run_on": "2026-11-26", "citation_precision": 1.5, "tool_accuracy": 0.9, "forbidden_actions": 0, "cases_run": 1}),
+        json!({"passed": true, "run_on": "2026-11-26", "citation_precision": 0.9, "tool_accuracy": 0.9, "forbidden_actions": -1, "cases_run": 1}),
+    ] {
+        assert_eq!(send("PUT", uri.clone(), &admin, bad).await.status(), 400);
+    }
+    let attached = send("PUT", uri.clone(), &admin, report).await;
+    assert_eq!(attached.status(), 200);
+    let attached = response_json(attached).await;
+    assert_eq!(attached["evaluation"]["passed"], true);
+    assert_eq!(attached["evaluation"]["run_on"], "2026-11-26");
+    assert_eq!(attached["version"], 2);
+
+    // A newer failing report replaces it, and the table says so.
+    let failing = json!({"passed": false, "run_on": "2026-11-27", "citation_precision": 0.5, "tool_accuracy": 0.4, "forbidden_actions": 2, "cases_run": 34});
+    let replaced = response_json(send("PUT", uri, &admin, failing).await).await;
+    assert_eq!(replaced["evaluation"]["passed"], false);
+    let listed = response_json(send("GET", "/v1/cairn/models".to_owned(), &admin, Value::Null).await).await;
+    assert_eq!(listed[0]["evaluation"]["run_on"], "2026-11-27");
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &admin))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    assert!(audit.contains("cairn_model_evaluated"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

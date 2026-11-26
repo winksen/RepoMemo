@@ -275,12 +275,22 @@ pub(crate) fn provider_endpoint(provider_type: &str, base_url: Option<&str>) -> 
 /// tools). With no choice, a native tool-calling model that has a passing live evaluation report on record starts in Agent mode,
 /// and every other model, and every model until a report is recorded, in Jobs mode.
 pub(crate) fn cairn_mode_of(provider: &ProviderSettings) -> &'static str {
+    cairn_mode_with(provider, &repomemo_ai::catalog_model_passed)
+}
+
+/// [`cairn_mode_of`] with the check of which catalog models have a passing report given, so a test need not share the global one.
+fn cairn_mode_with(provider: &ProviderSettings, catalog_passed: &dyn Fn(&str) -> bool) -> &'static str {
     let tool_mode = repomemo_ai::ModelTraits::from_metadata(&provider.metadata).tool_mode;
     match provider.metadata.get("cairn_mode").and_then(serde_json::Value::as_str) {
         Some("agent") if tool_mode != repomemo_ai::ToolMode::None => "agent",
         Some("agent") | Some("jobs") => "jobs",
         _ if tool_mode == repomemo_ai::ToolMode::Native
-            && repomemo_ai::agent_default_for(provider.model.as_deref()) =>
+            && (repomemo_ai::agent_default_for(provider.model.as_deref())
+                || provider
+                    .metadata
+                    .get("cairn_model_id")
+                    .and_then(serde_json::Value::as_str)
+                    .is_some_and(catalog_passed)) =>
         {
             "agent"
         }
@@ -323,6 +333,10 @@ fn provider_metadata(
         "purpose": purpose,
     });
     let kept = existing.cloned().unwrap_or_else(|| json!({}));
+    // The catalog model the provider is linked to (V0.9.78) survives a save.
+    if let Some(model_id) = kept.get("cairn_model_id").and_then(serde_json::Value::as_str) {
+        metadata["cairn_model_id"] = json!(model_id);
+    }
     let known = repomemo_ai::ModelTraits::is_known(&kept);
     let before = repomemo_ai::ModelTraits::from_metadata(&kept);
     let mut traits = before;
@@ -405,5 +419,47 @@ mod provider_metadata_tests {
     fn nonsense_is_refused() {
         assert!(provider_metadata(false, "text", None, Some("magic"), None, None).is_err());
         assert!(provider_metadata(false, "text", None, None, Some(10), None).is_err());
+    }
+}
+
+#[cfg(test)]
+mod catalog_default_tests {
+    use super::cairn_mode_with;
+    use repomemo_domain::ProviderSettings;
+    use serde_json::json;
+
+    fn provider(metadata: serde_json::Value) -> ProviderSettings {
+        ProviderSettings {
+            id: "p".to_owned(),
+            workspace_id: Some("w".to_owned()),
+            provider_type: "ollama".to_owned(),
+            name: "Local".to_owned(),
+            base_url: None,
+            model: Some("a-model-nobody-lists".to_owned()),
+            embedding_model: None,
+            enabled: true,
+            metadata,
+            api_key: None,
+        }
+    }
+
+    #[test]
+    fn a_native_model_of_the_catalog_with_a_passing_report_starts_in_agent_mode() {
+        let linked = |tool_mode: &str, id: &str| {
+            provider(json!({"purpose": "text", "tool_mode": tool_mode, "context_tokens": 32000, "cairn_model_id": id}))
+        };
+        let nothing = |_: &str| false;
+        let passed = |id: &str| id == "unit-test-passed";
+        // Nothing is on record: every workspace starts in Jobs mode.
+        assert_eq!(cairn_mode_with(&linked("native", "unit-test-passed"), &nothing), "jobs");
+        assert_eq!(cairn_mode_with(&linked("native", "unit-test-passed"), &passed), "agent");
+        // Only a model that takes tools natively, and only the one that passed.
+        assert_eq!(cairn_mode_with(&linked("json", "unit-test-passed"), &passed), "jobs");
+        assert_eq!(cairn_mode_with(&linked("native", "unit-test-failed"), &passed), "jobs");
+        // What an administrator chose wins.
+        let chosen = provider(
+            json!({"purpose": "text", "tool_mode": "native", "cairn_model_id": "unit-test-passed", "cairn_mode": "jobs"}),
+        );
+        assert_eq!(cairn_mode_with(&chosen, &passed), "jobs");
     }
 }
