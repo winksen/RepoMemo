@@ -6,7 +6,7 @@ pub(crate) async fn generate_workspace_ai_overview(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceAiOverview>, ApiError> {
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
-    let provider = crate::agent::text_provider(&state, &workspace_id).await?;
+    let provider = crate::agent::text_provider_for_role(&state, &workspace_id, &role).await?;
 
     let Some(provider) = provider else {
         return Ok(Json(WorkspaceAiOverview {
@@ -52,7 +52,7 @@ pub(crate) async fn ask_workspace(
     Json(request): Json<AskWorkspaceRequest>,
 ) -> Result<Json<AskAnswer>, ApiError> {
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
-    let provider = crate::agent::text_provider(&state, &workspace_id)
+    let provider = crate::agent::text_provider_for_role(&state, &workspace_id, &role)
         .await?
         .ok_or_else(|| {
             ApiError::bad_request(

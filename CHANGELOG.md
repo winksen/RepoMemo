@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.87 (2026-11-26)
+
+A model can be limited to roles, and the server enforces it.
+
+### Added
+- **Who may use a model.** The organization's CAIRN panel and a workspace's Settings › AI have a *Who may use it* choice for each model: *Everyone who may use AI*, *Members and up* or *Admins only*. A workspace can only narrow what its organization allows. Owners and admins always may, so nobody is locked out of a model they administer; a limit that names every role is no limit, and a limit on a model that is not in the list, or naming a role there is not, is refused. The limits are kept in the organization's and the workspace's policy (`model_roles`) and read by the catalog's own `roles` as well.
+- **Offered, not just refused.** A person's picker shows only the models their role may use, and a chat started with another is refused with `400`. The model that answers by default is chosen among those the role may use: the workspace default, the model the workspace had and the organization's default are each skipped for a role that may not use them, and with none left CAIRN answers by its rules. Ask and the workspace overview follow the same rule.
+- **After the AI policy.** A workspace's rule on which roles may use AI at all (Settings › AI policy) still decides first; the role limits only narrow which model a person who may use AI is given.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (a limit on a model outside the list or naming an unknown role is refused, owners and admins are always added, a viewer is offered only the open model and refused the other while a member gets both) was added; tests not run, and the screens were not opened in a browser.
+
+### Upgrading
+- Nothing to do. No model is limited until an administrator limits one.
+
 ## V0.9.86 (2026-11-26)
 
 A person picks the model of a chat.

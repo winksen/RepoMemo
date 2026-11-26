@@ -121,8 +121,38 @@ impl StorageEngine {
         Some(with_agent_mode(provider, mode))
     }
 
-    /// Resolves the text model of a workspace (see the module's description).
+    /// The models a role may not use in a workspace (V0.9.87): those the organization, the workspace or the catalog limit to other
+    /// roles. Owners and admins may use every model; no role at all (a background task) is not limited.
+    async fn denied_for_role(
+        &self,
+        organization: &Option<crate::organization_cairn::OrganizationCairnSettings>,
+        workspace: &crate::workspace_cairn::WorkspaceCairnSettings,
+        role: Option<&str>,
+    ) -> Result<Vec<String>> {
+        let Some(role) = role.filter(|role| !matches!(*role, "owner" | "admin")) else {
+            return Ok(Vec::new());
+        };
+        let limits =
+            |roles: Option<&Vec<String>>| roles.is_some_and(|roles| !roles.iter().any(|allowed| allowed == role));
+        let mut denied = Vec::new();
+        for model in self.list_cairn_models(None).await? {
+            let by_organization = organization
+                .as_ref()
+                .is_some_and(|settings| limits(settings.policy.model_roles.get(&model.id)));
+            if by_organization || limits(workspace.policy.model_roles.get(&model.id)) || limits(model.roles.as_ref()) {
+                denied.push(model.id);
+            }
+        }
+        Ok(denied)
+    }
+
+    /// Resolves the text model of a workspace (see the module's description) for no one in particular.
     pub async fn resolve_text_provider(&self, workspace_id: &str) -> Result<TextResolution> {
+        self.resolve_text_provider_as(workspace_id, None).await
+    }
+
+    /// Resolves the text model of a workspace for a person with a role: a model limited to other roles is not used (V0.9.87).
+    pub async fn resolve_text_provider_as(&self, workspace_id: &str, role: Option<&str>) -> Result<TextResolution> {
         let former = self
             .list_provider_settings(workspace_id)
             .await?
@@ -154,7 +184,10 @@ impl StorageEngine {
             |id: &str| enabled_by_organization.is_none_or(|ids| ids.iter().any(|enabled| enabled == id));
         let offered_by_workspace =
             |id: &str| workspace.version == 0 || workspace.policy.offered_model_ids.iter().any(|offered| offered == id);
-        let offered = |id: &str| offered_by_organization(id) && offered_by_workspace(id);
+        let denied = self.denied_for_role(&organization, &workspace, role).await?;
+        let offered = |id: &str| {
+            offered_by_organization(id) && offered_by_workspace(id) && !denied.iter().any(|denied| denied == id)
+        };
 
         // 1. The workspace's own default, which is its own provider's model when it is the same.
         let linked = former
@@ -227,6 +260,11 @@ impl StorageEngine {
     /// The text models offered in a workspace and usable now, by id (V0.9.86). Where neither the organization nor the workspace saved
     /// settings, only the model the workspace had is offered, so nothing changes for anyone until an administrator changes it.
     pub async fn offered_text_model_ids(&self, workspace_id: &str) -> Result<Vec<String>> {
+        self.offered_text_model_ids_for(workspace_id, None).await
+    }
+
+    /// The same for a person with a role: a model limited to other roles is not offered (V0.9.87).
+    pub async fn offered_text_model_ids_for(&self, workspace_id: &str, role: Option<&str>) -> Result<Vec<String>> {
         let organization = match self.workspace_organization(workspace_id).await? {
             Some(id) => Some(self.get_organization_cairn_settings(&id).await?),
             None => None,
@@ -260,6 +298,8 @@ impl StorageEngine {
                 }
             }
         }
+        let denied = self.denied_for_role(&organization, &workspace, role).await?;
+        ids.retain(|id| !denied.contains(id));
         let mut usable = Vec::new();
         for id in ids {
             if let Ok(model) = self.get_cairn_model(&id).await {
@@ -275,12 +315,17 @@ impl StorageEngine {
 
     /// The text model for a message in a chat whose person chose `chosen` (V0.9.86): that model while it is offered, else what the
     /// workspace resolves, with a note that the chosen one is no longer offered.
-    pub async fn resolve_text_provider_for(&self, workspace_id: &str, chosen: Option<&str>) -> Result<TextResolution> {
+    pub async fn resolve_text_provider_for(
+        &self,
+        workspace_id: &str,
+        chosen: Option<&str>,
+        role: Option<&str>,
+    ) -> Result<TextResolution> {
         let Some(chosen) = chosen else {
-            return self.resolve_text_provider(workspace_id).await;
+            return self.resolve_text_provider_as(workspace_id, role).await;
         };
         if self
-            .offered_text_model_ids(workspace_id)
+            .offered_text_model_ids_for(workspace_id, role)
             .await?
             .iter()
             .any(|id| id == chosen)
@@ -311,7 +356,7 @@ impl StorageEngine {
             Ok(model) => model.display_name,
             Err(_) => "the model".to_owned(),
         };
-        let mut resolution = self.resolve_text_provider(workspace_id).await?;
+        let mut resolution = self.resolve_text_provider_as(workspace_id, role).await?;
         let said = match resolution.resolved.as_ref() {
             Some(resolved) => format!(
                 "{name}, which you chose for this chat, is no longer offered, so {} answered.",
@@ -462,6 +507,7 @@ mod tests {
                     enabled_model_ids: enabled.iter().map(|model| model.id.clone()).collect(),
                     default_model_id: default.map(|model| model.id.clone()),
                     agent_mode: mode.to_owned(),
+                    model_roles: Default::default(),
                 },
                 &setup.actor,
             )
@@ -580,6 +626,7 @@ mod tests {
                         &WorkspaceCairnPolicy {
                             offered_model_ids: offered,
                             default_model_id: default,
+                            model_roles: Default::default(),
                         },
                         None,
                     )
@@ -651,6 +698,7 @@ mod tests {
                 &WorkspaceCairnPolicy {
                     offered_model_ids: vec![setup.former.id.clone(), setup.other.id.clone()],
                     default_model_id: Some(setup.other.id.clone()),
+                    model_roles: Default::default(),
                 },
                 Some(&setup.actor),
             )

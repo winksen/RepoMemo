@@ -92,8 +92,8 @@ pub(crate) async fn list_agent_capabilities(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<AgentCapabilitiesResponse>, ApiError> {
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
-    let provider = text_provider(&state, &workspace_id).await?;
-    let models = offered_models(&state, &workspace_id, provider.as_ref()).await?;
+    let provider = text_provider_for_role(&state, &workspace_id, &role).await?;
+    let models = offered_models(&state, &workspace_id, provider.as_ref(), &role).await?;
     // AI actions show as unavailable to roles the workspace keeps AI from.
     let provider = match provider {
         Some(provider) if ai_access::role_may_use_ai(&state, &workspace_id, &role).await? => Some(provider),
@@ -132,6 +132,7 @@ async fn offered_models(
     state: &AppState,
     workspace_id: &str,
     answering: Option<&ProviderSettings>,
+    role: &WorkspaceRole,
 ) -> Result<Vec<OfferedModel>, ApiError> {
     let answering = answering
         .and_then(|provider| provider.metadata.get("cairn_model_id"))
@@ -139,7 +140,7 @@ async fn offered_models(
     let mut models = Vec::new();
     for id in state
         .storage
-        .offered_text_model_ids(workspace_id)
+        .offered_text_model_ids_for(workspace_id, Some(role_name(role)))
         .await
         .map_err(map_storage_error)?
     {
@@ -256,7 +257,7 @@ pub(crate) async fn run_message(
     if let Some(model_id) = &requested_model {
         let offered = state
             .storage
-            .offered_text_model_ids(&workspace_id)
+            .offered_text_model_ids_for(&workspace_id, Some(role_name(&role)))
             .await
             .map_err(map_storage_error)?;
         if !offered.contains(model_id) {
@@ -268,7 +269,7 @@ pub(crate) async fn run_message(
         .or_else(|| existing.as_ref().and_then(|conversation| conversation.model_id.clone()));
     let resolution = state
         .storage
-        .resolve_text_provider_for(&workspace_id, chosen_model.as_deref())
+        .resolve_text_provider_for(&workspace_id, chosen_model.as_deref(), Some(role_name(&role)))
         .await
         .map_err(map_storage_error)?;
     // Said in the answer when the workspace's own model is not the one that answers.
@@ -1011,6 +1012,31 @@ pub(crate) async fn text_resolution(
         .resolve_text_provider(workspace_id)
         .await
         .map_err(map_storage_error)
+}
+
+/// The workspace role as the model limits name it (V0.9.87).
+pub(crate) fn role_name(role: &WorkspaceRole) -> &'static str {
+    match role {
+        WorkspaceRole::Owner => "owner",
+        WorkspaceRole::Admin => "admin",
+        WorkspaceRole::Member => "member",
+        WorkspaceRole::Viewer => "viewer",
+    }
+}
+
+/// The text model for a person with a role: one limited to other roles is not used.
+pub(crate) async fn text_provider_for_role(
+    state: &AppState,
+    workspace_id: &str,
+    role: &WorkspaceRole,
+) -> Result<Option<ProviderSettings>, ApiError> {
+    Ok(state
+        .storage
+        .resolve_text_provider_as(workspace_id, Some(role_name(role)))
+        .await
+        .map_err(map_storage_error)?
+        .resolved
+        .map(|resolved| resolved.provider))
 }
 
 pub(crate) async fn text_provider(state: &AppState, workspace_id: &str) -> Result<Option<ProviderSettings>, ApiError> {

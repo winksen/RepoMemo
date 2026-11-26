@@ -1817,7 +1817,7 @@ export function listOrganizationCairnModels(accessToken: string, organizationId:
   return request<CairnModel[]>(`/v1/organizations/${encodeURIComponent(organizationId)}/cairn/models`, {}, accessToken);
 }
 
-export function saveOrganizationCairn(accessToken: string, organizationId: string, change: { enabled_model_ids: string[]; default_model_id: string | null; agent_mode: string; expected_version: number }): Promise<OrganizationCairnSettings> {
+export function saveOrganizationCairn(accessToken: string, organizationId: string, change: { enabled_model_ids: string[]; default_model_id: string | null; agent_mode: string; model_roles: Record<string, string[]>; expected_version: number }): Promise<OrganizationCairnSettings> {
   return request<OrganizationCairnSettings>(`/v1/organizations/${encodeURIComponent(organizationId)}/cairn`, { method: "PUT", body: JSON.stringify(change) }, accessToken);
 }
 
@@ -1825,7 +1825,7 @@ export function getWorkspaceCairn(accessToken: string, workspaceId: string): Pro
   return request<WorkspaceCairnView>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn`, {}, accessToken);
 }
 
-export function saveWorkspaceCairn(accessToken: string, workspaceId: string, change: { offered_model_ids: string[]; default_model_id: string | null; expected_version: number }): Promise<void> {
+export function saveWorkspaceCairn(accessToken: string, workspaceId: string, change: { offered_model_ids: string[]; default_model_id: string | null; model_roles: Record<string, string[]>; expected_version: number }): Promise<void> {
   return request<void>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn`, { method: "PUT", body: JSON.stringify(change) }, accessToken);
 }
 

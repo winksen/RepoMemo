@@ -15,6 +15,9 @@ pub struct WorkspaceCairnPolicy {
     /// The model the workspace uses unless a person chooses another of those offered.
     #[serde(default)]
     pub default_model_id: Option<String>,
+    /// The roles that may use a model in this workspace, by model id, within what the organization allows (V0.9.87).
+    #[serde(default)]
+    pub model_roles: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 /// A workspace's settings with the version to name when changing them. `version` is 0 for a workspace that never saved any.

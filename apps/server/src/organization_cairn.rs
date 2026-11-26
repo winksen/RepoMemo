@@ -26,6 +26,9 @@ pub(crate) struct SettingsRequest {
     default_model_id: Option<String>,
     #[serde(default)]
     agent_mode: Option<String>,
+    /// The roles that may use a model, by model id (V0.9.87); a model with no entry is open to everyone who may use AI.
+    #[serde(default)]
+    model_roles: std::collections::BTreeMap<String, Vec<String>>,
     /// The version the caller read; 0 for an organization that never saved any.
     expected_version: i64,
 }
@@ -181,10 +184,12 @@ pub(crate) async fn update_settings(
             ));
         }
     }
+    let model_roles = crate::workspace_cairn::checked_model_roles(request.model_roles, &enabled)?;
     let policy = OrganizationCairnPolicy {
         enabled_model_ids: enabled,
         default_model_id: request.default_model_id,
         agent_mode,
+        model_roles,
     };
     let saved = state
         .storage

@@ -693,6 +693,7 @@ async fn import_cairn_settings(
     let policy = repomemo_storage::WorkspaceCairnPolicy {
         offered_model_ids: offered,
         default_model_id: default,
+        model_roles: Default::default(),
     };
     if let Err(error) = state
         .storage

@@ -17,6 +17,7 @@ import { showToast } from "../../components/ui/toast";
 import { Tooltip } from "../../components/ui/tooltip";
 import { apiMessage, formatTime } from "../format";
 import { useSystemData } from "../system/shared";
+import { limitsFor, RoleLimitSelect, withLimit } from "./RoleLimit";
 
 const MODES = [
   { label: "Automatic: Agent only for a model that passed the live evaluation", value: "auto" },
@@ -39,15 +40,16 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
   const [chosen, setChosen] = useState<string[]>(settings.enabled_model_ids);
   const [fallbackDefault, setDefault] = useState<string>(settings.default_model_id ?? "");
   const [mode, setMode] = useState<string>(settings.agent_mode);
+  const [roles, setRoles] = useState<Record<string, string[]>>(settings.model_roles ?? {});
   const [isBusy, setIsBusy] = useState(false);
   const textModels = models.filter((model) => model.purpose === "text");
   const defaultId = chosen.includes(fallbackDefault) ? fallbackDefault : (chosen[0] ?? "");
-  const dirty = JSON.stringify([[...chosen].sort(), defaultId || null, mode]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode]);
+  const dirty = JSON.stringify([[...chosen].sort(), defaultId || null, mode, limitsFor(roles, chosen)]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode, settings.model_roles ?? {}]);
 
   async function save() {
     setIsBusy(true);
     try {
-      await saveOrganizationCairn(accessToken, organizationId, { enabled_model_ids: chosen, default_model_id: defaultId || null, agent_mode: mode, expected_version: settings.version });
+      await saveOrganizationCairn(accessToken, organizationId, { enabled_model_ids: chosen, default_model_id: defaultId || null, agent_mode: mode, model_roles: limitsFor(roles, chosen), expected_version: settings.version });
       showToast("success", "The organization's CAIRN settings were saved.");
       onSaved();
     } catch (error) { showToast("error", apiMessage(error, "The settings could not be saved.")); }
@@ -57,7 +59,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
   if (!textModels.length) return <EmptyState description="A CAIRN administrator adds connections and models on the CAIRN administration page, Models section." title="No model can be chosen yet" />;
   return <form className="rm-system-budget-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
     <Table className="rm-dense-table">
-      <thead><tr><th scope="col">Use</th><th scope="col">Model</th><th scope="col">Where</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">Evaluation</th></tr></thead>
+      <thead><tr><th scope="col">Use</th><th scope="col">Model</th><th scope="col">Where</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">Evaluation</th><th scope="col">Who may use it</th></tr></thead>
       <tbody>{textModels.map((model) => <tr key={model.id}>
         <td><Checkbox checked={chosen.includes(model.id)} disabled={!canChange || (!model.selectable && !chosen.includes(model.id))} label={<span className="sr-only">Use {model.display_name}</span>} onCheckedChange={(on) => setChosen((current) => on ? [...current, model.id] : current.filter((id) => id !== model.id))} /></td>
         <th scope="row">{model.display_name}{!model.selectable ? <small className="shared-muted-copy"> · off or not confirmed</small> : null}</th>
@@ -65,6 +67,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
         <td>{TOOL_LABELS[model.tool_mode] ?? model.tool_mode}</td>
         <td>{model.context_tokens ? model.context_tokens.toLocaleString() : <span className="shared-muted-copy">Not tested</span>}</td>
         <td>{model.evaluation ? <Tooltip content={`Citation precision ${model.evaluation.citation_precision.toFixed(2)}, tool accuracy ${model.evaluation.tool_accuracy.toFixed(2)}`}><span><Badge>{model.evaluation.passed ? "Passed" : "Failed"} · {model.evaluation.run_on}</Badge></span></Tooltip> : <span className="shared-muted-copy">Not evaluated</span>}</td>
+        <td><RoleLimitSelect disabled={!canChange || !chosen.includes(model.id)} label={model.display_name} onChange={(limit) => setRoles((current) => withLimit(current, model.id, limit))} roles={roles[model.id]} /></td>
       </tr>)}</tbody>
     </Table>
     <Field hint="The model the organization's workspaces use unless they choose another of those above." label="Default model"><Dropdown aria-label="Default model" disabled={!canChange || chosen.length === 0} onValueChange={setDefault} options={textModels.filter((model) => chosen.includes(model.id)).map((model) => ({ label: model.display_name, value: model.id }))} placeholder="Choose models first" value={defaultId} /></Field>

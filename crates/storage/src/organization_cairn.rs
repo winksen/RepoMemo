@@ -25,6 +25,10 @@ pub struct OrganizationCairnPolicy {
     /// mode for every workspace that has not chosen its own.
     #[serde(default = "auto_mode")]
     pub agent_mode: String,
+    /// The roles that may use a model, by model id (V0.9.87): *cloud models for members and up*. A model with no entry is open to
+    /// everyone who may use AI. Owners and admins always may, so nobody is locked out of a model they administer.
+    #[serde(default)]
+    pub model_roles: std::collections::BTreeMap<String, Vec<String>>,
 }
 
 fn auto_mode() -> String {
@@ -37,6 +41,7 @@ impl Default for OrganizationCairnPolicy {
             enabled_model_ids: Vec::new(),
             default_model_id: None,
             agent_mode: auto_mode(),
+            model_roles: Default::default(),
         }
     }
 }
@@ -172,6 +177,7 @@ mod tests {
             enabled_model_ids: vec!["a".to_owned(), "b".to_owned()],
             default_model_id: Some("a".to_owned()),
             agent_mode: "jobs".to_owned(),
+            model_roles: Default::default(),
         };
         let CairnSaved::Saved(first) = storage
             .save_organization_cairn_settings(&organization.id, 0, &policy, &owner.id)

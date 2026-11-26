@@ -3030,3 +3030,129 @@ async fn a_chat_keeps_the_model_picked_for_it_and_falls_back_with_a_note_when_it
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_model_limited_to_roles_is_neither_offered_nor_accepted_for_other_roles() {
+    let data_dir = temp_data_dir("model-roles");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "roles-root@example.com").await;
+    let (member, _) = register_account(&app, "roles-member@example.com").await;
+    let (viewer, _) = register_account(&app, "roles-viewer@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &root,
+            json!({"name": "Roles Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "Roles Space", "organization_id": organization_id}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+    join(
+        &app,
+        &root,
+        "workspaces",
+        &workspace_id,
+        "roles-member@example.com",
+        "member",
+    )
+    .await;
+    join(
+        &app,
+        &root,
+        "workspaces",
+        &workspace_id,
+        "roles-viewer@example.com",
+        "viewer",
+    )
+    .await;
+    let connection = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &root,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let add = |name: &str| {
+        let body = json!({"connection_id": connection["id"], "model_id": name, "purpose": "text"});
+        let (send, root) = (&send, root.clone());
+        async move { response_json(send("POST", "/v1/cairn/models".to_owned(), &root, body).await).await }
+    };
+    let (open, restricted) = (add("llama3.1:8b").await, add("qwen2.5:7b").await);
+    let organization_uri = format!("/v1/organizations/{organization_id}/cairn");
+
+    // A role limit on a model that is not in the list, or naming a role there is not, is refused.
+    for bad in [
+        json!({"enabled_model_ids": [open["id"]], "model_roles": {restricted["id"].as_str().unwrap(): ["member"]}, "expected_version": 0}),
+        json!({"enabled_model_ids": [open["id"]], "model_roles": {open["id"].as_str().unwrap(): ["editor"]}, "expected_version": 0}),
+    ] {
+        assert_eq!(send("PUT", organization_uri.clone(), &root, bad).await.status(), 400);
+    }
+    let saved = send(
+        "PUT",
+        organization_uri,
+        &root,
+        json!({"enabled_model_ids": [open["id"], restricted["id"]], "default_model_id": open["id"], "model_roles": {restricted["id"].as_str().unwrap(): ["member"]}, "expected_version": 0}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    let saved = response_json(saved).await;
+    assert_eq!(
+        saved["model_roles"][restricted["id"].as_str().unwrap()],
+        json!(["member", "owner", "admin"]),
+        "owners and admins always may"
+    );
+
+    // Members and up are offered both; a viewer only the open one, and the server refuses the other for a viewer.
+    let names = |capabilities: &Value| {
+        let mut names = capabilities["models"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|model| model["name"].as_str().unwrap().to_owned())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    };
+    let uri = format!("/v1/workspaces/{workspace_id}/agent/capabilities");
+    assert_eq!(
+        names(&response_json(send("GET", uri.clone(), &root, Value::Null).await).await),
+        vec!["llama3.1:8b", "qwen2.5:7b"]
+    );
+    assert_eq!(
+        names(&response_json(send("GET", uri.clone(), &member, Value::Null).await).await),
+        vec!["llama3.1:8b", "qwen2.5:7b"]
+    );
+    assert_eq!(
+        names(&response_json(send("GET", uri, &viewer, Value::Null).await).await),
+        vec!["llama3.1:8b"]
+    );
+    let messages = format!("/v1/workspaces/{workspace_id}/agent/messages");
+    let body = json!({"message": "find the deploy runbook", "model_id": restricted["id"]});
+    assert_eq!(
+        send("POST", messages.clone(), &viewer, body.clone()).await.status(),
+        400
+    );
+    assert_eq!(send("POST", messages, &member, body).await.status(), 200);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

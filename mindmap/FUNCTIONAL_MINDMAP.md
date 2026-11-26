@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.86` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.87` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.87 — A model can be limited to roles, and the server enforces it.
+
+- **Models by role.** An organization, or a workspace within it, can limit a model to roles: *Everyone who may use AI*, *Members and up* or *Admins only*, for example cloud models for members and up. A person is offered only the models their role allows, the picker shows only those, and the server refuses another, after the workspace's AI policy has decided that the person may use AI at all. Owners and admins may always use every model.
+
+Checks: formatted, linted and type-checked; docs:check; test added, not run.
 
 ## V0.9.86 — A person picks the model of a chat.
 

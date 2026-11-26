@@ -15,6 +15,7 @@ import { Table } from "../../components/ui/table";
 import { showToast } from "../../components/ui/toast";
 import { apiMessage } from "../format";
 import { useSystemData } from "../system/shared";
+import { limitsFor, RoleLimitSelect, withLimit } from "../cairn-admin/RoleLimit";
 
 const TOOL_LABELS: Record<string, string> = { none: "No tools", json: "Tools as JSON", native: "Native tools" };
 
@@ -33,15 +34,16 @@ export function WorkspaceCairnPanel({ accessToken, workspaceId }: { accessToken:
 function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: string; onSaved: () => void; view: WorkspaceCairnView; workspaceId: string }) {
   const [offered, setOffered] = useState<string[]>(view.models.filter((model) => model.offered).map((model) => model.id));
   const [preferred, setPreferred] = useState<string>(view.default_model_id ?? "");
+  const [roles, setRoles] = useState<Record<string, string[]>>(view.model_roles ?? {});
   const [isBusy, setIsBusy] = useState(false);
   const defaultId = offered.includes(preferred) ? preferred : "";
   const saved = view.models.filter((model) => model.offered).map((model) => model.id).sort();
-  const dirty = JSON.stringify([[...offered].sort(), defaultId || null]) !== JSON.stringify([saved, view.default_model_id]);
+  const dirty = JSON.stringify([[...offered].sort(), defaultId || null, limitsFor(roles, offered)]) !== JSON.stringify([saved, view.default_model_id, view.model_roles ?? {}]);
 
   async function save() {
     setIsBusy(true);
     try {
-      await saveWorkspaceCairn(accessToken, workspaceId, { offered_model_ids: offered, default_model_id: defaultId || null, expected_version: view.version });
+      await saveWorkspaceCairn(accessToken, workspaceId, { offered_model_ids: offered, default_model_id: defaultId || null, model_roles: limitsFor(roles, offered), expected_version: view.version });
       showToast("success", "The workspace's models were saved.");
       onSaved();
     } catch (error) { showToast("error", apiMessage(error, "The models could not be saved.")); }
@@ -51,13 +53,14 @@ function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: stri
   if (!view.models.length) return <p className="shared-muted-copy">Your organization offers no model yet. An organization or CAIRN administrator chooses them; until then the workspace keeps its own provider below.</p>;
   return <form className="rm-system-budget-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
     <Table className="rm-dense-table">
-      <thead><tr><th scope="col">Offer</th><th scope="col">Model</th><th scope="col">Where</th><th scope="col">Tools</th><th scope="col">Context</th></tr></thead>
+      <thead><tr><th scope="col">Offer</th><th scope="col">Model</th><th scope="col">Where</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">Who may use it</th></tr></thead>
       <tbody>{view.models.map((model) => <tr key={model.id}>
         <td><Checkbox checked={offered.includes(model.id)} disabled={!model.selectable && !offered.includes(model.id)} label={<span className="sr-only">Offer {model.display_name}</span>} onCheckedChange={(on) => setOffered((current) => on ? [...current, model.id] : current.filter((id) => id !== model.id))} /></td>
         <th scope="row">{model.display_name} <Badge>From your organization</Badge>{model.answering ? <small className="shared-muted-copy"> · answers now</small> : null}{view.organization_default_model_id === model.id ? <small className="shared-muted-copy"> · organization default</small> : null}</th>
         <td><Badge icon={model.locality === "cloud" ? <Cloud size={ICON_SIZE.sm} /> : <HardDrives size={ICON_SIZE.sm} />}>{model.locality === "cloud" ? "Cloud" : "Local"}</Badge></td>
         <td>{TOOL_LABELS[model.tool_mode] ?? model.tool_mode}</td>
         <td>{model.context_tokens ? model.context_tokens.toLocaleString() : <span className="shared-muted-copy">Not tested</span>}</td>
+        <td><RoleLimitSelect disabled={!offered.includes(model.id)} label={model.display_name} onChange={(limit) => setRoles((current) => withLimit(current, model.id, limit))} roles={roles[model.id]} /></td>
       </tr>)}</tbody>
     </Table>
     <Field hint="The model this workspace uses unless a person chooses another of those it offers. Without one, its own provider answers while the organization offers it, then the organization's default." label="Workspace default"><Dropdown aria-label="Workspace default model" disabled={offered.length === 0} onValueChange={setPreferred} options={view.models.filter((model) => offered.includes(model.id)).map((model) => ({ label: model.display_name, value: model.id }))} placeholder="Offer models first" value={defaultId} /></Field>

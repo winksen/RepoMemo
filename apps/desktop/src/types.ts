@@ -919,6 +919,8 @@ export interface OrganizationCairnSettings {
   default_model_id: string | null;
   /** `auto` keeps the live-evaluation rule; `agent` and `jobs` set the mode of every workspace that has not chosen its own. */
   agent_mode: "auto" | "agent" | "jobs";
+  /** The roles that may use a model, by model id (V0.9.87); a model with no entry is open to everyone who may use AI. */
+  model_roles: Record<string, string[]>;
   updated_at: string | null;
   updated_by: string | null;
 }
@@ -929,6 +931,7 @@ export interface WorkspaceCairnView {
   version: number;
   offered_model_ids: string[];
   default_model_id: string | null;
+  model_roles: Record<string, string[]>;
   updated_at: string | null;
   updated_by: string | null;
   organization_default_model_id: string | null;

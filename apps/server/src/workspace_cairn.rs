@@ -16,6 +16,35 @@ use crate::{
     ApiError, AppState, AuthenticatedSubject, ManagingSubject,
 };
 
+/// The role limits of a model list, checked (V0.9.87): only models in the list, only the roles a workspace has, and a limit that names
+/// every role is no limit. Owners and admins may always use a model, so they are never left out.
+pub(crate) fn checked_model_roles(
+    given: std::collections::BTreeMap<String, Vec<String>>,
+    models: &[String],
+) -> Result<std::collections::BTreeMap<String, Vec<String>>, ApiError> {
+    let mut checked = std::collections::BTreeMap::new();
+    for (model_id, roles) in given {
+        if !models.contains(&model_id) {
+            return Err(ApiError::bad_request(
+                "A role limit names a model that is not in the list.",
+            ));
+        }
+        let mut kept: Vec<String> = Vec::new();
+        for role in roles.iter().map(String::as_str).chain(["owner", "admin"]) {
+            if !matches!(role, "owner" | "admin" | "member" | "viewer") {
+                return Err(ApiError::bad_request("A role is owner, admin, member or viewer."));
+            }
+            if !kept.iter().any(|existing| existing == role) {
+                kept.push(role.to_owned());
+            }
+        }
+        if kept.len() < 4 {
+            checked.insert(model_id, kept);
+        }
+    }
+    Ok(checked)
+}
+
 #[derive(Debug, Serialize)]
 pub(crate) struct WorkspaceModel {
     #[serde(flatten)]
@@ -45,6 +74,9 @@ pub(crate) struct WorkspaceCairnRequest {
     offered_model_ids: Vec<String>,
     #[serde(default)]
     default_model_id: Option<String>,
+    /// The roles that may use a model in this workspace, by model id (V0.9.87), within what the organization allows.
+    #[serde(default)]
+    model_roles: std::collections::BTreeMap<String, Vec<String>>,
     /// The version the caller read; 0 for a workspace that never saved any.
     expected_version: i64,
 }
@@ -187,9 +219,11 @@ pub(crate) async fn update_settings(
             ));
         }
     }
+    let model_roles = checked_model_roles(request.model_roles, &offered)?;
     let policy = WorkspaceCairnPolicy {
         offered_model_ids: offered,
         default_model_id: request.default_model_id,
+        model_roles,
     };
     let saved = state
         .storage
