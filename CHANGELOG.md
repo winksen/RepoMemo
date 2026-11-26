@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.88 (2026-11-26)
+
+A chat across workspaces sends a workspace's passages only to a model offered there.
+
+### Changed
+- **The boundary follows the catalog.** A chat across workspaces (V0.9.60) that writes an answer sends a workspace's passages to the chat's model only when that same model is offered in that workspace to the person's role, that is, when the workspace's organization offers it, the workspace offers it and their limits by role (V0.9.87) allow it. A workspace that does not is listed as found but not sent, with the reason, as V0.9.61 does for providers: *it does not offer llama3.1:8b to your role*. A workspace whose provider was never linked to the catalog is judged as before, by whether it uses the same provider.
+- **The chat's own model.** The chat's model is the one its person picked (V0.9.86), or what the home workspace resolves for their role, so a model limited to other roles is never the model of the chat. The person's AI allowance, the workspace's AI policy and who may read the workspace apply first, unchanged.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A storage test of the primitive the boundary uses (a model is offered in a workspace only while the organization, the workspace and the role allow it) was added; tests not run. The boundary was not checked end to end: no request body sent to a mock provider was inspected, which the plan asks for, so a passage from a workspace that does not offer the model is held back by the code reading, not by a test of the request.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.87 (2026-11-26)
 
 A model can be limited to roles, and the server enforces it.

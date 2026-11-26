@@ -386,7 +386,15 @@ pub(crate) async fn run_message(
     let outcome = if all_workspaces {
         // Across workspaces the chat only looks things up, with no AI: each result is labelled with its own workspace (V0.9.60).
         repomemo_api::AgentOutcome {
-            reply: all_workspaces_reply(state, subject, &workspace_id, &role, &message.message).await?,
+            reply: all_workspaces_reply(
+                state,
+                subject,
+                &workspace_id,
+                &role,
+                &message.message,
+                chosen_model.as_deref(),
+            )
+            .await?,
             correction: None,
             trace: None,
         }
@@ -610,6 +618,7 @@ async fn all_workspaces_reply(
     home_workspace_id: &str,
     home_role: &WorkspaceRole,
     message: &str,
+    chosen_model: Option<&str>,
 ) -> Result<repomemo_domain::AgentReply, ApiError> {
     let query: String = message
         .split_whitespace()
@@ -649,8 +658,24 @@ async fn all_workspaces_reply(
     let mut answer: Option<String> = None;
     let mut held_back = String::new();
     let home_min = ai_access::workspace_ai_min_role(state, home_workspace_id).await?;
-    let home_provider = text_provider(state, home_workspace_id).await?;
+    // The model of the chat, as its home workspace gives it to this person (V0.9.88).
+    let home_provider = state
+        .storage
+        .resolve_text_provider_for(home_workspace_id, chosen_model, Some(role_name(home_role)))
+        .await
+        .map_err(map_storage_error)?
+        .resolved
+        .map(|resolved| resolved.provider);
     if let (Some(home_provider), true) = (home_provider, home_min.allows(home_role)) {
+        let home_model_id = home_provider
+            .metadata
+            .get("cairn_model_id")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned);
+        let home_model_name = home_provider
+            .model
+            .clone()
+            .unwrap_or_else(|| home_provider.name.clone());
         let mut allowed = std::collections::HashSet::new();
         let mut refusals = std::collections::BTreeMap::new();
         for (workspace_id, _) in &names {
@@ -668,12 +693,26 @@ async fn all_workspaces_reply(
                     if !min.allows(&role) {
                         Some("your role there may not use AI".to_owned())
                     } else {
-                        match text_provider(state, workspace_id).await? {
-                            Some(own) if repomemo_api::same_provider(&own, &home_provider) => {
+                        // A workspace's passages go to the model only when that same model is offered there to this person's role
+                        // (V0.9.88): its organization and the workspace offer it, and their limits by role allow this role.
+                        let offers_model = match &home_model_id {
+                            Some(model_id) => state
+                                .storage
+                                .offered_text_model_ids_for(workspace_id, Some(role_name(&role)))
+                                .await
+                                .map_err(map_storage_error)?
+                                .contains(model_id),
+                            None => false,
+                        };
+                        match text_provider_for_role(state, workspace_id, &role).await? {
+                            Some(own) if offers_model || repomemo_api::same_provider(&own, &home_provider) => {
                                 // Each workspace that contributes spends from the person's AI allowance.
                                 ai_access::consume_ai_quota(state, subject)
                                     .err()
                                     .map(|_| "your AI allowance is used up".to_owned())
+                            }
+                            Some(_) if home_model_id.is_some() => {
+                                Some(format!("it does not offer {home_model_name} to your role"))
                             }
                             Some(_) => Some("it uses a different AI provider".to_owned()),
                             None => Some("it has no AI provider".to_owned()),

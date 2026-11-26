@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.87` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.88` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.88 — A chat across workspaces sends a workspace's passages only to a model offered there.
+
+- **Model boundary across workspaces.** When a chat looks across the person's workspaces and writes an answer, a workspace's passages are sent to the chat's model only if that same model is offered in that workspace to the person's role. The other workspaces' results are still listed as found and say why they were not sent: *it does not offer llama3.1:8b to your role*.
+
+Checks: formatted, linted and type-checked; docs:check; a storage test added, not run, and no request body to a mock provider was inspected.
 
 ## V0.9.87 — A model can be limited to roles, and the server enforces it.
 

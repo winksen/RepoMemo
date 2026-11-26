@@ -737,4 +737,78 @@ mod tests {
         );
         let _ = std::fs::remove_dir_all(&setup.dir);
     }
+
+    #[tokio::test]
+    async fn a_model_is_offered_in_a_workspace_only_when_the_organization_the_workspace_and_the_role_allow_it() {
+        use crate::workspace_cairn::WorkspaceCairnPolicy;
+        let setup = setup(None).await;
+        let storage = &setup.storage;
+        save(&setup, &[&setup.former, &setup.other], Some(&setup.former), "auto").await;
+        let other_workspace = storage
+            .create_shared_workspace_with_policy(&setup.actor, &setup.organization_id, "Other", None, false)
+            .await
+            .unwrap()
+            .workspace
+            .id;
+        // Both workspaces offer both models to everyone, then the other workspace stops offering the first model.
+        let offered = |workspace: &str, role: Option<&str>| {
+            let (storage, workspace, role) = (storage.clone(), workspace.to_owned(), role.map(str::to_owned));
+            async move {
+                storage
+                    .offered_text_model_ids_for(&workspace, role.as_deref())
+                    .await
+                    .unwrap()
+            }
+        };
+        assert!(offered(&setup.workspace_id, Some("member"))
+            .await
+            .contains(&setup.former.id));
+        assert!(offered(&other_workspace, Some("member"))
+            .await
+            .contains(&setup.former.id));
+        storage
+            .save_workspace_cairn_settings(
+                &other_workspace,
+                0,
+                &WorkspaceCairnPolicy {
+                    offered_model_ids: vec![setup.other.id.clone()],
+                    default_model_id: None,
+                    model_roles: Default::default(),
+                },
+                None,
+            )
+            .await
+            .unwrap();
+        assert!(
+            !offered(&other_workspace, Some("member"))
+                .await
+                .contains(&setup.former.id),
+            "a passage there never reaches it"
+        );
+        assert!(offered(&setup.workspace_id, Some("member"))
+            .await
+            .contains(&setup.former.id));
+
+        // A limit by role in the home workspace's organization: a viewer is not offered the model anywhere.
+        let current = storage
+            .get_organization_cairn_settings(&setup.organization_id)
+            .await
+            .unwrap();
+        let mut policy = current.policy.clone();
+        policy.model_roles.insert(
+            setup.former.id.clone(),
+            vec!["owner".to_owned(), "admin".to_owned(), "member".to_owned()],
+        );
+        storage
+            .save_organization_cairn_settings(&setup.organization_id, current.version, &policy, &setup.actor)
+            .await
+            .unwrap();
+        assert!(!offered(&setup.workspace_id, Some("viewer"))
+            .await
+            .contains(&setup.former.id));
+        assert!(offered(&setup.workspace_id, Some("member"))
+            .await
+            .contains(&setup.former.id));
+        let _ = std::fs::remove_dir_all(&setup.dir);
+    }
 }
