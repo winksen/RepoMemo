@@ -2391,3 +2391,184 @@ async fn a_cloud_model_cannot_be_chosen_until_its_connection_is_confirmed_and_ev
     assert!(audit.contains("cairn_connection_acknowledgement_withdrawn"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_organization_chooses_its_models_with_a_version_and_only_from_what_can_be_chosen() {
+    let data_dir = temp_data_dir("org-cairn");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "org-cairn-root@example.com").await;
+    let (cairn, cairn_tokens) = register_account(&app, "org-cairn-admin@example.com").await;
+    let (owner, _) = register_account(&app, "org-cairn-owner@example.com").await;
+    let (member, _) = register_account(&app, "org-cairn-member@example.com").await;
+    let (stranger, _) = register_account(&app, "org-cairn-stranger@example.com").await;
+    let cairn_id = cairn_tokens["user"]["id"].as_str().unwrap();
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/system/users/{cairn_id}/cairn-admin"),
+            &root,
+            json!({"enabled": true})
+        )
+        .await
+        .status(),
+        204
+    );
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &owner,
+            json!({"name": "Models Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    join(
+        &app,
+        &owner,
+        "organizations",
+        &organization_id,
+        "org-cairn-member@example.com",
+        "member",
+    )
+    .await;
+    let uri = format!("/v1/organizations/{organization_id}/cairn");
+
+    // The catalog: a local model, a cloud model on a confirmed connection, and a cloud model whose connection is off.
+    let local = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &cairn,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let cloud = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &cairn,
+            json!({"kind": "openrouter", "name": "OpenRouter", "api_key": "sk-or-org", "cloud_content_acknowledged": true}),
+        )
+        .await,
+    )
+    .await;
+    let off = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &cairn,
+            json!({"kind": "openrouter", "name": "Spare", "api_key": "sk-or-spare", "enabled": false}),
+        )
+        .await,
+    )
+    .await;
+    let add = |connection: &Value, name: &str| {
+        let body = json!({"connection_id": connection["id"], "model_id": name, "purpose": "text"});
+        let (send, cairn) = (&send, cairn.clone());
+        async move { response_json(send("POST", "/v1/cairn/models".to_owned(), &cairn, body).await).await }
+    };
+    let (near, far, idle) = (
+        add(&local, "llama3.1:8b").await,
+        add(&cloud, "openai/gpt-4o-mini").await,
+        add(&off, "mistral/small").await,
+    );
+
+    // Everyone with a part reads; a stranger does not; a member does not change.
+    let none = send("GET", uri.clone(), &member, Value::Null).await;
+    assert_eq!(none.status(), 200);
+    let none = response_json(none).await;
+    assert_eq!(
+        (none["version"].clone(), none["agent_mode"].clone()),
+        (json!(0), json!("auto"))
+    );
+    assert_eq!(send("GET", uri.clone(), &stranger, Value::Null).await.status(), 403);
+    let choice = json!({"enabled_model_ids": [near["id"], far["id"]], "default_model_id": near["id"], "agent_mode": "jobs", "expected_version": 0});
+    assert_eq!(send("PUT", uri.clone(), &member, choice.clone()).await.status(), 403);
+    assert_eq!(send("PUT", uri.clone(), &stranger, choice.clone()).await.status(), 403);
+    assert_eq!(
+        send("GET", "/v1/organizations/missing/cairn".to_owned(), &root, Value::Null)
+            .await
+            .status(),
+        404
+    );
+
+    // What cannot be chosen: a model outside the catalog, one whose connection is off, a default that is not enabled, a bad mode.
+    for bad in [
+        json!({"enabled_model_ids": ["nothing"], "expected_version": 0}),
+        json!({"enabled_model_ids": [idle["id"]], "expected_version": 0}),
+        json!({"enabled_model_ids": [near["id"]], "default_model_id": far["id"], "expected_version": 0}),
+        json!({"enabled_model_ids": [near["id"]], "agent_mode": "always", "expected_version": 0}),
+    ] {
+        assert_eq!(send("PUT", uri.clone(), &owner, bad).await.status(), 400);
+    }
+
+    // The owner chooses; a stale save is refused with the current version; a CAIRN administrator who is not a member also may.
+    let saved = send("PUT", uri.clone(), &owner, choice.clone()).await;
+    assert_eq!(saved.status(), 200);
+    let saved = response_json(saved).await;
+    assert_eq!(
+        (saved["version"].clone(), saved["default_model_id"].clone()),
+        (json!(1), near["id"].clone())
+    );
+    assert_eq!(saved["updated_by"], "Person");
+    let stale = send("PUT", uri.clone(), &owner, choice).await;
+    assert_eq!(stale.status(), 409);
+    assert!(response_json(stale).await.to_string().contains("now at version 1"));
+    let changed = send(
+        "PUT",
+        uri.clone(),
+        &cairn,
+        json!({"enabled_model_ids": [near["id"]], "default_model_id": near["id"], "agent_mode": "auto", "expected_version": 1}),
+    )
+    .await;
+    assert_eq!(changed.status(), 200);
+    assert_eq!(response_json(changed).await["version"], 2);
+
+    // A model an organization uses cannot be deleted.
+    assert_eq!(
+        send(
+            "DELETE",
+            format!("/v1/cairn/models/{}", near["id"].as_str().unwrap()),
+            &cairn,
+            Value::Null
+        )
+        .await
+        .status(),
+        409
+    );
+    assert_eq!(
+        send(
+            "DELETE",
+            format!("/v1/cairn/models/{}", far["id"].as_str().unwrap()),
+            &cairn,
+            Value::Null
+        )
+        .await
+        .status(),
+        204,
+        "no longer used once the organization stopped enabling it"
+    );
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &root))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    assert!(audit.contains("organization_cairn_settings_changed"));
+    assert!(
+        audit.contains("Models Org") && audit.contains("Agent mode from jobs to auto"),
+        "{audit}"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

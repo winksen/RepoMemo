@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.82 (2026-11-26)
+
+An organization has CAIRN settings: its models, its default and its Agent-mode default.
+
+### Added
+- **Settings per organization.** Migration `0102_organization_cairn_settings.sql` stores one versioned policy for each organization: the catalog models it uses, its default model and its Agent-mode default (`auto`, which keeps the evaluation rule of V0.9.79, `agent` or `jobs`). An organization that never saved any has the defaults at version 0. More fields arrive with the rows that add guardrails, retention and preferences; an older policy reads with their defaults.
+- **Who may.** `GET /v1/organizations/{id}/cairn` is read by the organization's members and by CAIRN, system and app administrators. `PUT` is for the organization's owners and admins and for CAIRN and system administrators, with a session or an `admin`-scope token. A stranger is refused both.
+- **A version on every save.** The change names the version it read (0 for none yet); a stale save is refused with `409` and the current version, and nothing is overwritten.
+- **Only what can be chosen.** A model must be in the catalog and selectable (V0.9.81: on, on a connection that is on and, if it leaves the network, confirmed), unless the organization already uses it; the default is one of the models enabled; at most 50 models. No organization can enable a cloud model before the confirmation.
+- **Audit.** Each change is an audit event, `organization_cairn_settings_changed`, with the models, the default and the Agent mode before and after. A model an organization uses cannot be deleted from the catalog. The person who saved last is shown as *Former member* once their account is anonymized.
+- **Not yet.** No screen and no run follows these settings: workspaces still use their own providers until V0.9.84.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; the migration is locked and `npm run docs:check` passes. A storage test (versions and stale saves) and a server test (who may read and change, what cannot be chosen, a stale save, a CAIRN administrator, a used model that cannot be deleted, and the audit) were added; tests not run.
+
+### Upgrading
+- A new empty table. Nothing to do.
+
 ## V0.9.81 (2026-11-26)
 
 Every model says whether it is local or cloud, and a cloud model needs a confirmed connection.

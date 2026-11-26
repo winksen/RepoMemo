@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.81` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.82` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.82 — An organization has CAIRN settings: its models, its default and its Agent-mode default.
+
+- **Organization CAIRN settings.** An organization's owners and admins, and CAIRN and system administrators, can choose which catalog models the organization uses, its default model and whether its workspaces start in Agent mode, through the API. Members can read them. Two administrators cannot overwrite each other unseen, and each change is recorded. There is no screen yet, and no workspace follows the settings yet.
+
+Checks: formatted, linted and type-checked; migration locked; docs:check; tests added, not run.
 
 ## V0.9.81 — Every model says whether it is local or cloud, and a cloud model needs a confirmed connection.
 

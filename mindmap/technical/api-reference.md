@@ -157,6 +157,8 @@
 |---|---|---|---|---|---|
 | GET | `/v1/organizations` | auth | — | — | Vec<Organization |
 | POST | `/v1/organizations` | auth | — | CreateOrganizationRequest (name, description, icon) | Organization |
+| GET | `/v1/organizations/{organization_id}/cairn` | auth | organization member, or require_cairn_reader | — | OrganizationCairnSettings |
+| PUT | `/v1/organizations/{organization_id}/cairn` | session or admin token | organization owner or admin, or require_cairn_admin | `{enabled_model_ids, default_model_id, agent_mode, expected_version}` | OrganizationCairnSettings |
 | PUT | `/v1/organizations/{organization_id}` | managing | require_organization_owner | UpdateOrganizationRequest (name, description, icon) | Organization |
 | GET | `/v1/organizations/{organization_id}/overview` | auth | require_organization_read | — | OrganizationOverviewResponse |
 | GET | `/v1/organizations/{organization_id}/members` | auth | require_organization_read | — | Vec<OrganizationMember |

@@ -54,6 +54,7 @@ mod mfa;
 mod milestones;
 mod my_work;
 mod onboarding;
+mod organization_cairn;
 mod organization_templates;
 mod organizations;
 mod outbound;
@@ -860,6 +861,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/notifications/{notification_id}/read", post(mark_notification_read))
         .route("/v1/organizations", get(list_organizations).post(create_organization))
         .route("/v1/organizations/{organization_id}", put(update_organization))
+        .route(
+            "/v1/organizations/{organization_id}/cairn",
+            get(organization_cairn::get_settings).put(organization_cairn::update_settings),
+        )
         .route(
             "/v1/organizations/{organization_id}/overview",
             get(organization_overview),

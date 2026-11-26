@@ -587,8 +587,8 @@ impl StorageEngine {
         Ok(())
     }
 
-    /// In how many places a model is used: workspace providers that name it and models that name it as their fallback. The
-    /// settings of organizations and workspaces that choose models add to this as they arrive.
+    /// In how many places a model is used: workspace providers that name it, models that name it as their fallback and organizations
+    /// that enable it or make it their default. The settings of workspaces that choose models add to this as they arrive.
     pub async fn cairn_model_uses(&self, model_id: &str) -> Result<i64> {
         let providers = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM provider_settings WHERE json_extract(metadata_json, '$.cairn_model_id') = ?1",
@@ -600,7 +600,8 @@ impl StorageEngine {
             .bind(model_id)
             .fetch_one(self.reader())
             .await?;
-        Ok(providers + fallbacks)
+        let organizations = self.organizations_using_cairn_model(model_id).await?;
+        Ok(providers + fallbacks + organizations)
     }
 
     /// Deletes a model. Refused while it is used.
