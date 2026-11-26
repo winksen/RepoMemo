@@ -108,6 +108,28 @@ pub struct RoutineLimits {
     pub events: bool,
 }
 
+/// What outside agents may do in a workspace (V0.9.101).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct McpPolicy {
+    pub mcp: bool,
+    pub inbox: bool,
+    pub inbox_bound: i64,
+    /// Who turned something off: `organization`, `workspace` or `default`.
+    pub set_by: &'static str,
+}
+
+impl McpPolicy {
+    /// What is said to an outside agent that is refused.
+    pub fn refusal(&self, what: &str) -> String {
+        let who = if self.set_by == "workspace" {
+            "This workspace's administrators turned off"
+        } else {
+            "Your organization turned off"
+        };
+        format!("{who} {what} for this workspace.")
+    }
+}
+
 /// What a resolution found: a model, or why there is none to say.
 #[derive(Debug, Clone, Default)]
 pub struct TextResolution {
@@ -516,6 +538,44 @@ impl StorageEngine {
             }
         }
         Ok(paused)
+    }
+
+    /// What outside agents may do in a workspace (V0.9.101): the stricter of the organization's and the workspace's.
+    pub async fn mcp_policy_for_workspace(&self, workspace_id: &str) -> Result<McpPolicy> {
+        let mut policy = McpPolicy {
+            mcp: true,
+            inbox: true,
+            inbox_bound: 50,
+            set_by: "default",
+        };
+        let mut take = |guardrails: &crate::organization_cairn::Guardrails, by: &'static str| {
+            if guardrails.mcp_enabled == Some(false) && policy.mcp {
+                policy.mcp = false;
+                policy.set_by = by;
+            }
+            if guardrails.inbox_enabled == Some(false) && policy.inbox {
+                policy.inbox = false;
+                policy.set_by = by;
+            }
+            if let Some(bound) = guardrails.inbox_bound {
+                policy.inbox_bound = policy.inbox_bound.min(bound);
+            }
+        };
+        if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+            take(
+                &self
+                    .get_organization_cairn_settings(&organization_id)
+                    .await?
+                    .policy
+                    .guardrails,
+                "organization",
+            );
+        }
+        take(
+            &self.get_workspace_cairn_settings(workspace_id).await?.policy.guardrails,
+            "workspace",
+        );
+        Ok(policy)
     }
 
     /// What one confirmation may change in a workspace, and from how many changes the person types the number (V0.9.92): the stricter

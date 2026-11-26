@@ -142,6 +142,13 @@ pub(crate) fn checked_guardrails(
         )?,
         budget_exempt_admins: given.budget_exempt_admins,
         strict_citations: given.strict_citations,
+        mcp_enabled: given.mcp_enabled,
+        inbox_enabled: given.inbox_enabled,
+        inbox_bound: ranged(
+            given.inbox_bound,
+            repomemo_api::INBOX_PENDING_MAX,
+            "The proposals that may wait in the inbox",
+        )?,
         retention_trace_days: ranged(
             given.retention_trace_days,
             repomemo_storage::MAX_RETENTION_DAYS,

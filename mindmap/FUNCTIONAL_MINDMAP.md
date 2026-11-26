@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.100` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.101` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.101 — An organization can turn off the MCP endpoint and the inbox for its workspaces.
+
+- **MCP and inbox policy.** An organization, and a workspace within it, can turn off the MCP endpoint for its workspaces, turn off outside agents' proposals into a person's inbox, and lower how many proposals wait at once (50 at most). A token's call into such a workspace is refused with the reason, and the workspace is no longer listed to it.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.100 — An organization sets how long CAIRN's history, chats and personal memory are kept.
 

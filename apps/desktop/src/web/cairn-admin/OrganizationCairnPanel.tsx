@@ -24,6 +24,7 @@ import { SecretsSetting } from "./SecretsSetting";
 import { BudgetFields } from "./BudgetFields";
 import { RoutineLimits } from "./RoutineLimits";
 import { RetentionFields } from "./RetentionFields";
+import { McpPolicy } from "./McpPolicy";
 import type { Guardrails } from "../../types";
 
 const MODES = [
@@ -88,6 +89,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
     <ChangeLimitFields disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     <SecretsSetting disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     <RetentionFields accessToken={accessToken} disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} organizationId={organizationId} />
+    <McpPolicy disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     <RoutineLimits disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     <BudgetFields canExempt disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     {canChange ? <Button busy={isBusy} disabled={!dirty} type="submit" variant="main">Save</Button> : null}

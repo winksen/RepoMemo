@@ -102,6 +102,21 @@ pub(crate) async fn mcp(
                     .filter(|entry| subject.token_reaches(&entry.workspace.id))
                     .map(|entry| format!("{} — id {}", entry.workspace.name, entry.workspace.id))
                     .collect::<Vec<_>>();
+                // A workspace whose organization or administrators turned the MCP endpoint off is not listed (V0.9.101).
+                let mut lines = lines;
+                let mut served = Vec::new();
+                for line in lines.drain(..) {
+                    let workspace = line.rsplit("id ").next().unwrap_or_default().to_owned();
+                    if state
+                        .storage
+                        .mcp_policy_for_workspace(&workspace)
+                        .await
+                        .map_or(true, |policy| policy.mcp)
+                    {
+                        served.push(line);
+                    }
+                }
+                let lines = served;
                 return reply(
                     &id,
                     text_result(
@@ -127,6 +142,11 @@ pub(crate) async fn mcp(
                     &id,
                     text_result("That workspace is not one this token can read.".to_owned(), true),
                 );
+            }
+            if let Ok(policy) = state.storage.mcp_policy_for_workspace(&workspace_id).await {
+                if !policy.mcp {
+                    return reply(&id, text_result(policy.refusal("the MCP endpoint"), true));
+                }
             }
             match state.core.mcp_call(&workspace_id, &name, &arguments).await {
                 Ok(text) => {
@@ -166,8 +186,21 @@ async fn propose(state: &AppState, subject: &AuthenticatedSubject, tool: &str, a
             true,
         );
     }
+    // The organization's and the workspace's policy (V0.9.101): outside agents may be kept out of the inbox, and its bound lowered.
+    let policy = state.storage.mcp_policy_for_workspace(&workspace_id).await.ok();
+    if let Some(policy) = policy.as_ref().filter(|policy| !policy.mcp || !policy.inbox) {
+        return text_result(
+            policy.refusal(if policy.mcp {
+                "the inbox for outside agents"
+            } else {
+                "the MCP endpoint"
+            }),
+            true,
+        );
+    }
+    let bound = policy.map_or(repomemo_api::INBOX_PENDING_MAX, |policy| policy.inbox_bound);
     match state.storage.pending_inbox_proposals(&subject.user_id).await {
-        Ok(count) if count >= repomemo_api::INBOX_PENDING_MAX => {
+        Ok(count) if count >= bound => {
             return text_result(
                 "The owner's inbox is full. Nothing more can be proposed until they confirm or dismiss some."
                     .to_owned(),

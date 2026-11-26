@@ -961,6 +961,10 @@ export interface Guardrails {
   retention_trace_days?: number | null;
   retention_chat_days?: number | null;
   retention_memory_days?: number | null;
+  /** Outside agents (V0.9.101): whether the MCP endpoint and the inbox serve the workspaces, and how many proposals wait. */
+  mcp_enabled?: boolean | null;
+  inbox_enabled?: boolean | null;
+  inbox_bound?: number | null;
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */

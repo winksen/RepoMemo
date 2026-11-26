@@ -533,6 +533,17 @@ pub(crate) async fn update_settings(
                 "A workspace's routine limits are never looser than its organization's.",
             ));
         }
+        if (organization.mcp_enabled == Some(false) && guardrails.mcp_enabled == Some(true))
+            || (organization.inbox_enabled == Some(false) && guardrails.inbox_enabled == Some(true))
+            || guardrails
+                .inbox_bound
+                .zip(organization.inbox_bound)
+                .is_some_and(|(own, theirs)| own > theirs)
+        {
+            return Err(ApiError::bad_request(
+                "A workspace's MCP and inbox policy is never looser than its organization's.",
+            ));
+        }
         if guardrails.monthly_token_budget.is_some() || guardrails.at_budget.is_some() {
             return Err(ApiError::bad_request(
                 "The monthly token budget is the organization's, not a workspace's.",

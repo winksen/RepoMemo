@@ -77,6 +77,14 @@ pub struct Guardrails {
     pub retention_chat_days: Option<i64>,
     #[serde(default)]
     pub retention_memory_days: Option<i64>,
+    /// Whether the MCP endpoint serves the workspaces, and whether outside agents may propose into the inbox, and how many proposals wait
+    /// at most (V0.9.101). None keeps them on and the bound at 50. A workspace can only turn them off or lower the bound.
+    #[serde(default)]
+    pub mcp_enabled: Option<bool>,
+    #[serde(default)]
+    pub inbox_enabled: Option<bool>,
+    #[serde(default)]
+    pub inbox_bound: Option<i64>,
 }
 
 /// The longest an organization can ask to keep anything, in days.

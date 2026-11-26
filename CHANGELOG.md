@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.101 (2026-11-26)
+
+An organization can turn off the MCP endpoint and the inbox for its workspaces.
+
+### Added
+- **The policy.** *Serve outside agents through the MCP endpoint*, *Let outside agents propose into a person's inbox* and *Inbox bound* (1 to 50, 50 by default) in the organization's CAIRN panel and, only stricter, in a workspace's Settings › AI. A workspace cannot turn on what its organization turned off, nor raise the bound (`400`).
+- **Refused with the reason.** An MCP client's read of such a workspace is refused with *Your organization turned off the MCP endpoint for this workspace* (or *This workspace's administrators …*), the workspace is left out of `list_workspaces`, and a proposal is refused when the inbox is off or the person's inbox already holds the lowered bound.
+- **Not changed.** The token's own scope and the owner's rights still apply first, and pending proposals already in an inbox are kept when the bound is lowered; they are just not added to.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added and no MCP client was run against it.
+
+### Upgrading
+- Nothing to do: everything stays on.
+
 ## V0.9.100 (2026-11-26)
 
 An organization sets how long CAIRN's history, chats and personal memory are kept.
