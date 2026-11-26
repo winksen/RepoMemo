@@ -6,13 +6,14 @@
 //! ones). Nothing is written.
 
 use repomemo_domain::{
-    ArchiveApproval, ArchiveArtifact, ArchiveChecklistItem, ArchiveChunkRef, ArchiveCitation, ArchiveComment,
-    ArchiveFolder, ArchiveLifecycle, ArchiveLifecycleEvent, ArchiveMemoryCard, ArchivePerson, ArchiveReview,
-    ArchiveRevision, ArchiveRevisionCitation, ArchiveSavedSearch, ArchiveSource, ArchiveTask, ArchiveVersion,
-    ArchiveWorkspace, SharedUser, WorkspaceArchiveData,
+    ArchiveApproval, ArchiveArtifact, ArchiveCairn, ArchiveChecklistItem, ArchiveChunkRef, ArchiveCitation,
+    ArchiveComment, ArchiveFolder, ArchiveLifecycle, ArchiveLifecycleEvent, ArchiveMemoryCard, ArchiveModelRef,
+    ArchivePerson, ArchiveReview, ArchiveRevision, ArchiveRevisionCitation, ArchiveSavedSearch, ArchiveSource,
+    ArchiveTask, ArchiveVersion, ArchiveWorkspace, SharedUser, WorkspaceArchiveData,
 };
 
 use super::*;
+use crate::cairn_catalog::CairnModel;
 
 /// The address an anonymized account was given; it is not an address worth carrying.
 const ANONYMIZED_ADDRESS_SUFFIX: &str = "@anonymized.invalid";
@@ -129,6 +130,7 @@ impl StorageEngine {
         let saved_searches = self.export_saved_searches(workspace_id).await?;
         let work = self.export_work(workspace_id).await?;
         let integrations = self.export_integrations(workspace_id).await?;
+        let cairn = self.export_cairn_settings(workspace_id).await?;
 
         Ok(WorkspaceArchiveData {
             workspace,
@@ -145,7 +147,35 @@ impl StorageEngine {
             integrations,
             versions,
             saved_searches,
+            cairn,
         })
+    }
+
+    /// The models a workspace offers and its default, named as their servers name them (V0.9.85). None for a workspace that never
+    /// saved settings, so an older archive and a workspace that never chose read the same.
+    async fn export_cairn_settings(&self, workspace_id: &str) -> Result<Option<ArchiveCairn>> {
+        let settings = self.get_workspace_cairn_settings(workspace_id).await?;
+        if settings.version == 0 {
+            return Ok(None);
+        }
+        let mut reference = |model: CairnModel| ArchiveModelRef {
+            model: model.model_id,
+            purpose: model.purpose,
+        };
+        let mut offered = Vec::new();
+        for id in &settings.policy.offered_model_ids {
+            if let Ok(model) = self.get_cairn_model(id).await {
+                offered.push(reference(model));
+            }
+        }
+        let default = match &settings.policy.default_model_id {
+            Some(id) => self.get_cairn_model(id).await.ok().map(&mut reference),
+            None => None,
+        };
+        Ok(Some(ArchiveCairn {
+            offered_models: offered,
+            default_model: default,
+        }))
     }
 
     /// The earlier versions of the workspace's files, each file's oldest first (V0.3.19).

@@ -549,6 +549,26 @@ pub struct WorkspaceArchiveData {
     /// Where connector items came from and what was published (format 5). Records only: nothing comes back connected, sending or public.
     #[serde(default)]
     pub integrations: ArchiveIntegrations,
+    /// The models the workspace offers and its default, by the name each model's server knows it by (V0.9.85). A model the importing
+    /// server does not have in its catalog is dropped, with a warning.
+    #[serde(default)]
+    pub cairn: Option<ArchiveCairn>,
+}
+
+/// A workspace's CAIRN model settings as an archive carries them.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ArchiveCairn {
+    #[serde(default)]
+    pub offered_models: Vec<ArchiveModelRef>,
+    #[serde(default)]
+    pub default_model: Option<ArchiveModelRef>,
+}
+
+/// A catalog model named by what a server calls it, since the ids of one server mean nothing on another.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArchiveModelRef {
+    pub model: String,
+    pub purpose: String,
 }
 
 /// Provenance and publication history (V0.8.19). It never holds a credential, a secret or an address that is not the tracker's own.

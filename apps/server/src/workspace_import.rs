@@ -578,6 +578,7 @@ async fn read_archive(
     }
     progress.stage("writing_records", 0);
     let mut finished = create_workspace(state, subject, query, &data).await?;
+    warnings.append(&mut finished.warnings);
     let mut summary = report(&manifest, Some(&data), problems, warnings, false);
     summary.widened_citations = finished.widened;
     summary.workspace = Some(finished.workspace.take().expect("created above"));
@@ -637,6 +638,70 @@ fn room_problems(state: &AppState, incoming: u64) -> Vec<String> {
 struct Created {
     workspace: Option<repomemo_domain::SharedWorkspace>,
     widened: u64,
+    /// What the import left out or changed, said to the person who imported (V0.9.85).
+    warnings: Vec<String>,
+}
+
+/// The workspace's CAIRN model settings from an archive: each model is matched to this server's catalog by the name its server knows
+/// it by and its purpose, and one that is not here is dropped with a warning. A model the organization does not offer is dropped too.
+async fn import_cairn_settings(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    workspace_id: &str,
+    data: &WorkspaceArchiveData,
+) -> Vec<String> {
+    let Some(cairn) = data.cairn.as_ref() else {
+        return Vec::new();
+    };
+    let mut warnings = Vec::new();
+    let catalog = state.storage.list_cairn_models(None).await.unwrap_or_default();
+    let organization = match state.storage.workspace_organization(workspace_id).await {
+        Ok(Some(id)) => state.storage.get_organization_cairn_settings(&id).await.ok(),
+        _ => None,
+    };
+    let mut find = |reference: &repomemo_domain::ArchiveModelRef| -> Option<String> {
+        let found = catalog
+            .iter()
+            .find(|model| model.model_id == reference.model && model.purpose == reference.purpose)
+            .filter(|model| {
+                organization
+                    .as_ref()
+                    .filter(|settings| settings.version > 0)
+                    .is_none_or(|settings| settings.policy.enabled_model_ids.contains(&model.id))
+            });
+        if found.is_none() {
+            warnings.push(format!(
+                "The model {} is not offered by this server's catalog or this organization, so the workspace does not offer it.",
+                reference.model
+            ));
+        }
+        found.map(|model| model.id.clone())
+    };
+    let offered: Vec<String> = cairn.offered_models.iter().filter_map(&mut find).collect();
+    let default = cairn
+        .default_model
+        .as_ref()
+        .and_then(&mut find)
+        .filter(|id| offered.contains(id));
+    // Nothing to keep: the workspace offers what its organization offers, as a new one does.
+    if offered.is_empty() {
+        if !cairn.offered_models.is_empty() {
+            warnings.push("None of the models the archive's workspace offered are here, so this workspace offers its organization's models.".to_owned());
+        }
+        return warnings;
+    }
+    let policy = repomemo_storage::WorkspaceCairnPolicy {
+        offered_model_ids: offered,
+        default_model_id: default,
+    };
+    if let Err(error) = state
+        .storage
+        .save_workspace_cairn_settings(workspace_id, 0, &policy, Some(&subject.user_id))
+        .await
+    {
+        tracing::error!(error = %error, workspace_id, "The CAIRN model settings of an archive could not be saved");
+    }
+    warnings
 }
 
 async fn create_workspace(
@@ -750,9 +815,11 @@ async fn create_workspace(
         ),
     )
     .await;
+    let warnings = import_cairn_settings(state, subject, &workspace_id, data).await;
     Ok(Created {
         workspace: Some(workspace),
         widened,
+        warnings,
     })
 }
 

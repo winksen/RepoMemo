@@ -601,7 +601,8 @@ impl StorageEngine {
             .fetch_one(self.reader())
             .await?;
         let organizations = self.organizations_using_cairn_model(model_id).await?;
-        Ok(providers + fallbacks + organizations)
+        let workspaces = self.workspaces_using_cairn_model(model_id).await?;
+        Ok(providers + fallbacks + organizations + workspaces)
     }
 
     /// Deletes a model. Refused while it is used.

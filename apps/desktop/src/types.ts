@@ -909,6 +909,19 @@ export interface OrganizationCairnSettings {
   updated_by: string | null;
 }
 
+/** A workspace's CAIRN model settings and the models of its organization it can offer (V0.9.85). `version` is 0 when it never saved any. */
+export interface WorkspaceCairnView {
+  workspace_id: string;
+  version: number;
+  offered_model_ids: string[];
+  default_model_id: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+  organization_default_model_id: string | null;
+  organization_decided: boolean;
+  models: (CairnModel & { from_organization: boolean; offered: boolean; answering: boolean })[];
+}
+
 /** A live evaluation report attached to a model (V0.9.79), as `npm run cairn:eval` measures it. */
 export interface CairnEvaluation {
   passed: boolean;

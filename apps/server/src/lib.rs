@@ -95,6 +95,7 @@ mod web_session;
 mod webhooks;
 mod winservice;
 mod workflow;
+mod workspace_cairn;
 mod workspace_export;
 mod workspace_import;
 mod workspaces;
@@ -868,6 +869,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/organizations/{organization_id}/cairn/models",
             get(organization_cairn::list_models),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/cairn",
+            get(workspace_cairn::get_settings).put(workspace_cairn::update_settings),
         )
         .route(
             "/v1/organizations/{organization_id}/overview",

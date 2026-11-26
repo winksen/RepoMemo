@@ -2,12 +2,14 @@
 //! configuration. Until a workspace chooses its own default (V0.9.85), a person chooses a model per chat (V0.9.86) or the person's
 //! preferences name one (V0.9.114), the order is:
 //!
-//! 1. the model the workspace used before (its own provider, linked to the catalog by V0.9.78) while the organization offers it;
-//! 2. the organization's default model;
-//! 3. none: CAIRN answers by its rules, as with no provider today.
+//! 1. the workspace's own default, when it saved settings (V0.9.85);
+//! 2. the model the workspace used before (its own provider, linked to the catalog by V0.9.78) while it is offered;
+//! 3. the organization's default model, while the workspace offers it;
+//! 4. none: CAIRN answers by its rules, as with no provider today.
 //!
-//! An organization that never saved settings offers whatever its workspaces had, so nothing changes for anyone until an administrator
-//! changes it. A model the organization turned off is never replaced silently by another: the answer says which one answered.
+//! A model is offered when the organization enables it (or never saved settings) and the workspace offers it (or never saved
+//! settings). When neither saved any, nothing changes for anyone: each workspace keeps the model it had. A model that is turned off
+//! is never replaced silently by another: the answer says which one answered.
 
 use repomemo_domain::ProviderSettings;
 use serde_json::{json, Value};
@@ -103,6 +105,22 @@ impl StorageEngine {
         ))
     }
 
+    /// A catalog model as a provider for a workspace, when it can be used now: on, a text model, on a connection that is usable.
+    async fn usable_catalog_provider(
+        &self,
+        workspace_id: &str,
+        model_id: &str,
+        mode: &str,
+    ) -> Option<ProviderSettings> {
+        let model = self.get_cairn_model(model_id).await.ok()?;
+        let connection = self.get_cairn_connection(&model.connection_id).await.ok()?;
+        if !(model.enabled && model.purpose == "text" && connection.is_usable()) {
+            return None;
+        }
+        let provider = self.catalog_provider(workspace_id, &model, &connection).await.ok()?;
+        Some(with_agent_mode(provider, mode))
+    }
+
     /// Resolves the text model of a workspace (see the module's description).
     pub async fn resolve_text_provider(&self, workspace_id: &str) -> Result<TextResolution> {
         let former = self
@@ -110,67 +128,119 @@ impl StorageEngine {
             .await?
             .into_iter()
             .find(|setting| setting.enabled && setting.purpose() == "text");
-        let Some(organization_id) = self.workspace_organization(workspace_id).await? else {
-            return Ok(TextResolution {
-                resolved: former.map(|provider| ResolvedTextProvider { provider, notice: None }),
-                notice: None,
-            });
+        let organization = match self.workspace_organization(workspace_id).await? {
+            Some(organization_id) => Some(self.get_organization_cairn_settings(&organization_id).await?),
+            None => None,
         };
-        let settings = self.get_organization_cairn_settings(&organization_id).await?;
-        // An organization that never saved settings offers whatever its workspaces had.
-        if settings.version == 0 {
+        let workspace = self.get_workspace_cairn_settings(workspace_id).await?;
+        let organization_decided = organization.as_ref().is_some_and(|settings| settings.version > 0);
+        // Neither the organization nor the workspace saved settings: every workspace keeps the model it had.
+        if !organization_decided && workspace.version == 0 {
             return Ok(TextResolution {
                 resolved: former.map(|provider| ResolvedTextProvider { provider, notice: None }),
                 notice: None,
             });
         }
-        let policy = &settings.policy;
-        let offered = |id: &str| policy.enabled_model_ids.iter().any(|enabled| enabled == id);
+        let (enabled_by_organization, mode, default_model) =
+            match organization.as_ref().filter(|settings| settings.version > 0) {
+                Some(settings) => (
+                    Some(&settings.policy.enabled_model_ids),
+                    settings.policy.agent_mode.as_str(),
+                    settings.policy.default_model_id.as_deref(),
+                ),
+                None => (None, "auto", None),
+            };
+        let offered_by_organization =
+            |id: &str| enabled_by_organization.is_none_or(|ids| ids.iter().any(|enabled| enabled == id));
+        let offered_by_workspace =
+            |id: &str| workspace.version == 0 || workspace.policy.offered_model_ids.iter().any(|offered| offered == id);
+        let offered = |id: &str| offered_by_organization(id) && offered_by_workspace(id);
 
-        if let Some(former) = former.as_ref() {
-            let linked = former.metadata.get("cairn_model_id").and_then(Value::as_str);
-            if linked.is_some_and(offered) {
+        // 1. The workspace's own default, which is its own provider's model when it is the same.
+        let linked = former
+            .as_ref()
+            .and_then(|provider| provider.metadata.get("cairn_model_id"))
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        if workspace.version > 0 {
+            if let Some(default_id) = workspace.policy.default_model_id.as_deref().filter(|id| offered(id)) {
+                if linked.as_deref() == Some(default_id) {
+                    if let Some(former) = former.clone() {
+                        return Ok(TextResolution {
+                            resolved: Some(ResolvedTextProvider {
+                                provider: with_agent_mode(former, mode),
+                                notice: None,
+                            }),
+                            notice: None,
+                        });
+                    }
+                }
+                if let Some(provider) = self.usable_catalog_provider(workspace_id, default_id, mode).await {
+                    return Ok(TextResolution {
+                        resolved: Some(ResolvedTextProvider {
+                            notice: self.lost_notice(&former, &provider, linked.as_deref(), &offered_by_organization),
+                            provider,
+                        }),
+                        notice: None,
+                    });
+                }
+            }
+        }
+        // 2. The model the workspace had, while it is offered.
+        if let (Some(former), Some(linked)) = (former.as_ref(), linked.as_deref()) {
+            if offered(linked) {
                 return Ok(TextResolution {
                     resolved: Some(ResolvedTextProvider {
-                        provider: with_agent_mode(former.clone(), &policy.agent_mode),
+                        provider: with_agent_mode(former.clone(), mode),
                         notice: None,
                     }),
                     notice: None,
                 });
             }
         }
-
-        let former_name = former
-            .as_ref()
-            .map(|provider| provider.model.clone().unwrap_or_else(|| provider.name.clone()));
-        if let Some(default_id) = policy.default_model_id.as_deref().filter(|id| offered(id)) {
-            if let Ok(model) = self.get_cairn_model(default_id).await {
-                if let Ok(connection) = self.get_cairn_connection(&model.connection_id).await {
-                    if model.enabled && model.purpose == "text" && connection.is_usable() {
-                        let provider = with_agent_mode(
-                            self.catalog_provider(workspace_id, &model, &connection).await?,
-                            &policy.agent_mode,
-                        );
-                        let notice = former_name.map(|former| {
-                            format!(
-                                "Your organization does not offer {former}, so {} answered.",
-                                model.display_name
-                            )
-                        });
-                        return Ok(TextResolution {
-                            resolved: Some(ResolvedTextProvider { provider, notice }),
-                            notice: None,
-                        });
-                    }
-                }
+        // 3. The organization's default, while the workspace offers it.
+        if let Some(default_id) = default_model.filter(|id| offered(id)) {
+            if let Some(provider) = self.usable_catalog_provider(workspace_id, default_id, mode).await {
+                return Ok(TextResolution {
+                    resolved: Some(ResolvedTextProvider {
+                        notice: self.lost_notice(&former, &provider, linked.as_deref(), &offered_by_organization),
+                        provider,
+                    }),
+                    notice: None,
+                });
             }
         }
         Ok(TextResolution {
             resolved: None,
-            notice: former_name.map(|former| {
-                format!("Your organization does not offer {former} and has no default model, so CAIRN answers by its rules.")
+            notice: former.as_ref().map(|provider| {
+                let name = provider.model.clone().unwrap_or_else(|| provider.name.clone());
+                let who = if linked.as_deref().is_some_and(|id| !offered_by_organization(id)) {
+                    "Your organization does not"
+                } else {
+                    "This workspace does not"
+                };
+                format!("{who} offer {name} and no other model is available, so CAIRN answers by its rules.")
             }),
         })
+    }
+
+    /// What to say when another model answers instead of the one the workspace had; nothing when it had none.
+    fn lost_notice(
+        &self,
+        former: &Option<ProviderSettings>,
+        answering: &ProviderSettings,
+        linked: Option<&str>,
+        offered_by_organization: &dyn Fn(&str) -> bool,
+    ) -> Option<String> {
+        let former = former.as_ref()?;
+        let name = former.model.clone().unwrap_or_else(|| former.name.clone());
+        let answered = answering.model.clone().unwrap_or_else(|| answering.name.clone());
+        let who = if linked.is_some_and(|id| !offered_by_organization(id)) {
+            "Your organization does not"
+        } else {
+            "This workspace does not"
+        };
+        Some(format!("{who} offer {name}, so {answered} answered."))
     }
 }
 
@@ -385,5 +455,130 @@ mod tests {
         assert_eq!(served.provider.metadata["cairn_mode"], "agent");
         assert!(served.notice.is_none(), "it had no model to lose");
         let _ = std::fs::remove_dir_all(setup.dir);
+    }
+
+    #[tokio::test]
+    async fn a_workspace_offers_a_subset_and_its_own_default_comes_first() {
+        use crate::workspace_cairn::WorkspaceCairnPolicy;
+        let setup = setup(None).await;
+        let storage = &setup.storage;
+        let save_workspace = |offered: Vec<String>, default: Option<String>, version: i64| {
+            let (storage, id) = (setup.storage.clone(), setup.workspace_id.clone());
+            async move {
+                storage
+                    .save_workspace_cairn_settings(
+                        &id,
+                        version,
+                        &WorkspaceCairnPolicy {
+                            offered_model_ids: offered,
+                            default_model_id: default,
+                        },
+                        None,
+                    )
+                    .await
+                    .unwrap()
+            }
+        };
+        // The organization has not decided, and the workspace offers only the other model and makes it its default: it answers.
+        save_workspace(vec![setup.other.id.clone()], Some(setup.other.id.clone()), 0).await;
+        let chosen = storage
+            .resolve_text_provider(&setup.workspace_id)
+            .await
+            .unwrap()
+            .resolved
+            .unwrap();
+        assert_eq!(chosen.provider.model.as_deref(), Some("qwen2.5:7b"));
+        assert_eq!(
+            chosen.notice.as_deref(),
+            Some("This workspace does not offer llama3.1:8b, so qwen2.5:7b answered.")
+        );
+
+        // Offering both with its former model as the default keeps the workspace's own provider, with its notice gone.
+        save_workspace(
+            vec![setup.former.id.clone(), setup.other.id.clone()],
+            Some(setup.former.id.clone()),
+            1,
+        )
+        .await;
+        let kept = storage
+            .resolve_text_provider(&setup.workspace_id)
+            .await
+            .unwrap()
+            .resolved
+            .unwrap();
+        assert_eq!((kept.provider.name.as_str(), kept.notice), ("Workspace Ollama", None));
+
+        // A workspace never offers what its organization does not: the organization enables only one model.
+        save(&setup, &[&setup.other], Some(&setup.other), "auto").await;
+        let narrowed = storage
+            .resolve_text_provider(&setup.workspace_id)
+            .await
+            .unwrap()
+            .resolved
+            .unwrap();
+        assert_eq!(narrowed.provider.model.as_deref(), Some("qwen2.5:7b"));
+        assert!(narrowed
+            .notice
+            .unwrap()
+            .starts_with("Your organization does not offer llama3.1:8b"));
+        let _ = std::fs::remove_dir_all(&setup.dir);
+    }
+
+    #[tokio::test]
+    async fn a_workspaces_model_settings_are_exported_by_name_and_only_when_it_saved_some() {
+        use crate::workspace_cairn::WorkspaceCairnPolicy;
+        let setup = setup(None).await;
+        assert!(setup
+            .storage
+            .export_workspace_data(&setup.workspace_id)
+            .await
+            .unwrap()
+            .cairn
+            .is_none());
+        setup
+            .storage
+            .save_workspace_cairn_settings(
+                &setup.workspace_id,
+                0,
+                &WorkspaceCairnPolicy {
+                    offered_model_ids: vec![setup.former.id.clone(), setup.other.id.clone()],
+                    default_model_id: Some(setup.other.id.clone()),
+                },
+                Some(&setup.actor),
+            )
+            .await
+            .unwrap();
+        let cairn = setup
+            .storage
+            .export_workspace_data(&setup.workspace_id)
+            .await
+            .unwrap()
+            .cairn
+            .unwrap();
+        let names = cairn
+            .offered_models
+            .iter()
+            .map(|model| model.model.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            names,
+            vec!["llama3.1:8b", "qwen2.5:7b"],
+            "by the name the server knows each by, not by an id of this server"
+        );
+        assert_eq!(cairn.default_model.unwrap().model, "qwen2.5:7b");
+        let written = serde_json::to_string(
+            &setup
+                .storage
+                .export_workspace_data(&setup.workspace_id)
+                .await
+                .unwrap()
+                .cairn,
+        )
+        .unwrap();
+        assert!(
+            !written.contains(&setup.former.id) && !written.contains(&setup.other.id),
+            "{written}"
+        );
+        let _ = std::fs::remove_dir_all(&setup.dir);
     }
 }

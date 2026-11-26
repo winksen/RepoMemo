@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.85 (2026-11-26)
+
+A workspace offers a subset of its organization's models and chooses its default.
+
+### Added
+- **Settings › AI lists the organization's models.** A new panel, *Models for CAIRN, Ask and summaries*, shows each text model of the workspace's organization marked *From your organization*, with *Local* or *Cloud*, the tools it takes and its context size, and whether it answers in the workspace now. A workspace administrator ticks the models the workspace offers and chooses the workspace default among them; a workspace is never shown a model its organization does not offer. A workspace that never saved settings offers what its organization offers. The provider forms below it still work.
+- **The order a workspace answers in.** The workspace's own default, while offered; then the model the workspace had; then the organization's default; each only while the organization and the workspace offer it. A model turned off is never replaced silently: the answer says which one answered, naming the workspace or the organization as the one that does not offer it.
+- **Saving.** `GET`/`PUT /v1/workspaces/{id}/cairn` for the workspace's owners and admins, with a version on every save (`409` when stale), only models the organization offers, a default among those offered, and at most 50; each change is an audit event and an entry in the workspace's activity with the models offered and the default before and after. A model a workspace offers cannot be deleted from the catalog.
+- **Archives.** Migration `0103_workspace_cairn_settings.sql` stores the policy. An archive carries the workspace's offered models and default by the name each model's server knows it by and its purpose, not by an id of this server; importing matches them to the importing server's catalog and organization, drops the ones it does not find with a warning, and, when none is found, leaves the workspace offering its organization's models. A workspace that never saved settings exports none, so an older archive and a new one read the same.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; the migration is locked and `npm run docs:check` passes. Storage tests (a workspace's subset and default come first and a workspace never offers what its organization does not; the settings are exported by name and only when saved) and a server test (only the organization's models are shown, a member is refused, a model outside the organization or a default not offered is refused, a stale save, and the audit) were added; tests not run, the archive import was not run end to end, and the screen was not opened in a browser.
+
+### Upgrading
+- A new empty table. Nothing to do: until a workspace saves settings it behaves as before.
+
 ## V0.9.84 (2026-11-26)
 
 Workspaces take their text model from their organization.

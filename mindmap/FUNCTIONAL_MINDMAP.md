@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.84` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.85` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.85 — A workspace offers a subset of its organization's models and chooses its default.
+
+- **Workspace model list.** In Settings › AI a workspace administrator sees the models of the workspace's organization, each marked *From your organization* with where it runs, its tools and its context, ticks the ones the workspace offers and picks the workspace default. Only the organization's models are listed, never others. The workspace default answers first, then the model the workspace had, then the organization's default. The choice travels with the workspace's archive.
+
+Checks: formatted, linted and type-checked; migration locked; docs:check; tests added, not run, and the archive import was not exercised end to end.
 
 ## V0.9.84 — Workspaces take their text model from their organization.
 

@@ -170,6 +170,14 @@ impl ModelView {
     pub(crate) fn selectable(&self) -> bool {
         self.selectable
     }
+
+    pub(crate) fn id(&self) -> &str {
+        &self.model.id
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.model.display_name
+    }
 }
 
 pub(crate) async fn view(state: &AppState, model: CairnModel) -> Result<ModelView, ApiError> {

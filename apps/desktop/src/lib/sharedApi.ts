@@ -23,6 +23,7 @@ import type {
   CairnModel,
   CairnModelTest,
   OrganizationCairnSettings,
+  WorkspaceCairnView,
   CairnConnectionInput,
   CairnConnectionTest,
   BackupsOverview,
@@ -1818,6 +1819,14 @@ export function listOrganizationCairnModels(accessToken: string, organizationId:
 
 export function saveOrganizationCairn(accessToken: string, organizationId: string, change: { enabled_model_ids: string[]; default_model_id: string | null; agent_mode: string; expected_version: number }): Promise<OrganizationCairnSettings> {
   return request<OrganizationCairnSettings>(`/v1/organizations/${encodeURIComponent(organizationId)}/cairn`, { method: "PUT", body: JSON.stringify(change) }, accessToken);
+}
+
+export function getWorkspaceCairn(accessToken: string, workspaceId: string): Promise<WorkspaceCairnView> {
+  return request<WorkspaceCairnView>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn`, {}, accessToken);
+}
+
+export function saveWorkspaceCairn(accessToken: string, workspaceId: string, change: { offered_model_ids: string[]; default_model_id: string | null; expected_version: number }): Promise<void> {
+  return request<void>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn`, { method: "PUT", body: JSON.stringify(change) }, accessToken);
 }
 
 export function listCairnModels(accessToken: string): Promise<CairnModel[]> {

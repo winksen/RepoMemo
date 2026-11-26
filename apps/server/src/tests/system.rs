@@ -2731,3 +2731,153 @@ async fn a_workspace_answers_with_the_organizations_default_when_its_own_model_i
     assert_eq!(model_of(&after), json!("qwen2.5:7b"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_workspace_offers_only_what_its_organization_offers_and_chooses_its_default() {
+    let data_dir = temp_data_dir("workspace-cairn");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "ws-cairn-root@example.com").await;
+    let (member, _) = register_account(&app, "ws-cairn-member@example.com").await;
+    let organization =
+        response_json(send("POST", "/v1/organizations".to_owned(), &root, json!({"name": "WS Org"})).await).await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    join(
+        &app,
+        &root,
+        "organizations",
+        &organization_id,
+        "ws-cairn-member@example.com",
+        "member",
+    )
+    .await;
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "WS Space", "organization_id": organization_id}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+    let uri = format!("/v1/workspaces/{workspace_id}/cairn");
+    let connection = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &root,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let add = |name: &str| {
+        let body = json!({"connection_id": connection["id"], "model_id": name, "purpose": "text"});
+        let (send, root) = (&send, root.clone());
+        async move { response_json(send("POST", "/v1/cairn/models".to_owned(), &root, body).await).await }
+    };
+    let (first, second, outside) = (
+        add("llama3.1:8b").await,
+        add("qwen2.5:7b").await,
+        add("mistral:7b").await,
+    );
+
+    // The organization enables two of the three; the workspace is shown those two, never the third, marked as the organization's.
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/organizations/{organization_id}/cairn"),
+            &root,
+            json!({"enabled_model_ids": [first["id"], second["id"]], "default_model_id": first["id"], "expected_version": 0})
+        )
+        .await
+        .status(),
+        200
+    );
+    let shown = response_json(send("GET", uri.clone(), &root, Value::Null).await).await;
+    assert_eq!(
+        (shown["version"].clone(), shown["organization_decided"].clone()),
+        (json!(0), json!(true))
+    );
+    let models = shown["models"].as_array().unwrap();
+    assert_eq!(models.len(), 2);
+    assert!(models
+        .iter()
+        .all(|model| model["from_organization"] == true && model["offered"] == true));
+    assert!(!shown.to_string().contains(outside["id"].as_str().unwrap()));
+
+    // A member does not read or change; a model the organization does not offer cannot be offered; a default must be offered.
+    assert_eq!(send("GET", uri.clone(), &member, Value::Null).await.status(), 403);
+    assert_eq!(
+        send(
+            "PUT",
+            uri.clone(),
+            &member,
+            json!({"offered_model_ids": [first["id"]], "expected_version": 0})
+        )
+        .await
+        .status(),
+        403
+    );
+    for bad in [
+        json!({"offered_model_ids": [outside["id"]], "expected_version": 0}),
+        json!({"offered_model_ids": [first["id"]], "default_model_id": second["id"], "expected_version": 0}),
+    ] {
+        assert_eq!(send("PUT", uri.clone(), &root, bad).await.status(), 400);
+    }
+
+    // The workspace offers one and makes it its default; a stale save is refused; the change is audited.
+    let saved = send(
+        "PUT",
+        uri.clone(),
+        &root,
+        json!({"offered_model_ids": [second["id"]], "default_model_id": second["id"], "expected_version": 0}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    assert_eq!(response_json(saved).await["version"], 1);
+    assert_eq!(
+        send(
+            "PUT",
+            uri.clone(),
+            &root,
+            json!({"offered_model_ids": [second["id"]], "expected_version": 0})
+        )
+        .await
+        .status(),
+        409
+    );
+    let after = response_json(send("GET", uri, &root, Value::Null).await).await;
+    let marked = |id: &Value| {
+        after["models"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|model| model["id"] == *id)
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(marked(&second["id"])["offered"], true);
+    assert_eq!(marked(&first["id"])["offered"], false);
+    assert_eq!(
+        marked(&second["id"])["answering"],
+        true,
+        "the workspace's default now answers"
+    );
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &root))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    assert!(audit.contains("workspace_cairn_settings_changed"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -10,6 +10,7 @@ import { Field } from "../../components/ui/field";
 import { Input } from "../../components/ui/input";
 import { AiPolicySettings } from "../../components/AiPolicySettings";
 import { AiProviderForm } from "../../components/AiProviderForm";
+import { WorkspaceCairnPanel } from "./WorkspaceCairnPanel";
 import { ConnectorSettings } from "../../components/ConnectorsPanel";
 import { WorkspaceExportSettings } from "../../components/WorkspaceExportSettings";
 import { SearchFeedbackPanel } from "../../components/SearchFeedbackPanel";
@@ -97,6 +98,7 @@ export function SettingsSection({ page }: { page: WorkspacePage }) {
               <WorkspaceCustomization accessToken={accessToken} onSaved={onWorkspaceUpdated} workspace={workspace.workspace}>
                 <TemplateSettings accessToken={accessToken} embedded key={`template-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
               </WorkspaceCustomization>
+              <WorkspaceCairnPanel accessToken={accessToken} key={`cairn-${workspace.workspace.id}`} workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="text" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="vision" workspaceId={workspace.workspace.id} />
               <AiProviderForm accessToken={accessToken} onSaved={onProviderSaved} providers={aiProviders} purpose="embedding" status={embeddingStatus} workspaceId={workspace.workspace.id} />
