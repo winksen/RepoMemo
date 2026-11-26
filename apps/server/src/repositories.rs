@@ -741,13 +741,7 @@ pub(crate) async fn summarize_repository(
 }
 
 async fn text_provider(state: &AppState, workspace_id: &str) -> Result<Option<ProviderSettings>, ApiError> {
-    Ok(state
-        .storage
-        .list_provider_settings(workspace_id)
-        .await
-        .map_err(ApiError::internal)?
-        .into_iter()
-        .find(|settings| settings.enabled && settings.purpose() == "text"))
+    crate::agent::text_provider(state, workspace_id).await
 }
 
 pub(crate) async fn list_repository_files(

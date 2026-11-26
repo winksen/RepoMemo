@@ -97,13 +97,8 @@ pub(crate) async fn admin_view(
             .map_err(map_storage_error)?;
         let mut setups = Vec::with_capacity(workspaces.len());
         for shared in workspaces {
-            let provider = state
-                .storage
-                .list_provider_settings(&shared.workspace.id)
-                .await
-                .map_err(map_storage_error)?
-                .into_iter()
-                .find(|setting| setting.enabled && setting.purpose() == "text");
+            // What the workspace answers with now: its own model, or the organization's default (V0.9.84).
+            let provider = crate::agent::text_provider(&state, &shared.workspace.id).await?;
             let organization_name = organizations
                 .iter()
                 .find(|organization| organization.id == shared.organization_id)

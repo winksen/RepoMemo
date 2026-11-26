@@ -39,6 +39,10 @@ impl StorageEngine {
     }
 
     pub async fn get_provider_settings(&self, provider_id: &str) -> Result<ProviderSettings> {
+        // A provider made from the catalog for a workspace's organization (V0.9.84) has no row of its own.
+        if provider_id.starts_with(crate::CATALOG_PROVIDER_PREFIX) {
+            return self.catalog_provider_by_id(provider_id).await;
+        }
         let row = sqlx::query_as::<_, ProviderSettingsRow>(
             r#"
             SELECT id, workspace_id, provider_type, name, base_url, model,

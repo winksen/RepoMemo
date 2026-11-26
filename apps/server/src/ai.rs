@@ -6,13 +6,7 @@ pub(crate) async fn generate_workspace_ai_overview(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<WorkspaceAiOverview>, ApiError> {
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
-    let provider = state
-        .storage
-        .list_provider_settings(&workspace_id)
-        .await
-        .map_err(map_storage_error)?
-        .into_iter()
-        .find(|setting| setting.enabled && setting.purpose() == "text");
+    let provider = crate::agent::text_provider(&state, &workspace_id).await?;
 
     let Some(provider) = provider else {
         return Ok(Json(WorkspaceAiOverview {
@@ -58,13 +52,8 @@ pub(crate) async fn ask_workspace(
     Json(request): Json<AskWorkspaceRequest>,
 ) -> Result<Json<AskAnswer>, ApiError> {
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
-    let provider = state
-        .storage
-        .list_provider_settings(&workspace_id)
-        .await
-        .map_err(map_storage_error)?
-        .into_iter()
-        .find(|setting| setting.enabled && setting.purpose() == "text")
+    let provider = crate::agent::text_provider(&state, &workspace_id)
+        .await?
         .ok_or_else(|| {
             ApiError::bad_request(
                 "No enabled AI provider is configured for this workspace. An administrator can configure one in Settings.",

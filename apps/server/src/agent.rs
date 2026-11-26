@@ -197,7 +197,14 @@ pub(crate) async fn run_message(
         }
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
-    let provider = text_provider(state, &workspace_id).await?;
+    let resolution = text_resolution(state, &workspace_id).await?;
+    // Said in the answer when the workspace's own model is not the one that answers.
+    let model_notice = resolution
+        .resolved
+        .as_ref()
+        .and_then(|resolved| resolved.notice.clone())
+        .or_else(|| resolution.notice.clone());
+    let provider = resolution.resolved.map(|resolved| resolved.provider);
     let context_tokens = provider
         .as_ref()
         .map(|provider| repomemo_ai::ModelTraits::from_metadata(&provider.metadata).context_tokens);
@@ -335,6 +342,9 @@ pub(crate) async fn run_message(
             .map_err(map_core_error)?
     };
     let (mut reply, loop_trace, correction) = (outcome.reply, outcome.trace, outcome.correction);
+    if let Some(notice) = model_notice {
+        reply.warnings.push(notice);
+    }
     // A routine proposes nothing: nobody is there to confirm it (V0.9.63).
     if live.read_only {
         reply.proposals.clear();
@@ -909,12 +919,22 @@ fn conversation_not_found() -> ApiError {
     ApiError::not_found("Assistant conversation was not found.")
 }
 
-async fn text_provider(state: &AppState, workspace_id: &str) -> Result<Option<ProviderSettings>, ApiError> {
-    Ok(state
+/// The text model that serves a workspace (V0.9.84): its own provider while the organization offers it, else the organization's
+/// default, else none. See `StorageEngine::resolve_text_provider`.
+pub(crate) async fn text_resolution(
+    state: &AppState,
+    workspace_id: &str,
+) -> Result<repomemo_storage::TextResolution, ApiError> {
+    state
         .storage
-        .list_provider_settings(workspace_id)
+        .resolve_text_provider(workspace_id)
         .await
-        .map_err(map_storage_error)?
-        .into_iter()
-        .find(|setting| setting.enabled && setting.purpose() == "text"))
+        .map_err(map_storage_error)
+}
+
+pub(crate) async fn text_provider(state: &AppState, workspace_id: &str) -> Result<Option<ProviderSettings>, ApiError> {
+    Ok(text_resolution(state, workspace_id)
+        .await?
+        .resolved
+        .map(|resolved| resolved.provider))
 }

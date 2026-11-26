@@ -36,6 +36,7 @@ mod archive_integrations;
 mod archive_work;
 mod artifacts;
 mod cairn_catalog;
+mod cairn_resolution;
 mod chat;
 mod chat_search;
 mod collaboration;
@@ -98,6 +99,7 @@ pub use cairn_catalog::{
     CairnConnection, CairnConnectionChange, CairnModel, CairnModelChange, CairnSaved, NewCairnConnection,
     NewCairnModel, CATALOG_NAME_CHARS, CONNECTION_KINDS, MODEL_PURPOSES, TOOL_MODES,
 };
+pub use cairn_resolution::{ResolvedTextProvider, TextResolution, CATALOG_PROVIDER_PREFIX};
 pub use chat::{NewChatDestination, CHAT_DIGESTS};
 pub use chat_search::ChatHit;
 pub use connector_quarantine::StoredQuarantine;

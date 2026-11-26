@@ -2645,3 +2645,89 @@ async fn an_organizations_administrators_see_the_models_they_can_choose() {
     );
     assert_eq!(send("GET", uri, &member, Value::Null).await.status(), 403);
 }
+
+#[tokio::test]
+async fn a_workspace_answers_with_the_organizations_default_when_its_own_model_is_not_offered_and_says_so() {
+    let data_dir = temp_data_dir("cairn-resolution");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "resolve-root@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &root,
+            json!({"name": "Resolve Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "Resolve Space", "organization_id": organization_id}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"]
+        .as_str()
+        .or(workspace["id"].as_str())
+        .unwrap()
+        .to_owned();
+    let provider = send(
+        "PUT",
+        format!("/v1/workspaces/{workspace_id}/ai-providers"),
+        &root,
+        json!({"provider_type": "ollama", "name": "Workspace Ollama", "base_url": "http://127.0.0.1:11434", "model": "llama3.1:8b", "enabled": true, "tool_mode": "native", "context_tokens": 32000}),
+    )
+    .await;
+    assert!(provider.status().is_success(), "{}", provider.status());
+    let capabilities_uri = format!("/v1/workspaces/{workspace_id}/agent/capabilities");
+    let model_of = |capabilities: &Value| capabilities["model"].clone();
+
+    // Nothing changes until the organization saves settings: the workspace answers with its own model.
+    let before = response_json(send("GET", capabilities_uri.clone(), &root, Value::Null).await).await;
+    assert_eq!(model_of(&before), json!("llama3.1:8b"));
+
+    // The organization offers only another model: the workspace now answers with that one.
+    let connection = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &root,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let connection_id = connection["id"].clone();
+    let spare = response_json(
+        send(
+            "POST",
+            "/v1/cairn/models".to_owned(),
+            &root,
+            json!({"connection_id": connection_id, "model_id": "qwen2.5:7b", "purpose": "text", "tool_mode": "native"}),
+        )
+        .await,
+    )
+    .await;
+    let saved = send(
+        "PUT",
+        format!("/v1/organizations/{organization_id}/cairn"),
+        &root,
+        json!({"enabled_model_ids": [spare["id"]], "default_model_id": spare["id"], "agent_mode": "auto", "expected_version": 0}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    let after = response_json(send("GET", capabilities_uri, &root, Value::Null).await).await;
+    assert_eq!(model_of(&after), json!("qwen2.5:7b"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.84 (2026-11-26)
+
+Workspaces take their text model from their organization.
+
+### Changed
+- **One text configuration.** CAIRN's chat, Ask, the workspace overview, repository summaries, routines and the administration overview now resolve a workspace's text model in one place. The model is, in order: the workspace's own model, while its organization offers it; the organization's default model; or none, in which case CAIRN answers by its rules, as with no provider today. Embedding and vision models stay a workspace choice.
+- **Nothing changes until an administrator changes it.** An organization that never saved CAIRN settings offers whatever its workspaces had, and each workspace's own provider is linked to its catalog model (V0.9.78), so after the upgrade every workspace answers with the model it had. Changing the organization's settings is what changes the answer.
+- **A model that is turned off is never replaced silently.** When the organization stops offering the workspace's model, the answer carries a warning (*Your organization does not offer llama3.1:8b, so qwen2.5:7b answered*); with no default the warning says CAIRN answers by its rules. A workspace that never had a model serves from the organization's default without a warning.
+- **Agent mode.** The organization's Agent-mode default (V0.9.82) now applies to a workspace that chose no mode of its own: *Agent* or *Jobs* for all of them, or *Automatic*, which keeps the live-evaluation rule. A mode a workspace chose stays.
+- **How it reaches every path.** The model the organization chose is a provider made from the catalog with its connection's key and the model's tools and context size; it has an id of its own, so the places that take a provider id (answering, summaries, the loop) read it without a row of its own. Its fallback (V0.9.80) and Agent default (V0.9.79) apply as for a stored provider.
+- **Not yet.** A workspace cannot choose its own default (V0.9.85) and a person cannot pick a model for a chat (V0.9.86); the provider forms in Settings › AI still work and still decide while the organization offers their model (V0.9.90 retires them).
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. Three storage tests (an organization that saved nothing changes nothing and one that offers the model keeps it; a model turned off is replaced by the default and the answer says so, with none when there is no default; a workspace with no provider uses the default and the Agent default yields to a workspace's own) and a server test (the capabilities show the organization's default once it stops offering the workspace's model) were added; tests not run, and no chat was held with a real model.
+
+### Upgrading
+- Nothing to do: until an organization saves settings, every workspace answers with the model it had.
+
 ## V0.9.83 (2026-11-26)
 
 An organization's admins choose its models, default and Agent mode on screen.

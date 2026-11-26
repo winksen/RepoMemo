@@ -183,15 +183,9 @@ async fn reason_not_to_run(state: &AppState, routine: &AgentRoutine) -> Option<S
         }
         _ => return Some("Its owner can no longer change this workspace.".to_owned()),
     }
-    match state.storage.list_provider_settings(&routine.workspace_id).await {
-        Ok(providers)
-            if providers
-                .iter()
-                .any(|setting| setting.enabled && setting.purpose() == "text") =>
-        {
-            None
-        }
-        _ => Some("The workspace has no AI provider turned on.".to_owned()),
+    match crate::agent::text_provider(state, &routine.workspace_id).await {
+        Ok(Some(_)) => None,
+        _ => Some("The workspace has no AI model turned on.".to_owned()),
     }
 }
 

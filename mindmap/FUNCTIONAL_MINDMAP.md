@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.83` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.84` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.84 — Workspaces take their text model from their organization.
+
+- **The organization's models serve its workspaces.** CAIRN, Ask and the summaries answer with the workspace's own model while its organization offers it, with the organization's default when it does not (and the answer says which one answered), and without a model when the organization offers none. An organization that has not saved settings changes nothing: every workspace keeps the model it had.
+
+Checks: formatted, linted and type-checked; docs:check; tests added, not run.
 
 ## V0.9.83 — An organization's admins choose its models, default and Agent mode on screen.
 
