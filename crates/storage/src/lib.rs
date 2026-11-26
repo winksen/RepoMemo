@@ -38,6 +38,7 @@ mod artifacts;
 mod cairn_catalog;
 mod cairn_resolution;
 mod cairn_retention;
+mod cairn_usage;
 mod chat;
 mod chat_search;
 mod collaboration;
@@ -106,6 +107,7 @@ pub use cairn_resolution::{
     CATALOG_PROVIDER_PREFIX,
 };
 pub use cairn_retention::RetentionCounts;
+pub use cairn_usage::UsageGroup;
 pub use chat::{NewChatDestination, CHAT_DIGESTS};
 pub use chat_search::ChatHit;
 pub use connector_quarantine::StoredQuarantine;

@@ -772,6 +772,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/cairn/admin", get(cairn_admin::admin_view))
         .route("/v1/cairn/admin/budgets", put(cairn_admin::update_budgets))
         .route("/v1/cairn/tools", get(cairn_tools::list_tools))
+        .route("/v1/cairn/admin/usage", get(cairn_admin::usage))
         .route(
             "/v1/cairn/connections",
             get(cairn_connections::list_connections).post(cairn_connections::create_connection),

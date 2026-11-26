@@ -23,6 +23,7 @@ import type {
   CairnModel,
   CairnModelTest,
   CairnTool,
+  CairnUsageRow,
   Guardrails,
   OrganizationCairnSettings,
   WorkspaceCairnView,
@@ -1837,6 +1838,10 @@ export function chooseWorkspaceModel(accessToken: string, workspaceId: string, p
 
 export function previewCairnRetention(accessToken: string, organizationId: string, guardrails: Guardrails): Promise<{ run_histories: number; chats: number; personal_memories: number }> {
   return request(`/v1/organizations/${encodeURIComponent(organizationId)}/cairn/retention-preview`, { method: "POST", body: JSON.stringify(guardrails) }, accessToken);
+}
+
+export function getCairnUsage(accessToken: string, days: number): Promise<{ days: number; rows: CairnUsageRow[]; total: CairnUsageRow }> {
+  return request(`/v1/cairn/admin/usage?days=${days}`, {}, accessToken);
 }
 
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {

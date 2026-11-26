@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.101` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.102` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.102 — The administration page shows CAIRN's usage and health.
+
+- **Usage and health.** The Usage section shows, for the last 7 or 30 days and for each organization, workspace and model, how many CAIRN runs there were, the tokens used, the runs that failed, the runs a fallback answered, and the average steps and seconds, with a CSV export. It shows figures only: no message, chat name or person, and a group of fewer than five people shows its size and nothing else.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.101 — An organization can turn off the MCP endpoint and the inbox for its workspaces.
 

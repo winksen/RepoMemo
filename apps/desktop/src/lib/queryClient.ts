@@ -87,6 +87,7 @@ export const cairnAdminKeys = {
   connections: () => ["cairn-admin", "connections"] as const,
   models: () => ["cairn-admin", "models"] as const,
   tools: () => ["cairn-admin", "tools"] as const,
+  usage: (days: number) => ["cairn-admin", "usage", days] as const,
   workspace: (workspaceId: string) => ["cairn-admin", "workspace", workspaceId] as const,
   organization: (organizationId: string) => ["cairn-admin", "organization", organizationId] as const,
   organizationModels: (organizationId: string) => ["cairn-admin", "organization-models", organizationId] as const,

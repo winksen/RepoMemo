@@ -79,6 +79,130 @@ pub(crate) struct CairnAdminView {
     overview: Option<AdminOverview>,
 }
 
+/// The smallest group of people whose figures are shown (V0.9.102): below it only the group's name and size are.
+const SMALLEST_GROUP: i64 = 5;
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct UsageQuery {
+    /// 7 or 30.
+    #[serde(default)]
+    days: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct UsageRow {
+    organization: String,
+    workspace: String,
+    model: String,
+    people: i64,
+    /// True when the group is smaller than five people, so its figures are withheld.
+    withheld: bool,
+    runs: Option<i64>,
+    tokens: Option<i64>,
+    failures: Option<i64>,
+    fallbacks: Option<i64>,
+    average_steps: Option<f64>,
+    average_seconds: Option<f64>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct UsageView {
+    days: i64,
+    rows: Vec<UsageRow>,
+    /// The people and figures of every group together, withheld when fewer than five people made the runs.
+    total: UsageRow,
+}
+
+fn row_of(group: repomemo_storage::UsageGroup) -> UsageRow {
+    let withheld = group.people < SMALLEST_GROUP;
+    UsageRow {
+        organization: group.organization_name,
+        workspace: group.workspace_name,
+        model: group.model,
+        people: group.people,
+        withheld,
+        runs: (!withheld).then_some(group.runs),
+        tokens: (!withheld).then_some(group.tokens),
+        failures: (!withheld).then_some(group.failures),
+        fallbacks: (!withheld).then_some(group.fallbacks),
+        average_steps: (!withheld).then_some(group.average_steps),
+        average_seconds: (!withheld).then_some(group.average_seconds),
+    }
+}
+
+/// CAIRN's usage and health (V0.9.102) over 7 or 30 days: runs, tokens, failures, fallbacks, steps and time for each organization,
+/// workspace and model. CAIRN, system and app administrators see every organization, owners and admins their own. Aggregates only: no
+/// message, no chat name, no person, and a group of fewer than five people shows its size and nothing else.
+pub(crate) async fn usage(
+    ReadingSubject(subject): ReadingSubject,
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<UsageQuery>,
+) -> Result<Json<UsageView>, ApiError> {
+    let days = match query.days.unwrap_or(7) {
+        7 => 7,
+        30 => 30,
+        _ => return Err(ApiError::bad_request("Usage is shown for 7 or 30 days.")),
+    };
+    let organizations: Option<Vec<String>> = if require_cairn_reader(&subject).is_ok() {
+        None
+    } else {
+        let own: Vec<String> = state
+            .storage
+            .list_organizations_for_user(&subject.user_id)
+            .await
+            .map_err(map_storage_error)?
+            .into_iter()
+            .filter(|organization| {
+                !organization.guest && matches!(organization.role, OrganizationRole::Owner | OrganizationRole::Admin)
+            })
+            .map(|organization| organization.id)
+            .collect();
+        if own.is_empty() {
+            return Err(ApiError::forbidden());
+        }
+        Some(own)
+    };
+    let groups = state
+        .storage
+        .cairn_usage(days, organizations.as_deref())
+        .await
+        .map_err(map_storage_error)?;
+    let total_people = {
+        // The people who made any run, counted again over all groups, so a person in two workspaces is one person.
+        let mut sum = repomemo_storage::UsageGroup {
+            organization_id: None,
+            organization_name: "All".to_owned(),
+            workspace_id: String::new(),
+            workspace_name: "All".to_owned(),
+            model: String::new(),
+            runs: groups.iter().map(|group| group.runs).sum(),
+            tokens: groups.iter().map(|group| group.tokens).sum(),
+            failures: groups.iter().map(|group| group.failures).sum(),
+            fallbacks: groups.iter().map(|group| group.fallbacks).sum(),
+            average_steps: 0.0,
+            average_seconds: 0.0,
+            people: groups.iter().map(|group| group.people).max().unwrap_or(0),
+        };
+        let runs = sum.runs.max(1) as f64;
+        sum.average_steps = groups
+            .iter()
+            .map(|group| group.average_steps * group.runs as f64)
+            .sum::<f64>()
+            / runs;
+        sum.average_seconds = groups
+            .iter()
+            .map(|group| group.average_seconds * group.runs as f64)
+            .sum::<f64>()
+            / runs;
+        sum
+    };
+    Ok(Json(UsageView {
+        days,
+        rows: groups.into_iter().map(row_of).collect(),
+        total: row_of(total_people),
+    }))
+}
+
 /// Who the page is for, and what it shows today.
 pub(crate) async fn admin_view(
     ReadingSubject(subject): ReadingSubject,

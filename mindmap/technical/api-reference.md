@@ -160,6 +160,7 @@
 | GET | `/v1/workspaces/{workspace_id}/cairn` | auth | require_workspace_admin | — | WorkspaceCairnView |
 | PUT | `/v1/workspaces/{workspace_id}/cairn` | session or admin token | require_workspace_admin | `{offered_model_ids, default_model_id, expected_version}` | WorkspaceCairnSettings |
 | PUT | `/v1/workspaces/{workspace_id}/cairn/models/{purpose}` | session or admin token | require_workspace_admin | `{model_id, confirm_rebuild}` | WorkspaceCairnView |
+| GET | `/v1/cairn/admin/usage` | auth | require_cairn_reader, or an owner or admin of an organization | `?days=7|30` | UsageView |
 | GET | `/v1/cairn/tools` | auth | any signed-in person | — | Vec<SwitchableTool> |
 | GET | `/v1/organizations/{organization_id}/cairn` | auth | organization member, or require_cairn_reader | — | OrganizationCairnSettings |
 | POST | `/v1/organizations/{organization_id}/cairn/retention-preview` | auth | organization owner or admin, or require_cairn_admin | Guardrails | RetentionCounts |

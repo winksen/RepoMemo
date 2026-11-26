@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.102 (2026-11-26)
+
+The administration page shows CAIRN's usage and health.
+
+### Added
+- **The Usage section.** For the last 7 or 30 days: runs, tokens, failures (runs that failed or ended partial), fallbacks (runs a fallback model answered, V0.9.80), steps and seconds per run, for each organization, workspace and model, with a total row. `GET /v1/cairn/admin/usage?days=7|30` serves it.
+- **Who sees what.** CAIRN, system and app administrators see every organization; owners and admins of an organization see its workspaces only; others are refused.
+- **Aggregates only.** The figures come from the stored runs and carry no message, no chat name and no person. A group of fewer than five people shows how many people it has and withholds its figures, and so does a total over fewer than five people; as the total's people count is the largest group's, it can under-count and so withhold more than it must.
+- **CSV.** *Export CSV* downloads the table as it is shown, with the same withheld rows.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added and the grouping query was not run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.101 (2026-11-26)
 
 An organization can turn off the MCP endpoint and the inbox for its workspaces.

@@ -1080,6 +1080,21 @@ export interface CairnConnectionInput {
   expected_version?: number;
 }
 
+/** One row of CAIRN's usage and health (V0.9.102); figures are null for a group of fewer than five people. */
+export interface CairnUsageRow {
+  organization: string;
+  workspace: string;
+  model: string;
+  people: number;
+  withheld: boolean;
+  runs: number | null;
+  tokens: number | null;
+  failures: number | null;
+  fallbacks: number | null;
+  average_steps: number | null;
+  average_seconds: number | null;
+}
+
 /** A CAIRN run budget: a run-time setting a CAIRN administrator changes, applied to the next run (V0.9.74). */
 export interface CairnBudget {
   key: string;
