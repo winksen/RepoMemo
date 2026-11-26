@@ -35,6 +35,8 @@ pub(crate) struct AgentCapabilitiesResponse {
     agent_mode: bool,
     /// The models a person can pick for a chat here (V0.9.86); the one that answers without a choice is marked `default`.
     models: Vec<OfferedModel>,
+    /// What the person has left of today's CAIRN budgets; none when no budget is set (V0.9.96).
+    budget: Option<repomemo_storage::PersonBudget>,
 }
 
 /// A model offered in a workspace, as the chat's picker shows it.
@@ -94,6 +96,16 @@ pub(crate) async fn list_agent_capabilities(
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
     let provider = text_provider_for_role(&state, &workspace_id, &role).await?;
     let models = offered_models(&state, &workspace_id, provider.as_ref(), &role).await?;
+    let budget = state
+        .storage
+        .person_budget(
+            &workspace_id,
+            &subject.user_id,
+            subject.is_system_admin || matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin),
+        )
+        .await
+        .ok()
+        .filter(|budget| !budget.exempt);
     // AI actions show as unavailable to roles the workspace keeps AI from.
     let provider = match provider {
         Some(provider) if ai_access::role_may_use_ai(&state, &workspace_id, &role).await? => Some(provider),
@@ -139,6 +151,7 @@ pub(crate) async fn list_agent_capabilities(
         model,
         agent_mode,
         models,
+        budget: budget.filter(|budget| budget.runs_limit.is_some() || budget.tokens_limit.is_some()),
     }))
 }
 
@@ -358,6 +371,25 @@ pub(crate) async fn run_message(
                         .iter()
                         .any(|info| info.id == capability && info.requires_ai),
                 };
+                // The person's daily budgets of runs and tokens (V0.9.96): a run that would call the model is refused once used up.
+                if (may_call_ai || agent_setup.is_some()) && !live.read_only {
+                    let budget = state
+                        .storage
+                        .person_budget(
+                            &workspace_id,
+                            &subject.user_id,
+                            subject.is_system_admin || matches!(role, WorkspaceRole::Owner | WorkspaceRole::Admin),
+                        )
+                        .await
+                        .map_err(map_storage_error)?;
+                    if !budget.allows_a_run() {
+                        return Err(ApiError::new(
+                            axum::http::StatusCode::TOO_MANY_REQUESTS,
+                            "budget_used",
+                            budget.refusal(),
+                        ));
+                    }
+                }
                 if may_call_ai {
                     ai_access::consume_ai_quota(state, subject)?;
                 }

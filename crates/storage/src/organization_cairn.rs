@@ -38,7 +38,21 @@ pub struct Guardrails {
     /// can turn it on, never off when its organization has it on.
     #[serde(default)]
     pub mask_personal_data: bool,
+    /// The most CAIRN runs a person may make in a day, in the organization's workspaces (V0.9.96); counted from the stored runs, from
+    /// midnight UTC. A workspace's is never higher than its organization's.
+    #[serde(default)]
+    pub daily_runs_per_person: Option<i64>,
+    /// The most tokens a person's runs may use in a day (V0.9.96).
+    #[serde(default)]
+    pub daily_tokens_per_person: Option<i64>,
+    /// Owners and admins are not stopped by these budgets (V0.9.96).
+    #[serde(default)]
+    pub budget_exempt_admins: bool,
 }
+
+/// The largest budgets that can be set: a budget is a limit, so there is a ceiling on how loose it may be.
+pub const MAX_DAILY_RUNS: i64 = 10_000;
+pub const MAX_DAILY_TOKENS: i64 = 100_000_000;
 
 /// The most changes one confirmation makes when nothing sets less.
 pub const DEFAULT_MAX_CHANGES: i64 = 200;

@@ -97,6 +97,16 @@ pub(crate) async fn list_models(
     Ok(Json(views))
 }
 
+/// A budget, within the largest that can be set (V0.9.96).
+fn ranged(value: Option<i64>, ceiling: i64, what: &str) -> Result<Option<i64>, ApiError> {
+    match value {
+        Some(value) if !(1..=ceiling).contains(&value) => Err(ApiError::bad_request(format!(
+            "{what} is a number from 1 to {ceiling}."
+        ))),
+        _ => Ok(value),
+    }
+}
+
 /// The guardrails of a request, checked (V0.9.91): only names of jobs and tools that exist.
 pub(crate) fn checked_guardrails(
     given: repomemo_storage::Guardrails,
@@ -120,6 +130,17 @@ pub(crate) fn checked_guardrails(
     Ok(repomemo_storage::Guardrails {
         secrets_for_cloud: given.secrets_for_cloud,
         mask_personal_data: given.mask_personal_data,
+        daily_runs_per_person: ranged(
+            given.daily_runs_per_person,
+            repomemo_storage::MAX_DAILY_RUNS,
+            "The runs a person may make in a day",
+        )?,
+        daily_tokens_per_person: ranged(
+            given.daily_tokens_per_person,
+            repomemo_storage::MAX_DAILY_TOKENS,
+            "The tokens a person may use in a day",
+        )?,
+        budget_exempt_admins: given.budget_exempt_admins,
         closed_folder_ids: given.closed_folder_ids,
         tools_off: crate::cairn_tools::checked_names(given.tools_off)?,
         max_changes: in_range(given.max_changes, "The most changes in one confirmation")?,

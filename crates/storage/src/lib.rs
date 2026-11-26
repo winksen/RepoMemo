@@ -100,7 +100,7 @@ pub use cairn_catalog::{
     CairnConnection, CairnConnectionChange, CairnModel, CairnModelChange, CairnSaved, NewCairnConnection,
     NewCairnModel, CATALOG_NAME_CHARS, CONNECTION_KINDS, MODEL_PURPOSES, TOOL_MODES,
 };
-pub use cairn_resolution::{ChangeLimits, ResolvedTextProvider, TextResolution, CATALOG_PROVIDER_PREFIX};
+pub use cairn_resolution::{ChangeLimits, PersonBudget, ResolvedTextProvider, TextResolution, CATALOG_PROVIDER_PREFIX};
 pub use chat::{NewChatDestination, CHAT_DIGESTS};
 pub use chat_search::ChatHit;
 pub use connector_quarantine::StoredQuarantine;
@@ -121,8 +121,8 @@ pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;
 pub use milestones::NewMilestone;
 pub use organization_cairn::{
-    Guardrails, OrganizationCairnPolicy, OrganizationCairnSettings, AGENT_MODES, DEFAULT_MAX_CHANGES,
-    ORGANIZATION_MODELS_MAX,
+    Guardrails, OrganizationCairnPolicy, OrganizationCairnSettings, AGENT_MODES, DEFAULT_MAX_CHANGES, MAX_DAILY_RUNS,
+    MAX_DAILY_TOKENS, ORGANIZATION_MODELS_MAX,
 };
 pub use organization_templates::StoredOrganizationTemplate;
 pub use organizations::StarterSetup;

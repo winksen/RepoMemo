@@ -511,6 +511,15 @@ pub(crate) async fn update_settings(
             .map_err(map_storage_error)?
             .policy
             .guardrails;
+        let loosens =
+            |own: Option<i64>, theirs: Option<i64>| matches!((own, theirs), (Some(own), Some(theirs)) if own > theirs);
+        if loosens(guardrails.daily_runs_per_person, organization.daily_runs_per_person)
+            || loosens(guardrails.daily_tokens_per_person, organization.daily_tokens_per_person)
+        {
+            return Err(ApiError::bad_request(
+                "A workspace's daily budget is never higher than its organization's.",
+            ));
+        }
         if organization.mask_personal_data && !guardrails.mask_personal_data {
             return Err(ApiError::bad_request(
                 "Your organization masks email addresses and phone numbers for cloud models; a workspace cannot turn that off.",

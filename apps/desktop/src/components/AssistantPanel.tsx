@@ -103,6 +103,17 @@ function storedTurn(turn: AgentTurn): ThreadTurn {
 }
 
 /** Workspace assistant: routes each message to one capability on the server and keeps the user's chats there. */
+/** What is left of today's budgets, said once it is below a fifth of one (V0.9.96). */
+function budgetNote(budget: AgentCapabilities["budget"]): JSX.Element | null {
+  if (!budget) return null;
+  const left = [
+    budget.runs_limit ? { name: "runs", left: Math.max(0, budget.runs_limit - budget.runs_used), of: budget.runs_limit } : null,
+    budget.tokens_limit ? { name: "tokens", left: Math.max(0, budget.tokens_limit - budget.tokens_used), of: budget.tokens_limit } : null,
+  ].filter((item): item is { name: string; left: number; of: number } => item !== null && item.left / item.of < 0.2);
+  if (!left.length) return null;
+  return <p>{left.map((item) => `${item.left.toLocaleString()} of ${item.of.toLocaleString()} ${item.name} left today`).join(" · ")}</p>;
+}
+
 export function AssistantPanel({ accessToken, composerHeader, hideChatList = false, onChatChange, onOpenArtifact, optionsHost, requestedChatId, variant = "dock", workspaceId }: {
   accessToken: string;
   /** On Cairn's page, where the chat's options are drawn (the page's header); without it the options are not shown. */
@@ -612,7 +623,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           </div>
           <IconButton appearance="plain" busy={isBusy} className="shared-assistant-send" disabled={isLoadingChat || !draft.trim()} label="Send" size="sm" type="submit"><ArrowElbowDownLeft size={ICON_SIZE.lg} /></IconButton>
         </div>
-        <div className="shared-assistant-model">{capabilities?.models && capabilities.models.length > 1 ? <ModelPicker models={capabilities.models} onChange={setChatModelId} selected={chatModelId} /> : null}{capabilities?.models && capabilities.models.length > 1 ? null : <p>{capabilities ? (capabilities.provider_name ? `Model: ${capabilities.model ?? "provider default"} · ${capabilities.provider_name}` : "No AI provider: file lookup and search only") : ""}</p>}</div>
+        <div className="shared-assistant-model">{capabilities?.models && capabilities.models.length > 1 ? <ModelPicker models={capabilities.models} onChange={setChatModelId} selected={chatModelId} /> : null}{budgetNote(capabilities?.budget)}{capabilities?.models && capabilities.models.length > 1 ? null : <p>{capabilities ? (capabilities.provider_name ? `Model: ${capabilities.model ?? "provider default"} · ${capabilities.provider_name}` : "No AI provider: file lookup and search only") : ""}</p>}</div>
       </form> : <form className="shared-assistant-composer" onSubmit={submit}>
         <div className="shared-assistant-actions" role="group" aria-label={`${ASSISTANT_NAME} actions`}>
           {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {

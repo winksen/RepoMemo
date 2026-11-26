@@ -580,6 +580,8 @@ export interface AgentCapabilities {
   agent_mode?: boolean;
   /** The models a person can pick for a chat here (V0.9.86); the one that answers without a choice is marked `default`. */
   models?: OfferedModel[];
+  /** What the person has left of today's CAIRN budgets; none when no budget is set (V0.9.96). */
+  budget?: { runs_limit: number | null; tokens_limit: number | null; runs_used: number; tokens_used: number; resets_at: string } | null;
 }
 
 /** A model offered in a workspace, as the chat's picker shows it. */
@@ -941,6 +943,10 @@ export interface Guardrails {
   secrets_for_cloud?: "mask" | "refuse" | null;
   /** Also replace email addresses and phone numbers for cloud models (V0.9.95); off by default. */
   mask_personal_data?: boolean;
+  /** The most runs and tokens a person may use in a day (V0.9.96). */
+  daily_runs_per_person?: number | null;
+  daily_tokens_per_person?: number | null;
+  budget_exempt_admins?: boolean;
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */

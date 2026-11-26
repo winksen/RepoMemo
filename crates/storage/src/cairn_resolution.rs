@@ -39,6 +39,41 @@ pub struct ChangeLimits {
     pub set_by: &'static str,
 }
 
+/// What a person has left of CAIRN's daily budgets in a workspace's organization (V0.9.96).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PersonBudget {
+    pub runs_limit: Option<i64>,
+    pub tokens_limit: Option<i64>,
+    pub runs_used: i64,
+    pub tokens_used: i64,
+    /// Owners and admins are not stopped when the organization exempts them.
+    pub exempt: bool,
+    /// When the day's count starts again, as an RFC 3339 time.
+    pub resets_at: String,
+}
+
+impl PersonBudget {
+    /// Whether the person may make another run.
+    pub fn allows_a_run(&self) -> bool {
+        self.exempt
+            || (self.runs_limit.is_none_or(|limit| self.runs_used < limit)
+                && self.tokens_limit.is_none_or(|limit| self.tokens_used < limit))
+    }
+
+    /// What is said when it does not.
+    pub fn refusal(&self) -> String {
+        let what = if self.runs_limit.is_some_and(|limit| self.runs_used >= limit) {
+            format!("your {} runs", self.runs_limit.unwrap_or_default())
+        } else {
+            format!("your {} tokens", self.tokens_limit.unwrap_or_default())
+        };
+        format!(
+            "You have used {what} for today. The count starts again at {}.",
+            self.resets_at
+        )
+    }
+}
+
 /// What a resolution found: a model, or why there is none to say.
 #[derive(Debug, Clone, Default)]
 pub struct TextResolution {
@@ -242,6 +277,58 @@ impl StorageEngine {
             }
         }
         Ok(resolution)
+    }
+
+    /// A person's daily CAIRN budgets and what they used today (V0.9.96): the stricter of the organization's and the workspace's,
+    /// counted from the stored runs of the organization's workspaces since midnight UTC. `is_admin` is for an owner or admin.
+    pub async fn person_budget(&self, workspace_id: &str, user_id: &str, is_admin: bool) -> Result<PersonBudget> {
+        let organization_id = self.workspace_organization(workspace_id).await?;
+        let mut runs_limit: Option<i64> = None;
+        let mut tokens_limit: Option<i64> = None;
+        let mut exempt_admins = false;
+        let mut take = |guardrails: &crate::organization_cairn::Guardrails| {
+            runs_limit = match (runs_limit, guardrails.daily_runs_per_person) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            };
+            tokens_limit = match (tokens_limit, guardrails.daily_tokens_per_person) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            };
+        };
+        if let Some(id) = &organization_id {
+            let guardrails = self.get_organization_cairn_settings(id).await?.policy.guardrails;
+            exempt_admins = guardrails.budget_exempt_admins;
+            take(&guardrails);
+        }
+        take(&self.get_workspace_cairn_settings(workspace_id).await?.policy.guardrails);
+        let now = Utc::now();
+        let today = now.date_naive().and_hms_opt(0, 0, 0).unwrap_or_default().and_utc();
+        let (runs_used, tokens_used) = if runs_limit.is_none() && tokens_limit.is_none() {
+            (0, 0)
+        } else {
+            let row = sqlx::query(
+                "SELECT COUNT(*) AS runs, COALESCE(SUM(r.input_tokens + r.output_tokens), 0) AS tokens
+                 FROM agent_runs r
+                 WHERE r.user_id = ?1 AND r.started_at >= ?2
+                   AND (r.workspace_id = ?3 OR r.workspace_id IN (SELECT workspace_id FROM workspace_organizations WHERE organization_id = ?4))",
+            )
+            .bind(user_id)
+            .bind(today.to_rfc3339())
+            .bind(workspace_id)
+            .bind(organization_id.as_deref().unwrap_or(""))
+            .fetch_one(self.reader())
+            .await?;
+            (row.get::<i64, _>("runs"), row.get::<i64, _>("tokens"))
+        };
+        Ok(PersonBudget {
+            runs_limit,
+            tokens_limit,
+            runs_used,
+            tokens_used,
+            exempt: is_admin && exempt_admins,
+            resets_at: (today + chrono::Duration::days(1)).to_rfc3339(),
+        })
     }
 
     /// What one confirmation may change in a workspace, and from how many changes the person types the number (V0.9.92): the stricter
@@ -1069,5 +1156,31 @@ mod tests {
             (30, Some(5), "workspace")
         );
         let _ = std::fs::remove_dir_all(&setup.dir);
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::PersonBudget;
+
+    fn budget(runs: Option<i64>, used: i64, exempt: bool) -> PersonBudget {
+        PersonBudget {
+            runs_limit: runs,
+            tokens_limit: None,
+            runs_used: used,
+            tokens_used: 0,
+            exempt,
+            resets_at: "2026-11-27T00:00:00+00:00".to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_person_past_the_budget_is_told_when_it_resets_and_an_exempt_admin_is_not_stopped() {
+        assert!(budget(None, 500, false).allows_a_run(), "no budget, no limit");
+        assert!(budget(Some(10), 9, false).allows_a_run());
+        let stopped = budget(Some(10), 10, false);
+        assert!(!stopped.allows_a_run());
+        assert!(stopped.refusal().contains("10 runs") && stopped.refusal().contains("2026-11-27"));
+        assert!(budget(Some(10), 50, true).allows_a_run());
     }
 }

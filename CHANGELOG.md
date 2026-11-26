@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.96 (2026-11-26)
+
+Each person has daily CAIRN budgets, set by the organization.
+
+### Added
+- **Budgets.** The organization's CAIRN panel and a workspace's Settings › AI have *Runs per person and day* and *Tokens per person and day*, empty for no limit, each within a fixed maximum (10,000 runs, 100 million tokens). A workspace can only set them lower than its organization (`400` otherwise). The system caps of the plan are replaced here by those fixed maximums.
+- **Counted from the stored runs.** The day starts at midnight UTC and counts the person's runs and their tokens in all the organization's workspaces, so nothing new is stored.
+- **The person is told.** The composer shows *N of M runs left today* once under a fifth is left; a run that would call the model is refused with `429` and *You have used your 10 runs for today. The count starts again at …* once the budget is used. Lookups that call no model are not counted against it.
+- **Admins.** *Owners and admins are not stopped by these budgets* exempts them (and system administrators); routines are not stopped by a person's budget.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A unit test of the budget's decisions was added; tests not run, and the counting query and the composer were not tried.
+
+### Upgrading
+- Nothing to do: no budget is set.
+
 ## V0.9.95 (2026-11-26)
 
 An organization can mask email addresses and phone numbers for cloud models.
