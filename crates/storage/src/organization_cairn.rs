@@ -58,6 +58,17 @@ pub struct Guardrails {
     /// off when its organization has it on.
     #[serde(default)]
     pub strict_citations: bool,
+    /// The most routines a person may have in a workspace, and the most a workspace may have (V0.9.99); none keeps the default of 10.
+    #[serde(default)]
+    pub routines_per_person: Option<i64>,
+    #[serde(default)]
+    pub routines_per_workspace: Option<i64>,
+    /// The kinds of schedule a routine may have (`daily`, `weekly`, `monthly`); none allows every kind.
+    #[serde(default)]
+    pub routine_schedules: Option<Vec<String>>,
+    /// Whether routines that run on an event are allowed; none allows them.
+    #[serde(default)]
+    pub event_routines: Option<bool>,
 }
 
 /// The largest monthly budget that can be set.

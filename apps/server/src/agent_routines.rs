@@ -60,6 +60,50 @@ pub(crate) async fn create_routine(
             return Err(ApiError::not_found("That folder was not found."));
         }
     }
+    // The organization's and the workspace's limits on routines (V0.9.99).
+    let limits = state
+        .storage
+        .routine_limits_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    if request.event_kind.is_some() && !limits.events {
+        return Err(ApiError::bad_request(
+            "Routines that run on an event are turned off here.",
+        ));
+    }
+    if limits
+        .schedules
+        .as_ref()
+        .is_some_and(|kinds| !kinds.contains(&request.schedule.kind))
+    {
+        return Err(ApiError::bad_request(format!(
+            "A {} schedule is not allowed for routines here. Allowed: {}.",
+            request.schedule.kind,
+            limits.schedules.unwrap_or_default().join(", ")
+        )));
+    }
+    let existing = state
+        .storage
+        .list_agent_routines(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    if existing
+        .iter()
+        .filter(|routine| routine.owner_id == subject.user_id)
+        .count() as i64
+        >= limits.per_person
+    {
+        return Err(ApiError::bad_request(format!(
+            "A person may have {} routines here.",
+            limits.per_person
+        )));
+    }
+    if existing.len() as i64 >= limits.per_workspace {
+        return Err(ApiError::bad_request(format!(
+            "The workspace may have {} routines.",
+            limits.per_workspace
+        )));
+    }
     state
         .storage
         .create_agent_routine(NewRoutine {

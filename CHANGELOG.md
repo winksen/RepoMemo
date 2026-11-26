@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.99 (2026-11-26)
+
+An organization and a workspace limit routines.
+
+### Added
+- **The limits.** *Routines per person in a workspace* and *Routines per workspace* (from 1 to 10, the old fixed limit), the *schedules routines may have* (daily, weekly, monthly) and *Routines that run on an event*, in the organization's CAIRN panel and, only stricter, in a workspace's Settings › AI.
+- **At creation.** A routine over a limit, with a schedule that is not allowed, or on an event while events are off is refused with a message that says which.
+- **Existing routines are paused, not deleted.** When an organization or a workspace saves new limits, the routines in the affected workspaces that they no longer allow are paused with the reason (*A person may have 2 routines here*), oldest kept; the owner sees the reason and can resume one that fits again.
+- **Stricter only.** A workspace's counts above its organization's, or event routines on when the organization turned them off, are refused with `400`.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added and nothing was run.
+
+### Upgrading
+- Nothing to do: nothing changes until a limit is set.
+
 ## V0.9.98 (2026-11-26)
 
 An organization or a workspace can require strict citations.

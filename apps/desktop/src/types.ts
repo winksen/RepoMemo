@@ -952,6 +952,11 @@ export interface Guardrails {
   at_budget?: "stop" | "local_only" | null;
   /** An answer about the workspace's content that cites nothing it read is not shown (V0.9.98). */
   strict_citations?: boolean;
+  /** Limits on routines (V0.9.99). */
+  routines_per_person?: number | null;
+  routines_per_workspace?: number | null;
+  routine_schedules?: string[] | null;
+  event_routines?: boolean | null;
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */

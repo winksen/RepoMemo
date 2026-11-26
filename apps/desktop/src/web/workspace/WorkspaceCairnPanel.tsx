@@ -23,6 +23,7 @@ import { ChangeLimitFields } from "../cairn-admin/ChangeLimitFields";
 import { ClosedFolders } from "../cairn-admin/ClosedFolders";
 import { SecretsSetting } from "../cairn-admin/SecretsSetting";
 import { BudgetFields } from "../cairn-admin/BudgetFields";
+import { RoutineLimits } from "../cairn-admin/RoutineLimits";
 import type { Guardrails } from "../../types";
 
 const TOOL_LABELS: Record<string, string> = { none: "No tools", json: "Tools as JSON", native: "Native tools" };
@@ -106,6 +107,7 @@ function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: stri
     <Field hint="The model this workspace uses unless a person chooses another of those it offers. Without one, its own provider answers while the organization offers it, then the organization's default." label="Workspace default"><Dropdown aria-label="Workspace default model" disabled={offered.length === 0} onValueChange={setPreferred} options={view.models.filter((model) => offered.includes(model.id)).map((model) => ({ label: model.display_name, value: model.id }))} placeholder="Offer models first" value={defaultId} /></Field>
     <ToolSwitches accessToken={accessToken} locked={view.organization_tools_off} off={toolsOff} onChange={setToolsOff} />
     <ChangeLimitFields ceiling={view.organization_limits} guardrails={guardrails} onChange={setGuardrails} />
+    <RoutineLimits guardrails={guardrails} onChange={setGuardrails} />
     <BudgetFields guardrails={guardrails} onChange={setGuardrails} />
     <SecretsSetting guardrails={guardrails} onChange={setGuardrails} organizationMasksPersonal={Boolean(view.organization_limits.mask_personal_data)} organizationStrict={Boolean(view.organization_limits.strict_citations)} organizationRefuses={view.organization_limits.secrets_for_cloud === "refuse"} />
     <ClosedFolders closed={guardrails.closed_folder_ids ?? []} folders={view.folders} onChange={(closed_folder_ids) => setGuardrails((current) => ({ ...current, closed_folder_ids }))} />

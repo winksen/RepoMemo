@@ -142,6 +142,29 @@ pub(crate) fn checked_guardrails(
         )?,
         budget_exempt_admins: given.budget_exempt_admins,
         strict_citations: given.strict_citations,
+        routines_per_person: ranged(
+            given.routines_per_person,
+            repomemo_storage::ROUTINES_MAX,
+            "The routines a person may have",
+        )?,
+        routines_per_workspace: ranged(
+            given.routines_per_workspace,
+            repomemo_storage::ROUTINES_MAX,
+            "The routines a workspace may have",
+        )?,
+        routine_schedules: match given.routine_schedules {
+            Some(kinds)
+                if kinds
+                    .iter()
+                    .any(|kind| !matches!(kind.as_str(), "daily" | "weekly" | "monthly")) =>
+            {
+                return Err(ApiError::bad_request(
+                    "A routine's schedule is daily, weekly or monthly.",
+                ))
+            }
+            other => other,
+        },
+        event_routines: given.event_routines,
         monthly_token_budget: ranged(
             given.monthly_token_budget,
             repomemo_storage::MAX_MONTHLY_TOKENS,
@@ -288,6 +311,19 @@ pub(crate) async fn update_settings(
             )))
         }
     };
+    // Routines in the organization's workspaces that its new limits no longer allow are paused with the reason (V0.9.99).
+    if let Ok(workspaces) = state
+        .storage
+        .list_shared_workspaces_for_system_admin(&subject.user_id)
+        .await
+    {
+        for shared in workspaces
+            .into_iter()
+            .filter(|shared| shared.organization_id == organization_id)
+        {
+            let _ = state.storage.enforce_routine_limits(&shared.workspace.id).await;
+        }
+    }
     let organization_name = state
         .storage
         .list_organizations_for_system_admin(&subject.user_id)

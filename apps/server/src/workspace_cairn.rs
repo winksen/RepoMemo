@@ -519,6 +519,20 @@ pub(crate) async fn update_settings(
                 "Your organization asks for strict citations; a workspace cannot turn that off.",
             ));
         }
+        if guardrails
+            .routines_per_person
+            .zip(organization.routines_per_person)
+            .is_some_and(|(own, theirs)| own > theirs)
+            || guardrails
+                .routines_per_workspace
+                .zip(organization.routines_per_workspace)
+                .is_some_and(|(own, theirs)| own > theirs)
+            || (organization.event_routines == Some(false) && guardrails.event_routines != Some(false))
+        {
+            return Err(ApiError::bad_request(
+                "A workspace's routine limits are never looser than its organization's.",
+            ));
+        }
         if guardrails.monthly_token_budget.is_some() || guardrails.at_budget.is_some() {
             return Err(ApiError::bad_request(
                 "The monthly token budget is the organization's, not a workspace's.",
@@ -604,6 +618,8 @@ pub(crate) async fn update_settings(
         before.policy.default_model_id.as_deref().map_or_else(|| "none".to_owned(), |id| name_of(&[id.to_owned()])),
         saved.policy.default_model_id.as_deref().map_or_else(|| "none".to_owned(), |id| name_of(&[id.to_owned()])),
     );
+    // Routines the new limits no longer allow are paused with the reason, not deleted (V0.9.99).
+    let _ = state.storage.enforce_routine_limits(&workspace_id).await;
     crate::record_workspace_activity(
         &state,
         &workspace_id,

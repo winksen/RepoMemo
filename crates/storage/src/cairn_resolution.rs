@@ -98,6 +98,16 @@ impl OrganizationBudget {
     }
 }
 
+/// What routines a workspace may have (V0.9.99).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoutineLimits {
+    pub per_person: i64,
+    pub per_workspace: i64,
+    /// The kinds of schedule allowed; none allows every kind.
+    pub schedules: Option<Vec<String>>,
+    pub events: bool,
+}
+
 /// What a resolution found: a model, or why there is none to say.
 #[derive(Debug, Clone, Default)]
 pub struct TextResolution {
@@ -425,6 +435,87 @@ impl StorageEngine {
                 .strict_citations;
         }
         Ok(strict)
+    }
+
+    /// What routines a workspace may have (V0.9.99): the stricter of the organization's and the workspace's.
+    pub async fn routine_limits_for_workspace(&self, workspace_id: &str) -> Result<RoutineLimits> {
+        let mut limits = RoutineLimits {
+            per_person: crate::agent_routines::ROUTINES_MAX,
+            per_workspace: crate::agent_routines::ROUTINES_MAX,
+            schedules: None,
+            events: true,
+        };
+        let mut take = |guardrails: &crate::organization_cairn::Guardrails| {
+            if let Some(max) = guardrails.routines_per_person {
+                limits.per_person = limits.per_person.min(max);
+            }
+            if let Some(max) = guardrails.routines_per_workspace {
+                limits.per_workspace = limits.per_workspace.min(max);
+            }
+            if let Some(kinds) = &guardrails.routine_schedules {
+                limits.schedules = Some(match limits.schedules.take() {
+                    Some(existing) => existing.into_iter().filter(|kind| kinds.contains(kind)).collect(),
+                    None => kinds.clone(),
+                });
+            }
+            if guardrails.event_routines == Some(false) {
+                limits.events = false;
+            }
+        };
+        if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+            take(
+                &self
+                    .get_organization_cairn_settings(&organization_id)
+                    .await?
+                    .policy
+                    .guardrails,
+            );
+        }
+        take(&self.get_workspace_cairn_settings(workspace_id).await?.policy.guardrails);
+        Ok(limits)
+    }
+
+    /// Pauses, with the reason and without deleting, the routines of a workspace that its limits no longer allow (V0.9.99): those over
+    /// the number a person or the workspace may have (the newest first), with a schedule that is not allowed, or on an event when
+    /// events are off. Returns how many were paused.
+    pub async fn enforce_routine_limits(&self, workspace_id: &str) -> Result<usize> {
+        let limits = self.routine_limits_for_workspace(workspace_id).await?;
+        let mut routines = self.list_agent_routines(workspace_id).await?;
+        routines.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut paused = 0;
+        let mut kept_in_workspace = 0_i64;
+        let mut kept_by_person: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        for routine in routines.iter().filter(|routine| routine.state == "active") {
+            let reason = if routine.event_kind.is_some() && !limits.events {
+                Some("Routines that run on an event are turned off by your organization or workspace.".to_owned())
+            } else if limits
+                .schedules
+                .as_ref()
+                .is_some_and(|kinds| !kinds.contains(&routine.schedule.kind))
+            {
+                Some(format!(
+                    "A {} schedule is not allowed for routines here.",
+                    routine.schedule.kind
+                ))
+            } else if kept_by_person.get(&routine.owner_id).copied().unwrap_or(0) >= limits.per_person {
+                Some(format!("A person may have {} routines here.", limits.per_person))
+            } else if kept_in_workspace >= limits.per_workspace {
+                Some(format!("The workspace may have {} routines.", limits.per_workspace))
+            } else {
+                None
+            };
+            match reason {
+                Some(reason) => {
+                    self.pause_agent_routine(&routine.id, &reason).await?;
+                    paused += 1;
+                }
+                None => {
+                    kept_in_workspace += 1;
+                    *kept_by_person.entry(routine.owner_id.clone()).or_insert(0) += 1;
+                }
+            }
+        }
+        Ok(paused)
     }
 
     /// What one confirmation may change in a workspace, and from how many changes the person types the number (V0.9.92): the stricter

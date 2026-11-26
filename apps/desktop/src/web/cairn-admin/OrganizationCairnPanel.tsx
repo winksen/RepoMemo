@@ -22,6 +22,7 @@ import { ToolSwitches } from "./ToolSwitches";
 import { ChangeLimitFields } from "./ChangeLimitFields";
 import { SecretsSetting } from "./SecretsSetting";
 import { BudgetFields } from "./BudgetFields";
+import { RoutineLimits } from "./RoutineLimits";
 import type { Guardrails } from "../../types";
 
 const MODES = [
@@ -85,6 +86,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
     <ToolSwitches accessToken={accessToken} disabled={!canChange} off={toolsOff} onChange={setToolsOff} />
     <ChangeLimitFields disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     <SecretsSetting disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
+    <RoutineLimits disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     <BudgetFields canExempt disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     {canChange ? <Button busy={isBusy} disabled={!dirty} type="submit" variant="main">Save</Button> : null}
   </form>;

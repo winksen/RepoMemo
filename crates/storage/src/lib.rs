@@ -101,7 +101,8 @@ pub use cairn_catalog::{
     NewCairnModel, CATALOG_NAME_CHARS, CONNECTION_KINDS, MODEL_PURPOSES, TOOL_MODES,
 };
 pub use cairn_resolution::{
-    ChangeLimits, OrganizationBudget, PersonBudget, ResolvedTextProvider, TextResolution, CATALOG_PROVIDER_PREFIX,
+    ChangeLimits, OrganizationBudget, PersonBudget, ResolvedTextProvider, RoutineLimits, TextResolution,
+    CATALOG_PROVIDER_PREFIX,
 };
 pub use chat::{NewChatDestination, CHAT_DIGESTS};
 pub use chat_search::ChatHit;
