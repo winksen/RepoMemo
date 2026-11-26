@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.95 (2026-11-26)
+
+An organization can mask email addresses and phone numbers for cloud models.
+
+### Added
+- **The option.** *Also mask email addresses and phone numbers*, in the organization's CAIRN panel and in a workspace's Settings › AI, off by default. When on, text on its way to a model outside the network has addresses replaced by `[email removed]` and phone numbers by `[phone removed]`, in the same places as secrets (chat, summaries, reranking, embeddings). Models on the network are not touched.
+- **Inheritance.** A workspace can turn it on for itself; when its organization has it on, the workspace cannot turn it off (`400`).
+- **Counted.** A run in Agent mode says how many sensitive items were replaced (*2 sensitive items were replaced by a marker before text went to the model*), never what they were.
+- **Few false positives.** A phone number is nine to fifteen digits with separators; dates, version numbers, counts and long identifiers are left alone.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A unit test of the patterns was added; tests not run, and nothing was sent to a real cloud model.
+
+### Upgrading
+- Nothing to do: the option is off.
+
 ## V0.9.94 (2026-11-26)
 
 Secrets are kept from cloud models.

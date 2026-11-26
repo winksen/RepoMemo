@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.94` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.95` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.95 — An organization can mask email addresses and phone numbers for cloud models.
+
+- **Personal data masking.** An organization can turn on, and a workspace within it can turn on for itself, masking of email addresses and phone numbers in text on its way to a model outside the network. Off by default. The run's history counts what was replaced.
+
+Checks: formatted, linted and type-checked; docs:check; unit test added, not run.
 
 ## V0.9.94 — Secrets are kept from cloud models.
 

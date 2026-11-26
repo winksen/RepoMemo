@@ -82,6 +82,7 @@ pub(crate) struct OrganizationLimits {
     max_changes: Option<i64>,
     type_to_confirm_from: Option<i64>,
     secrets_for_cloud: Option<String>,
+    mask_personal_data: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -235,12 +236,14 @@ pub(crate) async fn get_settings(
                 max_changes: guardrails.max_changes,
                 type_to_confirm_from: guardrails.type_to_confirm_from,
                 secrets_for_cloud: guardrails.secrets_for_cloud,
+                mask_personal_data: guardrails.mask_personal_data,
             }
         }
         None => OrganizationLimits {
             max_changes: None,
             type_to_confirm_from: None,
             secrets_for_cloud: None,
+            mask_personal_data: false,
         },
     };
     let answering = state
@@ -508,6 +511,11 @@ pub(crate) async fn update_settings(
             .map_err(map_storage_error)?
             .policy
             .guardrails;
+        if organization.mask_personal_data && !guardrails.mask_personal_data {
+            return Err(ApiError::bad_request(
+                "Your organization masks email addresses and phone numbers for cloud models; a workspace cannot turn that off.",
+            ));
+        }
         if organization.secrets_for_cloud.as_deref() == Some("refuse")
             && guardrails.secrets_for_cloud.as_deref() == Some("mask")
         {

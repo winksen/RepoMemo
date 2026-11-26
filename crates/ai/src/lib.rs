@@ -1023,6 +1023,8 @@ pub fn provider_from_settings(settings: ProviderSettings) -> Result<ConfiguredPr
 /// request is refused when the organization chose that. A model on the network is not guarded, and nothing is kept but how many.
 struct SecretGuard {
     refuse: bool,
+    /// Also replace email addresses and phone numbers (V0.9.95).
+    personal: bool,
     masked: std::sync::atomic::AtomicUsize,
 }
 
@@ -1033,13 +1035,19 @@ impl SecretGuard {
         }
         Some(Self {
             refuse: settings.metadata.get("secrets_mode").and_then(Value::as_str) == Some("refuse"),
+            personal: settings.metadata.get("personal_mode").and_then(Value::as_str) == Some("mask"),
             masked: std::sync::atomic::AtomicUsize::new(0),
         })
     }
 
     /// The text as it may be sent: with its secrets replaced, or an error when the organization does not send them.
     fn text(&self, text: &str) -> Result<String> {
-        let (clean, found) = secrets::mask_secrets(text);
+        let (mut clean, mut found) = secrets::mask_secrets(text);
+        if self.personal {
+            let (personal, count) = secrets::mask_personal_data(&clean);
+            clean = personal;
+            found += count;
+        }
         if found == 0 {
             return Ok(text.to_owned());
         }

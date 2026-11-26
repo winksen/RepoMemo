@@ -101,6 +101,58 @@ fn is_placeholder(value: &str) -> bool {
     plain && value.len() < 12
 }
 
+/// What stands in the place of an email address and of a phone number (V0.9.95).
+pub const EMAIL_MARKER: &str = "[email removed]";
+pub const PHONE_MARKER: &str = "[phone removed]";
+
+fn email_pattern() -> &'static Regex {
+    static PATTERN: OnceLock<Regex> = OnceLock::new();
+    PATTERN.get_or_init(|| {
+        Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b")
+            .expect("a valid expression")
+    })
+}
+
+fn phone_pattern() -> &'static Regex {
+    static PATTERN: OnceLock<Regex> = OnceLock::new();
+    PATTERN.get_or_init(|| Regex::new(r"(?:\+|\b00)?\d[\d\s().-]{7,}\d").expect("a valid expression"))
+}
+
+/// Whether a run of digits and separators is a phone number: nine to fifteen digits, and not a date or a plain number with no
+/// separators that is a count or an identifier.
+fn is_phone(candidate: &str) -> bool {
+    let digits = candidate.chars().filter(char::is_ascii_digit).count();
+    if !(9..=15).contains(&digits) {
+        return false;
+    }
+    let separators = candidate
+        .chars()
+        .any(|c| matches!(c, ' ' | '-' | '.' | '(' | ')' | '+'));
+    // 2026-11-26 and 26.11.2026 are dates.
+    let dated = Regex::new(r"^\s*(?:\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{1,2}[-./]\d{1,2}[-./]\d{4})\s*$")
+        .expect("a valid expression");
+    separators && !dated.is_match(candidate)
+}
+
+/// The text with email addresses and phone numbers replaced by markers, and how many were (V0.9.95). For an organization that asked.
+pub fn mask_personal_data(text: &str) -> (String, usize) {
+    let mut count = 0;
+    let emails = email_pattern().replace_all(text, |_: &Captures| {
+        count += 1;
+        EMAIL_MARKER
+    });
+    let phones = phone_pattern().replace_all(&emails, |found: &Captures| {
+        let candidate = found.get(0).map_or("", |m| m.as_str());
+        if is_phone(candidate) {
+            count += 1;
+            PHONE_MARKER.to_owned()
+        } else {
+            candidate.to_owned()
+        }
+    });
+    (phones.into_owned(), count)
+}
+
 /// The text with every secret replaced by [`MARKER`], and how many were replaced. Never returns the secrets.
 pub fn mask_secrets(text: &str) -> (String, usize) {
     let mut masked = text.to_owned();
@@ -208,6 +260,25 @@ mod tests {
             "Use the token field. token: x",
         ] {
             assert_eq!(masked(text), (text.to_owned(), 0), "{text}");
+        }
+    }
+
+    #[test]
+    fn email_addresses_and_phone_numbers_are_masked_and_dates_and_counts_are_not() {
+        let (out, count) =
+            mask_personal_data("Write to ada.lovelace@example.com or call +33 1 23 45 67 89 / 555-123-4567.");
+        assert_eq!(count, 3, "{out}");
+        assert_eq!(
+            out,
+            "Write to [email removed] or call [phone removed] / [phone removed]."
+        );
+        for text in [
+            "Released on 2026-11-26 and 26.11.2026.",
+            "Order 1234567890123 shipped",
+            "Version 1.2.3 of 4.5",
+            "Between 10 and 20, about 1,000,000 rows",
+        ] {
+            assert_eq!(mask_personal_data(text), (text.to_owned(), 0), "{text}");
         }
     }
 

@@ -215,6 +215,25 @@ impl StorageEngine {
 
     /// A resolution whose provider carries the organization's choice about secrets (V0.9.94).
     async fn guard_secrets(&self, workspace_id: &str, mut resolution: TextResolution) -> Result<TextResolution> {
+        let mut personal = self
+            .get_workspace_cairn_settings(workspace_id)
+            .await?
+            .policy
+            .guardrails
+            .mask_personal_data;
+        if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+            personal |= self
+                .get_organization_cairn_settings(&organization_id)
+                .await?
+                .policy
+                .guardrails
+                .mask_personal_data;
+        }
+        if let (true, Some(resolved)) = (personal, resolution.resolved.as_mut()) {
+            if let Some(object) = resolved.provider.metadata.as_object_mut() {
+                object.insert("personal_mode".to_owned(), json!("mask"));
+            }
+        }
         if let Some(resolved) = resolution.resolved.as_mut() {
             if self.secrets_mode_for_workspace(workspace_id).await? == "refuse" {
                 if let Some(object) = resolved.provider.metadata.as_object_mut() {

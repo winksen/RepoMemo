@@ -1025,7 +1025,11 @@ impl RepoMemoCore {
         if masked > 0 {
             let said = format!(
                 "{masked} {} replaced by a marker before text went to the model.",
-                if masked == 1 { "secret was" } else { "secrets were" }
+                if masked == 1 {
+                    "sensitive item was"
+                } else {
+                    "sensitive items were"
+                }
             );
             outcome.reply.warnings.push(said.clone());
             if let Some(trace) = outcome.trace.as_mut() {

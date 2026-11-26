@@ -34,6 +34,10 @@ pub struct Guardrails {
     /// default, and `refuse` sends nothing. A workspace can only choose the stricter.
     #[serde(default)]
     pub secrets_for_cloud: Option<String>,
+    /// Also replace email addresses and phone numbers on the way to a model outside the network (V0.9.95); off by default. A workspace
+    /// can turn it on, never off when its organization has it on.
+    #[serde(default)]
+    pub mask_personal_data: bool,
 }
 
 /// The most changes one confirmation makes when nothing sets less.

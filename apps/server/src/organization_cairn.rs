@@ -119,6 +119,7 @@ pub(crate) fn checked_guardrails(
     }
     Ok(repomemo_storage::Guardrails {
         secrets_for_cloud: given.secrets_for_cloud,
+        mask_personal_data: given.mask_personal_data,
         closed_folder_ids: given.closed_folder_ids,
         tools_off: crate::cairn_tools::checked_names(given.tools_off)?,
         max_changes: in_range(given.max_changes, "The most changes in one confirmation")?,
