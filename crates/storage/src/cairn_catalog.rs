@@ -231,6 +231,25 @@ impl StorageEngine {
     }
 
     pub async fn create_cairn_connection(&self, new: NewCairnConnection, actor: &str) -> Result<CairnConnection> {
+        self.insert_cairn_connection(new, Some(actor), false).await
+    }
+
+    /// A connection made by the server itself, from what a workspace's provider held (V0.9.78): no person made it, and it may carry
+    /// the acknowledgement the workspace's provider already had.
+    pub async fn import_cairn_connection(
+        &self,
+        new: NewCairnConnection,
+        acknowledged: bool,
+    ) -> Result<CairnConnection> {
+        self.insert_cairn_connection(new, None, acknowledged).await
+    }
+
+    async fn insert_cairn_connection(
+        &self,
+        new: NewCairnConnection,
+        actor: Option<&str>,
+        acknowledged: bool,
+    ) -> Result<CairnConnection> {
         checked_choice(&new.kind, CONNECTION_KINDS, "kind of connection")?;
         checked_choice(&new.locality, &["local", "cloud"], "locality")?;
         let name = checked_name(&new.name, "connection")?;
@@ -242,8 +261,9 @@ impl StorageEngine {
         };
         let now = Utc::now().to_rfc3339();
         sqlx::query(
-            "INSERT INTO cairn_connections (id, kind, name, base_url, api_key_sealed, locality, enabled, created_at, updated_at, updated_by)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9)",
+            "INSERT INTO cairn_connections (id, kind, name, base_url, api_key_sealed, locality, enabled, created_at, updated_at, updated_by,
+               cloud_acknowledged_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10)",
         )
         .bind(&id)
         .bind(&new.kind)
@@ -252,8 +272,9 @@ impl StorageEngine {
         .bind(sealed)
         .bind(&new.locality)
         .bind(new.enabled)
-        .bind(now)
+        .bind(&now)
         .bind(actor)
+        .bind(acknowledged.then(|| now.clone()))
         .execute(&self.pool)
         .await?;
         self.get_cairn_connection(&id).await
@@ -378,6 +399,15 @@ impl StorageEngine {
     }
 
     pub async fn create_cairn_model(&self, new: NewCairnModel, actor: &str) -> Result<CairnModel> {
+        self.insert_cairn_model(new, Some(actor)).await
+    }
+
+    /// A model added by the server itself, from what a workspace's provider named (V0.9.78).
+    pub async fn import_cairn_model(&self, new: NewCairnModel) -> Result<CairnModel> {
+        self.insert_cairn_model(new, None).await
+    }
+
+    async fn insert_cairn_model(&self, new: NewCairnModel, actor: Option<&str>) -> Result<CairnModel> {
         checked_choice(&new.purpose, MODEL_PURPOSES, "purpose")?;
         checked_choice(&new.tool_mode, TOOL_MODES, "tool mode")?;
         let display_name = checked_name(&new.display_name, "model")?;

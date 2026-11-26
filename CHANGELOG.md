@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.78 (2026-11-26)
+
+Workspace providers are moved into the model catalog.
+
+### Changed
+- **One connection for each server and key.** At startup the server turns every workspace's AI providers into catalog entries: providers of the same kind, address and key share one connection, named after its kind and host; another key is another connection. Each provider's model, as it names it (the embedding model for an embedding provider), becomes a catalog model with its purpose and the tool mode and context size the provider already had. A connection is on when any of its providers was, and keeps the cloud acknowledgement a provider already had.
+- **Keys stay encrypted.** Each key is sealed again for its connection with `REPOMEMO_SECRET_KEY`, never written in clear and never returned by a read.
+- **Each workspace keeps its model and mode.** A provider is linked to its catalog model with `cairn_model_id`, and its `cairn_mode` stays on it, so which workspace used which model, and how CAIRN answered there, is on record for the rows that follow.
+- **Nothing changes for people.** CAIRN, Ask and summaries still resolve from the workspace's own provider. The pass is safe to run again: a provider already linked is left alone, a server already in the catalog is reused, and a provider saved since is linked at the next start.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. Two tests were added (four workspaces and an embedding provider give three connections, four models and five linked providers, with no key in clear and a second run moving nothing; a server already in the catalog is reused); tests not run, and no upgraded database of an earlier version was opened.
+
+### Upgrading
+- Nothing to do. The first start after the upgrade makes the connections and models; the log says how many.
+
 ## V0.9.77 (2026-11-26)
 
 CAIRN administrators add the models of a connection and test them.

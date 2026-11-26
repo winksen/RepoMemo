@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.77` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.78` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.78 — Workspace providers are moved into the model catalog.
+
+- **Providers in the catalog.** When the server starts, every workspace's AI providers become connections and models of the catalog: one connection for each distinct server and key, one model for each model a provider names. The Models section lists them. Nothing changes for anyone: each workspace still answers with its own provider.
+
+Checks: formatted, linted and type-checked; docs:check; tests added, not run.
 
 ## V0.9.77 — CAIRN administrators add the models of a connection and test them.
 

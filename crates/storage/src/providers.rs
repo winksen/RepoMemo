@@ -20,6 +20,24 @@ impl StorageEngine {
             .collect())
     }
 
+    /// Every provider of every workspace, with its key decrypted, for the server to move into the catalog (V0.9.78).
+    pub async fn list_all_provider_settings(&self) -> Result<Vec<ProviderSettings>> {
+        let rows = sqlx::query_as::<_, ProviderSettingsRow>(
+            r#"
+            SELECT id, workspace_id, provider_type, name, base_url, model,
+                   embedding_model, enabled, metadata_json
+            FROM provider_settings
+            ORDER BY workspace_id, created_at, id
+            "#,
+        )
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows
+            .into_iter()
+            .map(|row| self.provider_settings_from_row(row))
+            .collect())
+    }
+
     pub async fn get_provider_settings(&self, provider_id: &str) -> Result<ProviderSettings> {
         let row = sqlx::query_as::<_, ProviderSettingsRow>(
             r#"

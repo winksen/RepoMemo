@@ -24,6 +24,7 @@ mod build_info;
 mod cairn_admin;
 mod cairn_connections;
 mod cairn_models;
+mod catalog_migration;
 mod chat;
 mod check_config;
 mod collaboration;
@@ -347,6 +348,20 @@ async fn build_state(
         read_mmap_mb: config.db_read_mmap_mb,
     })
     .await?;
+
+    // Workspace providers join the model catalog (V0.9.78); a provider already linked is left alone.
+    match catalog_migration::run(&storage).await {
+        Ok(moved) if moved.providers_linked > 0 => tracing::info!(
+            connections = moved.connections_made,
+            models = moved.models_made,
+            providers = moved.providers_linked,
+            "Moved workspace AI providers into the model catalog"
+        ),
+        Ok(_) => {}
+        Err(error) => {
+            tracing::error!(error = %error, "Workspace AI providers could not be moved into the model catalog")
+        }
+    }
 
     // Jobs a previous process left running will never finish; close them
     // before new work starts so no progress bar spins forever.
