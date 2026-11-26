@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.74` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.75` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.75 — The server has a model catalog in storage; nothing reads it yet.
+
+- **Model catalog storage.** Connections to model servers and the models they offer are stored once per server, ready for the rows that use them. A key is write-only, a model or connection in use cannot be deleted, and nothing a person sees changes.
+
+Checks: formatted and linted; migration locked; docs:check; tests added, not run.
 
 ## V0.9.74 — CAIRN's run budgets are settings a CAIRN administrator changes on the administration page.
 

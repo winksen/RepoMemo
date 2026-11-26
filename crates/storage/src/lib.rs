@@ -35,6 +35,7 @@ mod archive_import;
 mod archive_integrations;
 mod archive_work;
 mod artifacts;
+mod cairn_catalog;
 mod chat;
 mod chat_search;
 mod collaboration;
@@ -92,6 +93,10 @@ pub use agent_upkeep::{AskedQuestion, NewUpkeepFinding, UPKEEP_OPEN_MAX, UPKEEP_
 pub use ai_usage::{AiSpend, AiUsageRow};
 pub use approvals::{StoredApproval, StoredImportedApproval};
 pub use archive_import::{ImportedWorkspace, PendingPassage};
+pub use cairn_catalog::{
+    CairnConnection, CairnConnectionChange, CairnModel, CairnModelChange, CairnSaved, NewCairnConnection,
+    NewCairnModel, CATALOG_NAME_CHARS, CONNECTION_KINDS, MODEL_PURPOSES, TOOL_MODES,
+};
 pub use chat::{NewChatDestination, CHAT_DIGESTS};
 pub use chat_search::ChatHit;
 pub use connector_quarantine::StoredQuarantine;

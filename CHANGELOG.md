@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.75 (2026-11-26)
+
+The server has a model catalog in storage; nothing reads it yet.
+
+### Added
+- **Connections and models.** Migration `0101_cairn_catalog.sql` adds `cairn_connections` (kind Ollama, OpenRouter or OpenAI-compatible; name; address; locality; enabled; the cloud acknowledgement; a version) and `cairn_models` (connection, the name its server knows it by, display name, purpose text, vision or embedding, tool mode, context size, evaluation, fallback, roles, enabled, a version). The storage functions create, list, read, change and delete both, and `acknowledge` a cloud connection.
+- **The key is write-only.** A connection's key is encrypted with `REPOMEMO_SECRET_KEY`, as provider keys are, and no read returns it, only whether there is one. Editing a connection keeps the key only while its address does not change, so changing where requests go cannot send the key to a new address.
+- **Versions.** A change names the version it read; a stale save is returned with the current state instead of overwriting it.
+- **Deleting.** A model that a workspace provider or another model's fallback names is in use and cannot be deleted; a connection with a model in use cannot either. An unused connection is deleted with its models.
+
+### Checks
+- Formatted and linted with `-D warnings`; the migration is locked and `npm run docs:check` passes. Four storage tests were added (the key never appears in a read and is sealed at rest, it is kept or dropped by address, a used connection or model cannot be deleted, an unused one can and a model is added once); tests not run. No route, screen or behaviour changes.
+
+### Upgrading
+- Two empty tables are added. Nothing to do.
+
 ## V0.9.74 (2026-11-26)
 
 CAIRN's run budgets are settings a CAIRN administrator changes on the administration page.
