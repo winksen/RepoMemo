@@ -3156,3 +3156,172 @@ async fn a_model_limited_to_roles_is_neither_offered_nor_accepted_for_other_role
     assert_eq!(send("POST", messages, &member, body).await.status(), 200);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_workspace_chooses_its_embedding_and_vision_models_from_what_its_organization_enabled() {
+    let data_dir = temp_data_dir("workspace-purpose-models");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "purpose-root@example.com").await;
+    let (member, _) = register_account(&app, "purpose-member@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &root,
+            json!({"name": "Purpose Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    join(
+        &app,
+        &root,
+        "organizations",
+        &organization_id,
+        "purpose-member@example.com",
+        "member",
+    )
+    .await;
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "Purpose Space", "organization_id": organization_id}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+    let connection = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &root,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let add = |name: &str, purpose: &str| {
+        let body = json!({"connection_id": connection["id"], "model_id": name, "purpose": purpose});
+        let (send, root) = (&send, root.clone());
+        async move { response_json(send("POST", "/v1/cairn/models".to_owned(), &root, body).await).await }
+    };
+    let (text, embedding, spare, vision) = (
+        add("llama3.1:8b", "text").await,
+        add("nomic-embed-text", "embedding").await,
+        add("mxbai-embed-large", "embedding").await,
+        add("llava:7b", "vision").await,
+    );
+    // The organization enables the text model, one embedding model and the vision model; not the spare embedding model.
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/organizations/{organization_id}/cairn"),
+            &root,
+            json!({"enabled_model_ids": [text["id"], embedding["id"], vision["id"]], "default_model_id": text["id"], "expected_version": 0})
+        )
+        .await
+        .status(),
+        200
+    );
+    // A default must be a text model.
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/organizations/{organization_id}/cairn"),
+            &root,
+            json!({"enabled_model_ids": [text["id"], embedding["id"]], "default_model_id": embedding["id"], "expected_version": 1})
+        )
+        .await
+        .status(),
+        400
+    );
+    let view = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/cairn"),
+            &root,
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        view["embedding"]["candidates"].as_array().unwrap().len(),
+        1,
+        "only what the organization enabled, for this purpose"
+    );
+    assert_eq!(view["vision"]["candidates"][0]["model_id"], "llava:7b");
+    assert_eq!(view["embedding"]["current_model_id"], Value::Null);
+
+    // Chosen from the catalog, the model becomes the workspace's provider of that purpose.
+    let uri = |purpose: &str| format!("/v1/workspaces/{workspace_id}/cairn/models/{purpose}");
+    assert_eq!(
+        send("PUT", uri("embedding"), &member, json!({"model_id": embedding["id"]}))
+            .await
+            .status(),
+        403
+    );
+    for (purpose, body) in [
+        ("embedding", json!({"model_id": spare["id"]})),
+        ("embedding", json!({"model_id": vision["id"]})),
+        ("text", json!({"model_id": text["id"]})),
+    ] {
+        assert_eq!(send("PUT", uri(purpose), &root, body).await.status(), 400, "{purpose}");
+    }
+    let chosen = send("PUT", uri("embedding"), &root, json!({"model_id": embedding["id"]})).await;
+    assert_eq!(chosen.status(), 200);
+    assert_eq!(
+        response_json(chosen).await["embedding"]["current_model_id"],
+        embedding["id"]
+    );
+    assert_eq!(
+        send("PUT", uri("vision"), &root, json!({"model_id": vision["id"]}))
+            .await
+            .status(),
+        200
+    );
+    let providers = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/ai-providers"),
+            &root,
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    let purposes = providers
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|provider| provider["purpose"].as_str().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert!(
+        purposes.contains(&"embedding".to_owned()) && purposes.contains(&"vision".to_owned()),
+        "{purposes:?}"
+    );
+
+    // Turning one off leaves the other.
+    let off = response_json(send("PUT", uri("vision"), &root, json!({"model_id": null})).await).await;
+    assert_eq!(off["vision"]["current_model_id"], Value::Null);
+    assert_eq!(off["embedding"]["current_model_id"], embedding["id"]);
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &root))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    assert!(audit.contains("workspace_cairn_model_chosen"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

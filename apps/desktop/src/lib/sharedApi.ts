@@ -1829,6 +1829,10 @@ export function saveWorkspaceCairn(accessToken: string, workspaceId: string, cha
   return request<void>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn`, { method: "PUT", body: JSON.stringify(change) }, accessToken);
 }
 
+export function chooseWorkspaceModel(accessToken: string, workspaceId: string, purpose: "embedding" | "vision", choice: { model_id: string | null; confirm_rebuild?: boolean }): Promise<WorkspaceCairnView> {
+  return request<WorkspaceCairnView>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn/models/${purpose}`, { method: "PUT", body: JSON.stringify(choice) }, accessToken);
+}
+
 export function listCairnModels(accessToken: string): Promise<CairnModel[]> {
   return request<CairnModel[]>("/v1/cairn/models", {}, accessToken);
 }

@@ -183,6 +183,14 @@ pub(crate) async fn update_settings(
                 "The default model is one of the models the organization uses.",
             ));
         }
+        let default_model = state
+            .storage
+            .get_cairn_model(default)
+            .await
+            .map_err(map_storage_error)?;
+        if default_model.purpose != "text" {
+            return Err(ApiError::bad_request("The default model is a text model."));
+        }
     }
     let model_roles = crate::workspace_cairn::checked_model_roles(request.model_roles, &enabled)?;
     let policy = OrganizationCairnPolicy {

@@ -875,6 +875,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(workspace_cairn::get_settings).put(workspace_cairn::update_settings),
         )
         .route(
+            "/v1/workspaces/{workspace_id}/cairn/models/{purpose}",
+            put(workspace_cairn::choose_model),
+        )
+        .route(
             "/v1/organizations/{organization_id}/overview",
             get(organization_overview),
         )

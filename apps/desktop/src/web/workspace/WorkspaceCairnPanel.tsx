@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Cloud, HardDrives, Sparkle } from "@phosphor-icons/react";
-import { getWorkspaceCairn, saveWorkspaceCairn } from "../../lib/sharedApi";
+import { chooseWorkspaceModel, getWorkspaceCairn, saveWorkspaceCairn } from "../../lib/sharedApi";
+import { ConfirmDialog } from "../../components/ui/confirm-dialog";
+import type { PurposeChoice } from "../../types";
 import { cairnAdminKeys } from "../../lib/queryClient";
 import type { WorkspaceCairnView } from "../../types";
 import { Badge } from "../../components/ui/badge";
@@ -27,8 +29,36 @@ export function WorkspaceCairnPanel({ accessToken, workspaceId }: { accessToken:
   const [view, isLoading, reload] = useSystemData<WorkspaceCairnView>(cairnAdminKeys.workspace(workspaceId), () => getWorkspaceCairn(accessToken, workspaceId), { failure: "The workspace's models could not be loaded." });
   return <section className="shared-settings-group">
     <PanelHeading description={view?.organization_decided ? "Chosen by your organization" : "Your organization has not chosen yet"} icon={Sparkle} title="Models for CAIRN, Ask and summaries" />
+    {view ? <PurposeModels accessToken={accessToken} onChanged={() => void reload()} view={view} workspaceId={workspaceId} /> : null}
     {view ? <Editor accessToken={accessToken} key={`${workspaceId}:${view.version}:${view.models.map((model) => model.id).join()}`} onSaved={() => void reload()} view={view} workspaceId={workspaceId} /> : isLoading ? <SkeletonList label="Loading the workspace's models" /> : null}
   </section>;
+}
+
+const NONE = "none";
+
+/** The workspace's embedding and vision models, chosen from the catalog models its organization enabled (V0.9.89). Changing the embedding model asks first. */
+function PurposeModels({ accessToken, onChanged, view, workspaceId }: { accessToken: string; onChanged: () => void; view: WorkspaceCairnView; workspaceId: string }) {
+  const [pending, setPending] = useState<{ purpose: "embedding" | "vision"; modelId: string | null; message: string } | null>(null);
+  async function choose(purpose: "embedding" | "vision", modelId: string | null, confirm = false) {
+    try {
+      await chooseWorkspaceModel(accessToken, workspaceId, purpose, { model_id: modelId, confirm_rebuild: confirm });
+      showToast("success", purpose === "embedding" ? "The embedding model was saved. Passages are embedded in the background." : "The vision model was saved.");
+      setPending(null);
+      onChanged();
+    } catch (error) {
+      const message = apiMessage(error, "The model could not be saved.");
+      if (purpose === "embedding" && !confirm && /Confirm to continue/.test(message)) setPending({ purpose, modelId, message });
+      else showToast("error", message);
+    }
+  }
+  const field = (purpose: "embedding" | "vision", label: string, choice: PurposeChoice, hint: string) => <Field hint={choice.current_name && !choice.current_model_id ? `${hint} Now: ${choice.current_name}, set in the provider form below.` : hint} label={label}>
+    <Dropdown aria-label={label} onValueChange={(id) => void choose(purpose, id === NONE ? null : id)} options={[{ label: choice.candidates.length || choice.current_name ? "None" : "None offered by your organization", value: NONE }, ...choice.candidates.filter((model) => model.selectable || model.id === choice.current_model_id).map((model) => ({ label: `${model.display_name} · ${model.locality === "cloud" ? "Cloud" : "Local"}`, value: model.id }))]} value={choice.current_model_id ?? NONE} />
+  </Field>;
+  return <div className="rm-system-budget-form">
+    {field("embedding", "Embedding model", view.embedding, "Builds the vectors that search by meaning uses. Changing it removes the stored vectors and embeds every passage again.")}
+    {field("vision", "Vision model", view.vision, "Describes the images of the workspace so they can be searched.")}
+    <ConfirmDialog action="Change and rebuild" danger description={pending?.message} onCancel={() => setPending(null)} onConfirm={() => pending && void choose(pending.purpose, pending.modelId, true)} open={Boolean(pending)} title="Change the embedding model?" />
+  </div>;
 }
 
 function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: string; onSaved: () => void; view: WorkspaceCairnView; workspaceId: string }) {

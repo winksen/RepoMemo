@@ -66,6 +66,44 @@ pub(crate) struct WorkspaceCairnView {
     /// The organization saved its settings: only the models it enabled are shown.
     organization_decided: bool,
     models: Vec<WorkspaceModel>,
+    /// The embedding and vision models of the catalog the organization enabled, and the one the workspace uses now (V0.9.89).
+    embedding: PurposeChoice,
+    vision: PurposeChoice,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PurposeChoice {
+    /// The catalog model the workspace's provider of this purpose is linked to, when it has one on.
+    current_model_id: Option<String>,
+    /// The name of the model the workspace's provider uses when it is not one of the catalog's.
+    current_name: Option<String>,
+    candidates: Vec<ModelView>,
+}
+
+async fn purpose_choice(state: &AppState, workspace_id: &str, purpose: &str) -> Result<PurposeChoice, ApiError> {
+    let (candidates, _, _) = organization_models(state, workspace_id, purpose).await?;
+    let provider = state
+        .storage
+        .list_provider_settings(workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .find(|setting| setting.enabled && setting.purpose() == purpose);
+    Ok(PurposeChoice {
+        current_model_id: provider
+            .as_ref()
+            .and_then(|provider| provider.metadata.get("cairn_model_id"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_owned),
+        current_name: provider.map(|provider| {
+            if purpose == "embedding" {
+                provider.embedding_model_name().to_owned()
+            } else {
+                provider.model.unwrap_or(provider.name)
+            }
+        }),
+        candidates,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -86,6 +124,7 @@ pub(crate) struct WorkspaceCairnRequest {
 async fn organization_models(
     state: &AppState,
     workspace_id: &str,
+    purpose: &str,
 ) -> Result<(Vec<ModelView>, bool, Option<String>), ApiError> {
     let organization = match state
         .storage
@@ -108,7 +147,7 @@ async fn organization_models(
         .and_then(|settings| settings.policy.default_model_id.clone());
     let mut views = Vec::new();
     for model in state.storage.list_cairn_models(None).await.map_err(map_storage_error)? {
-        if model.purpose != "text" {
+        if model.purpose != purpose {
             continue;
         }
         let enabled = organization
@@ -139,7 +178,7 @@ pub(crate) async fn get_settings(
         .await
         .map_err(map_storage_error)?;
     let (models, organization_decided, organization_default_model_id) =
-        organization_models(&state, &workspace_id).await?;
+        organization_models(&state, &workspace_id, "text").await?;
     let answering = state
         .storage
         .resolve_text_provider(&workspace_id)
@@ -171,7 +210,155 @@ pub(crate) async fn get_settings(
         organization_default_model_id,
         organization_decided,
         models,
+        embedding: purpose_choice(&state, &workspace_id, "embedding").await?,
+        vision: purpose_choice(&state, &workspace_id, "vision").await?,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChooseModelRequest {
+    /// The catalog model to use, or none to turn the workspace's provider of this purpose off.
+    #[serde(default)]
+    model_id: Option<String>,
+    /// The administrator confirms that changing the embedding model removes the stored vectors and embeds every passage again.
+    #[serde(default)]
+    confirm_rebuild: bool,
+}
+
+/// Chooses a workspace's embedding or vision model from the catalog (V0.9.89): one the organization enabled, of that purpose, that can
+/// be chosen now. It becomes the workspace's provider of that purpose, so indexing and search read it as before. Changing the embedding
+/// model asks first, because every stored vector is removed and every passage embedded again in the background.
+pub(crate) async fn choose_model(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, purpose)): Path<(String, String)>,
+    Json(request): Json<ChooseModelRequest>,
+) -> Result<Json<WorkspaceCairnView>, ApiError> {
+    crate::require_workspace_admin(&state, &subject, &workspace_id).await?;
+    if !matches!(purpose.as_str(), "embedding" | "vision") {
+        return Err(ApiError::bad_request(
+            "A workspace chooses an embedding or a vision model here.",
+        ));
+    }
+    let existing = state
+        .storage
+        .list_provider_settings(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .find(|setting| setting.enabled && setting.purpose() == purpose);
+    let Some(model_id) = request.model_id else {
+        // Turning it off leaves the vectors and the descriptions that were made.
+        if let Some(mut provider) = existing {
+            provider.enabled = false;
+            state
+                .core
+                .save_provider_settings(provider)
+                .await
+                .map_err(crate::map_core_error)?;
+        }
+        return get_settings(subject, State(state), Path(workspace_id)).await;
+    };
+    let (allowed, _, _) = organization_models(&state, &workspace_id, &purpose).await?;
+    let Some(model) = allowed.iter().find(|model| model.id() == model_id.as_str()) else {
+        return Err(ApiError::bad_request(
+            "A workspace chooses only among the models its organization offers for this purpose.",
+        ));
+    };
+    if !model.selectable() {
+        return Err(ApiError::bad_request(format!(
+            "{} cannot be chosen: it, or its connection, is off, or the connection leaves your network and is not confirmed.",
+            model.name()
+        )));
+    }
+    let catalog = state
+        .storage
+        .get_cairn_model(&model_id)
+        .await
+        .map_err(map_storage_error)?;
+    let connection = state
+        .storage
+        .get_cairn_connection(&catalog.connection_id)
+        .await
+        .map_err(map_storage_error)?;
+    let changes_embedding = purpose == "embedding"
+        && existing
+            .as_ref()
+            .is_none_or(|provider| provider.embedding_model_name() != catalog.model_id);
+    let stored = if changes_embedding {
+        state
+            .storage
+            .embedding_count(&workspace_id)
+            .await
+            .map_err(map_storage_error)?
+    } else {
+        0
+    };
+    if stored > 0 && !request.confirm_rebuild {
+        return Err(ApiError::conflict(format!(
+            "Changing the embedding model to {} removes the {stored} stored vector(s) of this workspace and embeds every passage again in the background. Search by meaning is partial until it finishes; keyword search is not affected. Confirm to continue.",
+            catalog.display_name
+        )));
+    }
+    let key = state
+        .storage
+        .cairn_connection_key(&connection.id)
+        .await
+        .map_err(map_storage_error)?;
+    let settings = repomemo_domain::ProviderSettings {
+        id: existing
+            .as_ref()
+            .map(|provider| provider.id.clone())
+            .unwrap_or_default(),
+        workspace_id: Some(workspace_id.clone()),
+        provider_type: connection.kind.clone(),
+        name: catalog.display_name.clone(),
+        base_url: Some(connection.base_url.clone()),
+        model: Some(catalog.model_id.clone()),
+        embedding_model: (purpose == "embedding").then(|| catalog.model_id.clone()),
+        enabled: true,
+        metadata: serde_json::json!({
+            "purpose": purpose,
+            "cloud_content_acknowledged": connection.cloud_acknowledged_at.is_some(),
+            "cairn_model_id": catalog.id,
+        }),
+        api_key: key,
+    };
+    repomemo_ai::validate_settings(&settings).map_err(|error| ApiError::bad_request(error.to_string()))?;
+    let saved = state
+        .core
+        .save_provider_settings(settings)
+        .await
+        .map_err(crate::map_core_error)?;
+    if purpose == "embedding" {
+        if changes_embedding && stored > 0 {
+            state
+                .storage
+                .clear_workspace_embeddings(&workspace_id)
+                .await
+                .map_err(map_storage_error)?;
+        }
+        state.embedding_queue.request(&workspace_id);
+    } else {
+        // Images that were waiting for a provider are described now.
+        state.index_queue.resume_pending().await;
+    }
+    let detail = format!(
+        "Chose the {purpose} model {} ({}) for the workspace {workspace_id}.",
+        catalog.display_name, saved.name
+    );
+    crate::record_workspace_activity(
+        &state,
+        &workspace_id,
+        &subject.user_id,
+        "cairn_model_chosen",
+        "workspace",
+        Some(&workspace_id),
+        detail.clone(),
+    )
+    .await;
+    audit(&state, &subject, "workspace_cairn_model_chosen", detail).await;
+    get_settings(subject, State(state), Path(workspace_id)).await
 }
 
 pub(crate) async fn update_settings(
@@ -198,7 +385,7 @@ pub(crate) async fn update_settings(
         .await
         .map_err(map_storage_error)?;
     // Only what the organization offers, and what can be chosen now unless the workspace already offers it.
-    let (allowed, _, _) = organization_models(&state, &workspace_id).await?;
+    let (allowed, _, _) = organization_models(&state, &workspace_id, "text").await?;
     for id in &offered {
         let Some(model) = allowed.iter().find(|model| model.id() == id.as_str()) else {
             return Err(ApiError::bad_request(

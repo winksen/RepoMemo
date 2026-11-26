@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.88` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.89` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.89 — A workspace chooses its embedding and vision models from the catalog.
+
+- **Embedding and vision from the catalog.** In Settings › AI a workspace administrator chooses the workspace's embedding model and vision model from the catalog models of that purpose that the organization enabled; the organization enables them in the same table as its text models. Changing the embedding model asks first, because every stored vector is removed and every passage embedded again in the background.
+
+Checks: formatted, linted and type-checked; docs:check; test added, not run, and the confirmation of an embedding change was not exercised.
 
 ## V0.9.88 — A chat across workspaces sends a workspace's passages only to a model offered there.
 

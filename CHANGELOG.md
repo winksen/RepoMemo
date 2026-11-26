@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.89 (2026-11-26)
+
+A workspace chooses its embedding and vision models from the catalog.
+
+### Changed
+- **From the catalog.** Settings › AI has an *Embedding model* and a *Vision model* choice above the provider forms. A workspace administrator chooses among the catalog models of that purpose that the organization enabled and that can be chosen now (on, on a connection that is on and, if it leaves the network, confirmed), or none to turn it off; the vectors and descriptions already made stay when one is turned off. The chosen model becomes the workspace's provider of that purpose, with the connection's key, so indexing, search and the image descriptions read it as they read a provider saved by hand. A workspace whose model is still a provider saved by hand shows its name until it chooses.
+- **The organization enables them too.** The organization's CAIRN panel now lists models of every purpose, with a *For* column; a default model must still be a text model. An embedding or vision model the organization did not enable is refused with `400`.
+- **Changing the embedding model asks first.** Switching to another embedding model when the workspace has stored vectors answers `409` that says how many vectors would be removed and that every passage is embedded again in the background, with search by meaning partial until it finishes and keyword search unaffected. The administrator confirms in a dialog; then the vectors are removed and the embedding pass is queued, as `embeddings rebuild` does. Choosing the same model, or one with no vectors yet, changes nothing to ask about.
+- **Route and audit.** `PUT /v1/workspaces/{id}/cairn/models/embedding` and `/vision` with `{model_id, confirm_rebuild}` for the workspace's owners and admins (a session or an `admin` token). Each choice is an audit event and an entry in the workspace's activity.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (only what the organization enabled for the purpose is offered, a member is refused, a model of another purpose or not enabled is refused, the choice appears as the workspace's provider, turning one off leaves the other, and the audit; a default that is not a text model is refused) was added; tests not run. The confirmation for a changed embedding model with stored vectors was not exercised, and the screen was not opened in a browser.
+
+### Upgrading
+- Nothing to do. Providers saved by hand keep working until a workspace chooses.
+
 ## V0.9.88 (2026-11-26)
 
 A chat across workspaces sends a workspace's passages only to a model offered there.

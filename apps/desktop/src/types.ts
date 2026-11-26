@@ -937,6 +937,15 @@ export interface WorkspaceCairnView {
   organization_default_model_id: string | null;
   organization_decided: boolean;
   models: (CairnModel & { from_organization: boolean; offered: boolean; answering: boolean })[];
+  /** The embedding and vision models of the catalog the organization enabled, and the one the workspace uses now (V0.9.89). */
+  embedding: PurposeChoice;
+  vision: PurposeChoice;
+}
+
+export interface PurposeChoice {
+  current_model_id: string | null;
+  current_name: string | null;
+  candidates: CairnModel[];
 }
 
 /** A live evaluation report attached to a model (V0.9.79), as `npm run cairn:eval` measures it. */

@@ -42,8 +42,9 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
   const [mode, setMode] = useState<string>(settings.agent_mode);
   const [roles, setRoles] = useState<Record<string, string[]>>(settings.model_roles ?? {});
   const [isBusy, setIsBusy] = useState(false);
-  const textModels = models.filter((model) => model.purpose === "text");
-  const defaultId = chosen.includes(fallbackDefault) ? fallbackDefault : (chosen[0] ?? "");
+  const textModels = models;
+  const defaultChoices = models.filter((model) => model.purpose === "text");
+  const defaultId = chosen.includes(fallbackDefault) ? fallbackDefault : (defaultChoices.find((model) => chosen.includes(model.id))?.id ?? "");
   const dirty = JSON.stringify([[...chosen].sort(), defaultId || null, mode, limitsFor(roles, chosen)]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode, settings.model_roles ?? {}]);
 
   async function save() {
@@ -59,18 +60,19 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
   if (!textModels.length) return <EmptyState description="A CAIRN administrator adds connections and models on the CAIRN administration page, Models section." title="No model can be chosen yet" />;
   return <form className="rm-system-budget-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
     <Table className="rm-dense-table">
-      <thead><tr><th scope="col">Use</th><th scope="col">Model</th><th scope="col">Where</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">Evaluation</th><th scope="col">Who may use it</th></tr></thead>
+      <thead><tr><th scope="col">Use</th><th scope="col">Model</th><th scope="col">For</th><th scope="col">Where</th><th scope="col">Tools</th><th scope="col">Context</th><th scope="col">Evaluation</th><th scope="col">Who may use it</th></tr></thead>
       <tbody>{textModels.map((model) => <tr key={model.id}>
         <td><Checkbox checked={chosen.includes(model.id)} disabled={!canChange || (!model.selectable && !chosen.includes(model.id))} label={<span className="sr-only">Use {model.display_name}</span>} onCheckedChange={(on) => setChosen((current) => on ? [...current, model.id] : current.filter((id) => id !== model.id))} /></td>
         <th scope="row">{model.display_name}{!model.selectable ? <small className="shared-muted-copy"> · off or not confirmed</small> : null}</th>
+        <td>{model.purpose}</td>
         <td><Badge icon={model.locality === "cloud" ? <Cloud size={ICON_SIZE.sm} /> : <HardDrives size={ICON_SIZE.sm} />}>{model.locality === "cloud" ? "Cloud" : "Local"}</Badge></td>
-        <td>{TOOL_LABELS[model.tool_mode] ?? model.tool_mode}</td>
+        <td>{model.purpose === "text" ? (TOOL_LABELS[model.tool_mode] ?? model.tool_mode) : <span className="shared-muted-copy">—</span>}</td>
         <td>{model.context_tokens ? model.context_tokens.toLocaleString() : <span className="shared-muted-copy">Not tested</span>}</td>
         <td>{model.evaluation ? <Tooltip content={`Citation precision ${model.evaluation.citation_precision.toFixed(2)}, tool accuracy ${model.evaluation.tool_accuracy.toFixed(2)}`}><span><Badge>{model.evaluation.passed ? "Passed" : "Failed"} · {model.evaluation.run_on}</Badge></span></Tooltip> : <span className="shared-muted-copy">Not evaluated</span>}</td>
         <td><RoleLimitSelect disabled={!canChange || !chosen.includes(model.id)} label={model.display_name} onChange={(limit) => setRoles((current) => withLimit(current, model.id, limit))} roles={roles[model.id]} /></td>
       </tr>)}</tbody>
     </Table>
-    <Field hint="The model the organization's workspaces use unless they choose another of those above." label="Default model"><Dropdown aria-label="Default model" disabled={!canChange || chosen.length === 0} onValueChange={setDefault} options={textModels.filter((model) => chosen.includes(model.id)).map((model) => ({ label: model.display_name, value: model.id }))} placeholder="Choose models first" value={defaultId} /></Field>
+    <Field hint="The model the organization's workspaces use unless they choose another of those above." label="Default model"><Dropdown aria-label="Default model" disabled={!canChange || chosen.length === 0} onValueChange={setDefault} options={defaultChoices.filter((model) => chosen.includes(model.id)).map((model) => ({ label: model.display_name, value: model.id }))} placeholder="Choose models first" value={defaultId} /></Field>
     <Field hint="A workspace that chose its own mode keeps it." label="Agent mode"><Dropdown aria-label="Agent mode" disabled={!canChange} onValueChange={setMode} options={MODES} value={mode} /></Field>
     {canChange ? <Button busy={isBusy} disabled={!dirty} type="submit" variant="main">Save</Button> : null}
   </form>;
