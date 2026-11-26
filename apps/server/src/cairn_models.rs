@@ -165,7 +165,14 @@ pub(crate) struct EvaluationRequest {
     version: Option<String>,
 }
 
-async fn view(state: &AppState, model: CairnModel) -> Result<ModelView, ApiError> {
+impl ModelView {
+    /// Whether an organization can choose the model now.
+    pub(crate) fn selectable(&self) -> bool {
+        self.selectable
+    }
+}
+
+pub(crate) async fn view(state: &AppState, model: CairnModel) -> Result<ModelView, ApiError> {
     let uses = state
         .storage
         .cairn_model_uses(&model.id)

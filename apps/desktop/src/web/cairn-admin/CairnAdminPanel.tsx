@@ -19,6 +19,8 @@ import { CAIRN_ADMIN_SECTIONS, type CairnAdminSection } from "../constants";
 import { Facts, RefreshButton, useSystemData } from "../system/shared";
 import { ConnectionsPanel } from "./ConnectionsPanel";
 import { ModelsPanel } from "./ModelsPanel";
+import { OrganizationCairnPanel } from "./OrganizationCairnPanel";
+import { Dropdown } from "../../components/ui/dropdown";
 
 export { CAIRN_ADMIN_SECTIONS };
 export type { CairnAdminSection };
@@ -73,6 +75,17 @@ function BudgetsPanel({ accessToken, budgets, canChange, onChanged }: { accessTo
   </section>;
 }
 
+/** The Organizations section: choose an organization, then which models it uses and how its workspaces start (V0.9.83). */
+function OrganizationsSection({ accessToken, view }: { accessToken: string; view: CairnAdminView }) {
+  const [chosen, setChosen] = useState<string>(view.organizations[0]?.id ?? "");
+  const organization = view.organizations.find((entry) => entry.id === chosen) ?? view.organizations[0];
+  if (!organization) return <EmptyState description="Create an organization first." title="No organization yet" />;
+  return <>
+    {view.organizations.length > 1 ? <Dropdown aria-label="Organization" onValueChange={setChosen} options={view.organizations.map((entry) => ({ label: entry.name, value: entry.id }))} value={organization.id} /> : null}
+    <OrganizationCairnPanel accessToken={accessToken} canChange={view.can_change} key={organization.id} organizationId={organization.id} organizationName={organization.name} />
+  </>;
+}
+
 function OverviewSection({ accessToken, onChanged, view }: { accessToken: string; onChanged: () => void; view: CairnAdminView }) {
   const overview = view.overview;
   if (!overview) return <EmptyState description="The server-wide overview is for CAIRN, system and app administrators." title="Nothing to show here" />;
@@ -114,11 +127,7 @@ export function CairnAdminPanel({ accessToken, section, view, isLoading, onReloa
   const { label, intro, empty } = SECTION_LABELS[section];
   return <section className="shared-page-content rm-system-page">
     <PageHeader actions={<RefreshButton isLoading={isLoading} onClick={onReload} />} description={view.can_change ? intro : `${intro} You can read this page; only CAIRN and system administrators change it.`} title={`CAIRN administration · ${label}`} />
-    {section === "models" ? <><ConnectionsPanel accessToken={accessToken} canChange={view.can_change} /><ModelsPanel accessToken={accessToken} canChange={view.can_change} /><p className="shared-muted-copy">{empty}</p></> : section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : view.scope === "organization" && section === "organizations" ? <section className="shared-settings-group">
-      <PanelHeading description={`${view.organizations.length} organization${view.organizations.length === 1 ? "" : "s"}`} icon={Buildings} title="Organizations you administer" />
-      <ul>{view.organizations.map((organization) => <li key={organization.id}>{organization.name}</li>)}</ul>
-      <p className="shared-muted-copy">{empty}</p>
-    </section> : <EmptyState description={empty} icon={SECTION_LABELS[section].icon} title="Nothing here yet" />}
+    {section === "organizations" ? <OrganizationsSection accessToken={accessToken} view={view} /> : section === "models" ? <><ConnectionsPanel accessToken={accessToken} canChange={view.can_change} /><ModelsPanel accessToken={accessToken} canChange={view.can_change} /><p className="shared-muted-copy">{empty}</p></> : section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : <EmptyState description={empty} icon={SECTION_LABELS[section].icon} title="Nothing here yet" />}
   </section>;
 }
 

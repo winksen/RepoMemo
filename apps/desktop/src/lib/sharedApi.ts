@@ -22,6 +22,7 @@ import type {
   CairnConnection,
   CairnModel,
   CairnModelTest,
+  OrganizationCairnSettings,
   CairnConnectionInput,
   CairnConnectionTest,
   BackupsOverview,
@@ -1805,6 +1806,18 @@ export function deleteCairnConnection(accessToken: string, id: string): Promise<
 
 export function testCairnConnection(accessToken: string, id: string): Promise<CairnConnectionTest> {
   return request<CairnConnectionTest>(`/v1/cairn/connections/${encodeURIComponent(id)}/test`, { method: "POST", body: "{}" }, accessToken);
+}
+
+export function getOrganizationCairn(accessToken: string, organizationId: string): Promise<OrganizationCairnSettings> {
+  return request<OrganizationCairnSettings>(`/v1/organizations/${encodeURIComponent(organizationId)}/cairn`, {}, accessToken);
+}
+
+export function listOrganizationCairnModels(accessToken: string, organizationId: string): Promise<CairnModel[]> {
+  return request<CairnModel[]>(`/v1/organizations/${encodeURIComponent(organizationId)}/cairn/models`, {}, accessToken);
+}
+
+export function saveOrganizationCairn(accessToken: string, organizationId: string, change: { enabled_model_ids: string[]; default_model_id: string | null; agent_mode: string; expected_version: number }): Promise<OrganizationCairnSettings> {
+  return request<OrganizationCairnSettings>(`/v1/organizations/${encodeURIComponent(organizationId)}/cairn`, { method: "PUT", body: JSON.stringify(change) }, accessToken);
 }
 
 export function listCairnModels(accessToken: string): Promise<CairnModel[]> {

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.83 (2026-11-26)
+
+An organization's admins choose its models, default and Agent mode on screen.
+
+### Added
+- **Where.** The CAIRN administration page's *Organizations* section lists the organizations a person administers (all of them for CAIRN, system and app administrators; their own for owners and admins) with a chooser, and shows *CAIRN in* the chosen one. The same panel is in the organization's own *Administration* tab, between the members and the templates.
+- **What.** A table of the catalog's text models that can be chosen, each with *Local* or *Cloud*, the tools it takes, its context size and its live evaluation. The administrator ticks the models the organization uses, picks the default among them and chooses the Agent-mode default: *Automatic* (Agent only for a model that passed the live evaluation), *Agent* or *Jobs* for every workspace that has not chosen its own. A model that is off, or on a connection that is off or not confirmed, is shown but cannot be ticked, unless the organization already uses it.
+- **Saving.** The panel saves with the version it read: a stale save is refused with the current version, as the API does. People who only read see the same table without the controls.
+- **Route.** `GET /v1/organizations/{id}/cairn/models` returns what the organization's owners and admins (and CAIRN and system administrators) can choose from; members are refused.
+- **Not yet.** No workspace follows the choice: they keep their own providers until V0.9.84.
+
+### Checks
+- Type-checked, formatted and linted with `-D warnings`; `npm run docs:check` passes. A server test (the models offered, the one whose connection is off left out, members refused) was added; tests not run, and the screens were not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.82 (2026-11-26)
 
 An organization has CAIRN settings: its models, its default and its Agent-mode default.

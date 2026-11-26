@@ -2572,3 +2572,76 @@ async fn an_organization_chooses_its_models_with_a_version_and_only_from_what_ca
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_organizations_administrators_see_the_models_they_can_choose() {
+    let data_dir = temp_data_dir("org-cairn-models");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "org-models-root@example.com").await;
+    let (owner, _) = register_account(&app, "org-models-owner@example.com").await;
+    let (member, _) = register_account(&app, "org-models-member@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &owner,
+            json!({"name": "Choosers"}),
+        )
+        .await,
+    )
+    .await;
+    let id = organization["id"].as_str().unwrap().to_owned();
+    join(
+        &app,
+        &owner,
+        "organizations",
+        &id,
+        "org-models-member@example.com",
+        "member",
+    )
+    .await;
+    let local = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &root,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let off = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &root,
+            json!({"kind": "openrouter", "name": "Spare", "api_key": "sk-or-x", "enabled": false}),
+        )
+        .await,
+    )
+    .await;
+    for (connection, name) in [(&local, "llama3.1:8b"), (&off, "mistral/small")] {
+        send(
+            "POST",
+            "/v1/cairn/models".to_owned(),
+            &root,
+            json!({"connection_id": connection["id"], "model_id": name, "purpose": "text"}),
+        )
+        .await;
+    }
+    let uri = format!("/v1/organizations/{id}/cairn/models");
+    // Only the models that can be chosen are offered, with where they run; members do not choose, so they are not offered any.
+    let offered = response_json(send("GET", uri.clone(), &owner, Value::Null).await).await;
+    let offered = offered.as_array().unwrap();
+    assert_eq!(offered.len(), 1);
+    assert_eq!(
+        (offered[0]["model_id"].clone(), offered[0]["locality"].clone()),
+        (json!("llama3.1:8b"), json!("local"))
+    );
+    assert_eq!(send("GET", uri, &member, Value::Null).await.status(), 403);
+}

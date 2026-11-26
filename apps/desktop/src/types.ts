@@ -897,6 +897,18 @@ export interface CairnConnection {
   updated_by: string | null;
 }
 
+/** An organization's CAIRN settings (V0.9.83). `version` is 0 for an organization that never saved any. */
+export interface OrganizationCairnSettings {
+  organization_id: string;
+  version: number;
+  enabled_model_ids: string[];
+  default_model_id: string | null;
+  /** `auto` keeps the live-evaluation rule; `agent` and `jobs` set the mode of every workspace that has not chosen its own. */
+  agent_mode: "auto" | "agent" | "jobs";
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
 /** A live evaluation report attached to a model (V0.9.79), as `npm run cairn:eval` measures it. */
 export interface CairnEvaluation {
   passed: boolean;

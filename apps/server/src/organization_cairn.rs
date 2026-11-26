@@ -64,6 +64,33 @@ async fn require_access(
     }
 }
 
+/// The models an organization's administrators choose from (V0.9.83): those that can be chosen now, and any the organization already
+/// uses, with where they run, what they take and how they did in the live evaluation. For the people who may change the settings.
+pub(crate) async fn list_models(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(organization_id): Path<String>,
+) -> Result<Json<Vec<crate::cairn_models::ModelView>>, ApiError> {
+    require_access(&state, &subject, &organization_id, true).await?;
+    let used = state
+        .storage
+        .get_organization_cairn_settings(&organization_id)
+        .await
+        .map_err(map_storage_error)?
+        .policy
+        .enabled_model_ids;
+    let models = state.storage.list_cairn_models(None).await.map_err(map_storage_error)?;
+    let mut views = Vec::new();
+    for model in models {
+        let chosen = used.contains(&model.id);
+        let view = crate::cairn_models::view(&state, model).await?;
+        if view.selectable() || chosen {
+            views.push(view);
+        }
+    }
+    Ok(Json(views))
+}
+
 pub(crate) async fn get_settings(
     subject: AuthenticatedSubject,
     State(state): State<AppState>,
