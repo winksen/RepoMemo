@@ -295,6 +295,16 @@ pub async fn run_pass(state: &AppState, retry_indexing: bool, sweep_untracked: b
         }
     }
 
+    // What each organization keeps of CAIRN's history, chats and personal memory (V0.9.100): the shorter of its setting and the server's.
+    if let Ok(organizations) = storage.organization_ids().await {
+        for organization_id in organizations {
+            match storage.apply_organization_retention(&organization_id).await {
+                Ok(removed) => report.agent_runs_pruned += removed.run_histories as u64,
+                Err(error) => failed(&mut report, "organization retention", error),
+            }
+        }
+    }
+
     let data_dir = std::path::PathBuf::from(&state.instance.data_dir);
     let retention = runtime.logging.retention_days;
     match tokio::task::spawn_blocking(move || crate::logs::prune_log_files(&data_dir, retention)).await {

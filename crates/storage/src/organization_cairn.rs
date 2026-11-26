@@ -69,7 +69,18 @@ pub struct Guardrails {
     /// Whether routines that run on an event are allowed; none allows them.
     #[serde(default)]
     pub event_routines: Option<bool>,
+    /// How many days an organization keeps CAIRN's run history, its chats and its people's personal memory in its workspaces (V0.9.100);
+    /// none keeps what the server's own settings keep. The shorter of this and the server's applies.
+    #[serde(default)]
+    pub retention_trace_days: Option<i64>,
+    #[serde(default)]
+    pub retention_chat_days: Option<i64>,
+    #[serde(default)]
+    pub retention_memory_days: Option<i64>,
 }
+
+/// The longest an organization can ask to keep anything, in days.
+pub const MAX_RETENTION_DAYS: i64 = 3_650;
 
 /// The largest monthly budget that can be set.
 pub const MAX_MONTHLY_TOKENS: i64 = 10_000_000_000;

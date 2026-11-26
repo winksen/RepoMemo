@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.100 (2026-11-26)
+
+An organization sets how long CAIRN's history, chats and personal memory are kept.
+
+### Added
+- **Three retentions.** *Keep run histories for*, *Keep chats for* and *Keep personal memory for*, in days (1 to 3,650), in the organization's CAIRN panel. They apply to the organization's workspaces: run histories by when they started, chats by their last activity (the inbox chat is kept), personal memory by when it was last changed (memory not tied to a workspace is untouched).
+- **The shorter applies.** The maintenance sweep deletes what the organization's setting no longer keeps, on top of the server's own *CAIRN run history* setting, so the shorter of the two wins; empty keeps what the server keeps.
+- **See it before it happens.** *Show what this would delete* counts the run histories, chats and personal memories the retentions would remove now (`POST /v1/organizations/{id}/cairn/retention-preview`, nothing deleted). The deletion itself happens at the next maintenance pass.
+- **Not yet.** A workspace cannot set its own retention, and a person is not told that their chat was removed.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added and nothing was run: the counting and the deletion queries are untried.
+
+### Upgrading
+- Nothing to do: no retention is set.
+
 ## V0.9.99 (2026-11-26)
 
 An organization and a workspace limit routines.

@@ -142,6 +142,21 @@ pub(crate) fn checked_guardrails(
         )?,
         budget_exempt_admins: given.budget_exempt_admins,
         strict_citations: given.strict_citations,
+        retention_trace_days: ranged(
+            given.retention_trace_days,
+            repomemo_storage::MAX_RETENTION_DAYS,
+            "The days a run history is kept",
+        )?,
+        retention_chat_days: ranged(
+            given.retention_chat_days,
+            repomemo_storage::MAX_RETENTION_DAYS,
+            "The days a chat is kept",
+        )?,
+        retention_memory_days: ranged(
+            given.retention_memory_days,
+            repomemo_storage::MAX_RETENTION_DAYS,
+            "The days personal memory is kept",
+        )?,
         routines_per_person: ranged(
             given.routines_per_person,
             repomemo_storage::ROUTINES_MAX,
@@ -183,6 +198,23 @@ pub(crate) fn checked_guardrails(
         max_changes: in_range(given.max_changes, "The most changes in one confirmation")?,
         type_to_confirm_from: in_range(given.type_to_confirm_from, "The count from which the number is typed")?,
     })
+}
+
+/// What the retentions of a request would delete now, so an administrator sees it before saving (V0.9.100).
+pub(crate) async fn retention_preview(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(organization_id): Path<String>,
+    Json(request): Json<repomemo_storage::Guardrails>,
+) -> Result<Json<repomemo_storage::RetentionCounts>, ApiError> {
+    require_access(&state, &subject, &organization_id, true).await?;
+    let retention = checked_guardrails(request)?;
+    state
+        .storage
+        .retention_counts(&organization_id, &retention)
+        .await
+        .map(Json)
+        .map_err(map_storage_error)
 }
 
 pub(crate) async fn get_settings(

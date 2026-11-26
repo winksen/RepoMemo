@@ -869,6 +869,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(organization_cairn::get_settings).put(organization_cairn::update_settings),
         )
         .route(
+            "/v1/organizations/{organization_id}/cairn/retention-preview",
+            post(organization_cairn::retention_preview),
+        )
+        .route(
             "/v1/organizations/{organization_id}/cairn/models",
             get(organization_cairn::list_models),
         )

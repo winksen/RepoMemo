@@ -957,6 +957,10 @@ export interface Guardrails {
   routines_per_workspace?: number | null;
   routine_schedules?: string[] | null;
   event_routines?: boolean | null;
+  /** Days an organization keeps CAIRN's run history, chats and personal memory (V0.9.100). */
+  retention_trace_days?: number | null;
+  retention_chat_days?: number | null;
+  retention_memory_days?: number | null;
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */

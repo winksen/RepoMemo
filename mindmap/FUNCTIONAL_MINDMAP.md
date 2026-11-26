@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.99` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.100` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.100 — An organization sets how long CAIRN's history, chats and personal memory are kept.
+
+- **Retention by organization.** An organization sets how many days CAIRN's run histories, its chats and its people's personal memory are kept in its workspaces. The maintenance sweep applies the shorter of this and the server's own setting, and the administrator can ask what a change would delete before saving it.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.99 — An organization and a workspace limit routines.
 

@@ -1835,6 +1835,10 @@ export function chooseWorkspaceModel(accessToken: string, workspaceId: string, p
   return request<WorkspaceCairnView>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn/models/${purpose}`, { method: "PUT", body: JSON.stringify(choice) }, accessToken);
 }
 
+export function previewCairnRetention(accessToken: string, organizationId: string, guardrails: Guardrails): Promise<{ run_histories: number; chats: number; personal_memories: number }> {
+  return request(`/v1/organizations/${encodeURIComponent(organizationId)}/cairn/retention-preview`, { method: "POST", body: JSON.stringify(guardrails) }, accessToken);
+}
+
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {
   return request<CairnTool[]>("/v1/cairn/tools", {}, accessToken);
 }
