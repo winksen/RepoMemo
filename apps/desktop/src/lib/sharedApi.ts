@@ -24,6 +24,7 @@ import type {
   CairnModelTest,
   CairnAbility,
   CairnAbilityInput,
+  CairnPlaybook,
   CairnTool,
   CairnUsageRow,
   Guardrails,
@@ -1880,6 +1881,14 @@ export function listOrganizationAbilitiesForWorkspace(accessToken: string, works
 
 export function setWorkspaceAbility(accessToken: string, workspaceId: string, abilityId: string, enabled: boolean): Promise<{ enabled: boolean }> {
   return request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn/abilities/organization/${encodeURIComponent(abilityId)}`, { method: "PUT", body: JSON.stringify({ enabled }) }, accessToken);
+}
+
+export function listCairnPlaybooks(accessToken: string, workspaceId: string): Promise<CairnPlaybook[]> {
+  return request<CairnPlaybook[]>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn/playbooks`, {}, accessToken);
+}
+
+export function makeAbilityFromPlaybook(accessToken: string, workspaceId: string, artifactId: string, command = ""): Promise<CairnAbility> {
+  return request<CairnAbility>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn/playbooks/${encodeURIComponent(artifactId)}/ability`, { method: "POST", body: JSON.stringify({ command }) }, accessToken);
 }
 
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {

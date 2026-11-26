@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.107` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.108` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.108 — A verified playbook becomes an ability in one step, linked both ways.
+
+- **Playbook to ability.** In a workspace's CAIRN settings, each verified playbook has a Make an ability button. Its steps become the instructions, its description the description, and the tools it names (the registered ones) the tools the ability may use; the command comes from its name. The playbook then shows its ability's command, and the ability shows the playbook it came from.
+
+Checks: formatted, linted and type-checked; docs:check; one unit test added, not run.
 
 ## V0.9.107 — CAIRN runs an ability from its /command.
 

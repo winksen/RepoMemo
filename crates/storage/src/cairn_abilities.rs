@@ -37,6 +37,8 @@ pub struct CairnAbility {
     pub output_template: String,
     pub updated_at: String,
     pub updated_by: Option<String>,
+    /// The verified playbook (a file of the workspace) it was made from, when it was (V0.9.108).
+    pub source_playbook_id: Option<String>,
 }
 
 /// What a person writes to make or publish a version of an ability.
@@ -53,6 +55,9 @@ pub struct AbilityDraft {
     pub inputs: Vec<AbilityInput>,
     #[serde(default)]
     pub output_template: String,
+    /// Set by the server when an ability is made from a playbook; never taken from a request.
+    #[serde(skip)]
+    pub source_playbook_id: Option<String>,
 }
 
 /// A command as written: lower case letters, digits and hyphens, with or without the slash; returns it with the slash.
@@ -97,7 +102,7 @@ fn checked(draft: &AbilityDraft) -> Result<()> {
 }
 
 const SELECT: &str = "SELECT a.id, a.scope, a.organization_id, a.workspace_id, a.name, a.command, a.description, a.enabled, a.current_version,
-       v.instructions, v.tools_json, v.inputs_json, v.output_template, v.created_at AS updated_at, u.display_name AS updated_by
+       v.instructions, v.tools_json, v.inputs_json, v.output_template, v.created_at AS updated_at, u.display_name AS updated_by, a.source_playbook_id
      FROM cairn_abilities a
      JOIN cairn_ability_versions v ON v.ability_id = a.id AND v.version = a.current_version
      LEFT JOIN users u ON u.id = v.created_by";
@@ -119,6 +124,7 @@ fn ability_from(row: &SqliteRow) -> CairnAbility {
         output_template: row.get("output_template"),
         updated_at: row.get("updated_at"),
         updated_by: row.get("updated_by"),
+        source_playbook_id: row.get("source_playbook_id"),
     }
 }
 
@@ -179,8 +185,8 @@ impl StorageEngine {
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
         let inserted = sqlx::query(
-            "INSERT INTO cairn_abilities (id, scope, organization_id, workspace_id, name, command, description, created_at, updated_at, created_by)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9)",
+            "INSERT INTO cairn_abilities (id, scope, organization_id, workspace_id, name, command, description, created_at, updated_at, created_by, source_playbook_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, ?9, ?10)",
         )
         .bind(&id)
         .bind(if organization_id.is_some() { "organization" } else { "workspace" })
@@ -191,6 +197,7 @@ impl StorageEngine {
         .bind(draft.description.trim())
         .bind(&now)
         .bind(actor)
+        .bind(&draft.source_playbook_id)
         .execute(&mut *tx)
         .await;
         match inserted {
@@ -315,6 +322,17 @@ impl StorageEngine {
         Ok(())
     }
 
+    /// The abilities a workspace made from its playbooks, by the playbook's file id.
+    pub async fn abilities_from_playbooks(&self, workspace_id: &str) -> Result<Vec<CairnAbility>> {
+        let rows = sqlx::query(&format!(
+            "{SELECT} WHERE a.workspace_id = ?1 AND a.source_playbook_id IS NOT NULL ORDER BY a.command"
+        ))
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows.iter().map(ability_from).collect())
+    }
+
     /// Turns an ability on or off.
     pub async fn set_cairn_ability_enabled(&self, id: &str, enabled: bool) -> Result<CairnAbility> {
         let done = sqlx::query("UPDATE cairn_abilities SET enabled = ?2, updated_at = ?3 WHERE id = ?1")
@@ -410,6 +428,7 @@ mod tests {
             tools: vec!["search_evidence".to_owned()],
             inputs: Vec::new(),
             output_template: String::new(),
+            source_playbook_id: None,
         };
         let first = storage
             .create_cairn_ability(Some(&organization.id), None, &draft("Summarize the week."), &actor.id)

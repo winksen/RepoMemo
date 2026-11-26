@@ -38,7 +38,7 @@ mod team_memory;
 mod upkeep;
 pub use cross::{answer_from, held_back_lines, same_provider, split_by_boundary, CrossPassage};
 pub use inbox::{inbox_turn, INBOX_PENDING_MAX};
-pub use playbooks::{playbook_from_run, PlaybookDraft};
+pub use playbooks::{playbook_from_run, PlaybookDraft, PlaybookInfo};
 pub use run::{cairn_tool_catalog, mcp_tool_specs, AgentAbility, AgentLoopSetup, AgentOutcome, ProgressHook};
 #[cfg(test)]
 use summary::fit_history;

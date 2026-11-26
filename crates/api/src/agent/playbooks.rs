@@ -236,7 +236,36 @@ fn shorten_lines(text: &str, limit: usize) -> String {
     format!("{}…", cut.trim_end())
 }
 
+/// A verified playbook as it is shown to an administrator who may turn it into an ability (V0.9.108).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PlaybookInfo {
+    pub artifact_id: String,
+    pub name: String,
+    pub description: String,
+    pub when: String,
+    pub tools: Vec<String>,
+    pub body: String,
+    pub updated_at: String,
+}
+
 impl RepoMemoCore {
+    /// The verified, well formed playbooks of a workspace.
+    pub async fn list_playbooks(&self, workspace_id: &str) -> Vec<PlaybookInfo> {
+        self.workspace_playbooks(workspace_id)
+            .await
+            .into_iter()
+            .map(|playbook| PlaybookInfo {
+                artifact_id: playbook.artifact_id,
+                name: playbook.name,
+                description: playbook.description,
+                when: playbook.when,
+                tools: playbook.tools,
+                body: playbook.body,
+                updated_at: playbook.updated_at,
+            })
+            .collect()
+    }
+
     /// The workspace's playbooks that are verified and well formed, as the header and steps CAIRN is offered.
     pub(in crate::agent) async fn workspace_playbooks(&self, workspace_id: &str) -> Vec<Playbook> {
         let Ok(folders) = self.storage.list_folders(workspace_id).await else {

@@ -896,6 +896,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             put(cairn_abilities::set_for_workspace),
         )
         .route(
+            "/v1/workspaces/{workspace_id}/cairn/playbooks",
+            get(cairn_abilities::list_playbooks),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/cairn/playbooks/{artifact_id}/ability",
+            post(cairn_abilities::ability_from_playbook),
+        )
+        .route(
             "/v1/cairn/abilities/{ability_id}",
             put(cairn_abilities::publish).delete(cairn_abilities::remove),
         )

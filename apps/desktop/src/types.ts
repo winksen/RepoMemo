@@ -999,6 +999,20 @@ export interface CairnAbility {
   output_template: string;
   updated_at: string;
   updated_by: string | null;
+  /** The verified playbook (a file) it was made from (V0.9.108). */
+  source_playbook_id?: string | null;
+}
+
+/** A verified playbook of a workspace, with the ability made from it (V0.9.108). */
+export interface CairnPlaybook {
+  artifact_id: string;
+  name: string;
+  description: string;
+  when: string;
+  tools: string[];
+  updated_at: string;
+  ability_id: string | null;
+  ability_command: string | null;
 }
 
 export interface CairnAbilityInput {

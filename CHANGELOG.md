@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.108 (2026-11-26)
+
+A verified playbook becomes an ability in one step, linked both ways.
+
+### Added
+- **Make an ability.** In a workspace's CAIRN settings, a Playbooks list shows the workspace's verified playbooks. Make an ability turns one into a workspace ability in one step: the steps and the "use this when" line become the instructions, the description is kept, the tools the playbook names that are registered become the tools it may use, and the command is made from its name (`/incident-review`). Edit it afterwards like any ability.
+- **Linked both ways.** The playbook shows "Ability /command" in place of the button, and the ability shows "from the playbook name". The link is kept as the file's id, so the ability says so when the playbook was removed.
+- **Rules kept.** A playbook already made an ability is refused (409), a command that is taken is refused, and a playbook too long for the instructions limit says so. The link cannot be set by a request that makes an ability the ordinary way.
+- **Migration 0108.** `source_playbook_id` on `cairn_abilities`.
+
+### Not yet
+- **Following changes.** The ability is a copy: changing the playbook later does not change the ability, and the reverse.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. One unit test was added (the command from a name); no test was run and the screen was not opened.
+
+### Upgrading
+- The migration runs on start. Nothing else to do.
+
 ## V0.9.107 (2026-11-26)
 
 CAIRN runs an ability from its /command.

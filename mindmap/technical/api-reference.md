@@ -173,6 +173,8 @@
 | PUT | `/v1/cairn/abilities/{ability_id}/enabled` | auth | as the ability's scope | { enabled } | CairnAbility |
 | GET | `/v1/workspaces/{workspace_id}/cairn/abilities/organization` | auth | workspace admin | — | Vec<OrganizationAbilityView> |
 | PUT | `/v1/workspaces/{workspace_id}/cairn/abilities/organization/{ability_id}` | auth | workspace admin | { enabled } | { enabled } |
+| GET | `/v1/workspaces/{workspace_id}/cairn/playbooks` | auth | workspace admin | — | Vec<PlaybookView> |
+| POST | `/v1/workspaces/{workspace_id}/cairn/playbooks/{artifact_id}/ability` | auth | workspace admin | { command? } | CairnAbility |
 | GET | `/v1/cairn/abilities/{ability_id}/versions` | auth | as the ability's scope | — | Vec<AbilityVersion> |
 | POST | `/v1/organizations/{organization_id}/cairn/retention-preview` | auth | organization owner or admin, or require_cairn_admin | Guardrails | RetentionCounts |
 | GET | `/v1/organizations/{organization_id}/cairn/models` | auth | organization owner or admin, or require_cairn_admin | — | Vec<ModelView> |

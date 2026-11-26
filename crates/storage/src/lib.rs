@@ -99,7 +99,7 @@ pub use agent_upkeep::{AskedQuestion, NewUpkeepFinding, UPKEEP_OPEN_MAX, UPKEEP_
 pub use ai_usage::{AiSpend, AiUsageRow};
 pub use approvals::{StoredApproval, StoredImportedApproval};
 pub use archive_import::{ImportedWorkspace, PendingPassage};
-pub use cairn_abilities::{AbilityDraft, AbilityInput, CairnAbility};
+pub use cairn_abilities::{AbilityDraft, AbilityInput, CairnAbility, ABILITY_INSTRUCTIONS_CHARS};
 pub use cairn_catalog::{
     CairnConnection, CairnConnectionChange, CairnModel, CairnModelChange, CairnSaved, NewCairnConnection,
     NewCairnModel, CATALOG_NAME_CHARS, CONNECTION_KINDS, MODEL_PURPOSES, TOOL_MODES,

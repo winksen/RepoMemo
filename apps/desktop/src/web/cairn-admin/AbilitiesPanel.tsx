@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PencilSimple, Plus, Power, Sparkle, Trash } from "@phosphor-icons/react";
 import { createCairnAbility, deleteCairnAbility, listCairnAbilities, listCairnTools, publishCairnAbility, setCairnAbilityEnabled } from "../../lib/sharedApi";
 import { cairnAdminKeys } from "../../lib/queryClient";
@@ -49,12 +49,13 @@ function parseInputs(text: string): { name: string; label: string }[] {
  * asks for. Publishing makes a new version; the older ones are kept. An ability can be turned off without losing it. Trying one comes
  * with running abilities.
  */
-export function AbilitiesPanel({ accessToken, canChange, scope, scopeId, scopeName }: { accessToken: string; canChange: boolean; scope: "organization" | "workspace"; scopeId: string; scopeName: string }) {
+export function AbilitiesPanel({ accessToken, canChange, playbookNames, refreshKey, scope, scopeId, scopeName }: { accessToken: string; canChange: boolean; playbookNames?: Record<string, string>; refreshKey?: number; scope: "organization" | "workspace"; scopeId: string; scopeName: string }) {
   const [abilities, isLoading, reload] = useSystemData<CairnAbility[]>(cairnAdminKeys.abilities(scope, scopeId), () => listCairnAbilities(accessToken, scope, scopeId), { failure: "The abilities could not be loaded." });
   const [tools] = useSystemData<CairnTool[]>(cairnAdminKeys.tools(), () => listCairnTools(accessToken), { failure: "The list of what CAIRN can do could not be loaded." });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [removing, setRemoving] = useState<CairnAbility | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  useEffect(() => { if (refreshKey) void reload(); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     if (!draft) return;
@@ -94,7 +95,7 @@ export function AbilitiesPanel({ accessToken, canChange, scope, scopeId, scopeNa
     {abilities ? abilities.length ? <Table className="rm-dense-table">
       <thead><tr><th scope="col">Ability</th><th scope="col">Command</th><th scope="col">Tools</th><th scope="col">Version</th><th scope="col">Last change</th><th scope="col">State</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{abilities.map((ability) => <tr key={ability.id}>
-        <th scope="row">{ability.name}{ability.description ? <small className="shared-muted-copy"> · {ability.description}</small> : null}</th>
+        <th scope="row">{ability.name}{ability.description ? <small className="shared-muted-copy"> · {ability.description}</small> : null}{ability.source_playbook_id ? <small className="shared-muted-copy"> · from the playbook {playbookNames?.[ability.source_playbook_id] ?? "that was removed"}</small> : null}</th>
         <td><code>{ability.command}</code></td>
         <td>{ability.tools.length ? ability.tools.map(toolName).join(", ") : <span className="shared-muted-copy">None</span>}</td>
         <td><Badge>{`Version ${ability.version}`}</Badge></td>

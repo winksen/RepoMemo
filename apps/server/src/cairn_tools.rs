@@ -10,7 +10,7 @@ use crate::{ApiError, AuthenticatedSubject};
 #[derive(Debug, Serialize)]
 pub(crate) struct SwitchableTool {
     /// The job's id or the tool's name, as the policies keep it.
-    name: String,
+    pub(crate) name: String,
     label: String,
     /// `job` or `tool`.
     kind: &'static str,

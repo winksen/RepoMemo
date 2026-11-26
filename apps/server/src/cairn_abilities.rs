@@ -356,3 +356,160 @@ pub(crate) async fn offered(
         })
         .collect())
 }
+
+#[derive(Debug, Serialize)]
+pub(crate) struct PlaybookView {
+    #[serde(flatten)]
+    playbook: repomemo_api::PlaybookInfo,
+    /// The ability made from it, when there is one: the link from the playbook to its ability.
+    ability_id: Option<String>,
+    ability_command: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct FromPlaybookRequest {
+    /// The command to give it; the playbook's name, as a command, when empty.
+    #[serde(default)]
+    command: String,
+}
+
+/// A command made of a name: lower case words joined by hyphens, starting with a letter, at most 30 characters.
+fn command_from_name(name: &str) -> String {
+    let words: Vec<String> = name
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect();
+    let joined = words.join("-");
+    let trimmed = joined.trim_start_matches(|c: char| !c.is_ascii_lowercase());
+    let cut: String = trimmed.chars().take(30).collect();
+    let cut = cut.trim_end_matches('-').to_owned();
+    if cut.len() < 2 {
+        "/playbook".to_owned()
+    } else {
+        format!("/{cut}")
+    }
+}
+
+/// `GET /v1/workspaces/{id}/cairn/playbooks`: the verified playbooks, each with the ability made from it.
+pub(crate) async fn list_playbooks(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<PlaybookView>>, ApiError> {
+    crate::require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let linked = state
+        .storage
+        .abilities_from_playbooks(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(
+        state
+            .core
+            .list_playbooks(&workspace_id)
+            .await
+            .into_iter()
+            .map(|playbook| {
+                let ability = linked
+                    .iter()
+                    .find(|ability| ability.source_playbook_id.as_deref() == Some(playbook.artifact_id.as_str()));
+                PlaybookView {
+                    ability_id: ability.map(|ability| ability.id.clone()),
+                    ability_command: ability.map(|ability| ability.command.clone()),
+                    playbook,
+                }
+            })
+            .collect(),
+    ))
+}
+
+/// `POST /v1/workspaces/{id}/cairn/playbooks/{artifact_id}/ability`: makes an ability of a verified playbook in one step. Its steps
+/// become the instructions, its description the description, and the tools it names (the registered ones) the tools it may use.
+pub(crate) async fn ability_from_playbook(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, artifact_id)): Path<(String, String)>,
+    Json(request): Json<FromPlaybookRequest>,
+) -> Result<Json<CairnAbility>, ApiError> {
+    crate::require_workspace_admin(&state, &subject, &workspace_id).await?;
+    let playbook = state
+        .core
+        .list_playbooks(&workspace_id)
+        .await
+        .into_iter()
+        .find(|playbook| playbook.artifact_id == artifact_id)
+        .ok_or_else(|| ApiError::not_found("That is not a verified playbook of this workspace."))?;
+    let already = state
+        .storage
+        .abilities_from_playbooks(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    if let Some(existing) = already
+        .iter()
+        .find(|ability| ability.source_playbook_id.as_deref() == Some(artifact_id.as_str()))
+    {
+        return Err(ApiError::conflict(format!(
+            "{} is already {}.",
+            playbook.name, existing.command
+        )));
+    }
+    let instructions = format!("Use this when: {}\n\n{}", playbook.when, playbook.body);
+    if instructions.chars().count() > repomemo_storage::ABILITY_INSTRUCTIONS_CHARS {
+        return Err(ApiError::bad_request(format!(
+            "The playbook is too long to be an ability (at most {} characters).",
+            repomemo_storage::ABILITY_INSTRUCTIONS_CHARS
+        )));
+    }
+    let known = crate::cairn_tools::switchable();
+    let tools: Vec<String> = playbook
+        .tools
+        .iter()
+        .filter(|tool| known.iter().any(|entry| entry.name == **tool))
+        .cloned()
+        .collect();
+    let command = if request.command.trim().is_empty() {
+        command_from_name(&playbook.name)
+    } else {
+        request.command
+    };
+    let draft = AbilityDraft {
+        name: playbook.name.clone(),
+        command,
+        description: playbook.description.chars().take(300).collect(),
+        instructions,
+        tools,
+        inputs: Vec::new(),
+        output_template: String::new(),
+        source_playbook_id: Some(artifact_id),
+    };
+    let ability = state
+        .storage
+        .create_cairn_ability(None, Some(&workspace_id), &draft, &subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    record(
+        &state,
+        &subject,
+        "cairn_ability_created",
+        &ability,
+        "Made from the playbook, created",
+    )
+    .await;
+    Ok(Json(ability))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::command_from_name;
+
+    #[test]
+    fn a_command_is_made_of_a_playbook_name() {
+        assert_eq!(command_from_name("Incident review"), "/incident-review");
+        assert_eq!(command_from_name("  2024 Weekly_status!! "), "/weekly-status");
+        assert_eq!(
+            command_from_name("A very long playbook name that goes on and on"),
+            "/a-very-long-playbook-name-that"
+        );
+        assert_eq!(command_from_name("!"), "/playbook");
+    }
+}
