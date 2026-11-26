@@ -16,6 +16,7 @@ use serde_json::{json, Value};
 
 use super::*;
 use crate::cairn_catalog::{CairnConnection, CairnModel};
+use chrono::Datelike;
 
 /// The prefix of the id of a provider that is made from the catalog rather than stored: `catalog:<workspace id>:<model id>`.
 pub const CATALOG_PROVIDER_PREFIX: &str = "catalog:";
@@ -71,6 +72,29 @@ impl PersonBudget {
             "You have used {what} for today. The count starts again at {}.",
             self.resets_at
         )
+    }
+}
+
+/// An organization's monthly token budget and what its runs used this month (V0.9.97).
+#[derive(Debug, Clone)]
+pub struct OrganizationBudget {
+    pub organization_id: String,
+    pub limit: i64,
+    pub used: i64,
+    /// `stop` or `local_only`.
+    pub at_budget: String,
+    /// The month, as `YYYY-MM`.
+    pub month: String,
+}
+
+impl OrganizationBudget {
+    /// The share of the budget used, in percent, from 0.
+    pub fn percent(&self) -> i64 {
+        if self.limit <= 0 {
+            0
+        } else {
+            self.used.saturating_mul(100) / self.limit
+        }
     }
 }
 
@@ -329,6 +353,59 @@ impl StorageEngine {
             exempt: is_admin && exempt_admins,
             resets_at: (today + chrono::Duration::days(1)).to_rfc3339(),
         })
+    }
+
+    /// The monthly token budget of a workspace's organization and what it used this month, counted from the stored runs (V0.9.97);
+    /// none when the organization sets no budget.
+    pub async fn organization_budget(&self, workspace_id: &str) -> Result<Option<OrganizationBudget>> {
+        let Some(organization_id) = self.workspace_organization(workspace_id).await? else {
+            return Ok(None);
+        };
+        let guardrails = self
+            .get_organization_cairn_settings(&organization_id)
+            .await?
+            .policy
+            .guardrails;
+        let Some(limit) = guardrails.monthly_token_budget else {
+            return Ok(None);
+        };
+        let now = Utc::now();
+        let month_start = now
+            .date_naive()
+            .with_day0(0)
+            .unwrap_or(now.date_naive())
+            .and_hms_opt(0, 0, 0)
+            .unwrap_or_default()
+            .and_utc();
+        let used: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(SUM(r.input_tokens + r.output_tokens), 0) FROM agent_runs r
+             WHERE r.started_at >= ?1 AND r.workspace_id IN (SELECT workspace_id FROM workspace_organizations WHERE organization_id = ?2)",
+        )
+        .bind(month_start.to_rfc3339())
+        .bind(&organization_id)
+        .fetch_one(self.reader())
+        .await?;
+        Ok(Some(OrganizationBudget {
+            organization_id,
+            limit,
+            used,
+            at_budget: guardrails.at_budget.unwrap_or_else(|| "stop".to_owned()),
+            month: month_start.format("%Y-%m").to_string(),
+        }))
+    }
+
+    /// Records that the organization's administrators are told of a threshold this month; true only the first time (V0.9.97).
+    pub async fn claim_budget_notice(&self, organization_id: &str, month: &str, threshold: i64) -> Result<bool> {
+        let claimed = sqlx::query(
+            "INSERT OR IGNORE INTO cairn_budget_notices (organization_id, month, threshold, notified_at) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(organization_id)
+        .bind(month)
+        .bind(threshold)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+        Ok(claimed.rows_affected() == 1)
     }
 
     /// What one confirmation may change in a workspace, and from how many changes the person types the number (V0.9.92): the stricter

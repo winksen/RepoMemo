@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.96` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.97` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.97 — An organization has a monthly CAIRN token budget.
+
+- **Monthly token budget.** An organization can cap the tokens its CAIRN runs use in a calendar month. Its owners and admins are notified once at 80% and once at 100%. At the cap CAIRN stops until next month, or, if the organization chose that, only models on its own network keep answering.
+
+Checks: formatted, linted and type-checked; migration locked; docs:check; not tested.
 
 ## V0.9.96 — Each person has daily CAIRN budgets, set by the organization.
 

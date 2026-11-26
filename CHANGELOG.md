@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.97 (2026-11-26)
+
+An organization has a monthly CAIRN token budget.
+
+### Added
+- **The budget.** *Tokens per month for the organization* in the organization's CAIRN panel (empty for none, up to 10 billion), counted from the stored runs of all its workspaces in the calendar month (UTC). It is the organization's own: a workspace cannot set one (`400`).
+- **Told once at each threshold.** At 80% and at 100% the organization's owners and admins each get a notification, once for each month (migration `0105_cairn_budget_notices.sql` remembers it).
+- **At the cap.** *At the monthly budget* chooses: CAIRN stops (a run that would call the model is refused with `429` and says CAIRN answers again next month), or only models on the organization's own network answer, while a cloud model is refused with a message that says so. Lookups that call no model are not stopped, and routines are not counted against it when they run.
+- **Not covered.** The cap is checked when a run starts, so one run can go past it; the Usage page that shows the figures is V0.9.102.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; the migration is locked and `npm run docs:check` passes. No test was added for this release and nothing was run: the counting, the notices and the refusal are untested.
+
+### Upgrading
+- A new empty table. Nothing to do: no budget is set.
+
 ## V0.9.96 (2026-11-26)
 
 Each person has daily CAIRN budgets, set by the organization.

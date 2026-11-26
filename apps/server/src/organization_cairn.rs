@@ -141,6 +141,19 @@ pub(crate) fn checked_guardrails(
             "The tokens a person may use in a day",
         )?,
         budget_exempt_admins: given.budget_exempt_admins,
+        monthly_token_budget: ranged(
+            given.monthly_token_budget,
+            repomemo_storage::MAX_MONTHLY_TOKENS,
+            "The organization's monthly tokens",
+        )?,
+        at_budget: match given.at_budget.as_deref() {
+            None | Some("stop") | Some("local_only") => given.at_budget,
+            Some(_) => {
+                return Err(ApiError::bad_request(
+                    "At the budget, CAIRN stops or keeps to local models.",
+                ))
+            }
+        },
         closed_folder_ids: given.closed_folder_ids,
         tools_off: crate::cairn_tools::checked_names(given.tools_off)?,
         max_changes: in_range(given.max_changes, "The most changes in one confirmation")?,

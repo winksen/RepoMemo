@@ -390,6 +390,43 @@ pub(crate) async fn run_message(
                         ));
                     }
                 }
+                // The organization's monthly token budget (V0.9.97): administrators are told at 80 and 100 percent, once; at the cap CAIRN
+                // stops, or keeps to models on the network.
+                if (may_call_ai || agent_setup.is_some()) && !live.read_only {
+                    if let Some(budget) = state
+                        .storage
+                        .organization_budget(&workspace_id)
+                        .await
+                        .map_err(map_storage_error)?
+                    {
+                        for threshold in [80, 100] {
+                            if budget.percent() >= threshold
+                                && state
+                                    .storage
+                                    .claim_budget_notice(&budget.organization_id, &budget.month, threshold)
+                                    .await
+                                    .map_err(map_storage_error)?
+                            {
+                                notify_budget(state, &budget, threshold).await;
+                            }
+                        }
+                        if budget.used >= budget.limit {
+                            let cloud =
+                                repomemo_ai::is_cloud_connection(&provider.provider_type, provider.base_url.as_deref());
+                            if budget.at_budget != "local_only" || cloud {
+                                return Err(ApiError::new(
+                                    axum::http::StatusCode::TOO_MANY_REQUESTS,
+                                    "organization_budget_used",
+                                    if budget.at_budget == "local_only" {
+                                        "Your organization used its monthly CAIRN token budget: only models on its own network answer until next month."
+                                    } else {
+                                        "Your organization used its monthly CAIRN token budget: CAIRN answers again next month."
+                                    },
+                                ));
+                            }
+                        }
+                    }
+                }
                 if may_call_ai {
                     ai_access::consume_ai_quota(state, subject)?;
                 }
@@ -1139,6 +1176,40 @@ pub(crate) async fn text_resolution(
         .resolve_text_provider(workspace_id)
         .await
         .map_err(map_storage_error)
+}
+
+/// Tells an organization's owners and admins that its monthly CAIRN token budget reached a threshold (V0.9.97).
+async fn notify_budget(state: &AppState, budget: &repomemo_storage::OrganizationBudget, threshold: i64) {
+    let Ok(members) = state.storage.list_organization_members(&budget.organization_id).await else {
+        return;
+    };
+    for member in members.into_iter().filter(|member| {
+        matches!(
+            member.role,
+            repomemo_domain::OrganizationRole::Owner | repomemo_domain::OrganizationRole::Admin
+        )
+    }) {
+        let _ = state
+            .storage
+            .create_shared_notification(repomemo_storage::NewSharedNotification {
+                user_id: member.user.id,
+                workspace_id: None,
+                notification_type: "cairn_budget".to_owned(),
+                title: format!("CAIRN has used {threshold}% of this month's token budget"),
+                body: format!(
+                    "{} of {} tokens used. At the cap CAIRN {}.",
+                    budget.used,
+                    budget.limit,
+                    if budget.at_budget == "local_only" {
+                        "keeps to models on your network"
+                    } else {
+                        "stops until next month"
+                    }
+                ),
+                href: "/cairn/admin/organizations".to_owned(),
+            })
+            .await;
+    }
 }
 
 /// The reply to a job that was turned off, naming who turned it off (V0.9.91); none when it is on.

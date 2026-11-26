@@ -511,6 +511,11 @@ pub(crate) async fn update_settings(
             .map_err(map_storage_error)?
             .policy
             .guardrails;
+        if guardrails.monthly_token_budget.is_some() || guardrails.at_budget.is_some() {
+            return Err(ApiError::bad_request(
+                "The monthly token budget is the organization's, not a workspace's.",
+            ));
+        }
         let loosens =
             |own: Option<i64>, theirs: Option<i64>| matches!((own, theirs), (Some(own), Some(theirs)) if own > theirs);
         if loosens(guardrails.daily_runs_per_person, organization.daily_runs_per_person)

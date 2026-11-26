@@ -48,7 +48,16 @@ pub struct Guardrails {
     /// Owners and admins are not stopped by these budgets (V0.9.96).
     #[serde(default)]
     pub budget_exempt_admins: bool,
+    /// The most tokens the organization's CAIRN runs use in a month (V0.9.97); an organization's own setting.
+    #[serde(default)]
+    pub monthly_token_budget: Option<i64>,
+    /// What happens at the cap: `stop`, the default, or `local_only`, which keeps models on the network answering.
+    #[serde(default)]
+    pub at_budget: Option<String>,
 }
+
+/// The largest monthly budget that can be set.
+pub const MAX_MONTHLY_TOKENS: i64 = 10_000_000_000;
 
 /// The largest budgets that can be set: a budget is a limit, so there is a ceiling on how loose it may be.
 pub const MAX_DAILY_RUNS: i64 = 10_000;

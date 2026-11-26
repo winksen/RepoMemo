@@ -947,6 +947,9 @@ export interface Guardrails {
   daily_runs_per_person?: number | null;
   daily_tokens_per_person?: number | null;
   budget_exempt_admins?: boolean;
+  /** The organization's tokens a month (V0.9.97), and what happens at the cap. */
+  monthly_token_budget?: number | null;
+  at_budget?: "stop" | "local_only" | null;
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */
