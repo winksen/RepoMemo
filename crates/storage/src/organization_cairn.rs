@@ -85,6 +85,12 @@ pub struct Guardrails {
     pub inbox_enabled: Option<bool>,
     #[serde(default)]
     pub inbox_bound: Option<i64>,
+    /// Whether CAIRN reads and proposes personal memory in the workspaces (V0.9.111), and the most entries it keeps for a person. None
+    /// keeps it on, at the 40 entries a person has. A workspace can only turn it off; the cap is the organization's.
+    #[serde(default)]
+    pub personal_memory_enabled: Option<bool>,
+    #[serde(default)]
+    pub personal_memory_max_entries: Option<i64>,
 }
 
 /// The longest an organization can ask to keep anything, in days.

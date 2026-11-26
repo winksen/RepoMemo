@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Brain, Pencil, Plus, Trash } from "@phosphor-icons/react";
 import type { PersonalMemory } from "../generated/domain";
-import { addPersonalMemory, deletePersonalMemory, getPersonalMemory, setPersonalMemoryEnabled, updatePersonalMemory } from "../lib/sharedApi";
+import { addPersonalMemory, deleteAllPersonalMemory, deletePersonalMemory, exportPersonalMemory, getPersonalMemory, setPersonalMemoryEnabled, updatePersonalMemory } from "../lib/sharedApi";
 import { apiMessage } from "../web/format";
 import { Button } from "./ui/button";
+import { ConfirmDialog } from "./ui/confirm-dialog";
+import { saveBlob } from "../lib/saveBlob";
 import { Checkbox } from "./ui/checkbox";
 import { Field } from "./ui/field";
 import { ICON_SIZE } from "./ui/icon";
@@ -18,6 +20,7 @@ export function PersonalMemoryPanel({ accessToken }: { accessToken: string }) {
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   async function load() {
     try { setMemory(await getPersonalMemory(accessToken)); }
@@ -47,6 +50,11 @@ export function PersonalMemoryPanel({ accessToken }: { accessToken: string }) {
               <Button aria-label={`Edit "${entry.text}"`} disabled={busy} onClick={() => setEditing({ id: entry.id, text: entry.text })} type="button" variant="secondary"><Pencil size={ICON_SIZE.sm} /></Button>
               <Button aria-label={`Delete "${entry.text}"`} disabled={busy} onClick={() => void act(() => deletePersonalMemory(accessToken, entry.id), "The entry could not be deleted.")} type="button" variant="secondary"><Trash size={ICON_SIZE.sm} /></Button></>}
       </li>)}</ul> : <p className="shared-muted-copy">Nothing yet. Say “remember that I prefer answers in French” to {ASSISTANT_NAME}, or add something here.</p>}
+      <div>
+        <Button disabled={busy || memory.entries.length === 0} onClick={() => void act(async () => { const data = await exportPersonalMemory(accessToken); if (await saveBlob(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }), "cairn-memory.json")) showToast("success", "Your memory was exported."); }, "Your memory could not be exported.")} type="button" variant="secondary">Export</Button>{" "}
+        <Button disabled={busy || memory.entries.length === 0} onClick={() => setClearing(true)} type="button" variant="secondary"><Trash size={ICON_SIZE.md} /> Delete everything</Button>
+      </div>
+      <ConfirmDialog action="Delete everything" danger description="Every entry CAIRN remembers about you is deleted. This cannot be undone." onCancel={() => setClearing(false)} onConfirm={() => { setClearing(false); void act(async () => { const result = await deleteAllPersonalMemory(accessToken); showToast("success", `${result.deleted} ${result.deleted === 1 ? "entry was" : "entries were"} deleted.`); }, "Your memory could not be deleted."); }} open={clearing} title="Delete everything CAIRN remembers about you?" />
       <form onSubmit={(event) => { event.preventDefault(); if (!draft.trim()) return; void act(async () => { await addPersonalMemory(accessToken, draft); setDraft(""); }, "That could not be added."); }}>
         <Field label="Add something"><Input maxLength={280} onChange={(event) => setDraft(event.target.value)} placeholder="For example: I work on the billing project" value={draft} /></Field>
         <Button busy={busy} type="submit" variant="secondary"><Plus size={ICON_SIZE.md} /> Add</Button>

@@ -34,6 +34,36 @@ pub(crate) async fn get_personal_memory(
         .map_err(map_storage_error)
 }
 
+/// `GET /v1/agent/personal-memory/export`: everything CAIRN remembers about the caller, to keep.
+pub(crate) async fn export_personal_memory(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let memory = state
+        .storage
+        .personal_memory(&subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(serde_json::json!({
+        "exported_at": chrono::Utc::now().to_rfc3339(),
+        "enabled": memory.enabled,
+        "entries": memory.entries,
+    })))
+}
+
+/// `DELETE /v1/agent/personal-memory`: deletes everything CAIRN remembers about the caller.
+pub(crate) async fn delete_all_personal_memory(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let deleted = state
+        .storage
+        .delete_all_personal_memory(&subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(serde_json::json!({ "deleted": deleted })))
+}
+
 pub(crate) async fn add_personal_memory(
     ManagingSubject(subject): ManagingSubject,
     State(state): State<AppState>,

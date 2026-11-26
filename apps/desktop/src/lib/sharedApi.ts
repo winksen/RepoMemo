@@ -2534,6 +2534,12 @@ export function updatePersonalMemory(accessToken: string, entryId: string, text:
 export function deletePersonalMemory(accessToken: string, entryId: string): Promise<void> {
   return request<void>(`/v1/agent/personal-memory/${encodeURIComponent(entryId)}`, { method: "DELETE" }, accessToken);
 }
+export function exportPersonalMemory(accessToken: string): Promise<{ exported_at: string; enabled: boolean; entries: PersonalMemoryEntry[] }> {
+  return request("/v1/agent/personal-memory/export", {}, accessToken);
+}
+export function deleteAllPersonalMemory(accessToken: string): Promise<{ deleted: number }> {
+  return request("/v1/agent/personal-memory", { method: "DELETE" }, accessToken);
+}
 export function setPersonalMemoryEnabled(accessToken: string, enabled: boolean): Promise<void> {
   return request<void>("/v1/agent/personal-memory/settings", { method: "PUT", body: JSON.stringify({ enabled }) }, accessToken);
 }

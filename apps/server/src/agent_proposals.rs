@@ -181,6 +181,14 @@ async fn apply(
         AgentProposalKind::SavePersonalMemory => {
             // Only the person's own memory changes, so no role is needed beyond reading the chat they confirm it in (V0.9.51).
             let text = payload_text(proposal, "text");
+            let policy = state
+                .storage
+                .personal_memory_policy_for_workspace(workspace_id)
+                .await
+                .map_err(map_storage_error)?;
+            if !policy.enabled {
+                return Err(ApiError::bad_request(policy.refusal()));
+            }
             state
                 .storage
                 .add_personal_memory(&subject.user_id, None, &text, None)

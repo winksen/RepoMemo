@@ -544,6 +544,16 @@ pub(crate) async fn update_settings(
                 "A workspace's MCP and inbox policy is never looser than its organization's.",
             ));
         }
+        if organization.personal_memory_enabled == Some(false) && guardrails.personal_memory_enabled == Some(true) {
+            return Err(ApiError::bad_request(
+                "A workspace cannot turn personal memory on when its organization turned it off.",
+            ));
+        }
+        if guardrails.personal_memory_max_entries.is_some() {
+            return Err(ApiError::bad_request(
+                "The most entries CAIRN keeps about a person is set by the organization.",
+            ));
+        }
         if guardrails.monthly_token_budget.is_some() || guardrails.at_budget.is_some() {
             return Err(ApiError::bad_request(
                 "The monthly token budget is the organization's, not a workspace's.",

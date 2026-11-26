@@ -65,9 +65,10 @@ impl StorageEngine {
             .bind(user_id)
             .fetch_one(self.reader())
             .await?;
-        if count as usize >= PERSONAL_MEMORY_ENTRIES {
+        let cap = self.personal_memory_cap(user_id).await?;
+        if count as usize >= cap {
             repomemo_domain::bail_conflict!(
-                "CAIRN remembers at most {PERSONAL_MEMORY_ENTRIES} things about you. Delete one in your profile first."
+                "CAIRN remembers at most {cap} things about you. Delete one in your profile first."
             );
         }
         let duplicate: i64 = sqlx::query_scalar(
@@ -132,6 +133,15 @@ impl StorageEngine {
         Ok(())
     }
 
+    /// Deletes everything CAIRN remembers about the person, and says how many entries went.
+    pub async fn delete_all_personal_memory(&self, user_id: &str) -> Result<u64> {
+        let done = sqlx::query("DELETE FROM agent_personal_memory WHERE user_id = ?1")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(done.rows_affected())
+    }
+
     /// Turns the person's memory on or off. Off, it is neither read into their runs nor added to.
     pub async fn set_personal_memory_enabled(&self, user_id: &str, enabled: bool) -> Result<()> {
         sqlx::query(
@@ -147,7 +157,7 @@ impl StorageEngine {
     /// What goes into one person's run in one workspace: their entries that apply there, newest first, none when the memory is off.
     pub async fn personal_memory_for_run(&self, user_id: &str, workspace_id: &str) -> Result<Vec<String>> {
         let memory = self.personal_memory(user_id).await?;
-        if !memory.enabled {
+        if !memory.enabled || !self.personal_memory_policy_for_workspace(workspace_id).await?.enabled {
             return Ok(Vec::new());
         }
         Ok(memory

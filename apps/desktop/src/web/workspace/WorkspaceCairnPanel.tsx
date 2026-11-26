@@ -25,6 +25,7 @@ import { SecretsSetting } from "../cairn-admin/SecretsSetting";
 import { BudgetFields } from "../cairn-admin/BudgetFields";
 import { RoutineLimits } from "../cairn-admin/RoutineLimits";
 import { McpPolicy } from "../cairn-admin/McpPolicy";
+import { PersonalMemoryPolicy } from "../cairn-admin/PersonalMemoryPolicy";
 import { WorkspaceAbilities } from "../cairn-admin/WorkspaceAbilities";
 import type { Guardrails } from "../../types";
 
@@ -113,6 +114,7 @@ function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: stri
     <ToolSwitches accessToken={accessToken} locked={view.organization_tools_off} off={toolsOff} onChange={setToolsOff} />
     <ChangeLimitFields ceiling={view.organization_limits} guardrails={guardrails} onChange={setGuardrails} />
     <McpPolicy guardrails={guardrails} onChange={setGuardrails} />
+    <PersonalMemoryPolicy guardrails={guardrails} onChange={setGuardrails} />
     <RoutineLimits guardrails={guardrails} onChange={setGuardrails} />
     <BudgetFields guardrails={guardrails} onChange={setGuardrails} />
     <SecretsSetting guardrails={guardrails} onChange={setGuardrails} organizationMasksPersonal={Boolean(view.organization_limits.mask_personal_data)} organizationStrict={Boolean(view.organization_limits.strict_citations)} organizationRefuses={view.organization_limits.secrets_for_cloud === "refuse"} />

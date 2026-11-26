@@ -1094,7 +1094,13 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         )
         .route(
             "/v1/agent/personal-memory",
-            get(agent_memory::get_personal_memory).post(agent_memory::add_personal_memory),
+            get(agent_memory::get_personal_memory)
+                .post(agent_memory::add_personal_memory)
+                .delete(agent_memory::delete_all_personal_memory),
+        )
+        .route(
+            "/v1/agent/personal-memory/export",
+            get(agent_memory::export_personal_memory),
         )
         .route(
             "/v1/agent/personal-memory/settings",

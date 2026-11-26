@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.111 (2026-11-26)
+
+Organizations set a personal memory policy, and people can export or delete their memory.
+
+### Added
+- **On or off.** In an organization's CAIRN settings, a switch for personal memory in its workspaces. Off, a run in any of them reads none of what CAIRN remembers about the person, the "Remember about you" tool is not given to CAIRN, and confirming a waiting proposal to remember something is refused with the reason. A workspace's administrators can turn it off for their workspace too; they cannot turn it on when the organization turned it off.
+- **A cap.** The most entries CAIRN keeps about one person, 1 to 40. A person in several organizations has the smallest cap among them. Adding past it (in the profile or by confirming a proposal) says so and asks for one to be deleted. Entries already kept above a lowered cap stay until the person deletes them.
+- **Export.** The profile's CAIRN memory has an Export button: a JSON file with every entry and when it was exported.
+- **Delete everything.** A button, behind a confirmation, deletes every entry in one step and says how many went.
+- **Whatever the policy says.** A person can always see, export and delete their own memory, even where an organization turned it off.
+
+### Not yet
+- **The workspace panel's switch** shows as ticked when only the organization turned it off; the server still refuses a workspace that tries to turn it on.
+- **Entries kept for one workspace** are not separated in the export.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added or run, and the profile and the settings were not opened.
+
+### Upgrading
+- Nothing to do. No migration: the policy is part of the stored settings.
+
 ## V0.9.110 (2026-11-26)
 
 An organization's knowledge workspace is offered in all of its workspaces.

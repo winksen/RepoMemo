@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.110` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.111` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.111 — Organizations set a personal memory policy, and people can export or delete their memory.
+
+- **Personal memory policy.** An organization turns personal memory on or off for its workspaces and caps the entries CAIRN keeps for a person (at most 40). Off, CAIRN reads none of it in the organization's workspaces and is not given the tool that proposes it, and a proposal already waiting is refused when confirmed. A workspace can turn it off for itself, never on. In their profile, people can export what CAIRN remembers about them as a file, and delete all of it.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.110 — An organization's knowledge workspace is offered in all of its workspaces.
 

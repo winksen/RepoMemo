@@ -984,6 +984,9 @@ export interface Guardrails {
   mcp_enabled?: boolean | null;
   inbox_enabled?: boolean | null;
   inbox_bound?: number | null;
+  /** Whether CAIRN reads and adds to personal memory in the workspaces, and the most entries kept for a person (V0.9.111). */
+  personal_memory_enabled?: boolean | null;
+  personal_memory_max_entries?: number | null;
 }
 
 /** An ability: a procedure an organization or a workspace teaches CAIRN, run with a /command (V0.9.104). */

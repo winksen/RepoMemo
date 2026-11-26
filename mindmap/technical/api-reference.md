@@ -305,6 +305,8 @@
 | POST | `/v1/workspaces/{workspace_id}/agent/routines/{routine_id}/resume` | auth | its owner, or a workspace administrator | — | AgentRoutine |
 | POST | `/v1/workspaces/{workspace_id}/agent/routines/{routine_id}/run` | auth | its owner only | — | AgentRoutine |
 | GET | `/v1/agent/personal-memory` | auth | — | — | PersonalMemory |
+| DELETE | `/v1/agent/personal-memory` | managing | — | — | { deleted } |
+| GET | `/v1/agent/personal-memory/export` | auth | — | — | { exported_at, enabled, entries } |
 | POST | `/v1/agent/personal-memory` | managing | — | EntryRequest | PersonalMemoryEntry |
 | PUT | `/v1/agent/personal-memory/settings` | managing | — | EnabledRequest | status |
 | PUT | `/v1/agent/personal-memory/{entry_id}` | managing | — | EntryRequest | status |

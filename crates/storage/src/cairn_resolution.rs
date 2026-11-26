@@ -108,6 +108,26 @@ pub struct RoutineLimits {
     pub events: bool,
 }
 
+/// Whether personal memory is read and proposed in a workspace (V0.9.111).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PersonalMemoryPolicy {
+    pub enabled: bool,
+    /// Who turned it off: `organization`, `workspace` or `default`.
+    pub set_by: &'static str,
+}
+
+impl PersonalMemoryPolicy {
+    /// What is said when something about personal memory is refused.
+    pub fn refusal(&self) -> String {
+        let who = if self.set_by == "workspace" {
+            "This workspace's administrators turned"
+        } else {
+            "Your organization turned"
+        };
+        format!("{who} off personal memory here, so CAIRN does not read or add to it in this workspace.")
+    }
+}
+
 /// What outside agents may do in a workspace (V0.9.101).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct McpPolicy {
@@ -562,6 +582,58 @@ impl StorageEngine {
         let settings = self.get_organization_cairn_settings(&organization_id).await?;
         let text = settings.policy.instructions.trim();
         Ok((!text.is_empty()).then(|| (text.to_owned(), settings.version)))
+    }
+
+    /// Whether personal memory is read and proposed in a workspace (V0.9.111): off when the organization or the workspace turned it off.
+    pub async fn personal_memory_policy_for_workspace(&self, workspace_id: &str) -> Result<PersonalMemoryPolicy> {
+        let mut policy = PersonalMemoryPolicy {
+            enabled: true,
+            set_by: "default",
+        };
+        if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+            let guardrails = self
+                .get_organization_cairn_settings(&organization_id)
+                .await?
+                .policy
+                .guardrails;
+            if guardrails.personal_memory_enabled == Some(false) {
+                policy = PersonalMemoryPolicy {
+                    enabled: false,
+                    set_by: "organization",
+                };
+            }
+        }
+        if policy.enabled
+            && self
+                .get_workspace_cairn_settings(workspace_id)
+                .await?
+                .policy
+                .guardrails
+                .personal_memory_enabled
+                == Some(false)
+        {
+            policy = PersonalMemoryPolicy {
+                enabled: false,
+                set_by: "workspace",
+            };
+        }
+        Ok(policy)
+    }
+
+    /// The most entries of personal memory a person may have: the smallest cap among the organizations they belong to, and 40.
+    pub async fn personal_memory_cap(&self, user_id: &str) -> Result<usize> {
+        let mut cap = crate::personal_memory::PERSONAL_MEMORY_ENTRIES;
+        for organization in self.list_organizations_for_user(user_id).await? {
+            let guardrails = self
+                .get_organization_cairn_settings(&organization.id)
+                .await?
+                .policy
+                .guardrails;
+            if let Some(own) = guardrails.personal_memory_max_entries {
+                cap = cap.min(own.max(1) as usize);
+            }
+        }
+        Ok(cap)
     }
 
     /// What outside agents may do in a workspace (V0.9.101): the stricter of the organization's and the workspace's.

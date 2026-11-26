@@ -105,8 +105,8 @@ pub use cairn_catalog::{
     NewCairnModel, CATALOG_NAME_CHARS, CONNECTION_KINDS, MODEL_PURPOSES, TOOL_MODES,
 };
 pub use cairn_resolution::{
-    ChangeLimits, McpPolicy, OrganizationBudget, PersonBudget, ResolvedTextProvider, RoutineLimits, TextResolution,
-    CATALOG_PROVIDER_PREFIX,
+    ChangeLimits, McpPolicy, OrganizationBudget, PersonBudget, PersonalMemoryPolicy, ResolvedTextProvider,
+    RoutineLimits, TextResolution, CATALOG_PROVIDER_PREFIX,
 };
 pub use cairn_retention::RetentionCounts;
 pub use cairn_usage::UsageGroup;
@@ -137,6 +137,7 @@ pub use organization_cairn::{
 pub use organization_templates::StoredOrganizationTemplate;
 pub use organizations::StarterSetup;
 pub use outbound::{retry_delay_seconds, DueDelivery, MAX_DELIVERY_ATTEMPTS, OUTBOUND_EVENTS};
+pub use personal_memory::PERSONAL_MEMORY_ENTRIES;
 pub use project_references::MAX_PROJECT_REFERENCES;
 pub use project_updates::{NewProjectUpdate, MAX_UPDATE_LINKS};
 pub use projects::NewProject;

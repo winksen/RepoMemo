@@ -165,6 +165,12 @@ pub(crate) fn checked_guardrails(
             repomemo_storage::MAX_RETENTION_DAYS,
             "The days a chat is kept",
         )?,
+        personal_memory_enabled: given.personal_memory_enabled,
+        personal_memory_max_entries: ranged(
+            given.personal_memory_max_entries,
+            repomemo_storage::PERSONAL_MEMORY_ENTRIES as i64,
+            "The entries CAIRN keeps about a person",
+        )?,
         retention_memory_days: ranged(
             given.retention_memory_days,
             repomemo_storage::MAX_RETENTION_DAYS,

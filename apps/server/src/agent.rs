@@ -329,6 +329,13 @@ pub(crate) async fn run_message(
         .tools_off_for_workspace(&workspace_id)
         .await
         .map_err(map_storage_error)?;
+    // Personal memory off in this workspace: CAIRN is not given the tool that proposes it, and reads none (V0.9.111).
+    let personal_memory_on = state
+        .storage
+        .personal_memory_policy_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .enabled;
     // The organization's instructions for every run in its workspaces (V0.9.109).
     let organization_instructions = state
         .storage
@@ -372,7 +379,11 @@ pub(crate) async fn run_message(
                 max_steps: runtime.cairn_max_steps.clamp(1, 30) as usize,
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
                 max_run_tokens: runtime.cairn_max_run_tokens.max(0) as u64,
-                disabled_tools: tools_off.iter().map(|(name, _)| name.clone()).collect(),
+                disabled_tools: tools_off
+                    .iter()
+                    .map(|(name, _)| name.clone())
+                    .chain((!personal_memory_on).then(|| "propose_personal_memory".to_owned()))
+                    .collect(),
                 ability: None,
                 organization_instructions: organization_instructions.clone(),
                 knowledge_workspace,
