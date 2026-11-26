@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.93` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.94` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.94 — Secrets are kept from cloud models.
+
+- **Secrets stay on the network.** Before text goes to a model outside the network, what looks like a secret (a private key, a provider or cloud key, a token, a password in a configuration line, a connection string's password) is replaced by a marker. An organization can instead choose to send nothing that holds one; a workspace can only choose the stricter. The run's history counts what was removed, never the values.
+
+Checks: formatted, linted and type-checked; docs:check; unit tests of the patterns (true and false positives) and a server test added, not run.
 
 ## V0.9.93 — A workspace administrator can close folders to CAIRN.
 

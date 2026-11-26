@@ -111,6 +111,10 @@ impl<P: AiProvider, F: AiProvider> AiProvider for FallbackProvider<P, F> {
     async fn test_connection(&self) -> Result<ProviderTestResult> {
         self.primary.test_connection().await
     }
+
+    fn secrets_masked(&self) -> usize {
+        self.primary.secrets_masked() + self.fallback.as_ref().map_or(0, AiProvider::secrets_masked)
+    }
 }
 
 #[cfg(test)]

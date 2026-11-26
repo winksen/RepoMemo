@@ -187,6 +187,44 @@ impl StorageEngine {
         .collect())
     }
 
+    /// What happens to a secret on its way to a model outside the network in a workspace: `refuse` when the organization or the
+    /// workspace says so, else `mask` (V0.9.94).
+    pub async fn secrets_mode_for_workspace(&self, workspace_id: &str) -> Result<&'static str> {
+        let refuses = |guardrails: &crate::organization_cairn::Guardrails| {
+            guardrails.secrets_for_cloud.as_deref() == Some("refuse")
+        };
+        if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+            if refuses(
+                &self
+                    .get_organization_cairn_settings(&organization_id)
+                    .await?
+                    .policy
+                    .guardrails,
+            ) {
+                return Ok("refuse");
+            }
+        }
+        Ok(
+            if refuses(&self.get_workspace_cairn_settings(workspace_id).await?.policy.guardrails) {
+                "refuse"
+            } else {
+                "mask"
+            },
+        )
+    }
+
+    /// A resolution whose provider carries the organization's choice about secrets (V0.9.94).
+    async fn guard_secrets(&self, workspace_id: &str, mut resolution: TextResolution) -> Result<TextResolution> {
+        if let Some(resolved) = resolution.resolved.as_mut() {
+            if self.secrets_mode_for_workspace(workspace_id).await? == "refuse" {
+                if let Some(object) = resolved.provider.metadata.as_object_mut() {
+                    object.insert("secrets_mode".to_owned(), json!("refuse"));
+                }
+            }
+        }
+        Ok(resolution)
+    }
+
     /// What one confirmation may change in a workspace, and from how many changes the person types the number (V0.9.92): the stricter
     /// of the organization's and the workspace's, and never more than the default cap.
     pub async fn change_limits_for_workspace(&self, workspace_id: &str) -> Result<ChangeLimits> {
@@ -271,6 +309,11 @@ impl StorageEngine {
 
     /// Resolves the text model of a workspace for a person with a role: a model limited to other roles is not used (V0.9.87).
     pub async fn resolve_text_provider_as(&self, workspace_id: &str, role: Option<&str>) -> Result<TextResolution> {
+        let resolution = self.resolve_inner(workspace_id, role).await?;
+        self.guard_secrets(workspace_id, resolution).await
+    }
+
+    async fn resolve_inner(&self, workspace_id: &str, role: Option<&str>) -> Result<TextResolution> {
         let former = self
             .list_provider_settings(workspace_id)
             .await?
@@ -439,6 +482,16 @@ impl StorageEngine {
     /// The text model for a message in a chat whose person chose `chosen` (V0.9.86): that model while it is offered, else what the
     /// workspace resolves, with a note that the chosen one is no longer offered.
     pub async fn resolve_text_provider_for(
+        &self,
+        workspace_id: &str,
+        chosen: Option<&str>,
+        role: Option<&str>,
+    ) -> Result<TextResolution> {
+        let resolution = self.resolve_for_inner(workspace_id, chosen, role).await?;
+        self.guard_secrets(workspace_id, resolution).await
+    }
+
+    async fn resolve_for_inner(
         &self,
         workspace_id: &str,
         chosen: Option<&str>,

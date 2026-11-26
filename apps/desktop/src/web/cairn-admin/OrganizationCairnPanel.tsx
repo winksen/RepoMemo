@@ -20,6 +20,7 @@ import { useSystemData } from "../system/shared";
 import { limitsFor, RoleLimitSelect, withLimit } from "./RoleLimit";
 import { ToolSwitches } from "./ToolSwitches";
 import { ChangeLimitFields } from "./ChangeLimitFields";
+import { SecretsSetting } from "./SecretsSetting";
 import type { Guardrails } from "../../types";
 
 const MODES = [
@@ -82,6 +83,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
     <Field hint="A workspace that chose its own mode keeps it." label="Agent mode"><Dropdown aria-label="Agent mode" disabled={!canChange} onValueChange={setMode} options={MODES} value={mode} /></Field>
     <ToolSwitches accessToken={accessToken} disabled={!canChange} off={toolsOff} onChange={setToolsOff} />
     <ChangeLimitFields disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
+    <SecretsSetting disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     {canChange ? <Button busy={isBusy} disabled={!dirty} type="submit" variant="main">Save</Button> : null}
   </form>;
 }

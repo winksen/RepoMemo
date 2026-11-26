@@ -81,6 +81,7 @@ pub(crate) struct WorkspaceCairnView {
 pub(crate) struct OrganizationLimits {
     max_changes: Option<i64>,
     type_to_confirm_from: Option<i64>,
+    secrets_for_cloud: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -233,11 +234,13 @@ pub(crate) async fn get_settings(
             OrganizationLimits {
                 max_changes: guardrails.max_changes,
                 type_to_confirm_from: guardrails.type_to_confirm_from,
+                secrets_for_cloud: guardrails.secrets_for_cloud,
             }
         }
         None => OrganizationLimits {
             max_changes: None,
             type_to_confirm_from: None,
+            secrets_for_cloud: None,
         },
     };
     let answering = state
@@ -505,6 +508,13 @@ pub(crate) async fn update_settings(
             .map_err(map_storage_error)?
             .policy
             .guardrails;
+        if organization.secrets_for_cloud.as_deref() == Some("refuse")
+            && guardrails.secrets_for_cloud.as_deref() == Some("mask")
+        {
+            return Err(ApiError::bad_request(
+                "A workspace cannot send secrets to a cloud model, masked, when its organization refuses to.",
+            ));
+        }
         let ceiling = organization
             .max_changes
             .unwrap_or(repomemo_storage::DEFAULT_MAX_CHANGES);

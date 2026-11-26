@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.94 (2026-11-26)
+
+Secrets are kept from cloud models.
+
+### Added
+- **Masking.** Text sent to a model outside the network (OpenRouter, or an OpenAI-compatible server at a public address) first has its secrets replaced by `[secret removed]`: private key blocks, Amazon, GitHub, Slack, Stripe, Google and `sk-` keys, JSON web tokens, the password of a connection string, and the value of a password, secret, API key or token in a configuration line. It covers chat, summaries, reranking and embeddings. Models on the network are not touched.
+- **Few false positives.** Placeholders (`${PASSWORD}`, `<password>`, `changeme`, `****`), plain words after "password:" and public keys are left alone; the unit tests list both kinds.
+- **Mask or refuse.** The organization's panel and a workspace's Settings › AI have *A secret on its way to a cloud model*: replace with a marker (default) or send nothing, in which case the request fails with a message that says why. A workspace can only choose the stricter; an organization that refuses cannot be loosened (`400`).
+- **Counted, never shown.** A run in Agent mode adds a warning and a history note (*2 secrets were replaced by a marker before text went to the model*); the values are kept nowhere.
+- **Not covered.** Images, and tool-call arguments inside a message, are not scanned; Ask and summaries mask but do not report a count.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. Unit tests of the patterns were added; tests not run, and nothing was sent to a real cloud model.
+
+### Upgrading
+- Nothing to do, but masking is on by default for every cloud connection.
+
 ## V0.9.93 (2026-11-26)
 
 A workspace administrator can close folders to CAIRN.

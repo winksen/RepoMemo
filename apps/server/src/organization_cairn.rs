@@ -110,7 +110,15 @@ pub(crate) fn checked_guardrails(
         }
         _ => Ok(value),
     };
+    if let Some(mode) = given.secrets_for_cloud.as_deref() {
+        if !matches!(mode, "mask" | "refuse") {
+            return Err(ApiError::bad_request(
+                "Secrets for a cloud model are masked or refused.",
+            ));
+        }
+    }
     Ok(repomemo_storage::Guardrails {
+        secrets_for_cloud: given.secrets_for_cloud,
         closed_folder_ids: given.closed_folder_ids,
         tools_off: crate::cairn_tools::checked_names(given.tools_off)?,
         max_changes: in_range(given.max_changes, "The most changes in one confirmation")?,

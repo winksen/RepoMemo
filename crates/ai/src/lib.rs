@@ -12,6 +12,7 @@ mod catalog;
 mod chat;
 mod fallback;
 mod openai;
+mod secrets;
 
 pub use catalog::{
     connection_base_url, is_cloud_connection, list_connection_models, probe_connection, test_catalog_model,
@@ -21,6 +22,7 @@ pub use chat::*;
 use chat::{ollama_chat_body, ollama_chat_response, openrouter_chat_body, openrouter_chat_response};
 pub use fallback::{is_fallback_error, FallbackProvider};
 pub use openai::OpenAiCompatibleProvider;
+pub use secrets::{mask_secrets, MARKER as SECRET_MARKER};
 
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434";
 const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
@@ -423,6 +425,10 @@ pub trait AiProvider {
     async fn rerank(&self, query: String, candidates: Vec<String>) -> Result<Vec<usize>>;
     async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String>;
     async fn test_connection(&self) -> Result<ProviderTestResult>;
+    /// How many secrets were replaced by a marker before text went to a model outside the network (V0.9.94).
+    fn secrets_masked(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -996,80 +1002,167 @@ async fn openrouter_answer(response: reqwest::Response, empty_message: &str) -> 
     Ok(answer)
 }
 
-pub enum ConfiguredProvider {
+enum Backend {
     Ollama(OllamaProvider),
     OpenRouter(OpenRouterProvider),
     OpenAiCompatible(OpenAiCompatibleProvider),
 }
 
 pub fn provider_from_settings(settings: ProviderSettings) -> Result<ConfiguredProvider> {
-    match settings.provider_type.as_str() {
-        "ollama" => Ok(ConfiguredProvider::Ollama(OllamaProvider::from_settings(settings)?)),
-        "openrouter" => Ok(ConfiguredProvider::OpenRouter(OpenRouterProvider::from_settings(
-            settings,
-        )?)),
-        "openai_compatible" => Ok(ConfiguredProvider::OpenAiCompatible(
-            OpenAiCompatibleProvider::from_settings(settings)?,
-        )),
+    let guard = SecretGuard::for_settings(&settings);
+    let backend = match settings.provider_type.as_str() {
+        "ollama" => Backend::Ollama(OllamaProvider::from_settings(settings)?),
+        "openrouter" => Backend::OpenRouter(OpenRouterProvider::from_settings(settings)?),
+        "openai_compatible" => Backend::OpenAiCompatible(OpenAiCompatibleProvider::from_settings(settings)?),
         _ => bail!("Unsupported AI provider."),
+    };
+    Ok(ConfiguredProvider { backend, guard })
+}
+
+/// What a provider keeps from a model that is outside the network (V0.9.94): what looks like a secret is replaced by a marker, or the
+/// request is refused when the organization chose that. A model on the network is not guarded, and nothing is kept but how many.
+struct SecretGuard {
+    refuse: bool,
+    masked: std::sync::atomic::AtomicUsize,
+}
+
+impl SecretGuard {
+    fn for_settings(settings: &ProviderSettings) -> Option<Self> {
+        if !is_cloud_endpoint(&settings.provider_type, settings.base_url.as_deref()) {
+            return None;
+        }
+        Some(Self {
+            refuse: settings.metadata.get("secrets_mode").and_then(Value::as_str) == Some("refuse"),
+            masked: std::sync::atomic::AtomicUsize::new(0),
+        })
+    }
+
+    /// The text as it may be sent: with its secrets replaced, or an error when the organization does not send them.
+    fn text(&self, text: &str) -> Result<String> {
+        let (clean, found) = secrets::mask_secrets(text);
+        if found == 0 {
+            return Ok(text.to_owned());
+        }
+        if self.refuse {
+            bail!("{SECRETS_REFUSED}")
+        }
+        self.masked.fetch_add(found, std::sync::atomic::Ordering::SeqCst);
+        Ok(clean)
+    }
+}
+
+/// What a person is told when a secret was found and the organization does not send them to a cloud model.
+pub const SECRETS_REFUSED: &str = "What CAIRN was about to send to the model holds a secret (a key, a password or a token), and your organization does not send those to a model outside its network. Nothing was sent.";
+
+/// A provider as the workspace's settings describe it, guarded when its model is outside the network.
+pub struct ConfiguredProvider {
+    backend: Backend,
+    guard: Option<SecretGuard>,
+}
+
+impl ConfiguredProvider {
+    /// What was replaced by a marker so far.
+    pub fn masked(&self) -> usize {
+        self.guard
+            .as_ref()
+            .map_or(0, |guard| guard.masked.load(std::sync::atomic::Ordering::SeqCst))
+    }
+
+    fn clean(&self, text: &str) -> Result<String> {
+        match &self.guard {
+            Some(guard) => guard.text(text),
+            None => Ok(text.to_owned()),
+        }
+    }
+
+    fn clean_chat(&self, mut request: ChatRequest) -> Result<ChatRequest> {
+        if self.guard.is_some() {
+            for message in &mut request.messages {
+                message.content = self.clean(&message.content)?;
+            }
+        }
+        Ok(request)
     }
 }
 
 impl AiProvider for ConfiguredProvider {
+    fn secrets_masked(&self) -> usize {
+        self.masked()
+    }
+
     async fn chat(&self, request: ChatRequest) -> Result<ChatResponse> {
-        match self {
-            Self::Ollama(provider) => provider.chat(request).await,
-            Self::OpenRouter(provider) => provider.chat(request).await,
-            Self::OpenAiCompatible(provider) => provider.chat(request).await,
+        let request = self.clean_chat(request)?;
+        match &self.backend {
+            Backend::Ollama(provider) => provider.chat(request).await,
+            Backend::OpenRouter(provider) => provider.chat(request).await,
+            Backend::OpenAiCompatible(provider) => provider.chat(request).await,
         }
     }
-    async fn generate(&self, request: GenerateRequest) -> Result<String> {
-        match self {
-            Self::Ollama(provider) => provider.generate(request).await,
-            Self::OpenRouter(provider) => provider.generate(request).await,
-            Self::OpenAiCompatible(provider) => provider.generate(request).await,
+    async fn generate(&self, mut request: GenerateRequest) -> Result<String> {
+        if self.guard.is_some() {
+            request.prompt = self.clean(&request.prompt)?;
+            request.context = self.clean(&request.context)?;
+            if let Some(system) = request.system.take() {
+                request.system = Some(self.clean(&system)?);
+            }
+        }
+        match &self.backend {
+            Backend::Ollama(provider) => provider.generate(request).await,
+            Backend::OpenRouter(provider) => provider.generate(request).await,
+            Backend::OpenAiCompatible(provider) => provider.generate(request).await,
         }
     }
     async fn context_tokens(&self) -> Result<Option<u32>> {
-        match self {
-            Self::Ollama(provider) => provider.context_tokens().await,
-            Self::OpenRouter(provider) => provider.context_tokens().await,
-            Self::OpenAiCompatible(provider) => provider.context_tokens().await,
+        match &self.backend {
+            Backend::Ollama(provider) => provider.context_tokens().await,
+            Backend::OpenRouter(provider) => provider.context_tokens().await,
+            Backend::OpenAiCompatible(provider) => provider.context_tokens().await,
         }
     }
     async fn embed(&self, texts: Vec<String>, options: Value) -> Result<Vec<Vec<f32>>> {
-        match self {
-            Self::Ollama(provider) => provider.embed(texts, options).await,
-            Self::OpenRouter(provider) => provider.embed(texts, options).await,
-            Self::OpenAiCompatible(provider) => provider.embed(texts, options).await,
+        let texts = if self.guard.is_some() {
+            texts.iter().map(|text| self.clean(text)).collect::<Result<Vec<_>>>()?
+        } else {
+            texts
+        };
+        match &self.backend {
+            Backend::Ollama(provider) => provider.embed(texts, options).await,
+            Backend::OpenRouter(provider) => provider.embed(texts, options).await,
+            Backend::OpenAiCompatible(provider) => provider.embed(texts, options).await,
         }
     }
     async fn summarize(&self, target: String, options: Value) -> Result<String> {
-        match self {
-            Self::Ollama(provider) => provider.summarize(target, options).await,
-            Self::OpenRouter(provider) => provider.summarize(target, options).await,
-            Self::OpenAiCompatible(provider) => provider.summarize(target, options).await,
+        let target = self.clean(&target)?;
+        match &self.backend {
+            Backend::Ollama(provider) => provider.summarize(target, options).await,
+            Backend::OpenRouter(provider) => provider.summarize(target, options).await,
+            Backend::OpenAiCompatible(provider) => provider.summarize(target, options).await,
         }
     }
     async fn rerank(&self, query: String, candidates: Vec<String>) -> Result<Vec<usize>> {
-        match self {
-            Self::Ollama(provider) => provider.rerank(query, candidates).await,
-            Self::OpenRouter(provider) => provider.rerank(query, candidates).await,
-            Self::OpenAiCompatible(provider) => provider.rerank(query, candidates).await,
+        let query = self.clean(&query)?;
+        let candidates = candidates
+            .iter()
+            .map(|text| self.clean(text))
+            .collect::<Result<Vec<_>>>()?;
+        match &self.backend {
+            Backend::Ollama(provider) => provider.rerank(query, candidates).await,
+            Backend::OpenRouter(provider) => provider.rerank(query, candidates).await,
+            Backend::OpenAiCompatible(provider) => provider.rerank(query, candidates).await,
         }
     }
     async fn analyze_image(&self, request: ImageAnalysisRequest) -> Result<String> {
-        match self {
-            Self::Ollama(provider) => provider.analyze_image(request).await,
-            Self::OpenRouter(provider) => provider.analyze_image(request).await,
-            Self::OpenAiCompatible(provider) => provider.analyze_image(request).await,
+        match &self.backend {
+            Backend::Ollama(provider) => provider.analyze_image(request).await,
+            Backend::OpenRouter(provider) => provider.analyze_image(request).await,
+            Backend::OpenAiCompatible(provider) => provider.analyze_image(request).await,
         }
     }
     async fn test_connection(&self) -> Result<ProviderTestResult> {
-        match self {
-            Self::Ollama(provider) => provider.test_connection().await,
-            Self::OpenRouter(provider) => provider.test_connection().await,
-            Self::OpenAiCompatible(provider) => provider.test_connection().await,
+        match &self.backend {
+            Backend::Ollama(provider) => provider.test_connection().await,
+            Backend::OpenRouter(provider) => provider.test_connection().await,
+            Backend::OpenAiCompatible(provider) => provider.test_connection().await,
         }
     }
 }

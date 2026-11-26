@@ -30,6 +30,10 @@ pub struct Guardrails {
     /// Folders CAIRN does not read (V0.9.93): a workspace's own, so an organization sets none. Their subfolders are closed too.
     #[serde(default)]
     pub closed_folder_ids: Vec<String>,
+    /// What happens to a secret in text on its way to a model outside the network (V0.9.94): `mask` replaces it with a marker, the
+    /// default, and `refuse` sends nothing. A workspace can only choose the stricter.
+    #[serde(default)]
+    pub secrets_for_cloud: Option<String>,
 }
 
 /// The most changes one confirmation makes when nothing sets less.

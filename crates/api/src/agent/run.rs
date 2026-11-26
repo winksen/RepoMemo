@@ -1020,6 +1020,26 @@ impl RepoMemoCore {
         };
         let provider = repomemo_ai::FallbackProvider::new(provider, fallback);
         let mut outcome = self.loop_with(&provider, request, setup).await?;
+        // Secrets replaced on the way to a model outside the network are counted, never shown (V0.9.94).
+        let masked = provider.secrets_masked();
+        if masked > 0 {
+            let said = format!(
+                "{masked} {} replaced by a marker before text went to the model.",
+                if masked == 1 { "secret was" } else { "secrets were" }
+            );
+            outcome.reply.warnings.push(said.clone());
+            if let Some(trace) = outcome.trace.as_mut() {
+                trace.steps.push(AgentStep {
+                    position: trace.steps.len() as i64 + 1,
+                    kind: "note".to_owned(),
+                    tool: None,
+                    summary: shorten(&said, 160),
+                    evidence: Vec::new(),
+                    duration_ms: 0,
+                    error: None,
+                });
+            }
+        }
         if let Some(reason) = provider.used_fallback().then(|| provider.fallback_reason()).flatten() {
             let said = format!("{primary_model} {reason}, so {fallback_model} answered.");
             outcome.reply.warnings.push(said.clone());

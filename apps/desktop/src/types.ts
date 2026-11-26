@@ -937,6 +937,8 @@ export interface Guardrails {
   type_to_confirm_from?: number | null;
   /** Folders CAIRN does not read (V0.9.93): a workspace's own, with their subfolders. */
   closed_folder_ids?: string[];
+  /** What happens to a secret on its way to a cloud model (V0.9.94): masked by default, or refused. */
+  secrets_for_cloud?: "mask" | "refuse" | null;
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */
@@ -961,7 +963,7 @@ export interface WorkspaceCairnView {
   /** What the organization turned off, which the workspace cannot turn on (V0.9.91). */
   organization_tools_off: string[];
   /** What the organization set for one confirmation, which the workspace can only tighten (V0.9.92). */
-  organization_limits: { max_changes: number | null; type_to_confirm_from: number | null };
+  organization_limits: { max_changes: number | null; type_to_confirm_from: number | null; secrets_for_cloud?: "mask" | "refuse" | null };
   /** The workspace's folders, each marked when it is closed to CAIRN (V0.9.93). */
   folders: Folder[];
   organization_default_model_id: string | null;
