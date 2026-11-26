@@ -9,6 +9,7 @@ import {
   listSystemUsers,
   reactivateSystemUser,
   setAppAdmin,
+  setCairnAdmin,
   setSystemAdmin,
   unlockSystemUser,
 } from "../../lib/sharedApi";
@@ -38,7 +39,7 @@ import { useSystemData, count, RefreshButton } from "./shared";
 import { systemKeys } from "../../lib/queryClient";
 
 /** The confirmations that take something away: their button is the danger button. */
-const DESTRUCTIVE_KINDS = new Set(["revoke", "revoke-app", "sign-out", "deactivate", "anonymize", "mfa-reset"]);
+const DESTRUCTIVE_KINDS = new Set(["revoke", "revoke-app", "revoke-cairn", "sign-out", "deactivate", "anonymize", "mfa-reset"]);
 
 const ROLE_ICON = { owner: <Crown size={ICON_SIZE.sm} />, admin: <ShieldCheck size={ICON_SIZE.sm} />, member: <UserIcon size={ICON_SIZE.sm} />, viewer: <Eye size={ICON_SIZE.sm} /> };
 
@@ -72,7 +73,7 @@ function AccessTree({ user }: { user: SystemUser }) {
   </ul>;
 }
 
-type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "sign-out" | "reset" | "deactivate" | "reactivate" | "anonymize" | "mfa-reset"; user: SystemUser };
+type UserAction = { kind: "grant" | "revoke" | "grant-app" | "revoke-app" | "grant-cairn" | "revoke-cairn" | "sign-out" | "reset" | "deactivate" | "reactivate" | "anonymize" | "mfa-reset"; user: SystemUser };
 
 export function UsersSection({ accessToken, session }: { accessToken: string; session: SharedSession }) {
   const [users, isLoading, reload] = useSystemData<SystemUser[]>(systemKeys.users(), () => listSystemUsers(accessToken));
@@ -118,6 +119,9 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
       } else if (pending.kind === "reactivate") {
         await reactivateSystemUser(accessToken, pending.user.id);
         showToast("success", `${pending.user.display_name} can sign in again with their password.`);
+      } else if (pending.kind === "grant-cairn" || pending.kind === "revoke-cairn") {
+        await setCairnAdmin(accessToken, pending.user.id, pending.kind === "grant-cairn");
+        showToast("success", pending.kind === "grant-cairn" ? `${pending.user.display_name} is now a CAIRN administrator.` : `${pending.user.display_name} is no longer a CAIRN administrator.`);
       } else if (pending.kind === "grant-app" || pending.kind === "revoke-app") {
         await setAppAdmin(accessToken, pending.user.id, pending.kind === "grant-app");
         showToast("success", pending.kind === "grant-app" ? `${pending.user.display_name} is now an app administrator.` : `${pending.user.display_name} is no longer an app administrator.`);
@@ -143,6 +147,8 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
     revoke: { title: `Remove ${pending.user.display_name} from the system administrators?`, description: pending.user.id === session.user.id ? "You will lose access to the System pages and to workspaces you are not a member of." : "They keep their own organization and workspace memberships.", action: "Remove role" },
     "grant-app": { title: `Make ${pending.user.display_name} an app administrator?`, description: "They can manage users, settings, logs and maintenance for the whole server, but are not an administrator of every organization and workspace: they only reach the ones they belong to.", action: "Make app administrator" },
     "revoke-app": { title: `Remove ${pending.user.display_name} from the app administrators?`, description: pending.user.id === session.user.id ? "You will lose access to the System pages." : "They keep their own organization and workspace memberships.", action: "Remove role" },
+    "grant-cairn": { title: `Make ${pending.user.display_name} a CAIRN administrator?`, description: "They can administer CAIRN's models, limits and settings for the whole server, but not the server itself, and they are not an administrator of every organization and workspace.", action: "Make CAIRN administrator" },
+    "revoke-cairn": { title: `Remove ${pending.user.display_name} from the CAIRN administrators?`, description: "They keep their own organization and workspace memberships. System administrators stay CAIRN administrators by right.", action: "Remove role" },
     "sign-out": { title: `Sign ${pending.user.display_name} out everywhere?`, description: "Every device signed in to this account is signed out at once, and its personal access tokens are revoked, so scripts using them stop too. Their password is not changed.", action: "Sign out everywhere" },
     deactivate: { title: `Deactivate ${pending.user.display_name}?`, description: "They can no longer sign in or use a token. Their sessions end now, their API tokens are revoked and the invitations they sent are withdrawn. Everything they wrote stays, and so do their memberships. An owner must transfer what they own first. You can reactivate the account later.", action: "Deactivate account" },
     anonymize: { title: `Anonymize ${pending.user.display_name}?`, description: <>Their email address, name, password, picture, memberships, notices and conversations with Cairn are removed for good, and the address and name are taken out of activity summaries. What they wrote stays, credited to <strong>Former member</strong>. Log files and earlier backups are not rewritten. <strong>This cannot be undone.</strong> Type <code>{pending.user.email}</code> to confirm.</>, action: "Anonymize account" },
@@ -162,7 +168,7 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
       <thead><tr><th scope="col">Person</th><th scope="col">Role</th><th scope="col">Organizations and workspaces</th><th scope="col">Sessions</th><th scope="col">Last connected</th><th scope="col">Joined</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead>
       <tbody>{paging.rows.map((user) => <tr className={user.deactivated_at ? "rm-system-row-inactive" : undefined} key={user.id}>
         <th scope="row"><span className="rm-system-person"><UserAvatar name={user.display_name} size={32} userId={user.id} /><span><strong>{user.display_name}{user.id === session.user.id ? " (you)" : ""}</strong><small>{user.email}{user.two_step ? " · two-step on" : ""}</small>{user.deactivated_at ? <small><Tooltip content={`Deactivated ${formatTime(user.deactivated_at)}`}><Badge icon={<UserOff size={ICON_SIZE.sm} />} tone="warning">{user.anonymized_at ? "Anonymized" : "Deactivated"}</Badge></Tooltip></small> : null}</span></span></th>
-        <td>{user.is_system_admin ? <Tooltip content="Administers the server and every organization and workspace"><Badge icon={<ServerCog size={ICON_SIZE.sm} />}>Sys Admin</Badge></Tooltip> : user.is_app_admin ? <Tooltip content="Uses the System pages, without access to every organization and workspace"><Badge icon={<UserCog size={ICON_SIZE.sm} />}>App Admin</Badge></Tooltip> : <Badge icon={<UserIcon size={ICON_SIZE.sm} />}>User</Badge>}</td>
+        <td>{user.is_system_admin ? <Tooltip content="Administers the server and every organization and workspace"><Badge icon={<ServerCog size={ICON_SIZE.sm} />}>Sys Admin</Badge></Tooltip> : user.is_app_admin ? <Tooltip content="Uses the System pages, without access to every organization and workspace"><Badge icon={<UserCog size={ICON_SIZE.sm} />}>App Admin</Badge></Tooltip> : <Badge icon={<UserIcon size={ICON_SIZE.sm} />}>User</Badge>}{user.is_cairn_admin && !user.is_system_admin ? <> <Tooltip content="Administers CAIRN's models, limits and settings, not the server"><Badge icon={<ShieldCheck size={ICON_SIZE.sm} />}>CAIRN Admin</Badge></Tooltip></> : null}</td>
         <td><AccessTree user={user} /></td><td>{count(user.active_sessions)}</td><td>{formatTime(user.last_connected_at)}</td><td>{formatTime(user.created_at)}</td>
         <td>{session.is_system_admin && !user.anonymized_at ? <ActionMenu items={[
           user.is_system_admin
@@ -171,6 +177,9 @@ export function UsersSection({ accessToken, session }: { accessToken: string; se
           user.is_app_admin
             ? { label: "Remove app administrator role", icon: <ShieldOff size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "revoke-app", user }), destructive: true }
             : { label: "Make app administrator", icon: <UserCog size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "grant-app", user }) },
+          user.is_cairn_admin
+            ? { label: "Remove CAIRN administrator role", icon: <ShieldOff size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "revoke-cairn", user }), destructive: true }
+            : { label: "Make CAIRN administrator", icon: <ShieldCheck size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "grant-cairn", user }) },
           { label: "Create password reset link", icon: <Key size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "reset", user }) },
           { label: "Sign out everywhere", icon: <Logout size={ICON_SIZE.sm} />, onSelect: () => setPending({ kind: "sign-out", user }), destructive: true },
           { label: "Lift sign-in lockout", icon: <LockOpen size={ICON_SIZE.sm} />, onSelect: () => void unlock(user) },

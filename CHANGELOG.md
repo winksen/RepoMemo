@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.71 (2026-11-26)
+
+A system administrator can make a person a CAIRN administrator.
+
+### Security
+- **CAIRN administrators.** A new role, `users.cairn_admin` (migration `0100_cairn_admin.sql`), is granted and removed by a system administrator in System › Users (*Make CAIRN administrator*), with `PUT /v1/system/users/{user_id}/cairn-admin` or with `users cairn-admin <email> on|off --yes` in the console. System administrators are CAIRN administrators by right. Each change is an audit event, `cairn_admin_granted` or `cairn_admin_revoked`.
+- **Two guards for the rows that follow.** `require_cairn_admin` admits system and CAIRN administrators, with a session or a `system`-scope token; `require_cairn_reader` adds app administrators, who read and change nothing. No page or route uses them yet: the administration page is V0.9.72. The role opens nothing else today: a CAIRN administrator still cannot read the System pages.
+- **Tokens.** A CAIRN administrator may create a `system`-scope token, as system and app administrators may.
+- **Session.** `GET /v1/session` returns `is_cairn_admin`, true for system administrators too. Anonymizing an account clears the role.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; the migration is locked and `npm run docs:check` passes. Two tests were added (the grant, the console command and the audit; the guards for a member, a CAIRN, system and app administrator and a token); tests not run.
+
+### Upgrading
+- A migration adds the column; nobody is a CAIRN administrator until a system administrator makes them one.
+
 ## V0.9.70 (2026-11-26)
 
 CAIRN's administration is planned; nothing changes for people yet.

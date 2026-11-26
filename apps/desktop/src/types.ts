@@ -314,6 +314,8 @@ export interface SharedSession {
   is_system_admin?: boolean;
   /** Uses the System pages without the wildcard administrator access. */
   is_app_admin?: boolean;
+  /** Administers CAIRN's models, limits and settings: by a system administrator's grant, or by being one. */
+  is_cairn_admin?: boolean;
   /** The server lets this person create an organization; absent on an older server, where everyone could. */
   can_create_organizations?: boolean;
 }
@@ -886,6 +888,7 @@ export interface SystemUser {
   last_connected_at: string | null;
   is_system_admin: boolean;
   is_app_admin: boolean;
+  is_cairn_admin: boolean;
   deactivated_at: string | null;
   anonymized_at: string | null;
   organization_count: number;

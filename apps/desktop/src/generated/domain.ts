@@ -696,6 +696,8 @@ export interface SharedSession {
    * every organization and workspace.
    */
   is_app_admin: boolean;
+  /** The user administers CAIRN (models, limits and settings), by the grant of a system administrator or by being one. */
+  is_cairn_admin: boolean;
   /** The server lets this person create an organization (see the system setting `organization_creators`). */
   can_create_organizations: boolean;
 }
@@ -2935,6 +2937,7 @@ export interface SystemUser {
   last_connected_at: string | null;
   is_system_admin: boolean;
   is_app_admin: boolean;
+  is_cairn_admin: boolean;
   /**
    * When the account was deactivated, if it is. It cannot sign in or use
    * tokens until it is reactivated.

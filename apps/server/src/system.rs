@@ -906,6 +906,32 @@ pub(crate) fn require_system_admin(subject: &AuthenticatedSubject) -> Result<(),
     }
 }
 
+/// CAIRN's administration (V0.9.71): system administrators by right and the people they made CAIRN administrators, with a
+/// signed-in session or a personal access token with the `system` scope, so a leaked read-and-write token cannot change how
+/// CAIRN is administered.
+#[cfg_attr(not(test), allow(dead_code))] // the administration routes of V0.9.72 use it
+pub(crate) fn require_cairn_admin(subject: &AuthenticatedSubject) -> Result<(), ApiError> {
+    if !(subject.is_system_admin || subject.is_cairn_admin) {
+        return Err(ApiError::forbidden_because(
+            "Only system administrators and CAIRN administrators can change how CAIRN is administered.",
+        ));
+    }
+    require_system_change(subject)
+}
+
+/// Reading CAIRN's administration: the people of [`require_cairn_admin`] and app administrators, who read and change nothing,
+/// as they do in System.
+#[cfg_attr(not(test), allow(dead_code))] // the administration routes of V0.9.72 use it
+pub(crate) fn require_cairn_reader(subject: &AuthenticatedSubject) -> Result<(), ApiError> {
+    if subject.is_system_admin || subject.is_cairn_admin || subject.is_app_admin {
+        Ok(())
+    } else {
+        Err(ApiError::forbidden_because(
+            "Only system, CAIRN and app administrators can read how CAIRN is administered.",
+        ))
+    }
+}
+
 /// What only system administrators do (review M8): roles, run-time settings,
 /// other people's sessions, lockouts and passwords, the environment, and the
 /// raw log files. App administrators read the System pages and run jobs and
@@ -1302,6 +1328,47 @@ pub(crate) async fn set_app_admin(
             &subject,
             "app_admin_revoked",
             format!("Removed {who} from the app administrators."),
+        )
+        .await;
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Makes a person a CAIRN administrator, or removes the role. System administrators are CAIRN administrators by right and
+/// keep that whatever this flag says.
+pub(crate) async fn set_cairn_admin(
+    SessionSubject(subject): SessionSubject,
+    State(state): State<AppState>,
+    Path(user_id): Path<String>,
+    Json(request): Json<SystemAdminRequest>,
+) -> Result<StatusCode, ApiError> {
+    require_full_system_admin(&subject)?;
+    let user = state
+        .storage
+        .find_user(&user_id)
+        .await
+        .map_err(ApiError::internal)?
+        .ok_or_else(|| ApiError::not_found("User was not found."))?;
+    state
+        .storage
+        .set_cairn_admin(&user_id, request.enabled)
+        .await
+        .map_err(map_storage_error)?;
+    let who = user.email.unwrap_or(user.display_name);
+    if request.enabled {
+        audit(
+            &state,
+            &subject,
+            "cairn_admin_granted",
+            format!("Made {who} a CAIRN administrator."),
+        )
+        .await;
+    } else {
+        audit(
+            &state,
+            &subject,
+            "cairn_admin_revoked",
+            format!("Removed {who} from the CAIRN administrators."),
         )
         .await;
     }

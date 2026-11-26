@@ -288,6 +288,7 @@ async fn run_routine_with(state: &AppState, routine: &AgentRoutine, prompt: Opti
         session_version: 0,
         is_system_admin: false,
         is_app_admin: false,
+        is_cairn_admin: false,
         token: None,
     };
     let result = crate::agent::run_routine_message(

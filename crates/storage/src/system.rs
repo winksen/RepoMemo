@@ -33,6 +33,8 @@ pub struct UserAccess {
     /// Uses the system pages and API, without the access to every organization
     /// and workspace.
     pub is_app_admin: bool,
+    /// Administers CAIRN (its models, limits and settings) without administering the server.
+    pub is_cairn_admin: bool,
 }
 
 impl StorageEngine {
@@ -40,17 +42,33 @@ impl StorageEngine {
     /// when the user no longer exists or is deactivated (so a token of a
     /// deactivated account, of either kind, is never accepted).
     pub async fn user_access(&self, user_id: &str) -> Result<Option<UserAccess>> {
-        let row = sqlx::query_as::<_, (i64, i64, i64)>(
-            "SELECT session_version, is_system_admin, is_app_admin FROM users WHERE id = ?1 AND deactivated_at IS NULL",
+        let row = sqlx::query_as::<_, (i64, i64, i64, i64)>(
+            "SELECT session_version, is_system_admin, is_app_admin, is_cairn_admin FROM users WHERE id = ?1 AND deactivated_at IS NULL",
         )
         .bind(user_id)
         .fetch_optional(self.reader())
         .await?;
-        Ok(row.map(|(session_version, is_system_admin, is_app_admin)| UserAccess {
-            session_version,
-            is_system_admin: is_system_admin != 0,
-            is_app_admin: is_app_admin != 0,
-        }))
+        Ok(row.map(
+            |(session_version, is_system_admin, is_app_admin, is_cairn_admin)| UserAccess {
+                session_version,
+                is_system_admin: is_system_admin != 0,
+                is_app_admin: is_app_admin != 0,
+                is_cairn_admin: is_cairn_admin != 0,
+            },
+        ))
+    }
+
+    /// Grants or removes the CAIRN-administrator role.
+    pub async fn set_cairn_admin(&self, user_id: &str, enabled: bool) -> Result<()> {
+        let changed = sqlx::query("UPDATE users SET is_cairn_admin = ?1 WHERE id = ?2 AND anonymized_at IS NULL")
+            .bind(enabled)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+        if changed.rows_affected() == 0 {
+            repomemo_domain::bail_not_found!("User was not found.");
+        }
+        Ok(())
     }
 
     /// Grants or removes the app-administrator role.
@@ -172,14 +190,14 @@ impl StorageEngine {
         let now = Utc::now().to_rfc3339();
         let rows = sqlx::query(
             r#"
-            SELECT u.id, u.email, u.display_name, u.created_at, u.last_connected_at, u.is_system_admin, u.is_app_admin,
+            SELECT u.id, u.email, u.display_name, u.created_at, u.last_connected_at, u.is_system_admin, u.is_app_admin, u.is_cairn_admin,
               u.deactivated_at, u.anonymized_at,
               (SELECT COUNT(*) FROM organization_memberships m WHERE m.user_id = u.id) AS organization_count,
               (SELECT COUNT(*) FROM workspace_memberships m WHERE m.user_id = u.id) AS workspace_count,
               (SELECT COUNT(*) FROM refresh_tokens t WHERE t.user_id = u.id AND t.revoked_at IS NULL AND t.expires_at > ?1) AS active_sessions,
               EXISTS (SELECT 1 FROM user_mfa f WHERE f.user_id = u.id AND f.enabled = 1) AS two_step
             FROM users u
-            ORDER BY (u.deactivated_at IS NOT NULL) ASC, u.is_system_admin DESC, u.is_app_admin DESC, u.display_name COLLATE NOCASE ASC
+            ORDER BY (u.deactivated_at IS NOT NULL) ASC, u.is_system_admin DESC, u.is_app_admin DESC, u.is_cairn_admin DESC, u.display_name COLLATE NOCASE ASC
             "#,
         )
         .bind(&now)
@@ -229,6 +247,7 @@ impl StorageEngine {
                 last_connected_at: row.get("last_connected_at"),
                 is_system_admin: row.get::<i64, _>("is_system_admin") != 0,
                 is_app_admin: row.get::<i64, _>("is_app_admin") != 0,
+                is_cairn_admin: row.get::<i64, _>("is_cairn_admin") != 0,
                 deactivated_at: row.get("deactivated_at"),
                 anonymized_at: row.get("anonymized_at"),
                 organization_count: row.get("organization_count"),

@@ -382,6 +382,7 @@ async fn resolve_identity(
         session_version: 0,
         is_system_admin: false,
         is_app_admin: false,
+        is_cairn_admin: false,
         token: None,
     };
     let token = serde_json::from_value(json!({"token":invitation})).map_err(ApiError::internal)?;

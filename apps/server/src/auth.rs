@@ -475,6 +475,7 @@ pub(crate) async fn session(
         memberships,
         is_system_admin: subject.is_system_admin,
         is_app_admin: subject.is_app_admin,
+        is_cairn_admin: subject.is_system_admin || subject.is_cairn_admin,
         can_create_organizations: state.settings().organization_creators == "everyone"
             || subject.is_system_admin
             || subject.is_app_admin,

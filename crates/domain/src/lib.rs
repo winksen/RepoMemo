@@ -770,6 +770,9 @@ pub struct SharedSession {
     /// every organization and workspace.
     #[serde(default)]
     pub is_app_admin: bool,
+    /// The user administers CAIRN (models, limits and settings), by the grant of a system administrator or by being one.
+    #[serde(default)]
+    pub is_cairn_admin: bool,
     /// The server lets this person create an organization (see the system setting `organization_creators`).
     #[serde(default)]
     pub can_create_organizations: bool,
@@ -3365,6 +3368,8 @@ pub struct SystemUser {
     pub is_system_admin: bool,
     #[serde(default)]
     pub is_app_admin: bool,
+    #[serde(default)]
+    pub is_cairn_admin: bool,
     /// When the account was deactivated, if it is. It cannot sign in or use
     /// tokens until it is reactivated.
     #[serde(default)]

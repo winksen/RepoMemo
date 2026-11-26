@@ -94,6 +94,7 @@ flowchart LR
 | `settings reset <key>` | **yes** | `DELETE /v1/system/settings/{key}` |
 | `logs [--level] [--category] [--grep] [--day] [--limit]` | no | `GET /v1/system/logs` |
 | `users list` | no | `GET /v1/system/users` |
+| `users cairn-admin <email> on\|off` | **yes** | `PUT /v1/system/users/{u}/cairn-admin` |
 | `users unlock <email>` | **yes** | `POST /v1/system/users/{u}/unlock` |
 | `users signout <email>` | **yes** | `POST /v1/system/users/{u}/sessions/end` |
 | `users deactivate <email>` | **yes** | `POST /v1/system/users/{u}/deactivate` |

@@ -282,6 +282,7 @@ pub(crate) async fn authenticate(parts: &Parts, state: &AppState) -> Result<Auth
         session_version: claims.ver,
         is_system_admin: access.is_system_admin,
         is_app_admin: access.is_app_admin,
+        is_cairn_admin: access.is_cairn_admin,
         token: None,
     })
 }
@@ -330,6 +331,7 @@ pub(crate) async fn authenticate_personal_token(
         session_version: access.session_version,
         is_system_admin: access.is_system_admin,
         is_app_admin: access.is_app_admin,
+        is_cairn_admin: access.is_cairn_admin,
         token: Some(TokenGrant {
             token_id: grant.token_id,
             read_only,

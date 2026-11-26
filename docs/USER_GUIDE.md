@@ -595,7 +595,7 @@ flowchart LR
 |---|---|
 | **Overview** | Server health at a glance: version, storage, background work, traffic, locked sign-ins, templates loaded |
 | **Usage** | Activity per day, most active people, and every workspace's size, members and AI use |
-| **Users** | Every account and its memberships. Make system or **app admins** (same pages, but no automatic access to everything), sign someone out everywhere, unlock a sign-in lockout, **deactivate or reactivate** an account, and **anonymize** a deactivated one for good (what they wrote is credited to "Former member") |
+| **Users** | Every account and its memberships. Make system, **app** or **CAIRN admins** (app admins have the same pages but no automatic access to everything; CAIRN admins will administer CAIRN's models and limits, not the server), sign someone out everywhere, unlock a sign-in lockout, **deactivate or reactivate** an account, and **anonymize** a deactivated one for good (what they wrote is credited to "Former member") |
 | **Settings** | Registration, session length, sign-in protection, AI and upload limits, storage per workspace, backups schedule, logging, **mail** (with a test button and outbox), changed live |
 | **Logs** | Live or past events, filtered by kind, level, workspace or text |
 | **Jobs & maintenance** | Every background job (stop one if needed), run maintenance now, and **backups** |

@@ -57,6 +57,7 @@ const COMMANDS: &[CommandSpec] = &[
     CommandSpec { name: "settings reset", usage: "settings reset <key> --yes", summary: "Restores a setting's server default.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "logs", usage: "logs [--level warn] [--category security|activity|jobs|http|ai|database|performance|server] [--grep text] [--workspace id] [--day YYYY-MM-DD] [--limit n] [--after sequence] [--follow]", summary: "Log events, newest first: recent ones, or a day's file.", changes: false, arguments: 0, flags: &["level", "category", "grep", "workspace", "day", "limit", "after"] },
     CommandSpec { name: "users list", usage: "users list", summary: "Every account with its roles and sessions.", changes: false, arguments: 0, flags: &[] },
+    CommandSpec { name: "users cairn-admin", usage: "users cairn-admin <email> on|off --yes", summary: "Makes an account a CAIRN administrator, or removes the role (system administrators). System administrators are CAIRN administrators by right.", changes: true, arguments: 2, flags: &[] },
     CommandSpec { name: "users reset-link", usage: "users reset-link <email> --yes", summary: "Creates a one-time link, valid for 24 hours, that lets the account choose a new password.", changes: true, arguments: 1, flags: &[] },
     CommandSpec { name: "tokens list", usage: "tokens list [--user email]", summary: "Personal access tokens of your account, or of another account (system administrators).", changes: false, arguments: 0, flags: &["user"] },
     CommandSpec { name: "users unlock", usage: "users unlock <email> --yes", summary: "Lifts the sign-in lockouts of an account.", changes: true, arguments: 1, flags: &[] },
@@ -1022,6 +1023,7 @@ async fn execute(
                         "display_name",
                         "is_system_admin",
                         "is_app_admin",
+                        "is_cairn_admin",
                         "active_sessions",
                         "deactivated_at",
                         "last_connected_at",
@@ -1029,6 +1031,47 @@ async fn execute(
                     ],
                 },
                 to_json(users)?,
+            ))
+        }
+
+        "users cairn-admin" => {
+            let enabled = match arguments[1].to_lowercase().as_str() {
+                "on" => true,
+                "off" => false,
+                other => {
+                    return Err(ApiError::bad_request(format!(
+                        "users cairn-admin takes on or off, not {other}."
+                    )))
+                }
+            };
+            let user = find_account(state, &arguments[0]).await?;
+            let name = user.email.clone().unwrap_or_else(|| user.display_name.clone());
+            if !line.yes {
+                return Ok(dry_run(
+                    spec,
+                    if enabled {
+                        format!("Would make {name} a CAIRN administrator: they could administer CAIRN's models, limits and settings, not the server.")
+                    } else {
+                        format!("Would remove {name} from the CAIRN administrators. System administrators stay CAIRN administrators by right.")
+                    },
+                ));
+            }
+            super::set_cairn_admin(
+                as_session(who)?,
+                state_,
+                Path(user.id),
+                Json(super::SystemAdminRequest { enabled }),
+            )
+            .await?;
+            Ok(applied(
+                spec,
+                if enabled {
+                    format!("Made {name} a CAIRN administrator.")
+                } else {
+                    format!("Removed {name} from the CAIRN administrators.")
+                },
+                View::Text,
+                Value::Null,
             ))
         }
 

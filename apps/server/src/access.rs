@@ -400,6 +400,7 @@ async fn inviter_subject(state: &AppState, user_id: &str) -> Result<Option<Authe
         session_version: access.session_version,
         is_system_admin: access.is_system_admin,
         is_app_admin: access.is_app_admin,
+        is_cairn_admin: access.is_cairn_admin,
         token: None,
     }))
 }
@@ -813,9 +814,10 @@ pub(crate) async fn create_token(
     State(state): State<AppState>,
     Json(request): Json<CreateTokenRequest>,
 ) -> Result<(StatusCode, Json<CreatedToken>), ApiError> {
-    if request.scope.trim() == "system" && !(subject.is_system_admin || subject.is_app_admin) {
+    if request.scope.trim() == "system" && !(subject.is_system_admin || subject.is_app_admin || subject.is_cairn_admin)
+    {
         return Err(ApiError::forbidden_because(
-            "Only system and app administrators can create tokens with the system scope.",
+            "Only system, app and CAIRN administrators can create tokens with the system scope.",
         ));
     }
     if !TOKEN_TTL_DAYS.contains(&request.expires_in_days) {

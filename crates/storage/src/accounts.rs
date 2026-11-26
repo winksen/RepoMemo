@@ -425,7 +425,7 @@ impl StorageEngine {
         // a password hash that matches nothing.
         let placeholder = format!("former-member-{}@anonymized.invalid", user_id.replace('-', ""));
         sqlx::query(
-            "UPDATE users SET email = ?1, display_name = ?2, password_hash = '!', is_system_admin = 0, is_app_admin = 0, email_unverified_at = NULL, anonymized_at = ?3, updated_at = ?3 WHERE id = ?4",
+            "UPDATE users SET email = ?1, display_name = ?2, password_hash = '!', is_system_admin = 0, is_app_admin = 0, is_cairn_admin = 0, email_unverified_at = NULL, anonymized_at = ?3, updated_at = ?3 WHERE id = ?4",
         )
         .bind(placeholder)
         .bind(FORMER_MEMBER)

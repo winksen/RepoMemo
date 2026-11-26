@@ -745,6 +745,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/users", get(system::list_users))
         .route("/v1/system/users/{user_id}/system-admin", put(system::set_system_admin))
         .route("/v1/system/users/{user_id}/app-admin", put(system::set_app_admin))
+        .route("/v1/system/users/{user_id}/cairn-admin", put(system::set_cairn_admin))
         .route(
             "/v1/system/users/{user_id}/sessions/end",
             post(system::end_user_sessions),

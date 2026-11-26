@@ -794,6 +794,8 @@ pub(crate) struct AuthenticatedSubject {
     pub(crate) is_system_admin: bool,
     /// May use the system API and pages, without the wildcard access.
     pub(crate) is_app_admin: bool,
+    /// Administers CAIRN: its models, limits and settings (V0.9.71).
+    pub(crate) is_cairn_admin: bool,
     /// Set when the request came with a personal access token instead of a
     /// browser session.
     pub(crate) token: Option<TokenGrant>,

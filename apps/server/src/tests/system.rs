@@ -1417,3 +1417,158 @@ async fn a_clean_stop_leaves_a_database_that_needs_no_recovery() {
     again.finish().await;
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_system_administrator_makes_a_cairn_administrator() {
+    let data_dir = temp_data_dir("cairn-admin");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "cairn-root@example.com").await;
+    let (helper, helper_tokens) = register_account(&app, "cairn-helper@example.com").await;
+    let helper_id = helper_tokens["user"]["id"].as_str().unwrap().to_owned();
+    let uri = format!("/v1/system/users/{helper_id}/cairn-admin");
+
+    let session = |who: String| {
+        let app = app.clone();
+        async move { response_json(app.oneshot(auth_request("GET", "/v1/session", &who)).await.unwrap()).await }
+    };
+    assert_eq!(session(helper.clone()).await["is_cairn_admin"], false);
+    assert_eq!(
+        session(admin.clone()).await["is_cairn_admin"],
+        true,
+        "system administrators are CAIRN administrators by right"
+    );
+
+    // A member cannot grant the role, not even to themselves.
+    assert_eq!(
+        send("PUT", uri.clone(), &helper, json!({"enabled": true}))
+            .await
+            .status(),
+        403
+    );
+    assert_eq!(
+        send("PUT", uri.clone(), &admin, json!({"enabled": true}))
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(session(helper.clone()).await["is_cairn_admin"], true);
+
+    // The role is not a System page: a CAIRN administrator still cannot read System.
+    let read = app
+        .clone()
+        .oneshot(auth_request("GET", "/v1/system/users", &helper))
+        .await
+        .unwrap();
+    assert_eq!(read.status(), 403);
+    assert_eq!(
+        send("PUT", uri.clone(), &helper, json!({"enabled": false}))
+            .await
+            .status(),
+        403
+    );
+
+    // The console lists it and changes it as a dry run first.
+    let users = response_json(
+        send(
+            "POST",
+            "/v1/system/console".to_owned(),
+            &admin,
+            json!({"command": "users list"}),
+        )
+        .await,
+    )
+    .await;
+    assert!(users["view"]["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|column| column == "is_cairn_admin"));
+    let dry = response_json(
+        send(
+            "POST",
+            "/v1/system/console".to_owned(),
+            &admin,
+            json!({"command": "users cairn-admin cairn-helper@example.com off"}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(dry["dry_run"], true, "{dry}");
+    assert_eq!(session(helper.clone()).await["is_cairn_admin"], true);
+    let applied = send(
+        "POST",
+        "/v1/system/console".to_owned(),
+        &admin,
+        json!({"command": "users cairn-admin cairn-helper@example.com off --yes"}),
+    )
+    .await;
+    assert_eq!(applied.status(), 200);
+    assert_eq!(session(helper.clone()).await["is_cairn_admin"], false);
+    assert_eq!(
+        send(
+            "POST",
+            "/v1/system/console".to_owned(),
+            &admin,
+            json!({"command": "users cairn-admin cairn-helper@example.com maybe --yes"}),
+        )
+        .await
+        .status(),
+        400
+    );
+
+    // Both changes are in the audit trail.
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &admin))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    assert!(audit.contains("cairn_admin_granted") && audit.contains("cairn_admin_revoked"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[test]
+fn cairn_administration_is_open_to_cairn_and_system_administrators_and_read_by_app_administrators() {
+    use crate::system::{require_cairn_admin, require_cairn_reader};
+    let subject =
+        |system: bool, app: bool, cairn: bool, token: Option<crate::TokenGrant>| crate::AuthenticatedSubject {
+            user_id: "person".to_owned(),
+            expires_at: 0,
+            session_version: 0,
+            is_system_admin: system,
+            is_app_admin: app,
+            is_cairn_admin: cairn,
+            token,
+        };
+    let token = |system: bool| crate::TokenGrant {
+        token_id: "token".to_owned(),
+        read_only: false,
+        admin: false,
+        system,
+        mcp: false,
+        workspaces: None,
+    };
+    // A member is refused.
+    let member = subject(false, false, false, None);
+    assert!(require_cairn_admin(&member).is_err());
+    assert!(require_cairn_reader(&member).is_err());
+    // A CAIRN administrator and a system administrator change and read.
+    for who in [subject(false, false, true, None), subject(true, false, false, None)] {
+        assert!(require_cairn_admin(&who).is_ok());
+        assert!(require_cairn_reader(&who).is_ok());
+    }
+    // An app administrator reads and cannot change.
+    let reader = subject(false, true, false, None);
+    assert!(require_cairn_reader(&reader).is_ok());
+    assert!(require_cairn_admin(&reader).is_err());
+    // A token changes things only with the system scope.
+    assert!(require_cairn_admin(&subject(false, false, true, Some(token(false)))).is_err());
+    assert!(require_cairn_admin(&subject(false, false, true, Some(token(true)))).is_ok());
+}

@@ -1771,6 +1771,13 @@ export function listSystemUsers(accessToken: string): Promise<SystemUser[]> {
   return request<SystemUser[]>("/v1/system/users", {}, accessToken);
 }
 
+export function setCairnAdmin(accessToken: string, userId: string, enabled: boolean): Promise<void> {
+  return request<void>(`/v1/system/users/${encodeURIComponent(userId)}/cairn-admin`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  }, accessToken);
+}
+
 export function setAppAdmin(accessToken: string, userId: string, enabled: boolean): Promise<void> {
   return request<void>(`/v1/system/users/${encodeURIComponent(userId)}/app-admin`, {
     method: "PUT",
