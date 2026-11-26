@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.103` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.104` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.104 — CAIRN abilities are stored, versioned and served by an API.
+
+- **Abilities (storage and API).** An organization's or a workspace's administrators can teach CAIRN a procedure: a name, a /command, a description, instructions, the tools it may use (only registered ones), the fields it asks for and an output template. Each publish is a new version and every version is kept. An ability can be turned off or deleted. Nothing runs an ability yet; the page and the running come in the next releases.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.103 — The administration page has a history of every change.
 

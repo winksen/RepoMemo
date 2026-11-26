@@ -38,7 +38,7 @@ pub(crate) struct SettingsRequest {
 
 /// Whether the caller reads or changes an organization's CAIRN settings. CAIRN and system administrators may do both for every
 /// organization; app administrators read; members read their own; owners and admins change their own.
-async fn require_access(
+pub(crate) async fn require_access(
     state: &AppState,
     subject: &AuthenticatedSubject,
     organization_id: &str,

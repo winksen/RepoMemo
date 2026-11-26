@@ -21,6 +21,7 @@ mod backup;
 mod backup_copy;
 mod backup_crypto;
 mod build_info;
+mod cairn_abilities;
 mod cairn_admin;
 mod cairn_connections;
 mod cairn_models;
@@ -877,6 +878,26 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route(
             "/v1/organizations/{organization_id}/cairn/models",
             get(organization_cairn::list_models),
+        )
+        .route(
+            "/v1/organizations/{organization_id}/cairn/abilities",
+            get(cairn_abilities::list_organization).post(cairn_abilities::create_organization),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/cairn/abilities",
+            get(cairn_abilities::list_workspace).post(cairn_abilities::create_workspace),
+        )
+        .route(
+            "/v1/cairn/abilities/{ability_id}",
+            put(cairn_abilities::publish).delete(cairn_abilities::remove),
+        )
+        .route(
+            "/v1/cairn/abilities/{ability_id}/enabled",
+            put(cairn_abilities::set_enabled),
+        )
+        .route(
+            "/v1/cairn/abilities/{ability_id}/versions",
+            get(cairn_abilities::versions),
         )
         .route(
             "/v1/workspaces/{workspace_id}/cairn",

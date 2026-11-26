@@ -164,6 +164,14 @@
 | GET | `/v1/cairn/admin/history` | auth | require_cairn_reader, or an owner or admin of an organization | — | Vec<HistoryEntry> |
 | GET | `/v1/cairn/tools` | auth | any signed-in person | — | Vec<SwitchableTool> |
 | GET | `/v1/organizations/{organization_id}/cairn` | auth | organization member, or require_cairn_reader | — | OrganizationCairnSettings |
+| GET | `/v1/organizations/{organization_id}/cairn/abilities` | auth | organization member, or require_cairn_reader | — | Vec<CairnAbility> |
+| POST | `/v1/organizations/{organization_id}/cairn/abilities` | auth | organization owner or admin, or require_cairn_admin | AbilityRequest | CairnAbility |
+| GET | `/v1/workspaces/{workspace_id}/cairn/abilities` | auth | workspace admin | — | Vec<CairnAbility> |
+| POST | `/v1/workspaces/{workspace_id}/cairn/abilities` | auth | workspace admin | AbilityRequest | CairnAbility |
+| PUT | `/v1/cairn/abilities/{ability_id}` | auth | as the ability's scope | AbilityRequest (+ expected_version) | CairnAbility |
+| DELETE | `/v1/cairn/abilities/{ability_id}` | auth | as the ability's scope | — | { deleted } |
+| PUT | `/v1/cairn/abilities/{ability_id}/enabled` | auth | as the ability's scope | { enabled } | CairnAbility |
+| GET | `/v1/cairn/abilities/{ability_id}/versions` | auth | as the ability's scope | — | Vec<AbilityVersion> |
 | POST | `/v1/organizations/{organization_id}/cairn/retention-preview` | auth | organization owner or admin, or require_cairn_admin | Guardrails | RetentionCounts |
 | GET | `/v1/organizations/{organization_id}/cairn/models` | auth | organization owner or admin, or require_cairn_admin | — | Vec<ModelView> |
 | PUT | `/v1/organizations/{organization_id}/cairn` | session or admin token | organization owner or admin, or require_cairn_admin | `{enabled_model_ids, default_model_id, agent_mode, expected_version}` | OrganizationCairnSettings |

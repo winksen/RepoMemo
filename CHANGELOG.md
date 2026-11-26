@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.104 (2026-11-26)
+
+CAIRN abilities are stored, versioned and served by an API.
+
+### Added
+- **Abilities.** A procedure an organization or a workspace teaches CAIRN: a name, a `/command` (2 to 30 lower case letters, digits or hyphens), a description, instructions (up to 8,000 characters), the tools it may use, up to 8 input fields and an output template. The command is unique within its organization or workspace.
+- **Versions.** Publishing makes a new version and keeps the old ones. A publish names the version it read; a stale one is refused with the current version, like the other CAIRN settings. `GET /v1/cairn/abilities/{id}/versions` lists who published each and when.
+- **Rights.** Organization owners and admins, and CAIRN and system administrators, change an organization's abilities; a workspace's administrators change the workspace's. The tools are checked against the registry, so an ability can never add a tool or a right.
+- **Audit.** Creating, publishing, turning on or off and deleting are `cairn_ability_*` audit events, so they appear in the administration history.
+- **Migration 0106.** Two tables, `cairn_abilities` and `cairn_ability_versions`.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. One storage test was added (versions and the stale publish); no test was run and no route was called.
+
+### Upgrading
+- The migration runs on start. Nothing else to do.
+
 ## V0.9.103 (2026-11-26)
 
 The administration page has a history of every change.
