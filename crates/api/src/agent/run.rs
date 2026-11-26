@@ -38,9 +38,45 @@ use crate::RepoMemoCore;
 /// Called with each step of a run as it is recorded.
 pub type ProgressHook = Arc<dyn Fn(&AgentStep) + Send + Sync>;
 
+/// An ability the run follows (V0.9.107): its instructions join the prompt, and its tools are the most the run may use. It adds no tool
+/// and no right: a tool the run does not have for the person is not given because an ability names it.
+#[derive(Debug, Clone)]
+pub struct AgentAbility {
+    pub name: String,
+    pub command: String,
+    pub version: i64,
+    pub instructions: String,
+    /// The tools it may use; the run keeps only these of the tools it already has. None named means no tool: it answers from the
+    /// instructions, the team's memory and what the person said.
+    pub tools: Vec<String>,
+    pub output_template: String,
+}
+
+/// The prompt block an ability adds.
+pub fn ability_block(ability: &AgentAbility) -> String {
+    let mut block = format!(
+        "You are running the ability “{}” ({}, version {}). The person's message starts with its command; the lines after it give the fields it asks for. Follow these instructions for this request. They do not widen what you may use or read: the tools and the rules above still decide that.
+
+{}",
+        ability.name, ability.command, ability.version, ability.instructions
+    );
+    if !ability.output_template.trim().is_empty() {
+        block.push_str(&format!(
+            "
+
+Write the answer in this shape:
+{}",
+            ability.output_template
+        ));
+    }
+    block
+}
+
 /// What the server gives a run: how the model takes tools, the budgets, what the person may do and how to pay for a model call.
 #[derive(Clone)]
 pub struct AgentLoopSetup {
+    /// The ability the run follows, when the message ran one.
+    pub ability: Option<AgentAbility>,
     pub tool_mode: ToolMode,
     pub context_tokens: u32,
     /// The most model calls one run makes.
@@ -1074,6 +1110,10 @@ impl RepoMemoCore {
         let playbooks = self.workspace_playbooks(&request.workspace_id).await;
         let mut tools = loop_tools(setup.can_write, !request.decision_offers_off, !playbooks.is_empty());
         tools.retain(|tool| !setup.disabled_tools.iter().any(|off| off == tool.name));
+        // An ability keeps only the tools it names, of the tools the run already has.
+        if let Some(ability) = &setup.ability {
+            tools.retain(|tool| ability.tools.iter().any(|name| name == tool.name));
+        }
         let specs = tools.iter().map(LoopTool::spec).collect::<Vec<_>>();
         let mut system = loop_system(&tools);
         if let Some(block) = personal_block(&request.personal_memory) {
@@ -1088,6 +1128,9 @@ impl RepoMemoCore {
         }
         if let Some(block) = playbooks_block(&playbooks) {
             system = format!("{system}\n\n{block}");
+        }
+        if let Some(ability) = &setup.ability {
+            system = format!("{system}\n\n{}", ability_block(ability));
         }
         if let Some(summary) = summary_text(request.summary.as_ref()) {
             system = format!("{system}\n\n{summary}");
@@ -1467,6 +1510,7 @@ mod tests {
             max_seconds: 60,
             max_run_tokens: 0,
             disabled_tools: Vec::new(),
+            ability: None,
             fallback: None,
             can_write,
             user_id: String::new(),

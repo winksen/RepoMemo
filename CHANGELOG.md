@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.107 (2026-11-26)
+
+CAIRN runs an ability from its /command.
+
+### Added
+- **Run an ability.** A message that starts with an ability's `/command` runs CAIRN's loop with the ability's instructions added to the prompt and with only the tools the ability names, among those the run already has. An ability can narrow a run, never widen it: a viewer still gets no tool that changes the workspace, and a tool turned off stays off.
+- **Fields asked first.** An ability that asks for fields has them asked before it runs. The + menu puts the command and one `Label:` line for each field in the message box; a message that leaves one empty is answered with what is missing, and nothing is spent. An ability with one field also takes the words after the command.
+- **Named in the trace and the answer.** The first step of the run's trace is "Ability: name, version N", and the answer ends with the same line, so what followed which version of an ability can be told.
+- **Jobs mode.** An ability needs Agent mode. In the + menu it is shown disabled with that reason, and typing its command answers that it needs Agent mode.
+- **Output template.** When an ability has one, the prompt asks the answer to take its shape.
+
+### Not yet
+- **Try in a scratch chat** on the administration page. It needs a run kept nowhere, which has no home yet; it is not in this release.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. Two unit tests were added (the command and the fields); no test was run and no ability was run against a model.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.106 (2026-11-26)
 
 Workspaces turn organization abilities on or off, add their own, and offer them in the chat.

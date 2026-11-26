@@ -33,6 +33,9 @@ import { useAssistantCommands } from "../lib/useAssistantCommands";
 import { ASSISTANT_NAME } from "../lib/assistantName";
 import { submitShortcutLabel } from "../lib/submitShortcut";
 
+/** A new line, for the fields an ability asks. */
+const NL = String.fromCharCode(10);
+
 /** A turn as shown: stored turns plus the one waiting for, or failing to get, a reply. */
 type ThreadTurn = {
   key: string;
@@ -616,7 +619,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
                 </MenuPrimitive.Group>)}
                 {capabilities?.abilities?.length ? <MenuPrimitive.Group>
                   <MenuPrimitive.Label className="rm-action-heading">Abilities</MenuPrimitive.Label>
-                  {capabilities.abilities.map((ability) => <MenuPrimitive.Item className="rm-action-item" disabled={isBusy || isLoadingChat} key={ability.id} onSelect={() => { setSelected(null); setDraft(`${ability.command} `); input.current?.focus(); }} title={ability.description || `Run ${ability.name} with ${ability.command}.`}>
+                  {capabilities.abilities.map((ability) => <MenuPrimitive.Item className="rm-action-item" disabled={isBusy || isLoadingChat || ability.needs_agent_mode} key={ability.id} onSelect={() => { setSelected(null); setDraft(ability.inputs.length ? `${ability.command}${NL}${ability.inputs.map((field) => `${field.label}: `).join(NL)}` : `${ability.command} `); input.current?.focus(); }} title={ability.needs_agent_mode ? `${ability.name} needs Agent mode, which this workspace's model does not run in.` : ability.description || `Run ${ability.name} with ${ability.command}.`}>
                     <Sparkle size={ICON_SIZE.md} /><span>{ability.name}</span><small className="shared-muted-copy">{ability.command}</small>
                   </MenuPrimitive.Item>)}
                 </MenuPrimitive.Group> : null}

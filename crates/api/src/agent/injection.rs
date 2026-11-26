@@ -101,6 +101,7 @@ fn setup() -> AgentLoopSetup {
         max_seconds: 60,
         max_run_tokens: 0,
         disabled_tools: Vec::new(),
+        ability: None,
         fallback: None,
         can_write: true,
         user_id: String::new(),

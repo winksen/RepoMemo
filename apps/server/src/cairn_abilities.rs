@@ -328,10 +328,16 @@ pub(crate) struct OfferedAbility {
     scope: String,
     version: i64,
     inputs: Vec<repomemo_storage::AbilityInput>,
+    /// The workspace's model does not run in Agent mode, so the ability cannot run here.
+    needs_agent_mode: bool,
 }
 
 /// The abilities a workspace offers its people, for the capabilities response.
-pub(crate) async fn offered(state: &AppState, workspace_id: &str) -> Result<Vec<OfferedAbility>, ApiError> {
+pub(crate) async fn offered(
+    state: &AppState,
+    workspace_id: &str,
+    agent_mode: bool,
+) -> Result<Vec<OfferedAbility>, ApiError> {
     Ok(state
         .storage
         .abilities_for_workspace(workspace_id)
@@ -346,6 +352,7 @@ pub(crate) async fn offered(state: &AppState, workspace_id: &str) -> Result<Vec<
             scope: ability.scope,
             version: ability.version,
             inputs: ability.inputs,
+            needs_agent_mode: !agent_mode,
         })
         .collect())
 }

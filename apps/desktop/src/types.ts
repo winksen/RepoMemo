@@ -595,6 +595,8 @@ export interface OfferedAbility {
   scope: "organization" | "workspace";
   version: number;
   inputs: { name: string; label: string }[];
+  /** The workspace's model does not run in Agent mode, so the ability cannot run here. */
+  needs_agent_mode?: boolean;
 }
 
 /** A model offered in a workspace, as the chat's picker shows it. */

@@ -147,7 +147,7 @@ pub(crate) async fn list_agent_capabilities(
         ),
         None => (None, None),
     };
-    let abilities = crate::cairn_abilities::offered(&state, &workspace_id).await?;
+    let abilities = crate::cairn_abilities::offered(&state, &workspace_id, agent_mode).await?;
     Ok(Json(AgentCapabilitiesResponse {
         abilities,
         capabilities,
@@ -338,7 +338,7 @@ pub(crate) async fn run_message(
     };
     // In Agent mode (V0.9.40) a message is answered by a loop that spends one AI request for each model call, so the quota is
     // not spent up front.
-    let agent_setup = provider
+    let mut agent_setup = provider
         .as_ref()
         .filter(|provider| crate::ai::cairn_mode_of(provider) == "agent")
         .map(|provider| {
@@ -352,6 +352,7 @@ pub(crate) async fn run_message(
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
                 max_run_tokens: runtime.cairn_max_run_tokens.max(0) as u64,
                 disabled_tools: tools_off.iter().map(|(name, _)| name.clone()).collect(),
+                ability: None,
                 fallback,
                 can_write: !matches!(role, WorkspaceRole::Viewer) && !live.read_only,
                 user_id: subject.user_id.clone(),
@@ -363,6 +364,51 @@ pub(crate) async fn run_message(
                 }),
             }
         });
+    // An ability run with its /command (V0.9.107): it needs Agent mode, asks for its fields first, and follows its instructions with
+    // only its tools, of the tools the run has.
+    let mut ability_refusal: Option<repomemo_domain::AgentReply> = None;
+    let mut ran_ability: Option<(String, i64)> = None;
+    if message.capability.is_none() && !request.all_workspaces {
+        if let Some((command, rest)) = split_command(&message.message) {
+            let abilities = state
+                .storage
+                .abilities_for_workspace(&workspace_id)
+                .await
+                .map_err(map_storage_error)?;
+            if let Some(ability) = abilities.into_iter().find(|ability| ability.command == command) {
+                let missing = missing_inputs(rest, &ability.inputs);
+                if agent_setup.is_none() {
+                    ability_refusal = Some(repomemo_api::lookup_reply(format!(
+                        "{} ({}) needs Agent mode, which this workspace's model does not run in. An administrator can choose a model that takes tools.",
+                        ability.name, ability.command
+                    )));
+                } else if !missing.is_empty() {
+                    let lines: Vec<String> = missing.iter().map(|label| format!("{label}: ")).collect();
+                    ability_refusal = Some(repomemo_api::lookup_reply(format!(
+                        "{} needs a little more first. Send {} again with:
+
+{}",
+                        ability.name,
+                        ability.command,
+                        lines.join(
+                            "
+"
+                        )
+                    )));
+                } else if let Some(setup) = agent_setup.as_mut() {
+                    ran_ability = Some((ability.name.clone(), ability.version));
+                    setup.ability = Some(repomemo_api::AgentAbility {
+                        name: ability.name,
+                        command: ability.command,
+                        version: ability.version,
+                        instructions: ability.instructions,
+                        tools: ability.tools,
+                        output_template: ability.output_template,
+                    });
+                }
+            }
+        }
+    }
     let (provider_id, ai_unavailable_reason) = match provider {
         Some(provider) => {
             let min_role = ai_access::workspace_ai_min_role(state, &workspace_id).await?;
@@ -481,7 +527,8 @@ pub(crate) async fn run_message(
     // A job asked for from the + menu that was turned off is refused before it runs.
     let refused_job = message
         .capability
-        .and_then(|capability| switched_off_reply(&tools_off, capability));
+        .and_then(|capability| switched_off_reply(&tools_off, capability))
+        .or(ability_refusal);
     let outcome = if let Some(reply) = refused_job {
         repomemo_api::AgentOutcome {
             reply,
@@ -529,6 +576,15 @@ pub(crate) async fn run_message(
             .map_err(map_core_error)?
     };
     let (mut reply, loop_trace, correction) = (outcome.reply, outcome.trace, outcome.correction);
+    // The answer says which ability, and which version, it followed.
+    if let Some((name, version)) = &ran_ability {
+        reply.reply_markdown = format!(
+            "{}
+
+_Ability: {name}, version {version}_",
+            reply.reply_markdown.trim_end()
+        );
+    }
     // Strict citations (V0.9.98): an answer about the workspace's content that cites nothing it read is not shown, and says what was read.
     if reply.generated
         && reply.citations.is_empty()
@@ -640,8 +696,25 @@ pub(crate) async fn run_message(
     }
     // How the message was answered, kept for the person who asked (V0.9.39). A trace that cannot be stored never fails the answer.
     let ended_at = chrono::Utc::now();
-    let trace = loop_trace
+    let mut trace = loop_trace
         .unwrap_or_else(|| agent_run_trace(&message, &reply, (ended_at - started_at).num_milliseconds().max(0)));
+    if let Some((name, version)) = &ran_ability {
+        trace.steps.insert(
+            0,
+            repomemo_domain::AgentStep {
+                position: 1,
+                kind: "note".to_owned(),
+                tool: None,
+                summary: format!("Ability: {name}, version {version}"),
+                evidence: Vec::new(),
+                duration_ms: 0,
+                error: None,
+            },
+        );
+        for (index, step) in trace.steps.iter_mut().enumerate() {
+            step.position = index as i64 + 1;
+        }
+    }
     let (model, tool_mode) = match (&provider_for_run, provider_model) {
         (Some(_), Some((model, tool_mode))) => (model, Some(tool_mode)),
         _ => (None, None),
@@ -1243,6 +1316,38 @@ async fn notify_budget(state: &AppState, budget: &repomemo_storage::Organization
     }
 }
 
+/// A message that starts with a `/command`: the command, lower case with its slash, and what follows it.
+fn split_command(message: &str) -> Option<(String, &str)> {
+    let trimmed = message.trim_start();
+    if !trimmed.starts_with('/') {
+        return None;
+    }
+    let end = trimmed.find(char::is_whitespace).unwrap_or(trimmed.len());
+    Some((trimmed[..end].to_ascii_lowercase(), trimmed[end..].trim()))
+}
+
+/// The fields an ability asks that the message leaves empty. A line `Label: value` (or `name: value`) fills a field; one field also
+/// takes the words after the command as they are.
+fn missing_inputs(rest: &str, inputs: &[repomemo_storage::AbilityInput]) -> Vec<String> {
+    if inputs.len() == 1 && !rest.trim().is_empty() {
+        return Vec::new();
+    }
+    inputs
+        .iter()
+        .filter(|input| {
+            !rest.lines().any(|line| {
+                let Some((key, value)) = line.split_once(':') else {
+                    return false;
+                };
+                let key = key.trim();
+                (key.eq_ignore_ascii_case(&input.label) || key.eq_ignore_ascii_case(&input.name))
+                    && !value.trim().is_empty()
+            })
+        })
+        .map(|input| input.label.clone())
+        .collect()
+}
+
 /// The reply to a job that was turned off, naming who turned it off (V0.9.91); none when it is on.
 fn switched_off_reply(
     tools_off: &[(String, &'static str)],
@@ -1293,4 +1398,37 @@ pub(crate) async fn text_provider(state: &AppState, workspace_id: &str) -> Resul
         .await?
         .resolved
         .map(|resolved| resolved.provider))
+}
+
+#[cfg(test)]
+mod ability_tests {
+    use super::*;
+    use repomemo_storage::AbilityInput;
+
+    fn field(name: &str, label: &str) -> AbilityInput {
+        AbilityInput {
+            name: name.to_owned(),
+            label: label.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_message_that_starts_with_a_slash_is_a_command_and_its_rest() {
+        assert_eq!(
+            split_command("  /Weekly-Status\nTeam: Blue"),
+            Some(("/weekly-status".to_owned(), "Team: Blue"))
+        );
+        assert_eq!(split_command("/status"), Some(("/status".to_owned(), "")));
+        assert_eq!(split_command("what is /status"), None);
+    }
+
+    #[test]
+    fn a_field_is_filled_by_its_label_or_name_and_a_single_field_takes_the_words_after_the_command() {
+        let team = [field("team", "Team"), field("week", "Week")];
+        assert_eq!(missing_inputs("Team: Blue\nweek: 12", &team), Vec::<String>::new());
+        assert_eq!(missing_inputs("Team: Blue\nWeek: ", &team), vec!["Week".to_owned()]);
+        assert_eq!(missing_inputs("", &team), vec!["Team".to_owned(), "Week".to_owned()]);
+        assert!(missing_inputs("the blue team", &[field("team", "Team")]).is_empty());
+        assert!(missing_inputs("", &[]).is_empty());
+    }
 }

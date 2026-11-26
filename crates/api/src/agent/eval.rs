@@ -263,6 +263,7 @@ async fn the_scripted_cases_pass_and_meet_the_thresholds() {
                     max_seconds: 60,
                     max_run_tokens: 0,
                     disabled_tools: Vec::new(),
+                    ability: None,
                     fallback: None,
                     can_write: case.role.as_deref() != Some("viewer"),
                     user_id: String::new(),

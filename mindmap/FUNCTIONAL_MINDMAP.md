@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.106` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.107` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.107 — CAIRN runs an ability from its /command.
+
+- **Running an ability.** Typing an ability's /command, or choosing it in the + menu, runs CAIRN with the ability's instructions and only its tools, of the tools the run already has. An ability that asks for fields has them asked first: the + menu fills in the field names, and a message that leaves one empty is answered with what is missing. The trace and the answer say "Ability: name, version N". In Jobs mode an ability is shown as needing Agent mode and does not run.
+
+Checks: formatted, linted and type-checked; docs:check; two unit tests added, not run.
 
 ## V0.9.106 — Workspaces turn organization abilities on or off, add their own, and offer them in the chat.
 
