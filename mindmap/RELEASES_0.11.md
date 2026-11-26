@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.11 → 1.0 (polish)
 
-> **Current:** `V0.9.76` (2026-11-26); no 0.11 row is built yet.
+> **Current:** `V0.9.77` (2026-11-26); no 0.11 row is built yet.
 
 > **Theme:** Polish before 1.0: finish the owed screens, close the review's findings, make the product faster and calmer · **Baseline:** the 0.10 pilot line (V0.10.0 to V0.10.11) · **Related:** [Roadmap](ROADMAP.md#the-011x-line-polish-before-10) · [Polish review](analysis/2026-11-25-polish-review.md) · [Polish plan](plans/2026-11-25-0.11-polish.md)
 

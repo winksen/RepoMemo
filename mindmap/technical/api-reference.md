@@ -97,6 +97,12 @@
 | PUT | `/v1/cairn/connections/{connection_id}` | auth | require_cairn_admin | ConnectionRequest with `expected_version` | CairnConnection |
 | DELETE | `/v1/cairn/connections/{connection_id}` | auth | require_cairn_admin | — | status |
 | POST | `/v1/cairn/connections/{connection_id}/test` | auth | require_cairn_admin | — | ConnectionTest (reachable, key_accepted, model_count) |
+| GET | `/v1/cairn/connections/{connection_id}/available-models` | auth | require_cairn_admin | — | Vec<AvailableModel> |
+| GET | `/v1/cairn/models` | auth | require_cairn_reader | `?connection_id` | Vec<ModelView> |
+| POST | `/v1/cairn/models` | auth | require_cairn_admin | AddModelRequest | ModelView |
+| PUT | `/v1/cairn/models/{model_id}` | auth | require_cairn_admin | ChangeModelRequest with `expected_version` | ModelView |
+| DELETE | `/v1/cairn/models/{model_id}` | auth | require_cairn_admin | — | status |
+| POST | `/v1/cairn/models/{model_id}/test` | auth | require_cairn_admin | — | ModelTest |
 | POST | `/v1/system/users/{user_id}/sessions/end` | auth | require_full_system_admin, require_system_change | — | status |
 | POST | `/v1/system/users/{user_id}/unlock` | auth | require_full_system_admin, require_system_change | — | Value |
 | GET | `/v1/system/users/{user_id}/offboarding` | session | full system administrator | — | What the account owns and holds (owned places, open tasks and reviews, sessions, tokens, sent invitations) and whether it is the last system administrator |

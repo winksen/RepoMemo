@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.76` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.77` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.77 — CAIRN administrators add the models of a connection and test them.
+
+- **Models.** On the Models section, a CAIRN administrator finds what a connection's server offers, adds the ones CAIRN may use with a name and a purpose (text, vision or embedding), tests each for the tools it takes and its context size, and corrects what the test found. A model in use cannot be deleted. Nothing changes for people yet.
+
+Checks: formatted, linted and type-checked; docs:check; tests added, not run against a real model server.
 
 ## V0.9.76 — CAIRN administrators add and test connections to model servers.
 

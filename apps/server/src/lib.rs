@@ -23,6 +23,7 @@ mod backup_crypto;
 mod build_info;
 mod cairn_admin;
 mod cairn_connections;
+mod cairn_models;
 mod chat;
 mod check_config;
 mod collaboration;
@@ -762,6 +763,19 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             "/v1/cairn/connections/{connection_id}/test",
             post(cairn_connections::test_connection),
         )
+        .route(
+            "/v1/cairn/connections/{connection_id}/available-models",
+            get(cairn_models::available_models),
+        )
+        .route(
+            "/v1/cairn/models",
+            get(cairn_models::list_models).post(cairn_models::add_model),
+        )
+        .route(
+            "/v1/cairn/models/{model_id}",
+            put(cairn_models::change_model).delete(cairn_models::delete_model),
+        )
+        .route("/v1/cairn/models/{model_id}/test", post(cairn_models::test_model))
         .route(
             "/v1/system/users/{user_id}/sessions/end",
             post(system::end_user_sessions),

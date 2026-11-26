@@ -897,6 +897,44 @@ export interface CairnConnection {
   updated_by: string | null;
 }
 
+/** A model of a connection in the catalog (V0.9.77). */
+export interface CairnModel {
+  id: string;
+  connection_id: string;
+  /** The name the model server knows it by. */
+  model_id: string;
+  display_name: string;
+  purpose: "text" | "vision" | "embedding";
+  tool_mode: "none" | "json" | "native";
+  context_tokens: number;
+  vision: boolean;
+  evaluation: unknown | null;
+  fallback_model_id: string | null;
+  roles: string[] | null;
+  enabled: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+  /** In how many places the model is used; a model in use cannot be deleted. */
+  uses: number;
+}
+
+/** A model a connection's server offers, and the purposes it is already in the catalog for. */
+export interface AvailableCairnModel {
+  model_id: string;
+  added_for: string[];
+}
+
+/** What testing a model found; `model` has the traits the test filled in. */
+export interface CairnModelTest {
+  success: boolean;
+  message: string;
+  tool_mode: string | null;
+  context_tokens: number | null;
+  model: CairnModel;
+}
+
 /** What testing a connection found: whether the server answered and took the key. */
 export interface CairnConnectionTest {
   connection_id: string;

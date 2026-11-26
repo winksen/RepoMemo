@@ -9,8 +9,8 @@ use serde_json::Value;
 use std::time::Duration;
 
 use crate::{
-    check_provider_url, is_cloud_endpoint, provider_client, read_json, DEFAULT_BASE_URL, OPENROUTER_BASE_URL,
-    UNREACHABLE,
+    check_provider_url, detect_model_traits, is_cloud_endpoint, provider_client, provider_from_settings, read_json,
+    AiProvider, DEFAULT_BASE_URL, OPENROUTER_BASE_URL, UNREACHABLE,
 };
 
 /// What a connection test found.
@@ -185,4 +185,113 @@ mod tests {
             Some("https://api.example.com/v1")
         ));
     }
+}
+
+/// The models a server offers, by the name it knows them by (V0.9.77). A server that does not list its models, or cannot be reached,
+/// is an error with a message that says so.
+pub async fn list_connection_models(kind: &str, base_url: Option<&str>, api_key: Option<&str>) -> Result<Vec<String>> {
+    let base_url = connection_base_url(kind, base_url)?;
+    let key = api_key.map(str::trim).filter(|key| !key.is_empty());
+    let client = provider_client(Duration::from_secs(20))?;
+    let (status, ids) = match listed_models(&client, kind, &base_url, key).await {
+        Ok(listed) => listed,
+        Err(error) => {
+            tracing::warn!(error = %error, "A catalog connection could not list its models");
+            bail!("{UNREACHABLE}")
+        }
+    };
+    if matches!(status, 401 | 403) {
+        bail!("The server rejected the key.")
+    }
+    let mut ids =
+        ids.ok_or_else(|| anyhow::anyhow!("The server does not list its models; add one by the name it knows it by."))?;
+    ids.sort();
+    ids.dedup();
+    Ok(ids)
+}
+
+/// What testing a model found (V0.9.77).
+#[derive(Debug, Clone, Serialize)]
+pub struct ModelReport {
+    pub success: bool,
+    pub message: String,
+    /// `none`, `json` or `native`, for a text model that answered.
+    pub tool_mode: Option<String>,
+    pub context_tokens: Option<u32>,
+}
+
+/// Tries one model of a connection as a workspace's test of a provider does: a small request, and for a text model the tool mode and
+/// context size it takes, which fill the catalog entry and which an administrator may correct.
+pub async fn test_catalog_model(
+    kind: &str,
+    base_url: Option<&str>,
+    api_key: Option<&str>,
+    model: &str,
+    purpose: &str,
+) -> Result<ModelReport> {
+    let base_url = connection_base_url(kind, base_url)?;
+    let settings = repomemo_domain::ProviderSettings {
+        id: String::new(),
+        workspace_id: None,
+        provider_type: kind.to_owned(),
+        name: "Catalog test".to_owned(),
+        base_url: Some(base_url),
+        model: Some(model.trim().to_owned()),
+        embedding_model: (purpose == "embedding").then(|| model.trim().to_owned()),
+        // Off, so the checks that only matter to a provider a workspace turns on (the acknowledgement) do not apply to a test.
+        enabled: false,
+        metadata: serde_json::json!({ "purpose": purpose }),
+        api_key: api_key.map(str::trim).filter(|key| !key.is_empty()).map(str::to_owned),
+    };
+    let provider = provider_from_settings(settings)?;
+    if purpose == "embedding" {
+        return Ok(
+            match provider
+                .embed(vec!["RepoMemo model test".to_owned()], serde_json::json!({}))
+                .await
+            {
+                Ok(vectors) => ModelReport {
+                    success: true,
+                    message: format!(
+                        "Embeddings work with {model} ({} dimensions).",
+                        vectors.first().map_or(0, Vec::len)
+                    ),
+                    tool_mode: None,
+                    context_tokens: None,
+                },
+                Err(error) => {
+                    tracing::warn!(error = %error, "A catalog embedding model test failed");
+                    ModelReport {
+                        success: false,
+                        message:
+                            "The model could not build embeddings. Check its name and that it is an embedding model."
+                                .to_owned(),
+                        tool_mode: None,
+                        context_tokens: None,
+                    }
+                }
+            },
+        );
+    }
+    let result = provider.test_connection().await?;
+    if !result.success || purpose != "text" {
+        return Ok(ModelReport {
+            success: result.success,
+            message: result.message,
+            tool_mode: None,
+            context_tokens: None,
+        });
+    }
+    let traits = detect_model_traits(&provider).await;
+    Ok(ModelReport {
+        success: true,
+        message: format!(
+            "{} Tools: {} and a context of {} tokens.",
+            result.message,
+            traits.tool_mode.as_str(),
+            traits.context_tokens
+        ),
+        tool_mode: Some(traits.tool_mode.as_str().to_owned()),
+        context_tokens: Some(traits.context_tokens),
+    })
 }

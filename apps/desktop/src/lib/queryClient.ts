@@ -85,6 +85,8 @@ export const cairnAdminKeys = {
   all: ["cairn-admin"] as const,
   view: () => ["cairn-admin", "view"] as const,
   connections: () => ["cairn-admin", "connections"] as const,
+  models: () => ["cairn-admin", "models"] as const,
+  available: (connectionId: string) => ["cairn-admin", "available-models", connectionId] as const,
 };
 
 /** Cache keys of the System area (administrators only). Every key starts with `["system"]`, so one call clears them all. */

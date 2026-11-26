@@ -12,7 +12,10 @@ mod catalog;
 mod chat;
 mod openai;
 
-pub use catalog::{connection_base_url, is_cloud_connection, probe_connection, ConnectionReport};
+pub use catalog::{
+    connection_base_url, is_cloud_connection, list_connection_models, probe_connection, test_catalog_model,
+    ConnectionReport, ModelReport,
+};
 pub use chat::*;
 use chat::{ollama_chat_body, ollama_chat_response, openrouter_chat_body, openrouter_chat_response};
 pub use openai::OpenAiCompatibleProvider;

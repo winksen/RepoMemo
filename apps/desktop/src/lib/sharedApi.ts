@@ -18,7 +18,10 @@ import type {
   SystemUser,
   CairnAdminView,
   CairnBudget,
+  AvailableCairnModel,
   CairnConnection,
+  CairnModel,
+  CairnModelTest,
   CairnConnectionInput,
   CairnConnectionTest,
   BackupsOverview,
@@ -1798,6 +1801,30 @@ export function deleteCairnConnection(accessToken: string, id: string): Promise<
 
 export function testCairnConnection(accessToken: string, id: string): Promise<CairnConnectionTest> {
   return request<CairnConnectionTest>(`/v1/cairn/connections/${encodeURIComponent(id)}/test`, { method: "POST", body: "{}" }, accessToken);
+}
+
+export function listCairnModels(accessToken: string): Promise<CairnModel[]> {
+  return request<CairnModel[]>("/v1/cairn/models", {}, accessToken);
+}
+
+export function findCairnModels(accessToken: string, connectionId: string): Promise<AvailableCairnModel[]> {
+  return request<AvailableCairnModel[]>(`/v1/cairn/connections/${encodeURIComponent(connectionId)}/available-models`, {}, accessToken);
+}
+
+export function addCairnModel(accessToken: string, input: { connection_id: string; model_id: string; purpose: string; display_name?: string }): Promise<CairnModel> {
+  return request<CairnModel>("/v1/cairn/models", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function changeCairnModel(accessToken: string, id: string, input: { display_name: string; tool_mode: string; context_tokens: number; vision: boolean; enabled: boolean; expected_version: number }): Promise<CairnModel> {
+  return request<CairnModel>(`/v1/cairn/models/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function deleteCairnModel(accessToken: string, id: string): Promise<void> {
+  return request<void>(`/v1/cairn/models/${encodeURIComponent(id)}`, { method: "DELETE" }, accessToken);
+}
+
+export function testCairnModel(accessToken: string, id: string): Promise<CairnModelTest> {
+  return request<CairnModelTest>(`/v1/cairn/models/${encodeURIComponent(id)}/test`, { method: "POST", body: "{}" }, accessToken);
 }
 
 export function updateCairnBudgets(accessToken: string, change: { values?: Record<string, number>; reset?: string[] }): Promise<CairnBudget[]> {

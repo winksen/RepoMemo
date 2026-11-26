@@ -1,0 +1,356 @@
+//! The models of the catalog's connections (V0.9.77): finding what a server offers, adding chosen models with a name and a purpose,
+//! testing each for the tools it takes and its context size, and correcting what the test found. CAIRN and system administrators
+//! change them; app administrators read them. A model in use cannot be deleted.
+
+use axum::{
+    extract::{Path, Query, State},
+    http::StatusCode,
+    Json,
+};
+use repomemo_storage::{CairnModel, CairnModelChange, CairnSaved, NewCairnModel};
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    map_storage_error,
+    system::{audit, require_cairn_admin, require_cairn_reader},
+    ApiError, AppState, AuthenticatedSubject, ReadingSubject,
+};
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ModelView {
+    #[serde(flatten)]
+    model: CairnModel,
+    /// In how many places the model is used; a model in use cannot be deleted.
+    uses: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ModelsQuery {
+    #[serde(default)]
+    connection_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct AddModelRequest {
+    connection_id: String,
+    /// The name the model server knows the model by.
+    model_id: String,
+    #[serde(default)]
+    display_name: Option<String>,
+    purpose: String,
+    #[serde(default)]
+    tool_mode: Option<String>,
+    #[serde(default)]
+    context_tokens: Option<i64>,
+    #[serde(default)]
+    vision: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChangeModelRequest {
+    display_name: String,
+    tool_mode: String,
+    context_tokens: i64,
+    vision: bool,
+    enabled: bool,
+    expected_version: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct AvailableModel {
+    model_id: String,
+    /// The purposes the model is already in the catalog for, on this connection.
+    added_for: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ModelTest {
+    #[serde(flatten)]
+    report: repomemo_ai::ModelReport,
+    /// The model with the traits the test found, when it succeeded; as it was when it did not.
+    model: ModelView,
+}
+
+async fn view(state: &AppState, model: CairnModel) -> Result<ModelView, ApiError> {
+    let uses = state
+        .storage
+        .cairn_model_uses(&model.id)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(ModelView { model, uses })
+}
+
+pub(crate) async fn list_models(
+    ReadingSubject(subject): ReadingSubject,
+    State(state): State<AppState>,
+    Query(query): Query<ModelsQuery>,
+) -> Result<Json<Vec<ModelView>>, ApiError> {
+    require_cairn_reader(&subject)?;
+    let models = state
+        .storage
+        .list_cairn_models(query.connection_id.as_deref())
+        .await
+        .map_err(map_storage_error)?;
+    let mut views = Vec::with_capacity(models.len());
+    for model in models {
+        views.push(view(&state, model).await?);
+    }
+    Ok(Json(views))
+}
+
+/// What a connection's server offers, so the administrator can choose. It reaches the server with the connection's key.
+pub(crate) async fn available_models(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(connection_id): Path<String>,
+) -> Result<Json<Vec<AvailableModel>>, ApiError> {
+    require_cairn_admin(&subject)?;
+    let connection = state
+        .storage
+        .get_cairn_connection(&connection_id)
+        .await
+        .map_err(map_storage_error)?;
+    let key = state
+        .storage
+        .cairn_connection_key(&connection_id)
+        .await
+        .map_err(map_storage_error)?;
+    let ids = repomemo_ai::list_connection_models(&connection.kind, Some(&connection.base_url), key.as_deref())
+        .await
+        .map_err(|error| ApiError::bad_request(error.to_string()))?;
+    let added = state
+        .storage
+        .list_cairn_models(Some(&connection_id))
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(
+        ids.into_iter()
+            .map(|model_id| AvailableModel {
+                added_for: added
+                    .iter()
+                    .filter(|model| model.model_id == model_id)
+                    .map(|model| model.purpose.clone())
+                    .collect(),
+                model_id,
+            })
+            .collect(),
+    ))
+}
+
+pub(crate) async fn add_model(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Json(request): Json<AddModelRequest>,
+) -> Result<(StatusCode, Json<ModelView>), ApiError> {
+    require_cairn_admin(&subject)?;
+    let display_name = request
+        .display_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or(request.model_id.trim())
+        .to_owned();
+    let created = state
+        .storage
+        .create_cairn_model(
+            NewCairnModel {
+                connection_id: request.connection_id,
+                model_id: request.model_id,
+                display_name,
+                vision: request.vision.unwrap_or(request.purpose == "vision"),
+                purpose: request.purpose,
+                tool_mode: request.tool_mode.unwrap_or_else(|| "none".to_owned()),
+                context_tokens: request.context_tokens.unwrap_or(0),
+                evaluation: None,
+                fallback_model_id: None,
+                roles: None,
+                enabled: true,
+            },
+            &subject.user_id,
+        )
+        .await
+        .map_err(map_storage_error)?;
+    audit(
+        &state,
+        &subject,
+        "cairn_model_added",
+        format!(
+            "Added the {} model {} ({}).",
+            created.purpose, created.display_name, created.model_id
+        ),
+    )
+    .await;
+    Ok((StatusCode::CREATED, Json(view(&state, created).await?)))
+}
+
+pub(crate) async fn change_model(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<ChangeModelRequest>,
+) -> Result<Json<ModelView>, ApiError> {
+    require_cairn_admin(&subject)?;
+    let existing = state.storage.get_cairn_model(&id).await.map_err(map_storage_error)?;
+    let saved = state
+        .storage
+        .update_cairn_model(
+            &id,
+            request.expected_version,
+            CairnModelChange {
+                display_name: request.display_name,
+                tool_mode: request.tool_mode,
+                context_tokens: request.context_tokens,
+                vision: request.vision,
+                evaluation: existing.evaluation.clone(),
+                fallback_model_id: existing.fallback_model_id.clone(),
+                roles: existing.roles.clone(),
+                enabled: request.enabled,
+            },
+            &subject.user_id,
+        )
+        .await
+        .map_err(map_storage_error)?;
+    let saved = match saved {
+        CairnSaved::Saved(model) => model,
+        CairnSaved::Stale(current) => {
+            return Err(ApiError::conflict(format!(
+                "The model {} was changed by someone else (now at version {}). Reload it and change it again.",
+                current.display_name, current.version
+            )))
+        }
+    };
+    let mut changes = Vec::new();
+    if existing.display_name != saved.display_name {
+        changes.push(format!("name from {} to {}", existing.display_name, saved.display_name));
+    }
+    if existing.tool_mode != saved.tool_mode {
+        changes.push(format!("tools from {} to {}", existing.tool_mode, saved.tool_mode));
+    }
+    if existing.context_tokens != saved.context_tokens {
+        changes.push(format!(
+            "context from {} to {}",
+            existing.context_tokens, saved.context_tokens
+        ));
+    }
+    if existing.vision != saved.vision {
+        changes.push(format!("vision {}", if saved.vision { "on" } else { "off" }));
+    }
+    if existing.enabled != saved.enabled {
+        changes.push(format!("turned {}", if saved.enabled { "on" } else { "off" }));
+    }
+    audit(
+        &state,
+        &subject,
+        "cairn_model_changed",
+        format!(
+            "Changed the model {}: {}.",
+            saved.display_name,
+            if changes.is_empty() {
+                "nothing visible".to_owned()
+            } else {
+                changes.join("; ")
+            }
+        ),
+    )
+    .await;
+    Ok(Json(view(&state, saved).await?))
+}
+
+pub(crate) async fn delete_model(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    require_cairn_admin(&subject)?;
+    let existing = state.storage.get_cairn_model(&id).await.map_err(map_storage_error)?;
+    state.storage.delete_cairn_model(&id).await.map_err(map_storage_error)?;
+    audit(
+        &state,
+        &subject,
+        "cairn_model_deleted",
+        format!("Deleted the model {} ({}).", existing.display_name, existing.model_id),
+    )
+    .await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Tries a model, and fills the tool mode, the context size and, for a vision model, the vision trait with what the test found. The
+/// connection must be on: a model of a connection that is off, or that leaves the network without the confirmation, is not called.
+pub(crate) async fn test_model(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<ModelTest>, ApiError> {
+    require_cairn_admin(&subject)?;
+    let model = state.storage.get_cairn_model(&id).await.map_err(map_storage_error)?;
+    let connection = state
+        .storage
+        .get_cairn_connection(&model.connection_id)
+        .await
+        .map_err(map_storage_error)?;
+    if !connection.enabled {
+        return Err(ApiError::bad_request(format!(
+            "The connection {} is off; turn it on to test its models.",
+            connection.name
+        )));
+    }
+    let key = state
+        .storage
+        .cairn_connection_key(&connection.id)
+        .await
+        .map_err(map_storage_error)?;
+    let report = repomemo_ai::test_catalog_model(
+        &connection.kind,
+        Some(&connection.base_url),
+        key.as_deref(),
+        &model.model_id,
+        &model.purpose,
+    )
+    .await
+    .map_err(|error| ApiError::bad_request(error.to_string()))?;
+    let model = if report.success && (report.tool_mode.is_some() || report.context_tokens.is_some()) {
+        let saved = state
+            .storage
+            .update_cairn_model(
+                &id,
+                model.version,
+                CairnModelChange {
+                    display_name: model.display_name.clone(),
+                    tool_mode: report.tool_mode.clone().unwrap_or_else(|| model.tool_mode.clone()),
+                    context_tokens: report.context_tokens.map_or(model.context_tokens, i64::from),
+                    vision: model.vision,
+                    evaluation: model.evaluation.clone(),
+                    fallback_model_id: model.fallback_model_id.clone(),
+                    roles: model.roles.clone(),
+                    enabled: model.enabled,
+                },
+                &subject.user_id,
+            )
+            .await
+            .map_err(map_storage_error)?;
+        match saved {
+            CairnSaved::Saved(saved) | CairnSaved::Stale(saved) => saved,
+        }
+    } else {
+        model
+    };
+    audit(
+        &state,
+        &subject,
+        "cairn_model_tested",
+        format!(
+            "Tested the model {}: {}.",
+            model.display_name,
+            if report.success {
+                "it answered"
+            } else {
+                "it did not answer"
+            }
+        ),
+    )
+    .await;
+    Ok(Json(ModelTest {
+        report,
+        model: view(&state, model).await?,
+    }))
+}

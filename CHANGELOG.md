@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.77 (2026-11-26)
+
+CAIRN administrators add the models of a connection and test them.
+
+### Added
+- **Find models.** *Find models on* a connection lists what its server offers (Ollama's `/api/tags`, the `/models` of OpenRouter and OpenAI-compatible servers), with what is already in the catalog; the administrator chooses a purpose, text, vision or embedding, and adds the models CAIRN may use, with a display name that defaults to the model's own. A model is added once for each connection and purpose.
+- **Test.** *Test* tries a model as a workspace's provider test does and, for a text model, fills the tool mode and the context size it found. The administrator may correct both in *Edit*; testing again fills them again. A failed test changes nothing, and a model of a connection that is off is not tested.
+- **Delete.** A model that a workspace provider or another model's fallback uses cannot be deleted, and the table says where it is used.
+- **Routes and audit.** `GET`/`POST /v1/cairn/models`, `PUT`/`DELETE /v1/cairn/models/{id}` (a change names the version it read; a stale one is refused with `409`), `POST /v1/cairn/models/{id}/test` and `GET /v1/cairn/connections/{id}/available-models`. CAIRN and system administrators change; app administrators read the list. Each change and test is an audit event.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (permissions, adding once, a correction, a stale save, a delete, the audit and a test that reaches no server) was added; tests not run, and finding and testing were not tried against a real Ollama, OpenRouter or OpenAI-compatible server.
+
+### Upgrading
+- Nothing to do. No workspace uses the catalog yet.
+
 ## V0.9.76 (2026-11-26)
 
 CAIRN administrators add and test connections to model servers.

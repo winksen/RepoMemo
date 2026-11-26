@@ -1959,3 +1959,161 @@ async fn cairn_administrators_manage_connections_without_the_key_ever_coming_bac
     assert!(!audit.contains(secret), "the key is not in the audit trail");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn cairn_administrators_add_models_to_a_connection_and_correct_what_a_test_finds() {
+    let data_dir = temp_data_dir("cairn-models");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "model-root@example.com").await;
+    let (reader, reader_tokens) = register_account(&app, "model-reader@example.com").await;
+    let (member, _) = register_account(&app, "model-member@example.com").await;
+    let reader_id = reader_tokens["user"]["id"].as_str().unwrap();
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/system/users/{reader_id}/app-admin"),
+            &admin,
+            json!({"enabled": true})
+        )
+        .await
+        .status(),
+        204
+    );
+    let connection = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &admin,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let connection_id = connection["id"].as_str().unwrap().to_owned();
+    let models = "/v1/cairn/models".to_owned();
+    let add = json!({"connection_id": connection_id, "model_id": "llama3.1:8b", "purpose": "text"});
+
+    // Members are refused, app administrators read, and nobody but a CAIRN or system administrator changes the catalog.
+    assert_eq!(send("GET", models.clone(), &member, Value::Null).await.status(), 403);
+    assert_eq!(send("GET", models.clone(), &reader, Value::Null).await.status(), 200);
+    assert_eq!(send("POST", models.clone(), &reader, add.clone()).await.status(), 403);
+    assert_eq!(
+        send(
+            "GET",
+            format!("/v1/cairn/connections/{connection_id}/available-models"),
+            &reader,
+            Value::Null
+        )
+        .await
+        .status(),
+        403
+    );
+
+    // A model is added with a name and a purpose; the display name defaults to the model's own, and it is added once.
+    let made = send("POST", models.clone(), &admin, add.clone()).await;
+    assert_eq!(made.status(), 201);
+    let model = response_json(made).await;
+    assert_eq!(
+        (
+            model["display_name"].clone(),
+            model["purpose"].clone(),
+            model["tool_mode"].clone(),
+            model["uses"].clone()
+        ),
+        (json!("llama3.1:8b"), json!("text"), json!("none"), json!(0))
+    );
+    assert_eq!(send("POST", models.clone(), &admin, add).await.status(), 409);
+    for bad in [
+        json!({"connection_id": connection_id, "model_id": "x", "purpose": "audio"}),
+        json!({"connection_id": "missing", "model_id": "x", "purpose": "text"}),
+        json!({"connection_id": connection_id, "model_id": " ", "purpose": "text"}),
+    ] {
+        assert!(send("POST", models.clone(), &admin, bad)
+            .await
+            .status()
+            .is_client_error());
+    }
+
+    // The administrator corrects what a test would find; a stale save is refused.
+    let model_uri = format!("/v1/cairn/models/{}", model["id"].as_str().unwrap());
+    let correction = json!({"display_name": "Llama 3.1 (8B)", "tool_mode": "native", "context_tokens": 32768, "vision": false, "enabled": true, "expected_version": model["version"]});
+    let corrected = send("PUT", model_uri.clone(), &admin, correction.clone()).await;
+    assert_eq!(corrected.status(), 200);
+    let corrected = response_json(corrected).await;
+    assert_eq!(
+        (
+            corrected["tool_mode"].clone(),
+            corrected["context_tokens"].clone(),
+            corrected["version"].clone()
+        ),
+        (json!("native"), json!(32768), json!(2))
+    );
+    assert_eq!(send("PUT", model_uri.clone(), &admin, correction).await.status(), 409);
+    let listed = response_json(
+        send(
+            "GET",
+            format!("{models}?connection_id={connection_id}"),
+            &reader,
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(listed.as_array().unwrap().len(), 1);
+
+    // Finding and testing reach the server; nothing answers here, which is said without the server's words.
+    let found = send(
+        "GET",
+        format!("/v1/cairn/connections/{connection_id}/available-models"),
+        &admin,
+        Value::Null,
+    )
+    .await;
+    assert!(found.status().is_client_error() || found.status().is_success());
+    let tested = send("POST", format!("{model_uri}/test"), &admin, json!({})).await;
+    assert_eq!(tested.status(), 200);
+    let tested = response_json(tested).await;
+    assert!(tested["success"].is_boolean());
+    if tested["success"] == false {
+        assert_eq!(tested["model"]["tool_mode"], "native", "a failed test changes nothing");
+    }
+
+    // A model of a connection that is off is not tested, and deleting removes the model.
+    let current = response_json(send("GET", "/v1/cairn/connections".to_owned(), &admin, Value::Null).await).await;
+    let off = json!({"name": "Office Ollama", "enabled": false, "expected_version": current[0]["version"]});
+    assert_eq!(
+        send("PUT", format!("/v1/cairn/connections/{connection_id}"), &admin, off)
+            .await
+            .status(),
+        200
+    );
+    assert_eq!(
+        send("POST", format!("{model_uri}/test"), &admin, json!({}))
+            .await
+            .status(),
+        400
+    );
+    assert_eq!(send("DELETE", model_uri, &admin, Value::Null).await.status(), 204);
+    assert!(response_json(send("GET", models, &admin, Value::Null).await)
+        .await
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &admin))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    for action in ["cairn_model_added", "cairn_model_changed", "cairn_model_deleted"] {
+        assert!(audit.contains(action), "{action} missing");
+    }
+    let _ = std::fs::remove_dir_all(data_dir);
+}
