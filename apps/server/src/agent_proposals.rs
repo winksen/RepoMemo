@@ -374,6 +374,34 @@ fn payload_text(proposal: &AgentProposal, key: &str) -> String {
         .to_owned()
 }
 
+/// Refuses a confirmation that would change more than the cap allows, naming who set the cap.
+fn refuse_over_cap(limits: &repomemo_storage::ChangeLimits, changes: i64) -> Result<(), ApiError> {
+    if changes <= limits.max_changes {
+        return Ok(());
+    }
+    let who = match limits.set_by {
+        "organization" => "your organization allows",
+        "workspace" => "this workspace allows",
+        _ => "CAIRN makes",
+    };
+    Err(ApiError::bad_request(format!(
+        "This would make {changes} changes in one confirmation; {who} at most {}. Confirm fewer at a time.",
+        limits.max_changes
+    )))
+}
+
+/// What is said when the number of changes must be typed to confirm.
+fn type_the_number(proposal: &AgentProposal, count: i64) -> String {
+    if proposal.untrusted_sources.is_empty() {
+        format!("This changes {count} things at once. Type the number, {count}, to confirm.")
+    } else {
+        format!(
+            "This was proposed after reading content from outside the workspace ({}). Type the number of files, {count}, to confirm.",
+            proposal.untrusted_sources.join(", ")
+        )
+    }
+}
+
 /// What the person typed to confirm a large change CAIRN proposed after reading content it does not trust (V0.9.42).
 #[derive(Debug, Default, serde::Deserialize)]
 pub(crate) struct ConfirmProposalRequest {
@@ -386,7 +414,33 @@ const UNTRUSTED_BULK_LIMIT: i64 = 10;
 
 /// Whether a proposal must be confirmed by typing its count: it moves or trashes more than ten files and was made after CAIRN
 /// read content it does not trust. Returns that count.
+#[cfg(test)]
 fn needs_typed_count(proposal: &AgentProposal) -> Option<i64> {
+    needs_typed_count_with(proposal, None)
+}
+
+/// How many changes a proposal makes: the files it moves, trashes or marks, and one for anything else (V0.9.92).
+fn change_count(proposal: &AgentProposal) -> i64 {
+    match proposal.kind {
+        AgentProposalKind::MoveFiles | AgentProposalKind::TrashFiles | AgentProposalKind::SetStatus => proposal
+            .payload
+            .get("count")
+            .and_then(|count| count.as_i64())
+            .unwrap_or(1)
+            .max(1),
+        _ => 1,
+    }
+}
+
+/// [`needs_typed_count`] with the count from which an organization or workspace asks the number to be typed for any proposal
+/// (V0.9.92), besides the rule for what CAIRN read from outside the workspace.
+fn needs_typed_count_with(proposal: &AgentProposal, typed_from: Option<i64>) -> Option<i64> {
+    if let Some(from) = typed_from {
+        let count = change_count(proposal);
+        if count > from {
+            return Some(count);
+        }
+    }
     if proposal.untrusted_sources.is_empty()
         || !matches!(
             proposal.kind,
@@ -421,14 +475,17 @@ pub(crate) async fn confirm_agent_proposal(
     {
         require_workspace_write(&state, &subject, &workspace_id).await?;
     }
+    let limits = state
+        .storage
+        .change_limits_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
     let proposal = pending_proposal(&mut turn, &proposal_id)?;
-    if let Some(count) = needs_typed_count(proposal) {
+    refuse_over_cap(&limits, change_count(proposal))?;
+    if let Some(count) = needs_typed_count_with(proposal, limits.type_to_confirm_from) {
         let typed = body.and_then(|Json(request)| request.confirm_count);
         if typed != Some(count) {
-            return Err(ApiError::bad_request(format!(
-                "This was proposed after reading content from outside the workspace ({}). Type the number of files, {count}, to confirm.",
-                proposal.untrusted_sources.join(", ")
-            )));
+            return Err(ApiError::bad_request(type_the_number(proposal, count)));
         }
     }
     let settles_correction = proposal.payload.get("offer").and_then(|offer| offer.as_str()) == Some("correction");
@@ -494,19 +551,26 @@ pub(crate) async fn confirm_agent_changeset(
             ));
         }
     }
-    // Nothing is applied until every large change made after untrusted reading has its count typed.
-    for proposal in turn
+    // The whole set may not change more than one confirmation is allowed to (V0.9.92), and nothing is applied until every large
+    // change has its count typed.
+    let limits = state
+        .storage
+        .change_limits_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let ticked = turn
         .reply
         .proposals
         .iter()
-        .filter(|proposal| request.proposal_ids.contains(&proposal.id))
-    {
-        if let Some(count) = needs_typed_count(proposal) {
+        .filter(|proposal| request.proposal_ids.contains(&proposal.id));
+    refuse_over_cap(&limits, ticked.clone().map(change_count).sum())?;
+    for proposal in ticked {
+        if let Some(count) = needs_typed_count_with(proposal, limits.type_to_confirm_from) {
             if request.confirm_counts.get(&proposal.id) != Some(&count) {
                 return Err(ApiError::bad_request(format!(
-                    "\"{}\" was proposed after reading content from outside the workspace ({}). Type the number of files, {count}, to confirm.",
+                    "\"{}\": {}",
                     proposal.title,
-                    proposal.untrusted_sources.join(", ")
+                    type_the_number(proposal, count)
                 )));
             }
         }
@@ -703,5 +767,44 @@ mod tests {
         }
         let none = changeset_pending(&turn_with(None)).unwrap_err();
         assert_eq!(none.status, axum::http::StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn a_confirmation_over_the_cap_is_refused_with_who_set_it_and_the_number_is_typed_from_the_set_count() {
+        let limits = |max_changes, set_by| repomemo_storage::ChangeLimits {
+            max_changes,
+            type_to_confirm_from: None,
+            set_by,
+        };
+        assert!(refuse_over_cap(&limits(200, "default"), 200).is_ok());
+        let by_organization = refuse_over_cap(&limits(50, "organization"), 51).unwrap_err().message;
+        assert!(
+            by_organization.contains("your organization allows at most 50"),
+            "{by_organization}"
+        );
+        let by_workspace = refuse_over_cap(&limits(20, "workspace"), 21).unwrap_err().message;
+        assert!(
+            by_workspace.contains("this workspace allows at most 20"),
+            "{by_workspace}"
+        );
+
+        // From the set count the number is typed for any proposal, trusted or not; below it, only the old rule applies.
+        let trusted = proposal("p1", AgentProposalKind::TrashFiles, 8, &[]);
+        assert_eq!(needs_typed_count_with(&trusted, Some(5)), Some(8));
+        assert_eq!(
+            needs_typed_count_with(&trusted, Some(8)),
+            None,
+            "at the count, not above it"
+        );
+        assert_eq!(needs_typed_count_with(&trusted, None), None);
+        let outside = proposal("p2", AgentProposalKind::TrashFiles, 11, &["an issue"]);
+        assert_eq!(
+            needs_typed_count_with(&outside, Some(50)),
+            Some(11),
+            "the rule for outside content still applies"
+        );
+        // A change that is not about files counts as one.
+        assert_eq!(change_count(&proposal("p3", AgentProposalKind::SaveMemory, 40, &[])), 1);
+        assert!(type_the_number(&trusted, 8).contains("Type the number, 8"));
     }
 }

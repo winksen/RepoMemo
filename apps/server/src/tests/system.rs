@@ -3557,3 +3557,92 @@ async fn an_organization_and_a_workspace_turn_off_jobs_and_a_workspace_cannot_tu
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn change_limits_are_checked_and_a_workspace_is_never_looser_than_its_organization() {
+    let data_dir = temp_data_dir("change-limits");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "limits-root@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &root,
+            json!({"name": "Limits Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "Limits Space", "organization_id": organization_id}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+    let organization_uri = format!("/v1/organizations/{organization_id}/cairn");
+    let workspace_uri = format!("/v1/workspaces/{workspace_id}/cairn");
+
+    // Out-of-range values are refused.
+    for bad in [
+        json!({"max_changes": 0}),
+        json!({"max_changes": 201}),
+        json!({"type_to_confirm_from": -3}),
+    ] {
+        assert_eq!(
+            send(
+                "PUT",
+                organization_uri.clone(),
+                &root,
+                json!({"guardrails": bad, "expected_version": 0})
+            )
+            .await
+            .status(),
+            400
+        );
+    }
+    let saved = send(
+        "PUT",
+        organization_uri,
+        &root,
+        json!({"guardrails": {"max_changes": 50, "type_to_confirm_from": 10}, "expected_version": 0}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    assert_eq!(response_json(saved).await["guardrails"]["max_changes"], 50);
+
+    // A workspace may be stricter and not looser.
+    for loose in [json!({"max_changes": 60}), json!({"type_to_confirm_from": 11})] {
+        assert_eq!(
+            send(
+                "PUT",
+                workspace_uri.clone(),
+                &root,
+                json!({"guardrails": loose, "expected_version": 0})
+            )
+            .await
+            .status(),
+            400
+        );
+    }
+    let stricter = send(
+        "PUT",
+        workspace_uri,
+        &root,
+        json!({"guardrails": {"max_changes": 20, "type_to_confirm_from": 5}, "expected_version": 0}),
+    )
+    .await;
+    assert_eq!(stricter.status(), 200);
+    assert_eq!(response_json(stricter).await["guardrails"]["type_to_confirm_from"], 5);
+    let _ = std::fs::remove_dir_all(data_dir);
+}

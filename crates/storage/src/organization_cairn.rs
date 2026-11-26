@@ -19,7 +19,18 @@ pub struct Guardrails {
     /// CAIRN tools and jobs turned off, by name (V0.9.91).
     #[serde(default)]
     pub tools_off: Vec<String>,
+    /// The most changes one confirmation may make (V0.9.92); none keeps the default of 200. A workspace's is never higher than its
+    /// organization's.
+    #[serde(default)]
+    pub max_changes: Option<i64>,
+    /// The number of changes above which the person types the number to confirm (V0.9.92). None keeps today's rule: only after CAIRN
+    /// read content from outside the workspace, above ten. A workspace's is never higher than its organization's.
+    #[serde(default)]
+    pub type_to_confirm_from: Option<i64>,
 }
+
+/// The most changes one confirmation makes when nothing sets less.
+pub const DEFAULT_MAX_CHANGES: i64 = 200;
 
 /// What an organization decided about CAIRN. More fields arrive with the rows that add guardrails, retention and preferences, and
 /// an older policy reads with their defaults.

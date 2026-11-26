@@ -67,10 +67,18 @@ pub(crate) struct WorkspaceCairnView {
     organization_decided: bool,
     /// What the organization turned off, which the workspace cannot turn on (V0.9.91).
     organization_tools_off: Vec<String>,
+    /// What the organization set for one confirmation, which the workspace can only tighten (V0.9.92).
+    organization_limits: OrganizationLimits,
     models: Vec<WorkspaceModel>,
     /// The embedding and vision models of the catalog the organization enabled, and the one the workspace uses now (V0.9.89).
     embedding: PurposeChoice,
     vision: PurposeChoice,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct OrganizationLimits {
+    max_changes: Option<i64>,
+    type_to_confirm_from: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -193,6 +201,30 @@ pub(crate) async fn get_settings(
         .filter(|(_, by)| *by == "organization")
         .map(|(name, _)| name)
         .collect();
+    let organization_limits = match state
+        .storage
+        .workspace_organization(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+    {
+        Some(id) => {
+            let guardrails = state
+                .storage
+                .get_organization_cairn_settings(&id)
+                .await
+                .map_err(map_storage_error)?
+                .policy
+                .guardrails;
+            OrganizationLimits {
+                max_changes: guardrails.max_changes,
+                type_to_confirm_from: guardrails.type_to_confirm_from,
+            }
+        }
+        None => OrganizationLimits {
+            max_changes: None,
+            type_to_confirm_from: None,
+        },
+    };
     let answering = state
         .storage
         .resolve_text_provider(&workspace_id)
@@ -226,6 +258,7 @@ pub(crate) async fn get_settings(
         organization_default_model_id,
         organization_decided,
         organization_tools_off,
+        organization_limits,
         models,
         embedding: purpose_choice(&state, &workspace_id, "embedding").await?,
         vision: purpose_choice(&state, &workspace_id, "vision").await?,
@@ -425,6 +458,36 @@ pub(crate) async fn update_settings(
     }
     let model_roles = checked_model_roles(request.model_roles, &offered)?;
     let guardrails = crate::organization_cairn::checked_guardrails(request.guardrails)?;
+    // A workspace can be stricter than its organization, never looser.
+    if let Some(organization_id) = state
+        .storage
+        .workspace_organization(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+    {
+        let organization = state
+            .storage
+            .get_organization_cairn_settings(&organization_id)
+            .await
+            .map_err(map_storage_error)?
+            .policy
+            .guardrails;
+        let ceiling = organization
+            .max_changes
+            .unwrap_or(repomemo_storage::DEFAULT_MAX_CHANGES);
+        if guardrails.max_changes.is_some_and(|own| own > ceiling) {
+            return Err(ApiError::bad_request(format!(
+                "A workspace allows at most {ceiling} changes in one confirmation, as its organization does."
+            )));
+        }
+        if let (Some(own), Some(theirs)) = (guardrails.type_to_confirm_from, organization.type_to_confirm_from) {
+            if own > theirs {
+                return Err(ApiError::bad_request(format!(
+                    "A workspace types the number from {theirs} changes at the latest, as its organization asks."
+                )));
+            }
+        }
+    }
     let policy = WorkspaceCairnPolicy {
         offered_model_ids: offered,
         default_model_id: request.default_model_id,

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.91` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.92` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.92 — An organization and a workspace set how much CAIRN may change at once.
+
+- **Change limits.** An organization's administrators, and a workspace's within it, set the most changes one confirmation may make (200 by default) and the number above which the person types it to confirm. A confirmation over the cap is refused with the cap and who set it, and the typed confirmation follows the setting, for any change and not only for one made after CAIRN read content from outside the workspace. A workspace can only be stricter than its organization.
+
+Checks: formatted, linted and type-checked; docs:check; tests added, not run.
 
 ## V0.9.91 — An organization and a workspace can turn off any CAIRN job or tool.
 

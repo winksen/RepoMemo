@@ -101,8 +101,19 @@ pub(crate) async fn list_models(
 pub(crate) fn checked_guardrails(
     given: repomemo_storage::Guardrails,
 ) -> Result<repomemo_storage::Guardrails, ApiError> {
+    let in_range = |value: Option<i64>, what: &str| match value {
+        Some(value) if !(1..=repomemo_storage::DEFAULT_MAX_CHANGES).contains(&value) => {
+            Err(ApiError::bad_request(format!(
+                "{what} is a number from 1 to {}.",
+                repomemo_storage::DEFAULT_MAX_CHANGES
+            )))
+        }
+        _ => Ok(value),
+    };
     Ok(repomemo_storage::Guardrails {
         tools_off: crate::cairn_tools::checked_names(given.tools_off)?,
+        max_changes: in_range(given.max_changes, "The most changes in one confirmation")?,
+        type_to_confirm_from: in_range(given.type_to_confirm_from, "The count from which the number is typed")?,
     })
 }
 

@@ -19,6 +19,8 @@ import { apiMessage, formatTime } from "../format";
 import { useSystemData } from "../system/shared";
 import { limitsFor, RoleLimitSelect, withLimit } from "./RoleLimit";
 import { ToolSwitches } from "./ToolSwitches";
+import { ChangeLimitFields } from "./ChangeLimitFields";
+import type { Guardrails } from "../../types";
 
 const MODES = [
   { label: "Automatic: Agent only for a model that passed the live evaluation", value: "auto" },
@@ -42,17 +44,19 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
   const [fallbackDefault, setDefault] = useState<string>(settings.default_model_id ?? "");
   const [mode, setMode] = useState<string>(settings.agent_mode);
   const [roles, setRoles] = useState<Record<string, string[]>>(settings.model_roles ?? {});
-  const [toolsOff, setToolsOff] = useState<string[]>(settings.guardrails?.tools_off ?? []);
+  const [guardrails, setGuardrails] = useState<Guardrails>(settings.guardrails ?? { tools_off: [] });
+  const toolsOff = guardrails.tools_off;
+  const setToolsOff = (tools_off: string[]) => setGuardrails((current) => ({ ...current, tools_off }));
   const [isBusy, setIsBusy] = useState(false);
   const textModels = models;
   const defaultChoices = models.filter((model) => model.purpose === "text");
   const defaultId = chosen.includes(fallbackDefault) ? fallbackDefault : (defaultChoices.find((model) => chosen.includes(model.id))?.id ?? "");
-  const dirty = JSON.stringify([[...chosen].sort(), defaultId || null, mode, limitsFor(roles, chosen), [...toolsOff].sort()]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode, settings.model_roles ?? {}, [...(settings.guardrails?.tools_off ?? [])].sort()]);
+  const dirty = JSON.stringify([[...chosen].sort(), defaultId || null, mode, limitsFor(roles, chosen), { ...guardrails, tools_off: [...toolsOff].sort() }]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode, settings.model_roles ?? {}, { ...(settings.guardrails ?? { tools_off: [] }), tools_off: [...(settings.guardrails?.tools_off ?? [])].sort() }]);
 
   async function save() {
     setIsBusy(true);
     try {
-      await saveOrganizationCairn(accessToken, organizationId, { enabled_model_ids: chosen, default_model_id: defaultId || null, agent_mode: mode, model_roles: limitsFor(roles, chosen), guardrails: { tools_off: toolsOff }, expected_version: settings.version });
+      await saveOrganizationCairn(accessToken, organizationId, { enabled_model_ids: chosen, default_model_id: defaultId || null, agent_mode: mode, model_roles: limitsFor(roles, chosen), guardrails, expected_version: settings.version });
       showToast("success", "The organization's CAIRN settings were saved.");
       onSaved();
     } catch (error) { showToast("error", apiMessage(error, "The settings could not be saved.")); }
@@ -77,6 +81,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
     <Field hint="The model the organization's workspaces use unless they choose another of those above." label="Default model"><Dropdown aria-label="Default model" disabled={!canChange || chosen.length === 0} onValueChange={setDefault} options={defaultChoices.filter((model) => chosen.includes(model.id)).map((model) => ({ label: model.display_name, value: model.id }))} placeholder="Choose models first" value={defaultId} /></Field>
     <Field hint="A workspace that chose its own mode keeps it." label="Agent mode"><Dropdown aria-label="Agent mode" disabled={!canChange} onValueChange={setMode} options={MODES} value={mode} /></Field>
     <ToolSwitches accessToken={accessToken} disabled={!canChange} off={toolsOff} onChange={setToolsOff} />
+    <ChangeLimitFields disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     {canChange ? <Button busy={isBusy} disabled={!dirty} type="submit" variant="main">Save</Button> : null}
   </form>;
 }

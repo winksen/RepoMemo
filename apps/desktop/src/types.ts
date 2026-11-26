@@ -931,6 +931,10 @@ export interface OrganizationCairnSettings {
 export interface Guardrails {
   /** CAIRN jobs and tools turned off, by name (V0.9.91). */
   tools_off: string[];
+  /** The most changes one confirmation may make (V0.9.92); none keeps the default of 200. */
+  max_changes?: number | null;
+  /** The number of changes above which the number is typed to confirm (V0.9.92); none keeps the rule for content from outside. */
+  type_to_confirm_from?: number | null;
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */
@@ -954,6 +958,8 @@ export interface WorkspaceCairnView {
   updated_by: string | null;
   /** What the organization turned off, which the workspace cannot turn on (V0.9.91). */
   organization_tools_off: string[];
+  /** What the organization set for one confirmation, which the workspace can only tighten (V0.9.92). */
+  organization_limits: { max_changes: number | null; type_to_confirm_from: number | null };
   organization_default_model_id: string | null;
   organization_decided: boolean;
   models: (CairnModel & { from_organization: boolean; offered: boolean; answering: boolean })[];

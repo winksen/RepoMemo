@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.92 (2026-11-26)
+
+An organization and a workspace set how much CAIRN may change at once.
+
+### Added
+- **The cap.** The organization's CAIRN panel and a workspace's Settings › AI have *Most changes in one confirmation*: the files moved or trashed, tasks created and cards changed in one confirmation of a proposal or a set of changes, 200 by default as before and from 1 to 200 when set. A confirmation over the cap is refused with *This would make 51 changes in one confirmation; your organization allows at most 50*, naming the organization or the workspace, and nothing is applied.
+- **The typed number.** *Type the number to confirm from* asks the person to type the number of changes to confirm anything above it, whether or not CAIRN read content from outside the workspace. Empty keeps today's rule only: more than ten files after reading outside content (V0.9.42), which still applies on top of the setting.
+- **Only tighter below.** The organization sets them for its workspaces and a workspace can only lower them: a workspace's cap above its organization's, or a typed-from count above its organization's, is refused with `400`. The effective limit is the stricter of the two. Values outside 1 to 200 are refused.
+- **What counts as a change.** The files a move, trash or status change touches count one each; every other proposal (a card, a note, a task, a comment) counts one.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A unit test (the cap with who set it, and the typed number from the set count, with the rule for outside content kept), a storage test (the stricter of the organization and the workspace) and a server test (out-of-range values, a workspace never looser) were added; tests not run, and a confirmation was not made against a real proposal.
+
+### Upgrading
+- Nothing to do. With nothing set, the cap is 200 and the typed number follows the old rule.
+
 ## V0.9.91 (2026-11-26)
 
 An organization and a workspace can turn off any CAIRN job or tool.

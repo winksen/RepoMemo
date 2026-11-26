@@ -28,6 +28,17 @@ pub struct ResolvedTextProvider {
     pub notice: Option<String>,
 }
 
+/// What one confirmation of CAIRN's proposals may change in a workspace (V0.9.92).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChangeLimits {
+    /// The most changes in one confirmation.
+    pub max_changes: i64,
+    /// The number of changes above which the person types the number to confirm, besides the rule for content from outside.
+    pub type_to_confirm_from: Option<i64>,
+    /// Who set the cap: `organization`, `workspace` or `default`.
+    pub set_by: &'static str,
+}
+
 /// What a resolution found: a model, or why there is none to say.
 #[derive(Debug, Clone, Default)]
 pub struct TextResolution {
@@ -132,6 +143,42 @@ impl StorageEngine {
             }
         }
         Ok(off)
+    }
+
+    /// What one confirmation may change in a workspace, and from how many changes the person types the number (V0.9.92): the stricter
+    /// of the organization's and the workspace's, and never more than the default cap.
+    pub async fn change_limits_for_workspace(&self, workspace_id: &str) -> Result<ChangeLimits> {
+        let mut limits = ChangeLimits {
+            max_changes: crate::organization_cairn::DEFAULT_MAX_CHANGES,
+            type_to_confirm_from: None,
+            set_by: "default",
+        };
+        let mut apply = |guardrails: &crate::organization_cairn::Guardrails, by: &'static str| {
+            if let Some(max) = guardrails.max_changes.filter(|max| *max < limits.max_changes) {
+                limits.max_changes = max;
+                limits.set_by = by;
+            }
+            if let Some(from) = guardrails.type_to_confirm_from {
+                if limits.type_to_confirm_from.is_none_or(|current| from < current) {
+                    limits.type_to_confirm_from = Some(from);
+                }
+            }
+        };
+        if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+            apply(
+                &self
+                    .get_organization_cairn_settings(&organization_id)
+                    .await?
+                    .policy
+                    .guardrails,
+                "organization",
+            );
+        }
+        apply(
+            &self.get_workspace_cairn_settings(workspace_id).await?.policy.guardrails,
+            "workspace",
+        );
+        Ok(limits)
     }
 
     /// A catalog model as a provider for a workspace, when it can be used now: on, a text model, on a connection that is usable.
@@ -847,6 +894,66 @@ mod tests {
         assert!(offered(&setup.workspace_id, Some("member"))
             .await
             .contains(&setup.former.id));
+        let _ = std::fs::remove_dir_all(&setup.dir);
+    }
+
+    #[tokio::test]
+    async fn the_change_limits_are_the_stricter_of_the_organization_and_the_workspace() {
+        use crate::organization_cairn::Guardrails;
+        use crate::workspace_cairn::WorkspaceCairnPolicy;
+        let setup = setup(None).await;
+        let storage = &setup.storage;
+        let defaults = storage.change_limits_for_workspace(&setup.workspace_id).await.unwrap();
+        assert_eq!(
+            (defaults.max_changes, defaults.type_to_confirm_from, defaults.set_by),
+            (200, None, "default")
+        );
+
+        let current = storage
+            .get_organization_cairn_settings(&setup.organization_id)
+            .await
+            .unwrap();
+        let mut policy = current.policy.clone();
+        policy.guardrails = Guardrails {
+            max_changes: Some(50),
+            type_to_confirm_from: Some(20),
+            ..Default::default()
+        };
+        storage
+            .save_organization_cairn_settings(&setup.organization_id, current.version, &policy, &setup.actor)
+            .await
+            .unwrap();
+        let by_organization = storage.change_limits_for_workspace(&setup.workspace_id).await.unwrap();
+        assert_eq!(
+            (
+                by_organization.max_changes,
+                by_organization.type_to_confirm_from,
+                by_organization.set_by
+            ),
+            (50, Some(20), "organization")
+        );
+
+        storage
+            .save_workspace_cairn_settings(
+                &setup.workspace_id,
+                0,
+                &WorkspaceCairnPolicy {
+                    guardrails: Guardrails {
+                        max_changes: Some(30),
+                        type_to_confirm_from: Some(5),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                None,
+            )
+            .await
+            .unwrap();
+        let tightened = storage.change_limits_for_workspace(&setup.workspace_id).await.unwrap();
+        assert_eq!(
+            (tightened.max_changes, tightened.type_to_confirm_from, tightened.set_by),
+            (30, Some(5), "workspace")
+        );
         let _ = std::fs::remove_dir_all(&setup.dir);
     }
 }
