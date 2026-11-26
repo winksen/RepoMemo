@@ -85,8 +85,7 @@ impl RepoMemoCore {
             }
         };
         let mut files = self
-            .storage
-            .list_artifacts(workspace_id)
+            .cairn_artifacts(workspace_id)
             .await?
             .into_iter()
             .filter(|file| filter.keeps_kind(file) && filter.keeps_name(file))
@@ -131,8 +130,7 @@ impl RepoMemoCore {
     ) -> Result<Vec<ArtifactSummary>> {
         let wanted = ids.iter().map(String::as_str).collect::<std::collections::HashSet<_>>();
         Ok(self
-            .storage
-            .list_artifacts(workspace_id)
+            .cairn_artifacts(workspace_id)
             .await?
             .into_iter()
             .filter(|file| wanted.contains(file.id.as_str()))
@@ -202,20 +200,46 @@ impl RepoMemoCore {
         workspace_id: &str,
         query: &str,
     ) -> Result<Vec<repomemo_domain::SearchResult>> {
-        self.search_workspace(SearchRequest {
-            workspace_id: workspace_id.to_owned(),
-            query: query.to_owned(),
-            artifact_types: Vec::new(),
-            languages: Vec::new(),
-            source_ids: Vec::new(),
-            limit: Some(SEARCH_RESULT_LIMIT),
-            ..Default::default()
-        })
-        .await
+        let mut hits = self
+            .search_workspace(SearchRequest {
+                workspace_id: workspace_id.to_owned(),
+                query: query.to_owned(),
+                artifact_types: Vec::new(),
+                languages: Vec::new(),
+                source_ids: Vec::new(),
+                limit: Some(SEARCH_RESULT_LIMIT),
+                ..Default::default()
+            })
+            .await?;
+        self.drop_closed_hits(workspace_id, &mut hits).await;
+        Ok(hits)
     }
 
     /// Files whose title or path contains every word of `subject`, best first:
     /// exact names, then names starting with or containing the phrase.
+    /// The files of a workspace that CAIRN may read: those outside the folders a workspace administrator closed to it (V0.9.93).
+    pub(in crate::agent) async fn cairn_artifacts(&self, workspace_id: &str) -> Result<Vec<ArtifactSummary>> {
+        let closed = self.storage.closed_artifact_ids(workspace_id).await?;
+        let mut files = self.storage.list_artifacts(workspace_id).await?;
+        if !closed.is_empty() {
+            files.retain(|file| !closed.contains(&file.id));
+        }
+        Ok(files)
+    }
+
+    /// Drops the passages of closed folders from what a search found.
+    pub(in crate::agent) async fn drop_closed_hits(
+        &self,
+        workspace_id: &str,
+        hits: &mut Vec<repomemo_domain::SearchResult>,
+    ) {
+        if let Ok(closed) = self.storage.closed_artifact_ids(workspace_id).await {
+            if !closed.is_empty() {
+                hits.retain(|hit| !closed.contains(&hit.artifact_id));
+            }
+        }
+    }
+
     pub(in crate::agent) async fn match_files(&self, workspace_id: &str, subject: &str) -> Result<Vec<FileMatch>> {
         let phrase = subject.to_lowercase();
         let terms = phrase
@@ -226,8 +250,7 @@ impl RepoMemoCore {
             return Ok(Vec::new());
         }
         let mut scored = self
-            .storage
-            .list_artifacts(workspace_id)
+            .cairn_artifacts(workspace_id)
             .await?
             .into_iter()
             .filter_map(|artifact| {

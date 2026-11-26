@@ -20,6 +20,7 @@ import { useSystemData } from "../system/shared";
 import { limitsFor, RoleLimitSelect, withLimit } from "../cairn-admin/RoleLimit";
 import { ToolSwitches } from "../cairn-admin/ToolSwitches";
 import { ChangeLimitFields } from "../cairn-admin/ChangeLimitFields";
+import { ClosedFolders } from "../cairn-admin/ClosedFolders";
 import type { Guardrails } from "../../types";
 
 const TOOL_LABELS: Record<string, string> = { none: "No tools", json: "Tools as JSON", native: "Native tools" };
@@ -103,6 +104,7 @@ function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: stri
     <Field hint="The model this workspace uses unless a person chooses another of those it offers. Without one, its own provider answers while the organization offers it, then the organization's default." label="Workspace default"><Dropdown aria-label="Workspace default model" disabled={offered.length === 0} onValueChange={setPreferred} options={view.models.filter((model) => offered.includes(model.id)).map((model) => ({ label: model.display_name, value: model.id }))} placeholder="Offer models first" value={defaultId} /></Field>
     <ToolSwitches accessToken={accessToken} locked={view.organization_tools_off} off={toolsOff} onChange={setToolsOff} />
     <ChangeLimitFields ceiling={view.organization_limits} guardrails={guardrails} onChange={setGuardrails} />
+    <ClosedFolders closed={guardrails.closed_folder_ids ?? []} folders={view.folders} onChange={(closed_folder_ids) => setGuardrails((current) => ({ ...current, closed_folder_ids }))} />
     <Button busy={isBusy} disabled={!dirty} type="submit" variant="main">Save</Button>
   </form>;
 }

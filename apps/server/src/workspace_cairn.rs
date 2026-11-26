@@ -69,6 +69,8 @@ pub(crate) struct WorkspaceCairnView {
     organization_tools_off: Vec<String>,
     /// What the organization set for one confirmation, which the workspace can only tighten (V0.9.92).
     organization_limits: OrganizationLimits,
+    /// The workspace's folders, each marked when it is closed to CAIRN (V0.9.93).
+    folders: Vec<repomemo_domain::Folder>,
     models: Vec<WorkspaceModel>,
     /// The embedding and vision models of the catalog the organization enabled, and the one the workspace uses now (V0.9.89).
     embedding: PurposeChoice,
@@ -201,6 +203,19 @@ pub(crate) async fn get_settings(
         .filter(|(_, by)| *by == "organization")
         .map(|(name, _)| name)
         .collect();
+    let mut folders = state
+        .storage
+        .list_folders(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    let closed = state
+        .storage
+        .closed_folder_ids(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    for folder in &mut folders {
+        folder.closed_to_cairn = closed.contains(&folder.id);
+    }
     let organization_limits = match state
         .storage
         .workspace_organization(&workspace_id)
@@ -259,6 +274,7 @@ pub(crate) async fn get_settings(
         organization_decided,
         organization_tools_off,
         organization_limits,
+        folders,
         models,
         embedding: purpose_choice(&state, &workspace_id, "embedding").await?,
         vision: purpose_choice(&state, &workspace_id, "vision").await?,
@@ -457,7 +473,24 @@ pub(crate) async fn update_settings(
         }
     }
     let model_roles = checked_model_roles(request.model_roles, &offered)?;
-    let guardrails = crate::organization_cairn::checked_guardrails(request.guardrails)?;
+    let mut guardrails = crate::organization_cairn::checked_guardrails(request.guardrails)?;
+    // Only folders of this workspace can be closed (V0.9.93).
+    let folders = state
+        .storage
+        .list_folders(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    if guardrails
+        .closed_folder_ids
+        .iter()
+        .any(|id| !folders.iter().any(|folder| folder.id == *id))
+    {
+        return Err(ApiError::bad_request(
+            "A folder closed to CAIRN is a folder of this workspace.",
+        ));
+    }
+    guardrails.closed_folder_ids.sort();
+    guardrails.closed_folder_ids.dedup();
     // A workspace can be stricter than its organization, never looser.
     if let Some(organization_id) = state
         .storage

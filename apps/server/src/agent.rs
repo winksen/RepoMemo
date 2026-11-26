@@ -669,12 +669,29 @@ async fn all_workspaces_reply(
     let request: crate::requests::SearchAllRequest =
         serde_json::from_value(serde_json::json!({ "query": query, "limit": 12 }))
             .map_err(|_| ApiError::bad_request("That could not be searched."))?;
-    let (_, Json(found)) = crate::retrieval::search_all_workspaces(
+    let (_, Json(mut found)) = crate::retrieval::search_all_workspaces(
         crate::access_control::ReadingSubject(subject.clone()),
         State(state.clone()),
         Json(request),
     )
     .await?;
+    // What a workspace administrator closed to CAIRN is never returned in a chat across workspaces (V0.9.93).
+    let mut closed: Vec<(String, std::collections::HashSet<String>)> = Vec::new();
+    for hit in &found.results {
+        if !closed.iter().any(|(workspace, _)| *workspace == hit.workspace_id) {
+            let ids = state
+                .storage
+                .closed_artifact_ids(&hit.workspace_id)
+                .await
+                .map_err(map_storage_error)?;
+            closed.push((hit.workspace_id.clone(), ids));
+        }
+    }
+    found.results.retain(|hit| {
+        !closed
+            .iter()
+            .any(|(workspace, ids)| *workspace == hit.workspace_id && ids.contains(&hit.result.artifact_id))
+    });
     let mut names: Vec<(String, String)> = Vec::new();
     for hit in &found.results {
         if !names.iter().any(|(id, _)| *id == hit.workspace_id) {

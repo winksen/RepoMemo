@@ -11,6 +11,16 @@ impl RepoMemoCore {
                 if detail.summary.workspace_id != request.workspace_id {
                     repomemo_domain::bail_invalid!("That file belongs to a different workspace.");
                 }
+                if self
+                    .storage
+                    .closed_artifact_ids(&request.workspace_id)
+                    .await?
+                    .contains(&detail.summary.id)
+                {
+                    repomemo_domain::bail_invalid!(
+                        "That file is in a folder a workspace administrator closed to CAIRN."
+                    );
+                }
                 detail.summary
             }
             None => {

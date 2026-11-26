@@ -590,7 +590,7 @@ impl RepoMemoCore {
             .trim_end_matches(|c: char| c != '.' && !c.is_alphanumeric())
             .to_owned();
         if name.chars().count() >= 4 {
-            let found = self
+            let mut found = self
                 .search_workspace(SearchRequest {
                     workspace_id: ledger.workspace_id().to_owned(),
                     query: format!("\"{}\"", name.replace('"', " ")),
@@ -605,6 +605,7 @@ impl RepoMemoCore {
                 })
                 .await
                 .unwrap_or_default();
+            self.drop_closed_hits(ledger.workspace_id(), &mut found).await;
             let mut seen = Vec::new();
             for hit in found.iter().filter(|hit| hit.artifact_id != summary.id) {
                 if seen.contains(&hit.artifact_id) || seen.len() >= 5 {

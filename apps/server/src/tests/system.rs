@@ -3646,3 +3646,168 @@ async fn change_limits_are_checked_and_a_workspace_is_never_looser_than_its_orga
     assert_eq!(response_json(stricter).await["guardrails"]["type_to_confirm_from"], 5);
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_folder_closed_to_cairn_is_never_found_by_it_and_shows_a_lock() {
+    let data_dir = temp_data_dir("closed-folders");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "closed-root@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &root,
+            json!({"name": "Closed Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "Closed Space", "organization_id": organization_id}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+    let folder = response_json(
+        send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/folders"),
+            &root,
+            json!({"name": "Private"}),
+        )
+        .await,
+    )
+    .await;
+    let inner = response_json(
+        send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/folders"),
+            &root,
+            json!({"name": "Inner", "parent_id": folder["id"]}),
+        )
+        .await,
+    )
+    .await;
+    for (title, folder_id) in [
+        ("Secret plan", folder["id"].clone()),
+        ("Inner plan", inner["id"].clone()),
+        ("Public plan", Value::Null),
+    ] {
+        let created = send(
+            "POST",
+            format!("/v1/workspaces/{workspace_id}/artifacts/text"),
+            &root,
+            json!({"title": title, "content": format!("# {title}\nThe plan."), "language": "Markdown", "folder_id": folder_id}),
+        )
+        .await;
+        assert_eq!(created.status(), 201, "{title}");
+    }
+    let find = || {
+        let (send, root, uri) = (
+            &send,
+            root.clone(),
+            format!("/v1/workspaces/{workspace_id}/agent/messages"),
+        );
+        async move {
+            let reply = response_json(
+                send(
+                    "POST",
+                    uri,
+                    &root,
+                    json!({"message": "find the plan files", "capability": "find_files"}),
+                )
+                .await,
+            )
+            .await;
+            let mut titles = reply["turn"]["reply"]["files"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|file| file["title"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>();
+            titles.sort();
+            titles
+        }
+    };
+    assert_eq!(find().await, vec!["Inner plan", "Public plan", "Secret plan"]);
+
+    // Only a folder of the workspace can be closed, and an organization closes none.
+    let uri = format!("/v1/workspaces/{workspace_id}/cairn");
+    assert_eq!(
+        send(
+            "PUT",
+            uri.clone(),
+            &root,
+            json!({"guardrails": {"closed_folder_ids": ["nothing"]}, "expected_version": 0})
+        )
+        .await
+        .status(),
+        400
+    );
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/organizations/{organization_id}/cairn"),
+            &root,
+            json!({"guardrails": {"closed_folder_ids": [folder["id"]]}, "expected_version": 0})
+        )
+        .await
+        .status(),
+        400
+    );
+    let saved = send(
+        "PUT",
+        uri,
+        &root,
+        json!({"guardrails": {"closed_folder_ids": [folder["id"]]}, "expected_version": 0}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+
+    // CAIRN no longer finds what is in it or in the folder inside it; the file browser's folder list shows the lock on both.
+    assert_eq!(find().await, vec!["Public plan"]);
+    let folders = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/folders"),
+            &root,
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    let locked = |name: &str| {
+        folders
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|folder| folder["name"] == name)
+            .unwrap()["closed_to_cairn"]
+            .clone()
+    };
+    assert_eq!((locked("Private"), locked("Inner")), (json!(true), json!(true)));
+    // The files themselves are still there for people.
+    let files = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/artifacts"),
+            &root,
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    assert!(files.to_string().contains("Secret plan"));
+    let _ = std::fs::remove_dir_all(data_dir);
+}

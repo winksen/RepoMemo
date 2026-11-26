@@ -1109,6 +1109,8 @@ export interface Folder {
   created_at: string;
   /** Files sitting directly in this folder (not in its subfolders); filled by the folder list. */
   file_count: number;
+  /** A workspace administrator closed this folder, or one above it, to CAIRN (V0.9.93); filled by the folder list. */
+  closed_to_cairn: boolean;
 }
 
 /** Why an artifact could not be indexed, after every retry was used. */

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.92` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.93` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.93 — A workspace administrator can close folders to CAIRN.
+
+- **Folders CAIRN does not read.** In Settings › AI a workspace administrator closes folders to CAIRN. CAIRN's search, read, list, analysis and summary jobs and tools, its chats across workspaces and the MCP endpoint never return what is in a closed folder or the folders inside it. The file browser shows a lock on the folder. People and Ask outside CAIRN see and use the files as before.
+
+Checks: formatted, linted and type-checked; docs:check; test added, not run.
 
 ## V0.9.92 — An organization and a workspace set how much CAIRN may change at once.
 

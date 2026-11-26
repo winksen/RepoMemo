@@ -110,12 +110,21 @@ pub(crate) async fn list_folders(
     Path(workspace_id): Path<String>,
 ) -> Result<Json<Vec<Folder>>, ApiError> {
     require_workspace_read(&state, &subject, &workspace_id).await?;
-    state
+    let mut folders = state
         .storage
         .list_folders(&workspace_id)
         .await
-        .map(Json)
-        .map_err(map_storage_error)
+        .map_err(map_storage_error)?;
+    // A folder closed to CAIRN, or inside one, shows a lock in the file browser (V0.9.93).
+    let closed = state
+        .storage
+        .closed_folder_ids(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    for folder in &mut folders {
+        folder.closed_to_cairn = closed.contains(&folder.id);
+    }
+    Ok(Json(folders))
 }
 
 pub(crate) async fn create_folder(

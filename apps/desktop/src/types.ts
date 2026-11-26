@@ -935,6 +935,8 @@ export interface Guardrails {
   max_changes?: number | null;
   /** The number of changes above which the number is typed to confirm (V0.9.92); none keeps the rule for content from outside. */
   type_to_confirm_from?: number | null;
+  /** Folders CAIRN does not read (V0.9.93): a workspace's own, with their subfolders. */
+  closed_folder_ids?: string[];
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */
@@ -960,6 +962,8 @@ export interface WorkspaceCairnView {
   organization_tools_off: string[];
   /** What the organization set for one confirmation, which the workspace can only tighten (V0.9.92). */
   organization_limits: { max_changes: number | null; type_to_confirm_from: number | null };
+  /** The workspace's folders, each marked when it is closed to CAIRN (V0.9.93). */
+  folders: Folder[];
   organization_default_model_id: string | null;
   organization_decided: boolean;
   models: (CairnModel & { from_organization: boolean; offered: boolean; answering: boolean })[];

@@ -111,6 +111,7 @@ pub(crate) fn checked_guardrails(
         _ => Ok(value),
     };
     Ok(repomemo_storage::Guardrails {
+        closed_folder_ids: given.closed_folder_ids,
         tools_off: crate::cairn_tools::checked_names(given.tools_off)?,
         max_changes: in_range(given.max_changes, "The most changes in one confirmation")?,
         type_to_confirm_from: in_range(given.type_to_confirm_from, "The count from which the number is typed")?,
@@ -217,6 +218,11 @@ pub(crate) async fn update_settings(
     }
     let model_roles = crate::workspace_cairn::checked_model_roles(request.model_roles, &enabled)?;
     let guardrails = checked_guardrails(request.guardrails)?;
+    if !guardrails.closed_folder_ids.is_empty() {
+        return Err(ApiError::bad_request(
+            "Folders are closed to CAIRN by each workspace: an organization has no folders of its own.",
+        ));
+    }
     let policy = OrganizationCairnPolicy {
         enabled_model_ids: enabled,
         default_model_id: request.default_model_id,

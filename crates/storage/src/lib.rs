@@ -1436,6 +1436,7 @@ fn folder_from_row(row: &SqliteRow) -> Folder {
         name: row.get("name"),
         created_at: row.get("created_at"),
         file_count: row.try_get("file_count").unwrap_or(0),
+        closed_to_cairn: false,
     }
 }
 

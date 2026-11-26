@@ -27,6 +27,9 @@ pub struct Guardrails {
     /// read content from outside the workspace, above ten. A workspace's is never higher than its organization's.
     #[serde(default)]
     pub type_to_confirm_from: Option<i64>,
+    /// Folders CAIRN does not read (V0.9.93): a workspace's own, so an organization sets none. Their subfolders are closed too.
+    #[serde(default)]
+    pub closed_folder_ids: Vec<String>,
 }
 
 /// The most changes one confirmation makes when nothing sets less.

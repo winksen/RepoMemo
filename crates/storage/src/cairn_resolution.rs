@@ -145,6 +145,48 @@ impl StorageEngine {
         Ok(off)
     }
 
+    /// The folders closed to CAIRN in a workspace and every folder inside them (V0.9.93).
+    pub async fn closed_folder_ids(&self, workspace_id: &str) -> Result<std::collections::HashSet<String>> {
+        let settings = self.get_workspace_cairn_settings(workspace_id).await?;
+        let closed = settings.policy.guardrails.closed_folder_ids;
+        if closed.is_empty() {
+            return Ok(Default::default());
+        }
+        let folders = self.list_folders(workspace_id).await?;
+        let mut all: std::collections::HashSet<String> = closed.into_iter().collect();
+        loop {
+            let before = all.len();
+            for folder in &folders {
+                if folder.parent_id.as_ref().is_some_and(|parent| all.contains(parent)) {
+                    all.insert(folder.id.clone());
+                }
+            }
+            if all.len() == before {
+                break;
+            }
+        }
+        Ok(all)
+    }
+
+    /// The files in the folders closed to CAIRN (V0.9.93): CAIRN's tools, its chats across workspaces and the MCP endpoint never return
+    /// them. Ask outside CAIRN is unchanged.
+    pub async fn closed_artifact_ids(&self, workspace_id: &str) -> Result<std::collections::HashSet<String>> {
+        let folders = self.closed_folder_ids(workspace_id).await?;
+        if folders.is_empty() {
+            return Ok(Default::default());
+        }
+        let folders = serde_json::to_string(&folders.into_iter().collect::<Vec<_>>())?;
+        Ok(sqlx::query_scalar::<_, String>(
+            "SELECT id FROM artifacts WHERE workspace_id = ?1 AND folder_id IN (SELECT value FROM json_each(?2))",
+        )
+        .bind(workspace_id)
+        .bind(folders)
+        .fetch_all(self.reader())
+        .await?
+        .into_iter()
+        .collect())
+    }
+
     /// What one confirmation may change in a workspace, and from how many changes the person types the number (V0.9.92): the stricter
     /// of the organization's and the workspace's, and never more than the default cap.
     pub async fn change_limits_for_workspace(&self, workspace_id: &str) -> Result<ChangeLimits> {

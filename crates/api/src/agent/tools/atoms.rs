@@ -302,6 +302,8 @@ impl RepoMemoCore {
                 modified_before: None,
             })
             .await?;
+        // What a workspace administrator closed to CAIRN is never found (V0.9.93).
+        self.drop_closed_hits(&workspace_id, &mut found).await;
         if !filter.kinds.is_empty() {
             found.retain(|hit| {
                 let path = hit.path.to_lowercase();
@@ -379,6 +381,14 @@ impl RepoMemoCore {
         if let Some(item) = ledger.get(file) {
             if let Ok(summary) = self.storage.get_artifact_summary(&item.artifact_id).await {
                 if summary.workspace_id == ledger.workspace_id() {
+                    if self
+                        .storage
+                        .closed_artifact_ids(ledger.workspace_id())
+                        .await?
+                        .contains(&summary.id)
+                    {
+                        return Ok(Err(format!("No file in this workspace is named like \"{file}\".")));
+                    }
                     return Ok(Ok(summary));
                 }
             }

@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.93 (2026-11-26)
+
+A workspace administrator can close folders to CAIRN.
+
+### Added
+- **Closing a folder.** Settings › AI has *Folders closed to CAIRN*: the workspace's folders by path, each with a checkbox. A closed folder and every folder inside it are closed. Only a workspace administrator chooses, only folders of the workspace can be closed, and an organization closes none (its folders mean nothing to it): the organization's panel refuses a list of closed folders.
+- **CAIRN never returns what is in them.** The files of a closed folder are left out of the files CAIRN lists, matches by name and filters; its search tools and the passages its jobs find drop the passages of closed files; asking for a closed file by handle or by name is answered as if no such file existed, and summarizing one is refused; in a chat across workspaces the closed hits of each workspace are dropped before anything is listed or sent. The MCP endpoint reads through the same tools, so an outside agent never receives them either.
+- **The file browser shows it.** A closed folder, and the folders inside it, show a lock with the reason in a tooltip. `GET /v1/workspaces/{id}/folders` carries `closed_to_cairn`.
+- **Unchanged.** People see and open the files as before, and Ask outside CAIRN (the workspace's Ask question and the dashboard search) searches them as before: closing is about what CAIRN reads, not who can read.
+- **Known gaps.** A memory card that already cites a closed file still shows its citation, and the counts of the workspace overview CAIRN gives include closed files; neither shows what is in them.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (only workspace folders can be closed and an organization closes none; a job that finds files by name returns all three plans before and only the public one after; the lock is on the folder and the one inside it; the files are still listed for people) was added; tests not run. The search tools, the analysis, the chat across workspaces and MCP were changed but not tried against a closed file.
+
+### Upgrading
+- Nothing to do. No folder is closed until an administrator closes one.
+
 ## V0.9.92 (2026-11-26)
 
 An organization and a workspace set how much CAIRN may change at once.

@@ -429,6 +429,7 @@ mod tests {
             name: name.to_owned(),
             created_at: String::new(),
             file_count: 0,
+            closed_to_cairn: false,
         }
     }
 

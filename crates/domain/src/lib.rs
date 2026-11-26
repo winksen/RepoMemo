@@ -1238,6 +1238,9 @@ pub struct Folder {
     /// Files sitting directly in this folder (not in its subfolders); filled by the folder list.
     #[serde(default)]
     pub file_count: i64,
+    /// A workspace administrator closed this folder, or one above it, to CAIRN (V0.9.93); filled by the folder list.
+    #[serde(default)]
+    pub closed_to_cairn: bool,
 }
 
 /// Why an artifact could not be indexed, after every retry was used.
