@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.76 (2026-11-26)
+
+CAIRN administrators add and test connections to model servers.
+
+### Added
+- **Connections.** Models › Connections lists the servers CAIRN's models run on and lets CAIRN and system administrators add, edit, turn off, test and delete an Ollama, OpenRouter or OpenAI-compatible connection. App administrators read the list.
+- **The key is write-only.** It is never in a response, a log line or an audit event, only whether one is set. A saved key is only sent to the address it was saved for: changing the address asks for the key again.
+- **The endpoint policy applies.** An address outside the allowed hosts, a metadata service, a redirecting address, an address with a user name or a scheme other than http or https is refused, as for a workspace's provider. Whether a connection is local or cloud comes from its kind and address, never from the request, and a cloud connection can be on only after the administrator confirms that what CAIRN sends there leaves the network.
+- **Test.** *Test connection* says whether the server answered and took the key, and how many models it lists; it never carries the key or the server's own words.
+- **Routes and audit.** `GET`/`POST /v1/cairn/connections`, `PUT`/`DELETE /v1/cairn/connections/{id}` (a change names the version it read; a stale one is refused with `409`) and `POST /v1/cairn/connections/{id}/test`. Each change and test is an audit event.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (members and app administrators refused, bad addresses refused, the cloud rules, a key that never comes back, a stale save, a test and a delete, and the audit) and two tests of the address and locality rules were added; tests not run.
+
+### Upgrading
+- Nothing to do. Workspaces keep their own providers until the rows that move them.
+
 ## V0.9.75 (2026-11-26)
 
 The server has a model catalog in storage; nothing reads it yet.

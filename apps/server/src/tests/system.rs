@@ -1785,3 +1785,177 @@ async fn cairn_administrators_change_the_run_budgets_and_each_change_is_audited(
     assert!(audit.contains("CAIRN steps per request from 12 to 8"), "{audit}");
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn cairn_administrators_manage_connections_without_the_key_ever_coming_back() {
+    let data_dir = temp_data_dir("cairn-connections");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "conn-root@example.com").await;
+    let (cairn, cairn_tokens) = register_account(&app, "conn-cairn@example.com").await;
+    let (reader, reader_tokens) = register_account(&app, "conn-reader@example.com").await;
+    let (member, _) = register_account(&app, "conn-member@example.com").await;
+    for (kind, tokens) in [("cairn-admin", &cairn_tokens), ("app-admin", &reader_tokens)] {
+        let id = tokens["user"]["id"].as_str().unwrap();
+        assert_eq!(
+            send(
+                "PUT",
+                format!("/v1/system/users/{id}/{kind}"),
+                &admin,
+                json!({"enabled": true})
+            )
+            .await
+            .status(),
+            204
+        );
+    }
+    let uri = "/v1/cairn/connections".to_owned();
+    let local = json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"});
+
+    // A member is refused everything; an app administrator reads and changes nothing.
+    assert_eq!(send("GET", uri.clone(), &member, Value::Null).await.status(), 403);
+    assert_eq!(send("POST", uri.clone(), &member, local.clone()).await.status(), 403);
+    assert_eq!(send("GET", uri.clone(), &reader, Value::Null).await.status(), 200);
+    assert_eq!(send("POST", uri.clone(), &reader, local.clone()).await.status(), 403);
+
+    // An address outside the allowed hosts, or a metadata service, is refused, as for a workspace's provider.
+    for body in [
+        json!({"kind": "openai_compatible", "name": "Elsewhere", "base_url": "https://elsewhere.example/v1"}),
+        json!({"kind": "openai_compatible", "name": "Metadata", "base_url": "http://169.254.169.254/v1"}),
+        json!({"kind": "ollama", "name": "Scheme", "base_url": "ftp://127.0.0.1:11434"}),
+        json!({"kind": "anthropic", "name": "Unknown kind"}),
+        json!({"kind": "ollama", "name": "", "base_url": "http://127.0.0.1:11434"}),
+    ] {
+        assert_eq!(send("POST", uri.clone(), &cairn, body).await.status(), 400);
+    }
+
+    // A local connection is made; a cloud one needs the key and the acknowledgement that content leaves the network.
+    let made = send("POST", uri.clone(), &cairn, local).await;
+    assert_eq!(made.status(), 201);
+    let local = response_json(made).await;
+    assert_eq!(
+        (local["locality"].clone(), local["has_key"].clone()),
+        (json!("local"), json!(false))
+    );
+    let secret = "sk-or-very-secret-value";
+    let cloud = json!({"kind": "openrouter", "name": "OpenRouter", "api_key": secret});
+    assert_eq!(
+        send("POST", uri.clone(), &cairn, cloud.clone()).await.status(),
+        400,
+        "no acknowledgement"
+    );
+    assert_eq!(
+        send(
+            "POST",
+            uri.clone(),
+            &cairn,
+            json!({"kind": "openrouter", "name": "OpenRouter", "cloud_content_acknowledged": true})
+        )
+        .await
+        .status(),
+        400,
+        "no key"
+    );
+    let mut acknowledged = cloud.clone();
+    acknowledged["cloud_content_acknowledged"] = json!(true);
+    let made = send("POST", uri.clone(), &cairn, acknowledged).await;
+    assert_eq!(made.status(), 201);
+    let cloud = response_json(made).await;
+    assert_eq!(
+        (cloud["locality"].clone(), cloud["has_key"].clone()),
+        (json!("cloud"), json!(true))
+    );
+    assert!(cloud["cloud_acknowledged_at"].is_string());
+
+    // The key is in no response and no audit event.
+    let listed = response_json(send("GET", uri.clone(), &reader, Value::Null).await).await;
+    assert_eq!(listed.as_array().unwrap().len(), 2);
+    assert!(!listed.to_string().contains(secret));
+    assert!(!cloud.to_string().contains(secret));
+
+    // A stale save is refused; the same address keeps the key, another needs it again; a rename and turning off work.
+    let id = cloud["id"].as_str().unwrap().to_owned();
+    let change_uri = format!("/v1/cairn/connections/{id}");
+    let stale = json!({"name": "OpenRouter team", "enabled": false, "expected_version": 99});
+    assert_eq!(send("PUT", change_uri.clone(), &cairn, stale).await.status(), 409);
+    let renamed = send(
+        "PUT",
+        change_uri.clone(),
+        &cairn,
+        json!({"name": "OpenRouter team", "enabled": false, "expected_version": cloud["version"]}),
+    )
+    .await;
+    assert_eq!(renamed.status(), 200);
+    let renamed = response_json(renamed).await;
+    assert_eq!(
+        (
+            renamed["name"].clone(),
+            renamed["enabled"].clone(),
+            renamed["has_key"].clone()
+        ),
+        (json!("OpenRouter team"), json!(false), json!(true))
+    );
+    let same_address = json!({"name": "OpenRouter team", "enabled": false, "base_url": "https://openrouter.ai/api/v1/", "expected_version": renamed["version"]});
+    let kept = send("PUT", change_uri.clone(), &cairn, same_address).await;
+    assert_eq!(kept.status(), 200, "the same address keeps the key");
+    let kept = response_json(kept).await;
+    assert_eq!(kept["has_key"], true);
+    let other_address = json!({"name": "x", "enabled": false, "base_url": "http://127.0.0.1:11434", "expected_version": kept["version"]});
+    assert_eq!(
+        send("PUT", change_uri, &cairn, other_address).await.status(),
+        400,
+        "another address needs the key entered again"
+    );
+
+    // A test reports whether the server answered; nothing listens here, and the report holds no key.
+    let tested = send(
+        "POST",
+        format!("/v1/cairn/connections/{}/test", local["id"].as_str().unwrap()),
+        &cairn,
+        json!({}),
+    )
+    .await;
+    assert_eq!(tested.status(), 200);
+    let tested = response_json(tested).await;
+    assert!(tested["reachable"].is_boolean());
+    assert!(!tested.to_string().contains(secret));
+
+    // Deleting removes the connection.
+    assert_eq!(
+        send("DELETE", format!("/v1/cairn/connections/{id}"), &cairn, Value::Null)
+            .await
+            .status(),
+        204
+    );
+    assert_eq!(
+        response_json(send("GET", uri, &admin, Value::Null).await)
+            .await
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &admin))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    for action in [
+        "cairn_connection_added",
+        "cairn_connection_changed",
+        "cairn_connection_tested",
+        "cairn_connection_deleted",
+    ] {
+        assert!(audit.contains(action), "{action} missing");
+    }
+    assert!(!audit.contains(secret), "the key is not in the audit trail");
+    let _ = std::fs::remove_dir_all(data_dir);
+}

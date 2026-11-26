@@ -17,13 +17,14 @@ import { SkeletonList } from "../../components/ui/skeleton";
 import { Table } from "../../components/ui/table";
 import { CAIRN_ADMIN_SECTIONS, type CairnAdminSection } from "../constants";
 import { Facts, RefreshButton, useSystemData } from "../system/shared";
+import { ConnectionsPanel } from "./ConnectionsPanel";
 
 export { CAIRN_ADMIN_SECTIONS };
 export type { CairnAdminSection };
 
 const SECTION_LABELS: Record<CairnAdminSection, { label: string; icon: ReactNode; intro: string; empty: string }> = {
   overview: { label: "Overview", icon: <Compass size={ICON_SIZE.md} />, intro: "How CAIRN is set up on this server today: each workspace's model and mode, and the budgets and retention in force.", empty: "" },
-  models: { label: "Models", icon: <Cpu size={ICON_SIZE.md} />, intro: "The models CAIRN can use, kept once for the whole server.", empty: "The model catalog arrives in a later release. Until then each workspace keeps its own provider in Settings › AI." },
+  models: { label: "Models", icon: <Cpu size={ICON_SIZE.md} />, intro: "The servers CAIRN's models run on, and the models, kept once for the whole server.", empty: "The models of a connection arrive in a later release. Until then each workspace keeps its own provider in Settings › AI." },
   organizations: { label: "Organizations", icon: <Buildings size={ICON_SIZE.md} />, intro: "Which models each organization uses, and how CAIRN behaves for it.", empty: "Organization settings arrive in a later release." },
   guardrails: { label: "Guardrails", icon: <ShieldCheck size={ICON_SIZE.md} />, intro: "What CAIRN may do, see, send and spend, set once and narrowed by workspaces.", empty: "Guardrails arrive in a later release." },
   abilities: { label: "Abilities", icon: <Sparkle size={ICON_SIZE.md} />, intro: "Procedures an organization or a workspace teaches CAIRN, run with a command.", empty: "Abilities arrive in a later release." },
@@ -112,7 +113,7 @@ export function CairnAdminPanel({ accessToken, section, view, isLoading, onReloa
   const { label, intro, empty } = SECTION_LABELS[section];
   return <section className="shared-page-content rm-system-page">
     <PageHeader actions={<RefreshButton isLoading={isLoading} onClick={onReload} />} description={view.can_change ? intro : `${intro} You can read this page; only CAIRN and system administrators change it.`} title={`CAIRN administration · ${label}`} />
-    {section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : view.scope === "organization" && section === "organizations" ? <section className="shared-settings-group">
+    {section === "models" ? <><ConnectionsPanel accessToken={accessToken} canChange={view.can_change} /><p className="shared-muted-copy">{empty}</p></> : section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : view.scope === "organization" && section === "organizations" ? <section className="shared-settings-group">
       <PanelHeading description={`${view.organizations.length} organization${view.organizations.length === 1 ? "" : "s"}`} icon={Buildings} title="Organizations you administer" />
       <ul>{view.organizations.map((organization) => <li key={organization.id}>{organization.name}</li>)}</ul>
       <p className="shared-muted-copy">{empty}</p>

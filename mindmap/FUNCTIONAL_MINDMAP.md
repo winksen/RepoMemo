@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.75` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.76` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.76 — CAIRN administrators add and test connections to model servers.
+
+- **Connections.** CAIRN administrators add, change, turn off, test and delete connections to Ollama, OpenRouter and OpenAI-compatible servers on the Models section. The key is write-only, the address follows the same allowed hosts as a provider, and a connection that leaves the network needs a confirmation before it is on.
+
+Checks: formatted, linted and type-checked; docs:check; tests added, not run.
 
 ## V0.9.75 — The server has a model catalog in storage; nothing reads it yet.
 

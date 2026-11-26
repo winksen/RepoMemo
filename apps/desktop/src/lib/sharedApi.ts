@@ -18,6 +18,9 @@ import type {
   SystemUser,
   CairnAdminView,
   CairnBudget,
+  CairnConnection,
+  CairnConnectionInput,
+  CairnConnectionTest,
   BackupsOverview,
   MaintenanceStatus,
   AgentCapabilities,
@@ -1775,6 +1778,26 @@ export function listSystemUsers(accessToken: string): Promise<SystemUser[]> {
 
 export function getCairnAdmin(accessToken: string): Promise<CairnAdminView> {
   return request<CairnAdminView>("/v1/cairn/admin", {}, accessToken);
+}
+
+export function listCairnConnections(accessToken: string): Promise<CairnConnection[]> {
+  return request<CairnConnection[]>("/v1/cairn/connections", {}, accessToken);
+}
+
+export function createCairnConnection(accessToken: string, input: CairnConnectionInput): Promise<CairnConnection> {
+  return request<CairnConnection>("/v1/cairn/connections", { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function updateCairnConnection(accessToken: string, id: string, input: CairnConnectionInput): Promise<CairnConnection> {
+  return request<CairnConnection>(`/v1/cairn/connections/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function deleteCairnConnection(accessToken: string, id: string): Promise<void> {
+  return request<void>(`/v1/cairn/connections/${encodeURIComponent(id)}`, { method: "DELETE" }, accessToken);
+}
+
+export function testCairnConnection(accessToken: string, id: string): Promise<CairnConnectionTest> {
+  return request<CairnConnectionTest>(`/v1/cairn/connections/${encodeURIComponent(id)}/test`, { method: "POST", body: "{}" }, accessToken);
 }
 
 export function updateCairnBudgets(accessToken: string, change: { values?: Record<string, number>; reset?: string[] }): Promise<CairnBudget[]> {

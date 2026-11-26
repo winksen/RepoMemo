@@ -880,6 +880,43 @@ export interface SystemUsage {
   workspaces: WorkspaceUsage[];
 }
 
+/** A connection to a model server in the catalog (V0.9.76). The key is write-only: there is only whether one is set. */
+export interface CairnConnection {
+  id: string;
+  kind: "ollama" | "openrouter" | "openai_compatible";
+  name: string;
+  base_url: string;
+  has_key: boolean;
+  locality: "local" | "cloud";
+  enabled: boolean;
+  cloud_acknowledged_at: string | null;
+  cloud_acknowledged_by: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+/** What testing a connection found: whether the server answered and took the key. */
+export interface CairnConnectionTest {
+  connection_id: string;
+  reachable: boolean;
+  key_accepted: boolean | null;
+  model_count: number | null;
+  message: string;
+}
+
+/** What a connection is saved with. */
+export interface CairnConnectionInput {
+  kind?: string;
+  name: string;
+  base_url?: string;
+  api_key?: string;
+  enabled: boolean;
+  cloud_content_acknowledged: boolean;
+  expected_version?: number;
+}
+
 /** A CAIRN run budget: a run-time setting a CAIRN administrator changes, applied to the next run (V0.9.74). */
 export interface CairnBudget {
   key: string;
