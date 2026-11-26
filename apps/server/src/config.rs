@@ -191,6 +191,8 @@ pub struct ServerConfig {
     pub cairn_max_steps: i64,
     /// The longest one CAIRN run in Agent mode takes, in seconds.
     pub cairn_max_run_seconds: i64,
+    /// The most tokens (read and written) one CAIRN run in Agent mode uses; 0 sets no limit (V0.9.74).
+    pub cairn_max_run_tokens: i64,
     /// The most files one analysis reads in a CAIRN run, in batches of eight (V0.9.62).
     pub cairn_background_max_files: i64,
     /// What is logged, how it is printed and whether it is kept in files.
@@ -509,6 +511,7 @@ impl ServerConfig {
             cairn_trace_days: env_parse("REPOMEMO_CAIRN_TRACE_DAYS", 90)?,
             cairn_max_steps: env_parse("REPOMEMO_CAIRN_MAX_STEPS", 8)?,
             cairn_max_run_seconds: env_parse("REPOMEMO_CAIRN_MAX_RUN_SECONDS", 90)?,
+            cairn_max_run_tokens: env_parse("REPOMEMO_CAIRN_MAX_RUN_TOKENS", 0)?,
             cairn_background_max_files: env_parse("REPOMEMO_CAIRN_BACKGROUND_MAX_FILES", 200)?,
             logging: LogSettings::from_env()?,
             setup_wizard: env_flag("REPOMEMO_SETUP_WIZARD", true)?,
@@ -608,6 +611,7 @@ impl ServerConfig {
             cairn_trace_days: 90,
             cairn_max_steps: 8,
             cairn_max_run_seconds: 90,
+            cairn_max_run_tokens: 0,
             cairn_background_max_files: 200,
             logging: LogSettings {
                 to_file: false,
@@ -859,6 +863,7 @@ pub(crate) struct RuntimeSettings {
     pub(crate) cairn_trace_days: i64,
     pub(crate) cairn_max_steps: i64,
     pub(crate) cairn_max_run_seconds: i64,
+    pub(crate) cairn_max_run_tokens: i64,
     pub(crate) cairn_background_max_files: i64,
     pub(crate) system_admin_emails: Vec<String>,
     pub(crate) logging: LogSettings,
@@ -908,6 +913,7 @@ impl RuntimeSettings {
             cairn_trace_days: config.cairn_trace_days,
             cairn_max_steps: config.cairn_max_steps,
             cairn_max_run_seconds: config.cairn_max_run_seconds,
+            cairn_max_run_tokens: config.cairn_max_run_tokens,
             cairn_background_max_files: config.cairn_background_max_files,
             system_admin_emails: config.system_admin_emails.clone(),
             logging: config.logging.clone(),

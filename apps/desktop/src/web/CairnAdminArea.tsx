@@ -35,7 +35,7 @@ export default function CairnAdminArea({
       signOut={signOut}
       sidebar={null}
     >
-      {view ? <CairnAdminPanel isLoading={isLoading} key={shown} onReload={() => void reload()} section={shown} view={view} /> : error ? <section className="shared-page-content rm-system-page"><EmptyState description="Only CAIRN, system and app administrators, and owners and admins of an organization, can open the CAIRN administration." title="You cannot open the CAIRN administration" /></section> : <CairnAdminLoading />}
+      {view ? <CairnAdminPanel accessToken={accessToken} isLoading={isLoading} key={shown} onReload={() => void reload()} section={shown} view={view} /> : error ? <section className="shared-page-content rm-system-page"><EmptyState description="Only CAIRN, system and app administrators, and owners and admins of an organization, can open the CAIRN administration." title="You cannot open the CAIRN administration" /></section> : <CairnAdminLoading />}
     </SharedLayout>
   );
 }

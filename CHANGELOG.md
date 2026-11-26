@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.74 (2026-11-26)
+
+CAIRN's run budgets are settings a CAIRN administrator changes on the administration page.
+
+### Added
+- **Run budgets on Overview.** Steps, run seconds, run tokens, background files and trace days are editable there by CAIRN and system administrators, each with its range, its default (the environment's value), who changed it and when, and *Restore default*. A change applies to the next run, and several can be saved at once.
+- **Tokens per request.** A new budget, `REPOMEMO_CAIRN_MAX_RUN_TOKENS` (default `0`, no limit), ends a run in Agent mode as partial, naming the limit, once the model calls have used that many tokens. *Files per analysis* (`REPOMEMO_CAIRN_BACKGROUND_MAX_FILES`) is now a System setting too.
+- **Audit.** Each change is a `cairn_budgets_changed` event that keeps every budget's value before and after. Each budget stays within its fixed maximum: a value outside it, or a key that is not a budget, is refused and nothing is saved.
+- **Route.** `PUT /v1/cairn/admin/budgets` takes `{values, reset}`; it needs a CAIRN or system administrator with a session or a `system`-scope token. App administrators read the budgets and cannot change them.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (refusals, a change of several budgets, a restore, and the audit) was added; tests not run.
+
+### Upgrading
+- Nothing to do: no budget changes until an administrator changes it. The new token budget starts with no limit.
+
 ## V0.9.73 (2026-11-26)
 
 CAIRN's sidebar has an Administration tab.

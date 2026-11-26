@@ -2,14 +2,17 @@
 //! administrators) see every section and, on Overview, how CAIRN is set up today. Owners and admins of an organization see only the
 //! sections that concern their organizations. Everyone else is refused. App administrators read and change nothing.
 
+use std::collections::BTreeMap;
+
 use axum::{extract::State, Json};
 use repomemo_domain::OrganizationRole;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::{
     map_storage_error,
-    system::{require_cairn_admin, require_cairn_reader},
-    ApiError, AppState, ReadingSubject,
+    system::{cairn_budgets, change_cairn_budgets, require_cairn_admin, require_cairn_reader, CairnBudget},
+    ApiError, AppState, AuthenticatedSubject, ReadingSubject,
 };
 
 /// Every section of the page, in the order it is shown.
@@ -49,10 +52,8 @@ pub(crate) struct AdminWorkspaceSetup {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct AdminBudgets {
-    max_steps: i64,
-    max_run_seconds: i64,
-    trace_days: i64,
-    background_max_files: i64,
+    /// What CAIRN administrators edit: steps, run seconds, run tokens, background files and trace days.
+    settings: Vec<CairnBudget>,
     background_ai_per_day: u32,
     ai_requests_per_hour: u32,
     /// Models the server treats as having passed the live evaluation, from the environment.
@@ -139,10 +140,7 @@ pub(crate) async fn admin_view(
             overview: Some(AdminOverview {
                 workspaces: setups,
                 budgets: AdminBudgets {
-                    max_steps: settings.cairn_max_steps,
-                    max_run_seconds: settings.cairn_max_run_seconds,
-                    trace_days: settings.cairn_trace_days,
-                    background_max_files: settings.cairn_background_max_files,
+                    settings: cairn_budgets(&state).await?,
                     background_ai_per_day: settings.background_ai_per_day,
                     ai_requests_per_hour: settings.ai_quota.limit,
                     eval_passed_models: repomemo_ai::agent_default_models(),
@@ -178,4 +176,26 @@ pub(crate) async fn admin_view(
         organizations,
         overview: None,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct BudgetsRequest {
+    /// Budgets to set, by key.
+    #[serde(default)]
+    values: BTreeMap<String, Value>,
+    /// Budgets to restore to the environment's value, by key.
+    #[serde(default)]
+    reset: Vec<String>,
+}
+
+/// Changes the CAIRN run budgets (V0.9.74): for CAIRN and system administrators, with a session or a `system`-scope token. A change
+/// applies to the next run and is audited with each budget's value before and after.
+pub(crate) async fn update_budgets(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Json(request): Json<BudgetsRequest>,
+) -> Result<Json<Vec<CairnBudget>>, ApiError> {
+    require_cairn_admin(&subject)?;
+    change_cairn_budgets(&state, &subject, &request.values, &request.reset).await?;
+    cairn_budgets(&state).await.map(Json)
 }

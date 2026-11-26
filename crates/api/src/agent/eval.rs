@@ -261,6 +261,7 @@ async fn the_scripted_cases_pass_and_meet_the_thresholds() {
                     context_tokens: 8_192,
                     max_steps: case.max_steps.unwrap_or(8),
                     max_seconds: 60,
+                    max_run_tokens: 0,
                     can_write: case.role.as_deref() != Some("viewer"),
                     user_id: String::new(),
                     background_max_files: 8,

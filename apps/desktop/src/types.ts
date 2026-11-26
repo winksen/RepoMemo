@@ -880,6 +880,22 @@ export interface SystemUsage {
   workspaces: WorkspaceUsage[];
 }
 
+/** A CAIRN run budget: a run-time setting a CAIRN administrator changes, applied to the next run (V0.9.74). */
+export interface CairnBudget {
+  key: string;
+  label: string;
+  description: string;
+  unit: string;
+  min: number;
+  max: number;
+  value: number;
+  default_value: number;
+  /** Changed on the page, overriding the environment's value. */
+  overridden: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
 /** Who the CAIRN administration page is for and what it shows (V0.9.72). */
 export interface CairnAdminView {
   /** `server` for system, CAIRN and app administrators; `organization` for owners and admins of organizations. */
@@ -901,10 +917,8 @@ export interface CairnAdminView {
       mode: "agent" | "jobs" | null;
     }[];
     budgets: {
-      max_steps: number;
-      max_run_seconds: number;
-      trace_days: number;
-      background_max_files: number;
+      /** What CAIRN administrators edit: steps, run seconds, run tokens, background files and trace days. */
+      settings: CairnBudget[];
       background_ai_per_day: number;
       ai_requests_per_hour: number;
       eval_passed_models: string[];

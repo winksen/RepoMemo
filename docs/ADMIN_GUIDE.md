@@ -6,7 +6,7 @@ The path an administrator follows, in order, with **who does each step**. Detail
 
 What an administrator decides about CAIRN, the assistant, and where.
 
-**The CAIRN administration page** (`/cairn/admin`) shows how CAIRN is set up: each workspace's model and mode, and the budgets and retention in force. System and CAIRN administrators see every section and app administrators read the same page. Owners and admins of an organization see only the sections that concern their organizations. The models, guardrails, abilities, memory, usage and history sections are empty until later releases fill them.
+**The CAIRN administration page** (`/cairn/admin`) shows how CAIRN is set up: each workspace's model and mode, and the budgets and retention in force. System and CAIRN administrators see every section and app administrators read the same page. Owners and admins of an organization see only the sections that concern their organizations. On Overview, CAIRN and system administrators set the run budgets (steps, seconds, tokens, background files and the days a trace is kept) within fixed maximums; a change applies to the next run, is audited with its before and after, and *Restore default* returns a budget to the environment's value. The models, guardrails, abilities, memory, usage and history sections are empty until later releases fill them.
 
 | Decision | Where | What it does |
 |---|---|---|

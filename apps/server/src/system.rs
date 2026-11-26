@@ -224,6 +224,8 @@ const SETTINGS: &[SettingSpec] = &[
     SettingSpec { key: "system_audit_retention_days", group: "Background", label: "System audit history", description: "System administration events are kept this long. 0 keeps them forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
     SettingSpec { key: "cairn_max_steps", group: "AI", label: "CAIRN steps per request", description: "The most model calls one CAIRN request makes in Agent mode; each uses one of the person's AI requests for the hour. A request that needs more ends with a partial answer.", kind: SettingKind::Integer, min: 1, max: 30, unit: "calls", options: &[] },
     SettingSpec { key: "cairn_max_run_seconds", group: "AI", label: "CAIRN time per request", description: "The longest one CAIRN request takes in Agent mode before it answers with what it has.", kind: SettingKind::Integer, min: 10, max: 600, unit: "seconds", options: &[] },
+    SettingSpec { key: "cairn_max_run_tokens", group: "AI", label: "CAIRN tokens per request", description: "The most tokens, read and written, one CAIRN request uses in Agent mode before it answers with what it has. 0 sets no limit.", kind: SettingKind::Integer, min: 0, max: 2_000_000, unit: "tokens", options: &[] },
+    SettingSpec { key: "cairn_background_max_files", group: "AI", label: "CAIRN files per analysis", description: "The most files one analysis reads in a CAIRN request in Agent mode, in batches of eight; the analysis ends partial, listing the files not read.", kind: SettingKind::Integer, min: 8, max: 1_000, unit: "files", options: &[] },
     SettingSpec { key: "cairn_trace_days", group: "Background", label: "CAIRN run history", description: "What CAIRN did for each answer (its steps, not their text) is kept this long, personal to the person who asked. 0 keeps it forever.", kind: SettingKind::Integer, min: 0, max: 3_650, unit: "days", options: &[] },
 ];
 
@@ -262,6 +264,8 @@ fn read_setting(settings: &RuntimeSettings, key: &str) -> Value {
         "cairn_trace_days" => json!(settings.cairn_trace_days),
         "cairn_max_steps" => json!(settings.cairn_max_steps),
         "cairn_max_run_seconds" => json!(settings.cairn_max_run_seconds),
+        "cairn_max_run_tokens" => json!(settings.cairn_max_run_tokens),
+        "cairn_background_max_files" => json!(settings.cairn_background_max_files),
         "log_level" => json!(settings.logging.level),
         "log_console_format" => json!(settings.logging.console_format.as_str()),
         "log_to_file" => json!(settings.logging.to_file),
@@ -378,6 +382,8 @@ fn apply_setting(settings: &mut RuntimeSettings, key: &str, value: &Value) -> Re
                 "cairn_trace_days" => settings.cairn_trace_days = number,
                 "cairn_max_steps" => settings.cairn_max_steps = number,
                 "cairn_max_run_seconds" => settings.cairn_max_run_seconds = number,
+                "cairn_max_run_tokens" => settings.cairn_max_run_tokens = number,
+                "cairn_background_max_files" => settings.cairn_background_max_files = number,
                 "log_retention_days" => settings.logging.retention_days = number,
                 _ => unreachable!("every integer setting is handled"),
             }
@@ -909,7 +915,6 @@ pub(crate) fn require_system_admin(subject: &AuthenticatedSubject) -> Result<(),
 /// CAIRN's administration (V0.9.71): system administrators by right and the people they made CAIRN administrators, with a
 /// signed-in session or a personal access token with the `system` scope, so a leaked read-and-write token cannot change how
 /// CAIRN is administered.
-#[cfg_attr(not(test), allow(dead_code))] // the administration routes of V0.9.72 use it
 pub(crate) fn require_cairn_admin(subject: &AuthenticatedSubject) -> Result<(), ApiError> {
     if !(subject.is_system_admin || subject.is_cairn_admin) {
         return Err(ApiError::forbidden_because(
@@ -921,7 +926,6 @@ pub(crate) fn require_cairn_admin(subject: &AuthenticatedSubject) -> Result<(), 
 
 /// Reading CAIRN's administration: the people of [`require_cairn_admin`] and app administrators, who read and change nothing,
 /// as they do in System.
-#[cfg_attr(not(test), allow(dead_code))] // the administration routes of V0.9.72 use it
 pub(crate) fn require_cairn_reader(subject: &AuthenticatedSubject) -> Result<(), ApiError> {
     if subject.is_system_admin || subject.is_cairn_admin || subject.is_app_admin {
         Ok(())
@@ -1944,6 +1948,137 @@ pub(crate) async fn update_settings(
     )
     .await;
     settings_response(&state).await.map(Json)
+}
+
+/// The CAIRN run budgets a CAIRN administrator edits (V0.9.74). They are run-time system settings, so a change applies to the next
+/// run, and each has a fixed maximum that the setting's range holds.
+pub(crate) const CAIRN_BUDGET_KEYS: &[&str] = &[
+    "cairn_max_steps",
+    "cairn_max_run_seconds",
+    "cairn_max_run_tokens",
+    "cairn_background_max_files",
+    "cairn_trace_days",
+];
+
+/// One CAIRN run budget as the administration page shows it.
+#[derive(Debug, Serialize)]
+pub(crate) struct CairnBudget {
+    key: &'static str,
+    label: &'static str,
+    description: &'static str,
+    unit: &'static str,
+    min: i64,
+    max: i64,
+    value: Value,
+    default_value: Value,
+    /// Changed on the page, overriding the environment's value.
+    overridden: bool,
+    updated_at: Option<String>,
+    updated_by: Option<String>,
+}
+
+pub(crate) async fn cairn_budgets(state: &AppState) -> Result<Vec<CairnBudget>, ApiError> {
+    let stored = state
+        .storage
+        .list_system_settings()
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .map(|setting| (setting.key.clone(), setting))
+        .collect::<HashMap<_, _>>();
+    let current = state.settings();
+    Ok(CAIRN_BUDGET_KEYS
+        .iter()
+        .filter_map(|key| spec(key))
+        .map(|spec| {
+            let stored = stored.get(spec.key);
+            CairnBudget {
+                key: spec.key,
+                label: spec.label,
+                description: spec.description,
+                unit: spec.unit,
+                min: spec.min,
+                max: spec.max,
+                value: read_setting(&current, spec.key),
+                default_value: read_setting(&state.runtime.defaults, spec.key),
+                overridden: stored.is_some(),
+                updated_at: stored.map(|setting| setting.updated_at.clone()),
+                updated_by: stored
+                    .and_then(|setting| setting.updated_by.as_ref())
+                    .map(|user| user.display_name.clone()),
+            }
+        })
+        .collect())
+}
+
+/// Changes and restores CAIRN run budgets. Every value is checked before any is saved, so a request applies completely or not at
+/// all, and the audit event keeps each setting's value before and after.
+pub(crate) async fn change_cairn_budgets(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    values: &BTreeMap<String, Value>,
+    reset: &[String],
+) -> Result<(), ApiError> {
+    if values.is_empty() && reset.is_empty() {
+        return Err(ApiError::bad_request("No budgets were given."));
+    }
+    for key in values.keys().chain(reset.iter()) {
+        if !CAIRN_BUDGET_KEYS.contains(&key.as_str()) {
+            return Err(ApiError::bad_request(format!("{key} is not a CAIRN budget.")));
+        }
+    }
+    let before = state.settings();
+    let mut checked = (*before).clone();
+    for (key, value) in values {
+        apply_setting(&mut checked, key, value).map_err(ApiError::bad_request)?;
+    }
+    for (key, value) in values {
+        state
+            .storage
+            .set_system_setting(key, value, Some(&subject.user_id))
+            .await
+            .map_err(map_storage_error)?;
+    }
+    for key in reset {
+        state
+            .storage
+            .delete_system_setting(key)
+            .await
+            .map_err(map_storage_error)?;
+    }
+    // Rebuilt from the defaults and every stored change, as a reset does, so a restored budget returns to the environment's value.
+    let remaining = state
+        .storage
+        .list_system_settings()
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .map(|setting| (setting.key, setting.value))
+        .collect::<Vec<_>>();
+    state.runtime.load_overrides(&remaining);
+    let after = state.settings();
+    let changes = values
+        .keys()
+        .chain(reset.iter())
+        .filter_map(|key| spec(key))
+        .map(|spec| {
+            format!(
+                "{} from {} to {}",
+                spec.label,
+                read_setting(&before, spec.key),
+                read_setting(&after, spec.key)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ");
+    audit(
+        state,
+        subject,
+        "cairn_budgets_changed",
+        format!("Changed CAIRN run budgets: {changes}."),
+    )
+    .await;
+    Ok(())
 }
 
 /// Restores a setting's server default.

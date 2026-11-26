@@ -1652,7 +1652,7 @@ async fn the_cairn_administration_page_shows_each_person_only_what_they_may_open
             .iter()
             .any(|organization| organization["name"] == "Page Org"));
         let overview = &view["overview"];
-        assert_eq!(overview["budgets"]["max_steps"], 8);
+        assert_eq!(overview["budgets"]["settings"].as_array().unwrap().len(), 5);
         assert!(overview["workspaces"]
             .as_array()
             .unwrap()
@@ -1677,5 +1677,111 @@ async fn the_cairn_administration_page_shows_each_person_only_what_they_may_open
     );
     assert_eq!(view["organizations"].as_array().unwrap().len(), 1);
     assert!(view["overview"].is_null());
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn cairn_administrators_change_the_run_budgets_and_each_change_is_audited() {
+    let data_dir = temp_data_dir("cairn-budgets");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "budget-root@example.com").await;
+    let (cairn, cairn_tokens) = register_account(&app, "budget-cairn@example.com").await;
+    let (reader, reader_tokens) = register_account(&app, "budget-reader@example.com").await;
+    let (member, _) = register_account(&app, "budget-member@example.com").await;
+    let cairn_id = cairn_tokens["user"]["id"].as_str().unwrap().to_owned();
+    let reader_id = reader_tokens["user"]["id"].as_str().unwrap().to_owned();
+    for (kind, id) in [("cairn-admin", &cairn_id), ("app-admin", &reader_id)] {
+        assert_eq!(
+            send(
+                "PUT",
+                format!("/v1/system/users/{id}/{kind}"),
+                &admin,
+                json!({"enabled": true})
+            )
+            .await
+            .status(),
+            204
+        );
+    }
+    let uri = "/v1/cairn/admin/budgets".to_owned();
+    let budget = |view: &Value, key: &str| {
+        view["overview"]["budgets"]["settings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|setting| setting["key"] == key)
+            .cloned()
+            .unwrap()
+    };
+    let page = |who: String| {
+        let app = app.clone();
+        async move { response_json(app.oneshot(auth_request("GET", "/v1/cairn/admin", &who)).await.unwrap()).await }
+    };
+    assert_eq!(budget(&page(cairn.clone()).await, "cairn_max_steps")["value"], 8);
+
+    // Members and app administrators cannot change a budget.
+    for who in [&member, &reader] {
+        assert_eq!(
+            send("PUT", uri.clone(), who, json!({"values": {"cairn_max_steps": 12}}))
+                .await
+                .status(),
+            403
+        );
+    }
+    // A value over the fixed maximum, a budget that is not one, and an empty request are refused, and nothing is saved.
+    for body in [
+        json!({"values": {"cairn_max_steps": 31}}),
+        json!({"values": {"allow_registration": false}}),
+        json!({"values": {"cairn_max_steps": 12, "cairn_max_run_seconds": 5}}),
+        json!({}),
+    ] {
+        assert_eq!(send("PUT", uri.clone(), &cairn, body).await.status(), 400);
+    }
+    assert_eq!(budget(&page(cairn.clone()).await, "cairn_max_steps")["value"], 8);
+
+    // A CAIRN administrator changes several budgets at once; the next read follows.
+    let changed = send(
+        "PUT",
+        uri.clone(),
+        &cairn,
+        json!({"values": {"cairn_max_steps": 12, "cairn_max_run_tokens": 50000}}),
+    )
+    .await;
+    assert_eq!(changed.status(), 200);
+    let view = page(cairn.clone()).await;
+    assert_eq!(budget(&view, "cairn_max_steps")["value"], 12);
+    assert_eq!(budget(&view, "cairn_max_steps")["overridden"], true);
+    assert_eq!(budget(&view, "cairn_max_run_tokens")["value"], 50000);
+    assert_eq!(budget(&view, "cairn_max_run_seconds")["overridden"], false);
+
+    // Restoring brings back the environment's value.
+    assert_eq!(
+        send("PUT", uri.clone(), &cairn, json!({"reset": ["cairn_max_steps"]}))
+            .await
+            .status(),
+        200
+    );
+    let view = page(admin.clone()).await;
+    assert_eq!(budget(&view, "cairn_max_steps")["value"], 8);
+    assert_eq!(budget(&view, "cairn_max_steps")["overridden"], false);
+    assert_eq!(budget(&view, "cairn_max_run_tokens")["value"], 50000);
+
+    // The audit trail keeps the values before and after.
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &admin))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    assert!(audit.contains("cairn_budgets_changed"), "{audit}");
+    assert!(audit.contains("CAIRN steps per request from 8 to 12"), "{audit}");
+    assert!(audit.contains("CAIRN steps per request from 12 to 8"), "{audit}");
     let _ = std::fs::remove_dir_all(data_dir);
 }

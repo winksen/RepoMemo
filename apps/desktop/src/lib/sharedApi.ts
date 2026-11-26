@@ -17,6 +17,7 @@ import type {
   SystemUsage,
   SystemUser,
   CairnAdminView,
+  CairnBudget,
   BackupsOverview,
   MaintenanceStatus,
   AgentCapabilities,
@@ -1774,6 +1775,10 @@ export function listSystemUsers(accessToken: string): Promise<SystemUser[]> {
 
 export function getCairnAdmin(accessToken: string): Promise<CairnAdminView> {
   return request<CairnAdminView>("/v1/cairn/admin", {}, accessToken);
+}
+
+export function updateCairnBudgets(accessToken: string, change: { values?: Record<string, number>; reset?: string[] }): Promise<CairnBudget[]> {
+  return request<CairnBudget[]>("/v1/cairn/admin/budgets", { method: "PUT", body: JSON.stringify(change) }, accessToken);
 }
 
 export function setCairnAdmin(accessToken: string, userId: string, enabled: boolean): Promise<void> {

@@ -46,6 +46,8 @@ pub struct AgentLoopSetup {
     /// The most model calls one run makes.
     pub max_steps: usize,
     pub max_seconds: u64,
+    /// The most tokens (read and written) one run uses; 0 sets no limit (V0.9.74). The run ends partial at the next step once it is reached.
+    pub max_run_tokens: u64,
     /// Whether the person may change the workspace: a viewer's tool list holds no proposing tool.
     pub can_write: bool,
     /// The person the run is for: what is found in chats is theirs alone (V0.9.52).
@@ -1082,6 +1084,21 @@ impl RepoMemoCore {
                 );
                 return Ok(finish(&request, text, gathered, "partial", history.len()));
             }
+            let used_tokens =
+                u64::from(gathered.usage.input_tokens).saturating_add(u64::from(gathered.usage.output_tokens));
+            if setup.max_run_tokens > 0 && used_tokens >= setup.max_run_tokens {
+                let why = format!("I used the {} tokens I am given for one request", setup.max_run_tokens);
+                let text = partial_markdown(&why, &ran, &draft);
+                gathered.step(
+                    "answer",
+                    None,
+                    "Stopped at the token limit".to_owned(),
+                    Vec::new(),
+                    Duration::ZERO,
+                    None,
+                );
+                return Ok(finish(&request, text, gathered, "partial", history.len()));
+            }
             if let Err(reason) = (setup.consume_quota)() {
                 let text = partial_markdown(&format!("your AI allowance is used up ({reason})"), &ran, &draft);
                 gathered.step(
@@ -1384,6 +1401,7 @@ mod tests {
             context_tokens: 8_192,
             max_steps,
             max_seconds: 60,
+            max_run_tokens: 0,
             can_write,
             user_id: String::new(),
             background_max_files: 8,

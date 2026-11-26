@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.73` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.74` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.74 — CAIRN's run budgets are settings a CAIRN administrator changes on the administration page.
+
+- **Run budgets.** CAIRN and system administrators change the steps, seconds, tokens, background files and days of trace history of a CAIRN run on the administration page's Overview, within fixed maximums. A change applies to the next run, is audited with its before and after, and can be restored to the environment's value. A new token budget ends a run once it is reached; it starts with no limit.
+
+Checks: formatted, linted and type-checked; docs:check; test added, not run.
 
 ## V0.9.73 — CAIRN's sidebar has an Administration tab.
 

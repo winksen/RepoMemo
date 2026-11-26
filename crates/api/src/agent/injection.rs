@@ -99,6 +99,7 @@ fn setup() -> AgentLoopSetup {
         context_tokens: 8_192,
         max_steps: 8,
         max_seconds: 60,
+        max_run_tokens: 0,
         can_write: true,
         user_id: String::new(),
         background_max_files: 8,

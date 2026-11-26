@@ -1,8 +1,13 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Brain, Buildings, ChartBar, ClockCounterClockwise, Compass, Cpu, ShieldCheck, Sparkle } from "@phosphor-icons/react";
-import { getCairnAdmin } from "../../lib/sharedApi";
+import { getCairnAdmin, updateCairnBudgets } from "../../lib/sharedApi";
 import { cairnAdminKeys } from "../../lib/queryClient";
-import type { CairnAdminView } from "../../types";
+import type { CairnAdminView, CairnBudget } from "../../types";
+import { Button } from "../../components/ui/button";
+import { Field } from "../../components/ui/field";
+import { Input } from "../../components/ui/input";
+import { showToast } from "../../components/ui/toast";
+import { apiMessage, formatTime } from "../format";
 import { Badge } from "../../components/ui/badge";
 import { EmptyState } from "../../components/ui/empty-state";
 import { ICON_SIZE } from "../../components/ui/icon";
@@ -32,7 +37,41 @@ export function allowedSections(view: CairnAdminView | null | undefined): CairnA
   return CAIRN_ADMIN_SECTIONS.filter((section) => view?.sections.includes(section));
 }
 
-function OverviewSection({ view }: { view: CairnAdminView }) {
+/** The run budgets: one number each, changed together and applied to the next run (V0.9.74). A CAIRN administrator edits; others read. */
+function BudgetsPanel({ accessToken, budgets, canChange, onChanged }: { accessToken: string; budgets: CairnBudget[]; canChange: boolean; onChanged: () => void }) {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [isBusy, setIsBusy] = useState(false);
+  const changed = budgets.filter((budget) => drafts[budget.key] !== undefined && drafts[budget.key] !== String(budget.value));
+  async function save(change: { values?: Record<string, number>; reset?: string[] }, done: string) {
+    setIsBusy(true);
+    try {
+      await updateCairnBudgets(accessToken, change);
+      setDrafts({});
+      showToast("success", done);
+      onChanged();
+    } catch (error) { showToast("error", apiMessage(error, "The budgets could not be changed.")); }
+    finally { setIsBusy(false); }
+  }
+  return <section className="shared-settings-group">
+    <PanelHeading description="A change applies to the next run" icon={ShieldCheck} title="Run budgets" />
+    <form className="rm-system-budget-form" onSubmit={(event) => {
+      event.preventDefault();
+      const values: Record<string, number> = {};
+      for (const budget of changed) values[budget.key] = Number(drafts[budget.key]);
+      void save({ values }, `${changed.length} budget${changed.length === 1 ? "" : "s"} changed. The next run follows.`);
+    }}>
+      {budgets.map((budget) => <Field hint={`${budget.description} From ${budget.min.toLocaleString()} to ${budget.max.toLocaleString()} ${budget.unit}. Default ${budget.default_value.toLocaleString()}.${budget.overridden && budget.updated_at ? ` Changed ${formatTime(budget.updated_at)}${budget.updated_by ? ` by ${budget.updated_by}` : ""}.` : ""}`} key={budget.key} label={`${budget.label} (${budget.unit})`}>
+        <span className="rm-system-budget-row">
+          <Input disabled={!canChange} inputMode="numeric" max={budget.max} min={budget.min} onChange={(event) => setDrafts((current) => ({ ...current, [budget.key]: event.target.value }))} type="number" value={drafts[budget.key] ?? String(budget.value)} />
+          {canChange && budget.overridden ? <Button busy={isBusy} onClick={() => void save({ reset: [budget.key] }, `${budget.label} is back to ${budget.default_value.toLocaleString()}.`)} type="button" variant="secondary">Restore default</Button> : null}
+        </span>
+      </Field>)}
+      {canChange ? <Button busy={isBusy} disabled={changed.length === 0} type="submit" variant="main">Save budgets</Button> : null}
+    </form>
+  </section>;
+}
+
+function OverviewSection({ accessToken, onChanged, view }: { accessToken: string; onChanged: () => void; view: CairnAdminView }) {
   const overview = view.overview;
   if (!overview) return <EmptyState description="The server-wide overview is for CAIRN, system and app administrators." title="Nothing to show here" />;
   const { budgets } = overview;
@@ -50,14 +89,11 @@ function OverviewSection({ view }: { view: CairnAdminView }) {
         </tr>)}</tbody>
       </Table> : <EmptyState title="No workspace yet" />}
     </section>
+    <BudgetsPanel accessToken={accessToken} budgets={budgets.settings} canChange={view.can_change} key={budgets.settings.map((budget) => `${budget.key}:${budget.value}`).join()} onChanged={onChanged} />
     <section className="shared-settings-group">
-      <PanelHeading description="Set in the server's environment today" icon={ShieldCheck} title="Budgets and retention" />
+      <PanelHeading description="Set in the server's environment" icon={ShieldCheck} title="Other limits" />
       <Facts items={[
-        ["Steps in a run", String(budgets.max_steps)],
-        ["Seconds in a run", String(budgets.max_run_seconds)],
-        ["Days a trace is kept", String(budgets.trace_days)],
-        ["Files in a background pass", String(budgets.background_max_files)],
-        ["Background AI calls per day", budgets.background_ai_per_day.toLocaleString()],
+        ["Background AI calls per workspace and day", budgets.background_ai_per_day.toLocaleString()],
         ["AI requests per person and hour", budgets.ai_requests_per_hour ? budgets.ai_requests_per_hour.toLocaleString() : "Unlimited"],
         ["Models passed by the live evaluation", budgets.eval_passed_models.length ? budgets.eval_passed_models.join(", ") : "None named"],
       ]} />
@@ -66,7 +102,8 @@ function OverviewSection({ view }: { view: CairnAdminView }) {
 }
 
 /** The CAIRN administration page. */
-export function CairnAdminPanel({ section, view, isLoading, onReload }: {
+export function CairnAdminPanel({ accessToken, section, view, isLoading, onReload }: {
+  accessToken: string;
   section: CairnAdminSection;
   view: CairnAdminView;
   isLoading: boolean;
@@ -75,7 +112,7 @@ export function CairnAdminPanel({ section, view, isLoading, onReload }: {
   const { label, intro, empty } = SECTION_LABELS[section];
   return <section className="shared-page-content rm-system-page">
     <PageHeader actions={<RefreshButton isLoading={isLoading} onClick={onReload} />} description={view.can_change ? intro : `${intro} You can read this page; only CAIRN and system administrators change it.`} title={`CAIRN administration · ${label}`} />
-    {section === "overview" ? <OverviewSection view={view} /> : view.scope === "organization" && section === "organizations" ? <section className="shared-settings-group">
+    {section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : view.scope === "organization" && section === "organizations" ? <section className="shared-settings-group">
       <PanelHeading description={`${view.organizations.length} organization${view.organizations.length === 1 ? "" : "s"}`} icon={Buildings} title="Organizations you administer" />
       <ul>{view.organizations.map((organization) => <li key={organization.id}>{organization.name}</li>)}</ul>
       <p className="shared-muted-copy">{empty}</p>

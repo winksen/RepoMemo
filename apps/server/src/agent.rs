@@ -224,6 +224,7 @@ pub(crate) async fn run_message(
                 context_tokens: traits.context_tokens,
                 max_steps: runtime.cairn_max_steps.clamp(1, 30) as usize,
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
+                max_run_tokens: runtime.cairn_max_run_tokens.max(0) as u64,
                 can_write: !matches!(role, WorkspaceRole::Viewer) && !live.read_only,
                 user_id: subject.user_id.clone(),
                 background_max_files: runtime.cairn_background_max_files.clamp(8, 1000) as usize,
