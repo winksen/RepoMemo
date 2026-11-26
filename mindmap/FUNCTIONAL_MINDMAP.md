@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.97` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.98` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.98 — An organization or a workspace can require strict citations.
+
+- **Strict citations.** When an organization or a workspace turns it on, an AI-written answer about the workspace's content that cites nothing it read is not shown. CAIRN says it could not ground the answer and lists what it read. Greetings and replies CAIRN writes itself are exempt, and so are replies that only propose a change.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.97 — An organization has a monthly CAIRN token budget.
 

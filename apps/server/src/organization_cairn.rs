@@ -141,6 +141,7 @@ pub(crate) fn checked_guardrails(
             "The tokens a person may use in a day",
         )?,
         budget_exempt_admins: given.budget_exempt_admins,
+        strict_citations: given.strict_citations,
         monthly_token_budget: ranged(
             given.monthly_token_budget,
             repomemo_storage::MAX_MONTHLY_TOKENS,

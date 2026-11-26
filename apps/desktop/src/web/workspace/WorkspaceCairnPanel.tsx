@@ -107,7 +107,7 @@ function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: stri
     <ToolSwitches accessToken={accessToken} locked={view.organization_tools_off} off={toolsOff} onChange={setToolsOff} />
     <ChangeLimitFields ceiling={view.organization_limits} guardrails={guardrails} onChange={setGuardrails} />
     <BudgetFields guardrails={guardrails} onChange={setGuardrails} />
-    <SecretsSetting guardrails={guardrails} onChange={setGuardrails} organizationMasksPersonal={Boolean(view.organization_limits.mask_personal_data)} organizationRefuses={view.organization_limits.secrets_for_cloud === "refuse"} />
+    <SecretsSetting guardrails={guardrails} onChange={setGuardrails} organizationMasksPersonal={Boolean(view.organization_limits.mask_personal_data)} organizationStrict={Boolean(view.organization_limits.strict_citations)} organizationRefuses={view.organization_limits.secrets_for_cloud === "refuse"} />
     <ClosedFolders closed={guardrails.closed_folder_ids ?? []} folders={view.folders} onChange={(closed_folder_ids) => setGuardrails((current) => ({ ...current, closed_folder_ids }))} />
     <Button busy={isBusy} disabled={!dirty} type="submit" variant="main">Save</Button>
   </form>;

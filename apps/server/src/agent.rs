@@ -525,6 +525,33 @@ pub(crate) async fn run_message(
             .map_err(map_core_error)?
     };
     let (mut reply, loop_trace, correction) = (outcome.reply, outcome.trace, outcome.correction);
+    // Strict citations (V0.9.98): an answer about the workspace's content that cites nothing it read is not shown, and says what was read.
+    if reply.generated
+        && reply.citations.is_empty()
+        && reply.proposals.is_empty()
+        && state
+            .storage
+            .strict_citations_for_workspace(&workspace_id)
+            .await
+            .map_err(map_storage_error)?
+    {
+        let read: Vec<String> = reply
+            .files
+            .iter()
+            .map(|file| file.title.clone())
+            .chain(reply.matches.iter().map(|hit| hit.title.clone()))
+            .take(8)
+            .collect();
+        reply.reply_markdown = format!(
+            "I could not ground this answer in what I read, so I am not showing it.{}",
+            if read.is_empty() {
+                " I read no file.".to_owned()
+            } else {
+                format!(" What I read: {}.", read.join(", "))
+            }
+        );
+        reply.generated = false;
+    }
     // A job the router picked from the words that was turned off: what it made is dropped, and the person is told who turned it off.
     if let Some(reply_job) = reply
         .capability

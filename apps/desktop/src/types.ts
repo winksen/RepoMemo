@@ -950,6 +950,8 @@ export interface Guardrails {
   /** The organization's tokens a month (V0.9.97), and what happens at the cap. */
   monthly_token_budget?: number | null;
   at_budget?: "stop" | "local_only" | null;
+  /** An answer about the workspace's content that cites nothing it read is not shown (V0.9.98). */
+  strict_citations?: boolean;
 }
 
 /** A CAIRN job or tool that can be turned off (V0.9.91). */
@@ -974,7 +976,7 @@ export interface WorkspaceCairnView {
   /** What the organization turned off, which the workspace cannot turn on (V0.9.91). */
   organization_tools_off: string[];
   /** What the organization set for one confirmation, which the workspace can only tighten (V0.9.92). */
-  organization_limits: { max_changes: number | null; type_to_confirm_from: number | null; secrets_for_cloud?: "mask" | "refuse" | null; mask_personal_data?: boolean };
+  organization_limits: { max_changes: number | null; type_to_confirm_from: number | null; secrets_for_cloud?: "mask" | "refuse" | null; mask_personal_data?: boolean; strict_citations?: boolean };
   /** The workspace's folders, each marked when it is closed to CAIRN (V0.9.93). */
   folders: Folder[];
   organization_default_model_id: string | null;

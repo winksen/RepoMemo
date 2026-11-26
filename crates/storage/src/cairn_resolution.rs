@@ -408,6 +408,25 @@ impl StorageEngine {
         Ok(claimed.rows_affected() == 1)
     }
 
+    /// Whether an answer that cites nothing it read is withheld in a workspace (V0.9.98): the organization or the workspace asks.
+    pub async fn strict_citations_for_workspace(&self, workspace_id: &str) -> Result<bool> {
+        let mut strict = self
+            .get_workspace_cairn_settings(workspace_id)
+            .await?
+            .policy
+            .guardrails
+            .strict_citations;
+        if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+            strict |= self
+                .get_organization_cairn_settings(&organization_id)
+                .await?
+                .policy
+                .guardrails
+                .strict_citations;
+        }
+        Ok(strict)
+    }
+
     /// What one confirmation may change in a workspace, and from how many changes the person types the number (V0.9.92): the stricter
     /// of the organization's and the workspace's, and never more than the default cap.
     pub async fn change_limits_for_workspace(&self, workspace_id: &str) -> Result<ChangeLimits> {

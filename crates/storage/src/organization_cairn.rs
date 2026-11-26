@@ -54,6 +54,10 @@ pub struct Guardrails {
     /// What happens at the cap: `stop`, the default, or `local_only`, which keeps models on the network answering.
     #[serde(default)]
     pub at_budget: Option<String>,
+    /// An answer about the workspace's content that cites nothing it read is not shown (V0.9.98). A workspace can turn it on, never
+    /// off when its organization has it on.
+    #[serde(default)]
+    pub strict_citations: bool,
 }
 
 /// The largest monthly budget that can be set.

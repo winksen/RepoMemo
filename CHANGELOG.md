@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.98 (2026-11-26)
+
+An organization or a workspace can require strict citations.
+
+### Added
+- **The setting.** *Strict citations* in the organization's CAIRN panel and in a workspace's Settings › AI, off by default. A workspace may turn it on for itself and cannot turn it off when its organization has it on (`400`).
+- **What it does.** An answer written by the model that cites no passage it read is replaced by *I could not ground this answer in what I read, so I am not showing it*, with the files it read, and is stored as the turn's reply. Greetings, replies CAIRN assembles without a model, and replies that only propose a change are exempt.
+- **Limits.** The check is on whether the answer cites anything, not on whether each claim is supported, and an answer in Agent mode that the loop already refused for missing citations is unchanged.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added and nothing was run.
+
+### Upgrading
+- Nothing to do: it is off.
+
 ## V0.9.97 (2026-11-26)
 
 An organization has a monthly CAIRN token budget.

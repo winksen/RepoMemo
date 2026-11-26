@@ -83,6 +83,7 @@ pub(crate) struct OrganizationLimits {
     type_to_confirm_from: Option<i64>,
     secrets_for_cloud: Option<String>,
     mask_personal_data: bool,
+    strict_citations: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -237,6 +238,7 @@ pub(crate) async fn get_settings(
                 type_to_confirm_from: guardrails.type_to_confirm_from,
                 secrets_for_cloud: guardrails.secrets_for_cloud,
                 mask_personal_data: guardrails.mask_personal_data,
+                strict_citations: guardrails.strict_citations,
             }
         }
         None => OrganizationLimits {
@@ -244,6 +246,7 @@ pub(crate) async fn get_settings(
             type_to_confirm_from: None,
             secrets_for_cloud: None,
             mask_personal_data: false,
+            strict_citations: false,
         },
     };
     let answering = state
@@ -511,6 +514,11 @@ pub(crate) async fn update_settings(
             .map_err(map_storage_error)?
             .policy
             .guardrails;
+        if organization.strict_citations && !guardrails.strict_citations {
+            return Err(ApiError::bad_request(
+                "Your organization asks for strict citations; a workspace cannot turn that off.",
+            ));
+        }
         if guardrails.monthly_token_budget.is_some() || guardrails.at_budget.is_some() {
             return Err(ApiError::bad_request(
                 "The monthly token budget is the organization's, not a workspace's.",
