@@ -224,6 +224,114 @@ impl StorageEngine {
         })
     }
 
+    /// The text models offered in a workspace and usable now, by id (V0.9.86). Where neither the organization nor the workspace saved
+    /// settings, only the model the workspace had is offered, so nothing changes for anyone until an administrator changes it.
+    pub async fn offered_text_model_ids(&self, workspace_id: &str) -> Result<Vec<String>> {
+        let organization = match self.workspace_organization(workspace_id).await? {
+            Some(id) => Some(self.get_organization_cairn_settings(&id).await?),
+            None => None,
+        };
+        let workspace = self.get_workspace_cairn_settings(workspace_id).await?;
+        let decided = organization.as_ref().is_some_and(|settings| settings.version > 0);
+        let mut ids = Vec::new();
+        if !decided && workspace.version == 0 {
+            let linked = self
+                .list_provider_settings(workspace_id)
+                .await?
+                .into_iter()
+                .find(|setting| setting.enabled && setting.purpose() == "text")
+                .and_then(|provider| {
+                    provider
+                        .metadata
+                        .get("cairn_model_id")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned)
+                });
+            ids.extend(linked);
+        } else {
+            for model in self.list_cairn_models(None).await? {
+                let by_organization = organization
+                    .as_ref()
+                    .filter(|settings| settings.version > 0)
+                    .is_none_or(|settings| settings.policy.enabled_model_ids.contains(&model.id));
+                let by_workspace = workspace.version == 0 || workspace.policy.offered_model_ids.contains(&model.id);
+                if by_organization && by_workspace {
+                    ids.push(model.id);
+                }
+            }
+        }
+        let mut usable = Vec::new();
+        for id in ids {
+            if let Ok(model) = self.get_cairn_model(&id).await {
+                if let Ok(connection) = self.get_cairn_connection(&model.connection_id).await {
+                    if model.enabled && model.purpose == "text" && connection.is_usable() {
+                        usable.push(id);
+                    }
+                }
+            }
+        }
+        Ok(usable)
+    }
+
+    /// The text model for a message in a chat whose person chose `chosen` (V0.9.86): that model while it is offered, else what the
+    /// workspace resolves, with a note that the chosen one is no longer offered.
+    pub async fn resolve_text_provider_for(&self, workspace_id: &str, chosen: Option<&str>) -> Result<TextResolution> {
+        let Some(chosen) = chosen else {
+            return self.resolve_text_provider(workspace_id).await;
+        };
+        if self
+            .offered_text_model_ids(workspace_id)
+            .await?
+            .iter()
+            .any(|id| id == chosen)
+        {
+            let former = self
+                .list_provider_settings(workspace_id)
+                .await?
+                .into_iter()
+                .find(|setting| setting.enabled && setting.purpose() == "text");
+            let mode = match self.workspace_organization(workspace_id).await? {
+                Some(id) => self.get_organization_cairn_settings(&id).await?.policy.agent_mode,
+                None => "auto".to_owned(),
+            };
+            let provider = match former {
+                Some(former) if former.metadata.get("cairn_model_id").and_then(Value::as_str) == Some(chosen) => {
+                    Some(with_agent_mode(former, &mode))
+                }
+                _ => self.usable_catalog_provider(workspace_id, chosen, &mode).await,
+            };
+            if let Some(provider) = provider {
+                return Ok(TextResolution {
+                    resolved: Some(ResolvedTextProvider { provider, notice: None }),
+                    notice: None,
+                });
+            }
+        }
+        let name = match self.get_cairn_model(chosen).await {
+            Ok(model) => model.display_name,
+            Err(_) => "the model".to_owned(),
+        };
+        let mut resolution = self.resolve_text_provider(workspace_id).await?;
+        let said = match resolution.resolved.as_ref() {
+            Some(resolved) => format!(
+                "{name}, which you chose for this chat, is no longer offered, so {} answered.",
+                resolved
+                    .provider
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| resolved.provider.name.clone())
+            ),
+            None => {
+                format!("{name}, which you chose for this chat, is no longer offered, and no other model is available.")
+            }
+        };
+        match resolution.resolved.as_mut() {
+            Some(resolved) => resolved.notice = Some(said),
+            None => resolution.notice = Some(said),
+        }
+        Ok(resolution)
+    }
+
     /// What to say when another model answers instead of the one the workspace had; nothing when it had none.
     fn lost_notice(
         &self,

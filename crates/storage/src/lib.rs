@@ -424,7 +424,7 @@ pub struct EmbeddingCandidate {
     pub text: String,
 }
 
-const AGENT_CONVERSATION_SELECT: &str = "SELECT conversation.id, conversation.workspace_id, conversation.title, (SELECT COUNT(*) FROM assistant_turns turn WHERE turn.conversation_id = conversation.id) AS turn_count, conversation.created_at, conversation.updated_at, EXISTS (SELECT 1 FROM agent_conversation_shares share WHERE share.conversation_id = conversation.id) AS shared, conversation.all_workspaces AS all_workspaces, conversation.origin AS origin FROM assistant_conversations conversation";
+const AGENT_CONVERSATION_SELECT: &str = "SELECT conversation.id, conversation.workspace_id, conversation.title, (SELECT COUNT(*) FROM assistant_turns turn WHERE turn.conversation_id = conversation.id) AS turn_count, conversation.created_at, conversation.updated_at, EXISTS (SELECT 1 FROM agent_conversation_shares share WHERE share.conversation_id = conversation.id) AS shared, conversation.all_workspaces AS all_workspaces, conversation.origin AS origin, conversation.cairn_model_id AS cairn_model_id FROM assistant_conversations conversation";
 
 #[derive(Debug, sqlx::FromRow)]
 struct AgentConversationRow {
@@ -437,6 +437,7 @@ struct AgentConversationRow {
     shared: bool,
     all_workspaces: bool,
     origin: String,
+    cairn_model_id: Option<String>,
 }
 
 impl From<AgentConversationRow> for AgentConversation {
@@ -451,6 +452,7 @@ impl From<AgentConversationRow> for AgentConversation {
             shared: row.shared,
             all_workspaces: row.all_workspaces,
             origin: row.origin,
+            model_id: row.cairn_model_id,
         }
     }
 }

@@ -33,6 +33,20 @@ pub(crate) struct AgentCapabilitiesResponse {
     model: Option<String>,
     /// Whether CAIRN works in a loop in this workspace (V0.9.40), so a client can run it live (V0.9.43).
     agent_mode: bool,
+    /// The models a person can pick for a chat here (V0.9.86); the one that answers without a choice is marked `default`.
+    models: Vec<OfferedModel>,
+}
+
+/// A model offered in a workspace, as the chat's picker shows it.
+#[derive(Debug, Serialize)]
+pub(crate) struct OfferedModel {
+    id: String,
+    name: String,
+    /// `local` or `cloud`.
+    locality: String,
+    /// It takes tools, so CAIRN can work in a loop with it.
+    agent: bool,
+    default: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -49,6 +63,9 @@ pub(crate) struct AgentMessageRequest {
     /// Start the chat across all the person's workspaces (V0.9.60). Only a new chat takes it: a chat keeps the scope it was made with.
     #[serde(default)]
     all_workspaces: bool,
+    /// The catalog model to use from now in this chat (V0.9.86); it must be offered in the workspace. Omitted keeps the chat's own.
+    #[serde(default)]
+    model_id: Option<String>,
 }
 
 /// A file the person uploaded in the chat, which the upload route has already stored (V0.9.12).
@@ -76,6 +93,7 @@ pub(crate) async fn list_agent_capabilities(
 ) -> Result<Json<AgentCapabilitiesResponse>, ApiError> {
     let role = require_workspace_read(&state, &subject, &workspace_id).await?;
     let provider = text_provider(&state, &workspace_id).await?;
+    let models = offered_models(&state, &workspace_id, provider.as_ref()).await?;
     // AI actions show as unavailable to roles the workspace keeps AI from.
     let provider = match provider {
         Some(provider) if ai_access::role_may_use_ai(&state, &workspace_id, &role).await? => Some(provider),
@@ -105,7 +123,41 @@ pub(crate) async fn list_agent_capabilities(
         provider_name,
         model,
         agent_mode,
+        models,
     }))
+}
+
+/// The models a person can pick for a chat in a workspace, with where each runs and whether it takes tools.
+async fn offered_models(
+    state: &AppState,
+    workspace_id: &str,
+    answering: Option<&ProviderSettings>,
+) -> Result<Vec<OfferedModel>, ApiError> {
+    let answering = answering
+        .and_then(|provider| provider.metadata.get("cairn_model_id"))
+        .and_then(serde_json::Value::as_str);
+    let mut models = Vec::new();
+    for id in state
+        .storage
+        .offered_text_model_ids(workspace_id)
+        .await
+        .map_err(map_storage_error)?
+    {
+        let model = state.storage.get_cairn_model(&id).await.map_err(map_storage_error)?;
+        let connection = state
+            .storage
+            .get_cairn_connection(&model.connection_id)
+            .await
+            .map_err(map_storage_error)?;
+        models.push(OfferedModel {
+            default: answering == Some(id.as_str()),
+            agent: model.tool_mode != "none",
+            locality: connection.locality,
+            name: model.display_name,
+            id,
+        });
+    }
+    Ok(models)
 }
 
 pub(crate) async fn send_agent_message(
@@ -144,6 +196,7 @@ pub(crate) async fn run_routine_message(
         artifact_ids: Vec::new(),
         conversation_id,
         all_workspaces: false,
+        model_id: None,
     };
     run_message(
         state,
@@ -197,7 +250,27 @@ pub(crate) async fn run_message(
         }
         None => (Vec::new(), Vec::new(), Vec::new()),
     };
-    let resolution = text_resolution(state, &workspace_id).await?;
+    // The model of the chat: the one the person picks now, else the one the chat has. A model that is not offered here is refused,
+    // and one the chat has that is no longer offered is replaced by what the workspace resolves, with a note (V0.9.86).
+    let requested_model = request.model_id.clone().filter(|id| !id.trim().is_empty());
+    if let Some(model_id) = &requested_model {
+        let offered = state
+            .storage
+            .offered_text_model_ids(&workspace_id)
+            .await
+            .map_err(map_storage_error)?;
+        if !offered.contains(model_id) {
+            return Err(ApiError::bad_request("That model is not offered in this workspace."));
+        }
+    }
+    let chosen_model = requested_model
+        .clone()
+        .or_else(|| existing.as_ref().and_then(|conversation| conversation.model_id.clone()));
+    let resolution = state
+        .storage
+        .resolve_text_provider_for(&workspace_id, chosen_model.as_deref())
+        .await
+        .map_err(map_storage_error)?;
     // Said in the answer when the workspace's own model is not the one that answers.
     let model_notice = resolution
         .resolved
@@ -388,6 +461,14 @@ pub(crate) async fn run_message(
             created.id
         }
     };
+    // The chat keeps the model the person picked, so it answers with it from one message to the next.
+    if let Some(model_id) = &requested_model {
+        state
+            .storage
+            .set_agent_conversation_model(&conversation_id, Some(model_id))
+            .await
+            .map_err(map_storage_error)?;
+    }
     let turn = state
         .storage
         .append_agent_turn(&conversation_id, &label, &message, &reply)

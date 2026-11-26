@@ -1115,6 +1115,7 @@ input[type="file"] {
 .shared-chat-options-host { display: inline-flex; }
 
 /* The model sits under the message box. The bar has no fill of its own: its content is on the page's background (V0.8.67). */
+.shared-assistant-model .shared-model-picker { width: auto; max-width: 320px; min-height: 28px; margin: 0 auto; font-size: 12px; }
 .shared-assistant-model { min-height: 16px; margin: -2px 0 0; color: var(--color-text-subtle); font-size: 12px; text-align: center; }
 .shared-home-header { background: transparent; box-shadow: none; }
 /* Every dropdown eases in and eases out (V0.8.67). `translate` and `scale` are the individual properties, so they leave the

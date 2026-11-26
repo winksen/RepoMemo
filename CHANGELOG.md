@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.86 (2026-11-26)
+
+A person picks the model of a chat.
+
+### Added
+- **The model line is a picker.** Under the message box, CAIRN's model line is now a picker of the models offered in the workspace, each with its name, *Local* or *Cloud* and *Agent* when the model takes tools. It shows when the workspace offers more than one model; with one, the line reads as before. A model offered here is one the organization enables and the workspace offers (V0.9.82, V0.9.85) and that can be chosen now (V0.9.81); where neither saved settings, only the model the workspace had is offered, so nothing changes for anyone.
+- **Per chat.** The choice is kept on the chat (`assistant_conversations.cairn_model_id`, migration `0104_chat_model.sql`), so every message of the chat uses it without being told again, and opening the chat shows it. The model that answered each message was already recorded with the run of that message. A new chat starts with the model the workspace resolves.
+- **The server decides.** `POST /v1/workspaces/{id}/agent/messages` (and a live run) takes `model_id`; one that is not offered in the workspace is refused with `400`. `GET .../agent/capabilities` returns the offered `models` and marks the one that answers by default.
+- **A removed model.** When the organization or the workspace stops offering the chat's model, the next message is answered by what the workspace resolves and the answer carries a note (*qwen2.5:7b, which you chose for this chat, is no longer offered, so llama3.1:8b answered*). The chat does not silently switch to a cloud model: only models the workspace offers are ever used.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; the migration is locked and `npm run docs:check` passes. A server test (the picker's models with where they run and which take tools, a model outside the workspace refused, a chat that keeps its model, and the note when it is removed) was added; tests not run, and the picker was not opened in a browser.
+
 ## V0.9.85 (2026-11-26)
 
 A workspace offers a subset of its organization's models and chooses its default.

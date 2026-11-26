@@ -2641,6 +2641,8 @@ export interface AgentConversation {
   all_workspaces: boolean;
   /** `chat`, or `inbox` for the chat where an outside agent's proposals wait (V0.9.67). */
   origin: string;
+  /** The catalog model the person chose for this chat (V0.9.86); none uses what the workspace resolves. */
+  model_id: string | null;
 }
 
 /** A chat shared with the workspace (V0.9.57), as the others see it in the list. */

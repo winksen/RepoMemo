@@ -25,6 +25,16 @@ pub fn neutralize_for_copy(reply: &AgentReply) -> AgentReply {
 
 impl StorageEngine {
     /// Makes a chat one that looks across all the person's workspaces (V0.9.60); set when the chat is made.
+    /// Keeps the catalog model a person chose for a chat, or clears it (V0.9.86).
+    pub async fn set_agent_conversation_model(&self, conversation_id: &str, model_id: Option<&str>) -> Result<()> {
+        sqlx::query("UPDATE assistant_conversations SET cairn_model_id = ?2 WHERE id = ?1")
+            .bind(conversation_id)
+            .bind(model_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn set_agent_conversation_all_workspaces(&self, conversation_id: &str) -> Result<()> {
         sqlx::query("UPDATE assistant_conversations SET all_workspaces = 1 WHERE id = ?1")
             .bind(conversation_id)

@@ -578,6 +578,18 @@ export interface AgentCapabilities {
   model?: string | null;
   /** Whether CAIRN works in a loop in this workspace, so a message can run live. */
   agent_mode?: boolean;
+  /** The models a person can pick for a chat here (V0.9.86); the one that answers without a choice is marked `default`. */
+  models?: OfferedModel[];
+}
+
+/** A model offered in a workspace, as the chat's picker shows it. */
+export interface OfferedModel {
+  id: string;
+  name: string;
+  locality: "local" | "cloud";
+  /** It takes tools, so CAIRN can work in a loop with it. */
+  agent: boolean;
+  default: boolean;
 }
 
 export interface AgentMessage {
@@ -586,6 +598,8 @@ export interface AgentMessage {
   artifact_id?: string | null;
   /** Files selected in an earlier reply that the message is about (V0.9.26). */
   artifact_ids?: string[];
+  /** The model picked for the chat (V0.9.86); the chat keeps it for the next messages. */
+  model_id?: string | null;
 }
 
 export interface AgentTurn {

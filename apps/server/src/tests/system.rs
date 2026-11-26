@@ -2881,3 +2881,152 @@ async fn a_workspace_offers_only_what_its_organization_offers_and_chooses_its_de
     assert!(audit.contains("workspace_cairn_settings_changed"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_chat_keeps_the_model_picked_for_it_and_falls_back_with_a_note_when_it_is_no_longer_offered() {
+    let data_dir = temp_data_dir("chat-model");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "chat-model-root@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &root,
+            json!({"name": "Chat Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "Chat Space", "organization_id": organization_id}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+    let connection = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &root,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let add = |name: &str, tools: &str| {
+        let body = json!({"connection_id": connection["id"], "model_id": name, "purpose": "text", "tool_mode": tools});
+        let (send, root) = (&send, root.clone());
+        async move { response_json(send("POST", "/v1/cairn/models".to_owned(), &root, body).await).await }
+    };
+    let (first, second, outside) = (
+        add("llama3.1:8b", "native").await,
+        add("qwen2.5:7b", "none").await,
+        add("mistral:7b", "none").await,
+    );
+    let organization_uri = format!("/v1/organizations/{organization_id}/cairn");
+    let decide = |models: Vec<&Value>, default: &Value, version: i64| {
+        let ids = models.iter().map(|model| model["id"].clone()).collect::<Vec<_>>();
+        let (send, root, uri) = (&send, root.clone(), organization_uri.clone());
+        let default = default["id"].clone();
+        async move {
+            let saved = send(
+                "PUT",
+                uri,
+                &root,
+                json!({"enabled_model_ids": ids, "default_model_id": default, "expected_version": version}),
+            )
+            .await;
+            assert_eq!(saved.status(), 200);
+        }
+    };
+    decide(vec![&first, &second], &first, 0).await;
+
+    // The picker offers the organization's models, marks where each runs and which take tools, and says which answers by default.
+    let capabilities_uri = format!("/v1/workspaces/{workspace_id}/agent/capabilities");
+    let capabilities = response_json(send("GET", capabilities_uri.clone(), &root, Value::Null).await).await;
+    let offered = capabilities["models"].as_array().unwrap();
+    assert_eq!(offered.len(), 2);
+    let named = |name: &str| offered.iter().find(|model| model["name"] == name).cloned().unwrap();
+    assert_eq!(
+        (
+            named("llama3.1:8b")["agent"].clone(),
+            named("llama3.1:8b")["default"].clone()
+        ),
+        (json!(true), json!(true))
+    );
+    assert_eq!(
+        (
+            named("qwen2.5:7b")["agent"].clone(),
+            named("qwen2.5:7b")["locality"].clone()
+        ),
+        (json!(false), json!("local"))
+    );
+
+    // A model that is not offered here is refused; an offered one is kept by the chat for the next message.
+    let messages_uri = format!("/v1/workspaces/{workspace_id}/agent/messages");
+    let refused = send(
+        "POST",
+        messages_uri.clone(),
+        &root,
+        json!({"message": "find the deploy runbook", "model_id": outside["id"]}),
+    )
+    .await;
+    assert_eq!(refused.status(), 400);
+    let started = response_json(
+        send(
+            "POST",
+            messages_uri.clone(),
+            &root,
+            json!({"message": "find the deploy runbook", "model_id": second["id"]}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(started["conversation"]["model_id"], second["id"]);
+    let conversation_id = started["conversation"]["id"].as_str().unwrap().to_owned();
+    let next = response_json(
+        send(
+            "POST",
+            messages_uri.clone(),
+            &root,
+            json!({"message": "find the retry policy", "conversation_id": conversation_id}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        next["conversation"]["model_id"], second["id"],
+        "the chat keeps it without being told again"
+    );
+    assert!(next["turn"]["reply"]["warnings"].as_array().unwrap().is_empty());
+
+    // The organization stops offering it: the next message uses the default and says so.
+    decide(vec![&first], &first, 1).await;
+    let after = response_json(
+        send(
+            "POST",
+            messages_uri,
+            &root,
+            json!({"message": "find the runbook again", "conversation_id": conversation_id}),
+        )
+        .await,
+    )
+    .await;
+    let warnings = after["turn"]["reply"]["warnings"].to_string();
+    assert!(
+        warnings.contains("qwen2.5:7b, which you chose for this chat, is no longer offered"),
+        "{warnings}"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

@@ -12,6 +12,7 @@ import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
 import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
 import { CairnIcon } from "./CairnIcon";
+import { ModelPicker } from "./ModelPicker";
 import { ChatOptions } from "./ChatOptions";
 import { ActionMenu } from "./ui/action-menu";
 import { Button } from "./ui/button";
@@ -221,6 +222,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
       if (token !== view.current) return;
       setTurns(detail.turns.map(storedTurn));
       setScopeAll(Boolean(detail.conversation.all_workspaces));
+      setChatModelId(detail.conversation.model_id ?? null);
       upsertConversation(detail.conversation);
     } catch (error) {
       if (token !== view.current) return;
@@ -235,6 +237,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     view.current += 1;
     setActiveId(null);
     setScopeAll(false);
+    setChatModelId(null);
     rememberChat(workspaceId, null);
     setTurns([]);
     setIsLoadingChat(false);
@@ -243,6 +246,8 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   }
 
   const [scopeAll, setScopeAll] = useState(false);
+  // The model picked for this chat (V0.9.86); none uses what the workspace resolves.
+  const [chatModelId, setChatModelId] = useState<string | null>(null);
   const [sharedWithMe, setSharedWithMe] = useState<SharedConversation[]>([]);
   useEffect(() => {
     if (!showChats) return;
@@ -311,7 +316,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
   function send(request: AgentMessage, label: string) {
     if (isBusy || isLoadingChat) return;
     pendingCounter.current += 1;
-    void run({ key: `pending-${pendingCounter.current}`, request, label, status: "pending" });
+    void run({ key: `pending-${pendingCounter.current}`, request: chatModelId && !request.model_id ? { ...request, model_id: chatModelId } : request, label, status: "pending" });
   }
 
   function submit(event?: FormEvent<HTMLFormElement>) {
@@ -607,7 +612,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           </div>
           <IconButton appearance="plain" busy={isBusy} className="shared-assistant-send" disabled={isLoadingChat || !draft.trim()} label="Send" size="sm" type="submit"><ArrowElbowDownLeft size={ICON_SIZE.lg} /></IconButton>
         </div>
-        <p className="shared-assistant-model">{capabilities ? (capabilities.provider_name ? `Model: ${capabilities.model ?? "provider default"} · ${capabilities.provider_name}` : "No AI provider: file lookup and search only") : ""}</p>
+        <div className="shared-assistant-model">{capabilities?.models && capabilities.models.length > 1 ? <ModelPicker models={capabilities.models} onChange={setChatModelId} selected={chatModelId} /> : null}{capabilities?.models && capabilities.models.length > 1 ? null : <p>{capabilities ? (capabilities.provider_name ? `Model: ${capabilities.model ?? "provider default"} · ${capabilities.provider_name}` : "No AI provider: file lookup and search only") : ""}</p>}</div>
       </form> : <form className="shared-assistant-composer" onSubmit={submit}>
         <div className="shared-assistant-actions" role="group" aria-label={`${ASSISTANT_NAME} actions`}>
           {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {

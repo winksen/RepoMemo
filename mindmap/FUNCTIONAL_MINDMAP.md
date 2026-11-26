@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.85` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.86` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.86 — A person picks the model of a chat.
+
+- **Model picker.** The model line under CAIRN's message box becomes a picker of the models offered in the workspace, each with its name, *Local* or *Cloud*, and *Agent* when it takes tools. The choice belongs to the chat and is kept for its next messages. A model that is no longer offered is replaced by the workspace's, and the answer says so.
+
+Checks: formatted, linted and type-checked; migration locked; docs:check; test added, not run.
 
 ## V0.9.85 — A workspace offers a subset of its organization's models and chooses its default.
 

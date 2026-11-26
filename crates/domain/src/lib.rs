@@ -3041,6 +3041,9 @@ pub struct AgentConversation {
     /// `chat`, or `inbox` for the chat where an outside agent's proposals wait (V0.9.67).
     #[serde(default)]
     pub origin: String,
+    /// The catalog model the person chose for this chat (V0.9.86); none uses what the workspace resolves.
+    #[serde(default)]
+    pub model_id: Option<String>,
 }
 
 /// A chat shared with the workspace (V0.9.57), as the others see it in the list.
