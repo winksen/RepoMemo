@@ -582,6 +582,19 @@ export interface AgentCapabilities {
   models?: OfferedModel[];
   /** What the person has left of today's CAIRN budgets; none when no budget is set (V0.9.96). */
   budget?: { runs_limit: number | null; tokens_limit: number | null; runs_used: number; tokens_used: number; resets_at: string } | null;
+  /** The abilities the workspace offers, run with their /command (V0.9.106). */
+  abilities?: OfferedAbility[];
+}
+
+/** An ability as the chat offers it. */
+export interface OfferedAbility {
+  id: string;
+  name: string;
+  command: string;
+  description: string;
+  scope: "organization" | "workspace";
+  version: number;
+  inputs: { name: string; label: string }[];
 }
 
 /** A model offered in a workspace, as the chat's picker shows it. */

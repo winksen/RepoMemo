@@ -888,6 +888,14 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
             get(cairn_abilities::list_workspace).post(cairn_abilities::create_workspace),
         )
         .route(
+            "/v1/workspaces/{workspace_id}/cairn/abilities/organization",
+            get(cairn_abilities::list_for_workspace),
+        )
+        .route(
+            "/v1/workspaces/{workspace_id}/cairn/abilities/organization/{ability_id}",
+            put(cairn_abilities::set_for_workspace),
+        )
+        .route(
             "/v1/cairn/abilities/{ability_id}",
             put(cairn_abilities::publish).delete(cairn_abilities::remove),
         )

@@ -3,7 +3,7 @@ import { SafeMarkdown } from "./SafeMarkdown";
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft } from "@phosphor-icons/react";
+import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft, Sparkle } from "@phosphor-icons/react";
 import { continueSharedConversation, listSharedWithWorkspace, shareSharedAgentConversation, offerSharedAgentPlaybook, attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, confirmSharedAgentChangeset, dismissSharedAgentChangeset, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
 import type { AgentCapabilities, AgentCapability, AgentConversation, AgentMessage, AgentProposal, AgentReply, AgentRun, AgentStep, AgentTurn, AgentTurnResponse, MemoryCardSummary } from "../types";
 import type { SharedConversation } from "../generated/domain";
@@ -614,6 +614,12 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
                     </MenuPrimitive.Item>;
                   })}
                 </MenuPrimitive.Group>)}
+                {capabilities?.abilities?.length ? <MenuPrimitive.Group>
+                  <MenuPrimitive.Label className="rm-action-heading">Abilities</MenuPrimitive.Label>
+                  {capabilities.abilities.map((ability) => <MenuPrimitive.Item className="rm-action-item" disabled={isBusy || isLoadingChat} key={ability.id} onSelect={() => { setSelected(null); setDraft(`${ability.command} `); input.current?.focus(); }} title={ability.description || `Run ${ability.name} with ${ability.command}.`}>
+                    <Sparkle size={ICON_SIZE.md} /><span>{ability.name}</span><small className="shared-muted-copy">{ability.command}</small>
+                  </MenuPrimitive.Item>)}
+                </MenuPrimitive.Group> : null}
               </MenuPrimitive.Content>
             </MenuPrimitive.Portal>
           </MenuPrimitive.Root>

@@ -45,7 +45,9 @@ async fn require_ability_access(
 ) -> Result<(), ApiError> {
     match (&ability.organization_id, &ability.workspace_id) {
         (Some(organization_id), _) => require_access(state, subject, organization_id, change).await,
-        (_, Some(workspace_id)) => crate::require_workspace_admin(state, subject, workspace_id).await.map(drop),
+        (_, Some(workspace_id)) => crate::require_workspace_admin(state, subject, workspace_id)
+            .await
+            .map(drop),
         _ => Err(ApiError::forbidden()),
     }
 }
@@ -254,4 +256,96 @@ pub(crate) async fn versions(
             .map(|(version, at, by)| AbilityVersion { version, at, by })
             .collect(),
     ))
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct OrganizationAbilityView {
+    ability: CairnAbility,
+    /// Whether this workspace has it on.
+    on: bool,
+}
+
+/// `GET /v1/workspaces/{id}/cairn/abilities/organization`: the organization's abilities, each with whether the workspace has it on.
+pub(crate) async fn list_for_workspace(
+    subject: AuthenticatedSubject,
+    State(state): State<AppState>,
+    Path(workspace_id): Path<String>,
+) -> Result<Json<Vec<OrganizationAbilityView>>, ApiError> {
+    crate::require_workspace_admin(&state, &subject, &workspace_id).await?;
+    Ok(Json(
+        state
+            .storage
+            .organization_abilities_for_workspace(&workspace_id)
+            .await
+            .map_err(map_storage_error)?
+            .into_iter()
+            .map(|(ability, on)| OrganizationAbilityView { ability, on })
+            .collect(),
+    ))
+}
+
+/// `PUT /v1/workspaces/{id}/cairn/abilities/organization/{ability_id}`: turns one of the organization's abilities on or off here.
+pub(crate) async fn set_for_workspace(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    Path((workspace_id, ability_id)): Path<(String, String)>,
+    Json(request): Json<EnabledRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    crate::require_workspace_admin(&state, &subject, &workspace_id).await?;
+    state
+        .storage
+        .set_workspace_ability(&workspace_id, &ability_id, request.enabled, &subject.user_id)
+        .await
+        .map_err(map_storage_error)?;
+    let ability = state
+        .storage
+        .get_cairn_ability(&ability_id)
+        .await
+        .map_err(map_storage_error)?;
+    audit(
+        &state,
+        &subject,
+        "workspace_cairn_ability_switched",
+        format!(
+            "{} the organization's ability {} ({}) in workspace {workspace_id}.",
+            if request.enabled { "Turned on" } else { "Turned off" },
+            ability.name,
+            ability.command
+        ),
+    )
+    .await;
+    Ok(Json(serde_json::json!({ "enabled": request.enabled })))
+}
+
+/// What the chat's + menu and the `/commands` need to know about an ability.
+#[derive(Debug, Serialize)]
+pub(crate) struct OfferedAbility {
+    id: String,
+    name: String,
+    command: String,
+    description: String,
+    /// `organization` or `workspace`.
+    scope: String,
+    version: i64,
+    inputs: Vec<repomemo_storage::AbilityInput>,
+}
+
+/// The abilities a workspace offers its people, for the capabilities response.
+pub(crate) async fn offered(state: &AppState, workspace_id: &str) -> Result<Vec<OfferedAbility>, ApiError> {
+    Ok(state
+        .storage
+        .abilities_for_workspace(workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .map(|ability| OfferedAbility {
+            id: ability.id,
+            name: ability.name,
+            command: ability.command,
+            description: ability.description,
+            scope: ability.scope,
+            version: ability.version,
+            inputs: ability.inputs,
+        })
+        .collect())
 }

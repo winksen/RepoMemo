@@ -1874,6 +1874,14 @@ export function deleteCairnAbility(accessToken: string, abilityId: string): Prom
   return request<void>(`/v1/cairn/abilities/${encodeURIComponent(abilityId)}`, { method: "DELETE" }, accessToken);
 }
 
+export function listOrganizationAbilitiesForWorkspace(accessToken: string, workspaceId: string): Promise<{ ability: CairnAbility; on: boolean }[]> {
+  return request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn/abilities/organization`, {}, accessToken);
+}
+
+export function setWorkspaceAbility(accessToken: string, workspaceId: string, abilityId: string, enabled: boolean): Promise<{ enabled: boolean }> {
+  return request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn/abilities/organization/${encodeURIComponent(abilityId)}`, { method: "PUT", body: JSON.stringify({ enabled }) }, accessToken);
+}
+
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {
   return request<CairnTool[]>("/v1/cairn/tools", {}, accessToken);
 }

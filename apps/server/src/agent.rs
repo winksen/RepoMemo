@@ -37,6 +37,8 @@ pub(crate) struct AgentCapabilitiesResponse {
     models: Vec<OfferedModel>,
     /// What the person has left of today's CAIRN budgets; none when no budget is set (V0.9.96).
     budget: Option<repomemo_storage::PersonBudget>,
+    /// The abilities the workspace offers (V0.9.106): its organization's that are on and its own, each run with its /command.
+    abilities: Vec<crate::cairn_abilities::OfferedAbility>,
 }
 
 /// A model offered in a workspace, as the chat's picker shows it.
@@ -145,7 +147,9 @@ pub(crate) async fn list_agent_capabilities(
         ),
         None => (None, None),
     };
+    let abilities = crate::cairn_abilities::offered(&state, &workspace_id).await?;
     Ok(Json(AgentCapabilitiesResponse {
+        abilities,
         capabilities,
         provider_name,
         model,

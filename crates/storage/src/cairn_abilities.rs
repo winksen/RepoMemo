@@ -158,6 +158,23 @@ impl StorageEngine {
     ) -> Result<CairnAbility> {
         checked(draft)?;
         let command = checked_command(&draft.command)?;
+        // A workspace's command may not repeat one its organization teaches, so a /command means one thing.
+        if let Some(workspace_id) = workspace_id {
+            if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+                let taken: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM cairn_abilities WHERE organization_id = ?1 AND command = ?2",
+                )
+                .bind(organization_id)
+                .bind(&command)
+                .fetch_one(self.reader())
+                .await?;
+                if taken > 0 {
+                    repomemo_domain::bail_conflict!(
+                        "{command} is already an ability of this workspace's organization."
+                    );
+                }
+            }
+        }
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let mut tx = self.pool.begin().await?;
@@ -227,6 +244,75 @@ impl StorageEngine {
         insert_version(&mut tx, id, expected_version + 1, draft, actor, &now).await?;
         tx.commit().await?;
         Ok(Ok(self.get_cairn_ability(id).await?))
+    }
+
+    /// The abilities a workspace offers: its organization's that are on and that the workspace did not turn off, and its own that are on.
+    pub async fn abilities_for_workspace(&self, workspace_id: &str) -> Result<Vec<CairnAbility>> {
+        let organization_id = self.workspace_organization(workspace_id).await?;
+        let rows = sqlx::query(&format!(
+            "{SELECT} WHERE a.enabled = 1 AND ((?1 IS NOT NULL AND a.organization_id = ?1
+                 AND a.id NOT IN (SELECT ability_id FROM workspace_ability_off WHERE workspace_id = ?2))
+               OR a.workspace_id = ?2) ORDER BY a.command"
+        ))
+        .bind(organization_id)
+        .bind(workspace_id)
+        .fetch_all(self.reader())
+        .await?;
+        Ok(rows.iter().map(ability_from).collect())
+    }
+
+    /// An organization's abilities as a workspace sees them, each with whether the workspace has it on.
+    pub async fn organization_abilities_for_workspace(&self, workspace_id: &str) -> Result<Vec<(CairnAbility, bool)>> {
+        let Some(organization_id) = self.workspace_organization(workspace_id).await? else {
+            return Ok(Vec::new());
+        };
+        let off: Vec<String> =
+            sqlx::query_scalar("SELECT ability_id FROM workspace_ability_off WHERE workspace_id = ?1")
+                .bind(workspace_id)
+                .fetch_all(self.reader())
+                .await?;
+        Ok(self
+            .list_cairn_abilities(Some(&organization_id), None)
+            .await?
+            .into_iter()
+            .map(|ability| {
+                let on = !off.contains(&ability.id);
+                (ability, on)
+            })
+            .collect())
+    }
+
+    /// Turns one of the workspace's organization's abilities off or on for the workspace.
+    pub async fn set_workspace_ability(
+        &self,
+        workspace_id: &str,
+        ability_id: &str,
+        on: bool,
+        actor: &str,
+    ) -> Result<()> {
+        let ability = self.get_cairn_ability(ability_id).await?;
+        let organization_id = self.workspace_organization(workspace_id).await?;
+        if ability.organization_id.is_none() || ability.organization_id != organization_id {
+            repomemo_domain::bail_invalid!("That ability is not one of this workspace's organization.");
+        }
+        if on {
+            sqlx::query("DELETE FROM workspace_ability_off WHERE workspace_id = ?1 AND ability_id = ?2")
+                .bind(workspace_id)
+                .bind(ability_id)
+                .execute(&self.pool)
+                .await?;
+        } else {
+            sqlx::query(
+                "INSERT OR IGNORE INTO workspace_ability_off (workspace_id, ability_id, turned_off_at, turned_off_by) VALUES (?1, ?2, ?3, ?4)",
+            )
+            .bind(workspace_id)
+            .bind(ability_id)
+            .bind(Utc::now().to_rfc3339())
+            .bind(actor)
+            .execute(&self.pool)
+            .await?;
+        }
+        Ok(())
     }
 
     /// Turns an ability on or off.

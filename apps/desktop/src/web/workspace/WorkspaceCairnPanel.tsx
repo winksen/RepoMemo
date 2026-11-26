@@ -25,6 +25,7 @@ import { SecretsSetting } from "../cairn-admin/SecretsSetting";
 import { BudgetFields } from "../cairn-admin/BudgetFields";
 import { RoutineLimits } from "../cairn-admin/RoutineLimits";
 import { McpPolicy } from "../cairn-admin/McpPolicy";
+import { WorkspaceAbilities } from "../cairn-admin/WorkspaceAbilities";
 import type { Guardrails } from "../../types";
 
 const TOOL_LABELS: Record<string, string> = { none: "No tools", json: "Tools as JSON", native: "Native tools" };
@@ -35,11 +36,14 @@ const TOOL_LABELS: Record<string, string> = { none: "No tools", json: "Tools as 
  */
 export function WorkspaceCairnPanel({ accessToken, embeddingStatus, workspaceId }: { accessToken: string; embeddingStatus?: string | null; workspaceId: string }) {
   const [view, isLoading, reload] = useSystemData<WorkspaceCairnView>(cairnAdminKeys.workspace(workspaceId), () => getWorkspaceCairn(accessToken, workspaceId), { failure: "The workspace's models could not be loaded." });
-  return <section className="shared-settings-group">
+  return <>
+  <section className="shared-settings-group">
     <PanelHeading description={view?.organization_decided ? "Chosen by your organization" : "Your organization has not chosen yet"} icon={Sparkle} title="Models for CAIRN, Ask and summaries" />
     {view ? <PurposeModels accessToken={accessToken} onChanged={() => void reload()} status={embeddingStatus} view={view} workspaceId={workspaceId} /> : null}
     {view ? <Editor accessToken={accessToken} key={`${workspaceId}:${view.version}:${view.models.map((model) => model.id).join()}`} onSaved={() => void reload()} view={view} workspaceId={workspaceId} /> : isLoading ? <SkeletonList label="Loading the workspace's models" /> : null}
-  </section>;
+  </section>
+  <WorkspaceAbilities accessToken={accessToken} workspaceId={workspaceId} workspaceName="this workspace" />
+  </>;
 }
 
 const NONE = "none";

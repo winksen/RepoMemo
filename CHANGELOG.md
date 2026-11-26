@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.106 (2026-11-26)
+
+Workspaces turn organization abilities on or off, add their own, and offer them in the chat.
+
+### Added
+- **The workspace's abilities.** In a workspace's CAIRN settings, administrators see the abilities their organization teaches, each with a switch for this workspace (on until turned off), and an Abilities list of their own with the same form as on the administration page.
+- **In the chat.** Every ability that is on appears in the + menu under Abilities, with its command. Choosing one puts its `/command` in the message box. Typing the command runs it from V0.9.107; until then it is only text.
+- **One meaning per command.** A workspace cannot add a command its organization already teaches.
+- **An ability the organization turns off** is off everywhere, whatever a workspace chose.
+- **Audit.** Turning an organization ability on or off in a workspace is a `workspace_cairn_ability_switched` event.
+- **Migration 0107.** `workspace_ability_off`.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was run and the screens were not opened.
+
+### Upgrading
+- The migration runs on start. Nothing else to do.
+
 ## V0.9.105 (2026-11-26)
 
 Abilities can be made, edited and turned off on the administration page.

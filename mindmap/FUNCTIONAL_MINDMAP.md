@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.105` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.106` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.106 — Workspaces turn organization abilities on or off, add their own, and offer them in the chat.
+
+- **Workspace abilities.** A workspace's administrators see the abilities their organization teaches, turn off the ones the workspace does not want, and add abilities of their own. What is on appears in the chat's + menu under Abilities, and choosing one puts its /command in the message box. A workspace's command cannot repeat one its organization teaches. Running the command is V0.9.107.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.105 — Abilities can be made, edited and turned off on the administration page.
 
