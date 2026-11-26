@@ -1844,6 +1844,10 @@ export function getCairnUsage(accessToken: string, days: number): Promise<{ days
   return request(`/v1/cairn/admin/usage?days=${days}`, {}, accessToken);
 }
 
+export function getCairnHistory(accessToken: string): Promise<{ id: string; at: string; who: string; action: string; detail: string }[]> {
+  return request(`/v1/cairn/admin/history`, {}, accessToken);
+}
+
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {
   return request<CairnTool[]>("/v1/cairn/tools", {}, accessToken);
 }

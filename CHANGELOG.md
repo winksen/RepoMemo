@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.103 (2026-11-26)
+
+The administration page has a history of every change.
+
+### Added
+- **The History section.** Every change made on the CAIRN administration page and in the organization and workspace CAIRN settings, newest first: connections added, changed, tested and deleted, models added, changed, evaluated and deleted, budgets, the cloud confirmation, and each organization's and workspace's settings. Each row says who, when, what changed and the values before and after. `GET /v1/cairn/admin/history` serves it.
+- **Before and after for the guardrails too.** The audit text of the organization's and the workspace's settings now carries the guardrails (switches, limits, budgets, retention, routines, MCP policy) and the role limits before and after, as they are stored. A key is never in it: connection keys are never written to the audit trail.
+- **Also in System › Audit.** These are the System audit events, so System › Audit lists them with the rest.
+- **Who sees what.** CAIRN, system and app administrators see all of it. Owners and admins of an organization see the changes whose text names their organizations; connection and model changes, which are server-wide, are for the server administrators. This matching is by the organization's name, so it is rough.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added and the History section was not opened.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.102 (2026-11-26)
 
 The administration page shows CAIRN's usage and health.

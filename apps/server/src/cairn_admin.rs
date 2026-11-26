@@ -203,6 +203,73 @@ pub(crate) async fn usage(
     }))
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct HistoryEntry {
+    id: String,
+    at: String,
+    who: String,
+    action: String,
+    /// What changed, with the values before and after. It never holds a key.
+    detail: String,
+}
+
+/// The administration history (V0.9.103): every change made on the CAIRN administration page and in the organization and workspace
+/// CAIRN settings, newest first, with who made it and the values before and after. CAIRN, system and app administrators see all of it;
+/// owners and admins of an organization see the changes that name their organizations. It is the System audit trail, filtered.
+pub(crate) async fn history(
+    ReadingSubject(subject): ReadingSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<HistoryEntry>>, ApiError> {
+    let names: Option<Vec<String>> = if require_cairn_reader(&subject).is_ok() {
+        None
+    } else {
+        let own: Vec<String> = state
+            .storage
+            .list_organizations_for_user(&subject.user_id)
+            .await
+            .map_err(map_storage_error)?
+            .into_iter()
+            .filter(|organization| {
+                !organization.guest && matches!(organization.role, OrganizationRole::Owner | OrganizationRole::Admin)
+            })
+            .map(|organization| organization.name)
+            .collect();
+        if own.is_empty() {
+            return Err(ApiError::forbidden());
+        }
+        Some(own)
+    };
+    let events = state
+        .storage
+        .list_system_events(1000)
+        .await
+        .map_err(map_storage_error)?;
+    Ok(Json(
+        events
+            .into_iter()
+            .filter(|event| {
+                event.action.starts_with("cairn_")
+                    || event.action.starts_with("organization_cairn_")
+                    || event.action.starts_with("workspace_cairn_")
+            })
+            .filter(|event| {
+                names
+                    .as_ref()
+                    .is_none_or(|names| names.iter().any(|name| event.detail.contains(name.as_str())))
+            })
+            .map(|event| HistoryEntry {
+                id: event.id,
+                at: event.created_at,
+                who: event
+                    .actor
+                    .map_or_else(|| "The server".to_owned(), |actor| actor.display_name),
+                action: event.action,
+                detail: event.detail,
+            })
+            .collect(),
+    ))
+}
+
 /// Who the page is for, and what it shows today.
 pub(crate) async fn admin_view(
     ReadingSubject(subject): ReadingSubject,

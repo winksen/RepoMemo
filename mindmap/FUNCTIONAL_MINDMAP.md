@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.102` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.103` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.103 — The administration page has a history of every change.
+
+- **Administration history.** The History section lists every change made to how CAIRN is administered: connections, models, budgets, and the organization and workspace CAIRN settings, with who made it, when and the values before and after. Keys never appear. The same events are in System › Audit. Organization owners and admins see the changes that name their organizations.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.102 — The administration page shows CAIRN's usage and health.
 

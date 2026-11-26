@@ -388,6 +388,12 @@ pub(crate) async fn update_settings(
             },
             before.policy.agent_mode,
             saved.policy.agent_mode
+        ) + &format!(
+            " Guardrails from {} to {}. Role limits from {} to {}.",
+            serde_json::to_string(&before.policy.guardrails).unwrap_or_default(),
+            serde_json::to_string(&saved.policy.guardrails).unwrap_or_default(),
+            serde_json::to_string(&before.policy.model_roles).unwrap_or_default(),
+            serde_json::to_string(&saved.policy.model_roles).unwrap_or_default()
         ),
     )
     .await;

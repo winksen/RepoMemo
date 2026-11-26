@@ -631,6 +631,13 @@ pub(crate) async fn update_settings(
     );
     // Routines the new limits no longer allow are paused with the reason, not deleted (V0.9.99).
     let _ = state.storage.enforce_routine_limits(&workspace_id).await;
+    let detail = format!(
+        "{detail} Guardrails from {} to {}. Role limits from {} to {}.",
+        serde_json::to_string(&before.policy.guardrails).unwrap_or_default(),
+        serde_json::to_string(&saved.policy.guardrails).unwrap_or_default(),
+        serde_json::to_string(&before.policy.model_roles).unwrap_or_default(),
+        serde_json::to_string(&saved.policy.model_roles).unwrap_or_default()
+    );
     crate::record_workspace_activity(
         &state,
         &workspace_id,
