@@ -2,6 +2,25 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.105 (2026-11-26)
+
+Abilities can be made, edited and turned off on the administration page.
+
+### Added
+- **The Abilities section.** Choose an organization and see its abilities: name, command, the tools it may use, its version, who changed it last and when, and whether it is on. CAIRN administrators add one, edit it and publish a new version (the older versions are kept), turn it off and on, or delete it. Errors and successes are toasts.
+- **The form.** A name, a `/command`, a description, instructions, the fields CAIRN asks for before it starts (one per line, as `name: Label`), an output template and the tools it may use, chosen from the registry.
+- **Stale edits.** Publishing names the version that was read; if someone else published first, the save is refused and says so.
+
+### Not yet
+- **Try.** Trying an ability in a scratch chat needs abilities to run, which is V0.9.107.
+- **Workspaces.** A workspace's own abilities and the on or off choice for the organization's are V0.9.106.
+
+### Checks
+- Type-checked; `npm run docs:check` passes. The page was not opened.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.104 (2026-11-26)
 
 CAIRN abilities are stored, versioned and served by an API.

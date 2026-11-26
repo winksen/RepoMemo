@@ -21,6 +21,7 @@ import { ConnectionsPanel } from "./ConnectionsPanel";
 import { ModelsPanel } from "./ModelsPanel";
 import { UsagePanel } from "./UsagePanel";
 import { HistoryPanel } from "./HistoryPanel";
+import { AbilitiesPanel } from "./AbilitiesPanel";
 import { OrganizationCairnPanel } from "./OrganizationCairnPanel";
 import { Dropdown } from "../../components/ui/dropdown";
 
@@ -88,6 +89,17 @@ function OrganizationsSection({ accessToken, view }: { accessToken: string; view
   </>;
 }
 
+/** The Abilities section: choose an organization, then the abilities it teaches CAIRN (V0.9.105). */
+function AbilitiesSection({ accessToken, view }: { accessToken: string; view: CairnAdminView }) {
+  const [chosen, setChosen] = useState<string>(view.organizations[0]?.id ?? "");
+  const organization = view.organizations.find((entry) => entry.id === chosen) ?? view.organizations[0];
+  if (!organization) return <EmptyState description="Create an organization first." title="No organization yet" />;
+  return <>
+    {view.organizations.length > 1 ? <Dropdown aria-label="Organization" onValueChange={setChosen} options={view.organizations.map((entry) => ({ label: entry.name, value: entry.id }))} value={organization.id} /> : null}
+    <AbilitiesPanel accessToken={accessToken} canChange={view.can_change} key={organization.id} scope="organization" scopeId={organization.id} scopeName={organization.name} />
+  </>;
+}
+
 function OverviewSection({ accessToken, onChanged, view }: { accessToken: string; onChanged: () => void; view: CairnAdminView }) {
   const overview = view.overview;
   if (!overview) return <EmptyState description="The server-wide overview is for CAIRN, system and app administrators." title="Nothing to show here" />;
@@ -129,7 +141,7 @@ export function CairnAdminPanel({ accessToken, section, view, isLoading, onReloa
   const { label, intro, empty } = SECTION_LABELS[section];
   return <section className="shared-page-content rm-system-page">
     <PageHeader actions={<RefreshButton isLoading={isLoading} onClick={onReload} />} description={view.can_change ? intro : `${intro} You can read this page; only CAIRN and system administrators change it.`} title={`CAIRN administration · ${label}`} />
-    {section === "history" ? <HistoryPanel accessToken={accessToken} /> : section === "usage" ? <UsagePanel accessToken={accessToken} /> : section === "organizations" ? <OrganizationsSection accessToken={accessToken} view={view} /> : section === "models" ? <><ConnectionsPanel accessToken={accessToken} canChange={view.can_change} /><ModelsPanel accessToken={accessToken} canChange={view.can_change} /><p className="shared-muted-copy">{empty}</p></> : section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : <EmptyState description={empty} icon={SECTION_LABELS[section].icon} title="Nothing here yet" />}
+    {section === "abilities" ? <AbilitiesSection accessToken={accessToken} view={view} /> : section === "history" ? <HistoryPanel accessToken={accessToken} /> : section === "usage" ? <UsagePanel accessToken={accessToken} /> : section === "organizations" ? <OrganizationsSection accessToken={accessToken} view={view} /> : section === "models" ? <><ConnectionsPanel accessToken={accessToken} canChange={view.can_change} /><ModelsPanel accessToken={accessToken} canChange={view.can_change} /><p className="shared-muted-copy">{empty}</p></> : section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : <EmptyState description={empty} icon={SECTION_LABELS[section].icon} title="Nothing here yet" />}
   </section>;
 }
 

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.104` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.105` (2026-11-26). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.105 — Abilities can be made, edited and turned off on the administration page.
+
+- **Abilities on the administration page.** The Abilities section lists an organization's abilities with their command, tools, version, who changed them last and when. Administrators add an ability, edit it and publish a new version, turn it off and on, and delete it. Trying an ability in a scratch chat comes with running abilities (V0.9.107).
+
+Checks: type-checked; docs:check; not tested.
 
 ## V0.9.104 — CAIRN abilities are stored, versioned and served by an API.
 

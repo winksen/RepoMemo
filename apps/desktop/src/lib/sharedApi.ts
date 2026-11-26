@@ -22,6 +22,8 @@ import type {
   CairnConnection,
   CairnModel,
   CairnModelTest,
+  CairnAbility,
+  CairnAbilityInput,
   CairnTool,
   CairnUsageRow,
   Guardrails,
@@ -1846,6 +1848,30 @@ export function getCairnUsage(accessToken: string, days: number): Promise<{ days
 
 export function getCairnHistory(accessToken: string): Promise<{ id: string; at: string; who: string; action: string; detail: string }[]> {
   return request(`/v1/cairn/admin/history`, {}, accessToken);
+}
+
+function abilityBase(scope: "organization" | "workspace", id: string): string {
+  return `/v1/${scope === "organization" ? "organizations" : "workspaces"}/${encodeURIComponent(id)}/cairn/abilities`;
+}
+
+export function listCairnAbilities(accessToken: string, scope: "organization" | "workspace", id: string): Promise<CairnAbility[]> {
+  return request<CairnAbility[]>(abilityBase(scope, id), {}, accessToken);
+}
+
+export function createCairnAbility(accessToken: string, scope: "organization" | "workspace", id: string, input: CairnAbilityInput): Promise<CairnAbility> {
+  return request<CairnAbility>(abilityBase(scope, id), { method: "POST", body: JSON.stringify(input) }, accessToken);
+}
+
+export function publishCairnAbility(accessToken: string, abilityId: string, input: CairnAbilityInput & { expected_version: number }): Promise<CairnAbility> {
+  return request<CairnAbility>(`/v1/cairn/abilities/${encodeURIComponent(abilityId)}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
+}
+
+export function setCairnAbilityEnabled(accessToken: string, abilityId: string, enabled: boolean): Promise<CairnAbility> {
+  return request<CairnAbility>(`/v1/cairn/abilities/${encodeURIComponent(abilityId)}/enabled`, { method: "PUT", body: JSON.stringify({ enabled }) }, accessToken);
+}
+
+export function deleteCairnAbility(accessToken: string, abilityId: string): Promise<void> {
+  return request<void>(`/v1/cairn/abilities/${encodeURIComponent(abilityId)}`, { method: "DELETE" }, accessToken);
 }
 
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {

@@ -967,6 +967,35 @@ export interface Guardrails {
   inbox_bound?: number | null;
 }
 
+/** An ability: a procedure an organization or a workspace teaches CAIRN, run with a /command (V0.9.104). */
+export interface CairnAbility {
+  id: string;
+  scope: "organization" | "workspace";
+  organization_id: string | null;
+  workspace_id: string | null;
+  name: string;
+  command: string;
+  description: string;
+  enabled: boolean;
+  version: number;
+  instructions: string;
+  tools: string[];
+  inputs: { name: string; label: string }[];
+  output_template: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export interface CairnAbilityInput {
+  name: string;
+  command: string;
+  description: string;
+  instructions: string;
+  tools: string[];
+  inputs: { name: string; label: string }[];
+  output_template: string;
+}
+
 /** A CAIRN job or tool that can be turned off (V0.9.91). */
 export interface CairnTool {
   name: string;
