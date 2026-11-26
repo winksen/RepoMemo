@@ -100,6 +100,21 @@ pub(crate) async fn list_agent_capabilities(
         _ => None,
     };
     let mut capabilities = agent_capabilities(provider.is_some());
+    // A job that was turned off is shown as unavailable, with who turned it off (V0.9.91).
+    let off = state
+        .storage
+        .tools_off_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    for info in &mut capabilities {
+        if let Some((_, by)) = off
+            .iter()
+            .find(|(name, _)| *name == crate::cairn_tools::job_id(info.id))
+        {
+            info.available = false;
+            info.switched_off_by = Some((*by).to_owned());
+        }
+    }
     // A viewer cannot change the workspace, so what would change it is not offered (V0.9.10).
     if matches!(role, WorkspaceRole::Viewer) {
         for info in &mut capabilities {
@@ -291,6 +306,12 @@ pub(crate) async fn run_message(
                 .to_owned(),
         )
     });
+    // What was turned off for this workspace: tools the loop is not given, and jobs that are refused (V0.9.91).
+    let tools_off = state
+        .storage
+        .tools_off_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
     // The model's fallback, when it has one and may be used (V0.9.80).
     let fallback = match provider.as_ref() {
         Some(provider) if crate::ai::cairn_mode_of(provider) == "agent" => {
@@ -313,6 +334,7 @@ pub(crate) async fn run_message(
                 max_steps: runtime.cairn_max_steps.clamp(1, 30) as usize,
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
                 max_run_tokens: runtime.cairn_max_run_tokens.max(0) as u64,
+                disabled_tools: tools_off.iter().map(|(name, _)| name.clone()).collect(),
                 fallback,
                 can_write: !matches!(role, WorkspaceRole::Viewer) && !live.read_only,
                 user_id: subject.user_id.clone(),
@@ -383,7 +405,17 @@ pub(crate) async fn run_message(
     let all_workspaces = existing
         .as_ref()
         .map_or(request.all_workspaces, |conversation| conversation.all_workspaces);
-    let outcome = if all_workspaces {
+    // A job asked for from the + menu that was turned off is refused before it runs.
+    let refused_job = message
+        .capability
+        .and_then(|capability| switched_off_reply(&tools_off, capability));
+    let outcome = if let Some(reply) = refused_job {
+        repomemo_api::AgentOutcome {
+            reply,
+            correction: None,
+            trace: None,
+        }
+    } else if all_workspaces {
         // Across workspaces the chat only looks things up, with no AI: each result is labelled with its own workspace (V0.9.60).
         repomemo_api::AgentOutcome {
             reply: all_workspaces_reply(
@@ -424,6 +456,13 @@ pub(crate) async fn run_message(
             .map_err(map_core_error)?
     };
     let (mut reply, loop_trace, correction) = (outcome.reply, outcome.trace, outcome.correction);
+    // A job the router picked from the words that was turned off: what it made is dropped, and the person is told who turned it off.
+    if let Some(reply_job) = reply
+        .capability
+        .and_then(|capability| switched_off_reply(&tools_off, capability))
+    {
+        reply = reply_job;
+    }
     if let Some(notice) = model_notice {
         reply.warnings.push(notice);
     }
@@ -1051,6 +1090,26 @@ pub(crate) async fn text_resolution(
         .resolve_text_provider(workspace_id)
         .await
         .map_err(map_storage_error)
+}
+
+/// The reply to a job that was turned off, naming who turned it off (V0.9.91); none when it is on.
+fn switched_off_reply(
+    tools_off: &[(String, &'static str)],
+    capability: AgentCapability,
+) -> Option<repomemo_domain::AgentReply> {
+    let id = crate::cairn_tools::job_id(capability);
+    let (_, by) = tools_off.iter().find(|(name, _)| *name == id)?;
+    let who = if *by == "organization" {
+        "Your organization turned off"
+    } else {
+        "This workspace's administrators turned off"
+    };
+    let mut reply = repomemo_api::lookup_reply(format!(
+        "{who} “{}”, so I cannot do that here.",
+        crate::cairn_tools::label_of(&id)
+    ));
+    reply.capability = Some(capability);
+    Some(reply)
 }
 
 /// The workspace role as the model limits name it (V0.9.87).

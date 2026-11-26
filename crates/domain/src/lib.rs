@@ -2929,6 +2929,9 @@ pub struct AgentCapabilityInfo {
     /// Whether the job changes the workspace once the person confirms it (V0.9.32); a viewer is not offered it.
     #[serde(default)]
     pub writes: bool,
+    /// Who turned the job off, `organization` or `workspace` (V0.9.91); none when it is on.
+    #[serde(default)]
+    pub switched_off_by: Option<String>,
 }
 
 /// What CAIRN offers to do for the person, which it does only when they confirm (V0.9.10).

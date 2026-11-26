@@ -921,8 +921,25 @@ export interface OrganizationCairnSettings {
   agent_mode: "auto" | "agent" | "jobs";
   /** The roles that may use a model, by model id (V0.9.87); a model with no entry is open to everyone who may use AI. */
   model_roles: Record<string, string[]>;
+  /** What CAIRN may do in the organization's workspaces (V0.9.91 on). */
+  guardrails: Guardrails;
   updated_at: string | null;
   updated_by: string | null;
+}
+
+/** What CAIRN may do, see, send and spend; rows add fields. */
+export interface Guardrails {
+  /** CAIRN jobs and tools turned off, by name (V0.9.91). */
+  tools_off: string[];
+}
+
+/** A CAIRN job or tool that can be turned off (V0.9.91). */
+export interface CairnTool {
+  name: string;
+  label: string;
+  kind: "job" | "tool";
+  description: string;
+  writes: boolean;
 }
 
 /** A workspace's CAIRN model settings and the models of its organization it can offer (V0.9.85). `version` is 0 when it never saved any. */
@@ -932,8 +949,11 @@ export interface WorkspaceCairnView {
   offered_model_ids: string[];
   default_model_id: string | null;
   model_roles: Record<string, string[]>;
+  guardrails: Guardrails;
   updated_at: string | null;
   updated_by: string | null;
+  /** What the organization turned off, which the workspace cannot turn on (V0.9.91). */
+  organization_tools_off: string[];
   organization_default_model_id: string | null;
   organization_decided: boolean;
   models: (CairnModel & { from_organization: boolean; offered: boolean; answering: boolean })[];

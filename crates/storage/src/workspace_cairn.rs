@@ -18,6 +18,9 @@ pub struct WorkspaceCairnPolicy {
     /// The roles that may use a model in this workspace, by model id, within what the organization allows (V0.9.87).
     #[serde(default)]
     pub model_roles: std::collections::BTreeMap<String, Vec<String>>,
+    /// What the workspace turns off or limits further than its organization (V0.9.91 on).
+    #[serde(default)]
+    pub guardrails: crate::organization_cairn::Guardrails,
 }
 
 /// A workspace's settings with the version to name when changing them. `version` is 0 for a workspace that never saved any.

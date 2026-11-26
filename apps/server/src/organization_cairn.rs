@@ -29,6 +29,9 @@ pub(crate) struct SettingsRequest {
     /// The roles that may use a model, by model id (V0.9.87); a model with no entry is open to everyone who may use AI.
     #[serde(default)]
     model_roles: std::collections::BTreeMap<String, Vec<String>>,
+    /// What CAIRN may do in the organization's workspaces (V0.9.91 on).
+    #[serde(default)]
+    guardrails: repomemo_storage::Guardrails,
     /// The version the caller read; 0 for an organization that never saved any.
     expected_version: i64,
 }
@@ -92,6 +95,15 @@ pub(crate) async fn list_models(
         }
     }
     Ok(Json(views))
+}
+
+/// The guardrails of a request, checked (V0.9.91): only names of jobs and tools that exist.
+pub(crate) fn checked_guardrails(
+    given: repomemo_storage::Guardrails,
+) -> Result<repomemo_storage::Guardrails, ApiError> {
+    Ok(repomemo_storage::Guardrails {
+        tools_off: crate::cairn_tools::checked_names(given.tools_off)?,
+    })
 }
 
 pub(crate) async fn get_settings(
@@ -193,11 +205,13 @@ pub(crate) async fn update_settings(
         }
     }
     let model_roles = crate::workspace_cairn::checked_model_roles(request.model_roles, &enabled)?;
+    let guardrails = checked_guardrails(request.guardrails)?;
     let policy = OrganizationCairnPolicy {
         enabled_model_ids: enabled,
         default_model_id: request.default_model_id,
         agent_mode,
         model_roles,
+        guardrails,
     };
     let saved = state
         .storage

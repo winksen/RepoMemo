@@ -105,6 +105,35 @@ impl StorageEngine {
         ))
     }
 
+    /// The CAIRN tools and jobs turned off in a workspace, by name, with who turned each off (V0.9.91): the organization, whose
+    /// switches a workspace cannot undo, or the workspace itself.
+    pub async fn tools_off_for_workspace(&self, workspace_id: &str) -> Result<Vec<(String, &'static str)>> {
+        let mut off: Vec<(String, &'static str)> = Vec::new();
+        if let Some(organization_id) = self.workspace_organization(workspace_id).await? {
+            for name in self
+                .get_organization_cairn_settings(&organization_id)
+                .await?
+                .policy
+                .guardrails
+                .tools_off
+            {
+                off.push((name, "organization"));
+            }
+        }
+        for name in self
+            .get_workspace_cairn_settings(workspace_id)
+            .await?
+            .policy
+            .guardrails
+            .tools_off
+        {
+            if !off.iter().any(|(existing, _)| *existing == name) {
+                off.push((name, "workspace"));
+            }
+        }
+        Ok(off)
+    }
+
     /// A catalog model as a provider for a workspace, when it can be used now: on, a text model, on a connection that is usable.
     async fn usable_catalog_provider(
         &self,
@@ -182,8 +211,11 @@ impl StorageEngine {
             };
         let offered_by_organization =
             |id: &str| enabled_by_organization.is_none_or(|ids| ids.iter().any(|enabled| enabled == id));
-        let offered_by_workspace =
-            |id: &str| workspace.version == 0 || workspace.policy.offered_model_ids.iter().any(|offered| offered == id);
+        let offered_by_workspace = |id: &str| {
+            workspace.version == 0
+                || workspace.policy.offered_model_ids.is_empty()
+                || workspace.policy.offered_model_ids.iter().any(|offered| offered == id)
+        };
         let denied = self.denied_for_role(&organization, &workspace, role).await?;
         let offered = |id: &str| {
             offered_by_organization(id) && offered_by_workspace(id) && !denied.iter().any(|denied| denied == id)
@@ -292,7 +324,9 @@ impl StorageEngine {
                     .as_ref()
                     .filter(|settings| settings.version > 0)
                     .is_none_or(|settings| settings.policy.enabled_model_ids.contains(&model.id));
-                let by_workspace = workspace.version == 0 || workspace.policy.offered_model_ids.contains(&model.id);
+                let by_workspace = workspace.version == 0
+                    || workspace.policy.offered_model_ids.is_empty()
+                    || workspace.policy.offered_model_ids.contains(&model.id);
                 if by_organization && by_workspace {
                     ids.push(model.id);
                 }
@@ -508,6 +542,7 @@ mod tests {
                     default_model_id: default.map(|model| model.id.clone()),
                     agent_mode: mode.to_owned(),
                     model_roles: Default::default(),
+                    guardrails: Default::default(),
                 },
                 &setup.actor,
             )
@@ -627,6 +662,7 @@ mod tests {
                             offered_model_ids: offered,
                             default_model_id: default,
                             model_roles: Default::default(),
+                            guardrails: Default::default(),
                         },
                         None,
                     )
@@ -699,6 +735,7 @@ mod tests {
                     offered_model_ids: vec![setup.former.id.clone(), setup.other.id.clone()],
                     default_model_id: Some(setup.other.id.clone()),
                     model_roles: Default::default(),
+                    guardrails: Default::default(),
                 },
                 Some(&setup.actor),
             )
@@ -774,6 +811,7 @@ mod tests {
                     offered_model_ids: vec![setup.other.id.clone()],
                     default_model_id: None,
                     model_roles: Default::default(),
+                    guardrails: Default::default(),
                 },
                 None,
             )

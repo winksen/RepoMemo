@@ -3380,3 +3380,180 @@ async fn the_old_workspace_provider_route_is_read_only_on_a_real_server() {
     );
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn an_organization_and_a_workspace_turn_off_jobs_and_a_workspace_cannot_turn_on_what_its_organization_turned_off()
+{
+    let data_dir = temp_data_dir("tool-switches");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (root, _) = register_account(&app, "switch-root@example.com").await;
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &root,
+            json!({"name": "Switch Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    let workspace = response_json(
+        send(
+            "POST",
+            "/v1/workspaces".to_owned(),
+            &root,
+            json!({"name": "Switch Space", "organization_id": organization_id}),
+        )
+        .await,
+    )
+    .await;
+    let workspace_id = workspace["workspace"]["id"].as_str().unwrap().to_owned();
+
+    // What can be turned off: the jobs and the tools of the loop, in one list.
+    let tools = response_json(send("GET", "/v1/cairn/tools".to_owned(), &root, Value::Null).await).await;
+    let has = |name: &str, kind: &str| {
+        tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == name && tool["kind"] == kind)
+    };
+    assert!(
+        has("find_files", "job") && has("manage_files", "job") && has("search_evidence", "tool"),
+        "{tools}"
+    );
+
+    // A name that is neither is refused; the organization turns off a job.
+    let organization_uri = format!("/v1/organizations/{organization_id}/cairn");
+    assert_eq!(
+        send(
+            "PUT",
+            organization_uri.clone(),
+            &root,
+            json!({"guardrails": {"tools_off": ["find_files", "nonsense"]}, "expected_version": 0})
+        )
+        .await
+        .status(),
+        400
+    );
+    assert_eq!(
+        send(
+            "PUT",
+            organization_uri,
+            &root,
+            json!({"guardrails": {"tools_off": ["find_files"]}, "expected_version": 0})
+        )
+        .await
+        .status(),
+        200
+    );
+
+    // The + menu shows it as unavailable with who turned it off, and a request for it is answered with who turned it off.
+    let capabilities = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/agent/capabilities"),
+            &root,
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    let job = |name: &str| {
+        capabilities["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|job| job["id"] == name)
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(
+        (
+            job("find_files")["available"].clone(),
+            job("find_files")["switched_off_by"].clone()
+        ),
+        (json!(false), json!("organization"))
+    );
+    assert_eq!(job("search_content")["switched_off_by"], Value::Null);
+    let messages = format!("/v1/workspaces/{workspace_id}/agent/messages");
+    let asked = response_json(
+        send(
+            "POST",
+            messages.clone(),
+            &root,
+            json!({"message": "find the deploy runbook", "capability": "find_files"}),
+        )
+        .await,
+    )
+    .await;
+    assert!(
+        asked["turn"]["reply"]["reply_markdown"]
+            .as_str()
+            .unwrap()
+            .contains("Your organization turned off"),
+        "{asked}"
+    );
+    let routed = response_json(
+        send(
+            "POST",
+            messages.clone(),
+            &root,
+            json!({"message": "find the deploy runbook"}),
+        )
+        .await,
+    )
+    .await;
+    assert!(
+        routed["turn"]["reply"]["reply_markdown"]
+            .as_str()
+            .unwrap()
+            .contains("Your organization turned off"),
+        "{routed}"
+    );
+
+    // The workspace turns off more, and cannot turn on what the organization turned off.
+    let workspace_uri = format!("/v1/workspaces/{workspace_id}/cairn");
+    let saved = send(
+        "PUT",
+        workspace_uri.clone(),
+        &root,
+        json!({"guardrails": {"tools_off": ["manage_files"]}, "expected_version": 0}),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    let view = response_json(send("GET", workspace_uri, &root, Value::Null).await).await;
+    assert_eq!(view["organization_tools_off"], json!(["find_files"]));
+    let capabilities = response_json(
+        send(
+            "GET",
+            format!("/v1/workspaces/{workspace_id}/agent/capabilities"),
+            &root,
+            Value::Null,
+        )
+        .await,
+    )
+    .await;
+    let job = |name: &str| {
+        capabilities["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|job| job["id"] == name)
+            .cloned()
+            .unwrap()
+    };
+    assert_eq!(job("manage_files")["switched_off_by"], "workspace");
+    assert_eq!(
+        job("find_files")["switched_off_by"],
+        "organization",
+        "the workspace's save did not turn it back on"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

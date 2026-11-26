@@ -24,6 +24,7 @@ mod build_info;
 mod cairn_admin;
 mod cairn_connections;
 mod cairn_models;
+mod cairn_tools;
 mod catalog_migration;
 mod chat;
 mod check_config;
@@ -770,6 +771,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/users/{user_id}/cairn-admin", put(system::set_cairn_admin))
         .route("/v1/cairn/admin", get(cairn_admin::admin_view))
         .route("/v1/cairn/admin/budgets", put(cairn_admin::update_budgets))
+        .route("/v1/cairn/tools", get(cairn_tools::list_tools))
         .route(
             "/v1/cairn/connections",
             get(cairn_connections::list_connections).post(cairn_connections::create_connection),

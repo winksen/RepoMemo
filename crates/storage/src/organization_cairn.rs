@@ -11,6 +11,16 @@ pub const AGENT_MODES: &[&str] = &["auto", "agent", "jobs"];
 /// The most models an organization enables.
 pub const ORGANIZATION_MODELS_MAX: usize = 50;
 
+/// What CAIRN may do, see, send and spend (V0.9.91 on), set by an organization and tightened by a workspace: a workspace can only
+/// turn more off or make a limit stricter, never loosen what its organization set. Rows add fields here, and an older policy reads with
+/// their defaults.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Guardrails {
+    /// CAIRN tools and jobs turned off, by name (V0.9.91).
+    #[serde(default)]
+    pub tools_off: Vec<String>,
+}
+
 /// What an organization decided about CAIRN. More fields arrive with the rows that add guardrails, retention and preferences, and
 /// an older policy reads with their defaults.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,6 +39,9 @@ pub struct OrganizationCairnPolicy {
     /// everyone who may use AI. Owners and admins always may, so nobody is locked out of a model they administer.
     #[serde(default)]
     pub model_roles: std::collections::BTreeMap<String, Vec<String>>,
+    /// What CAIRN may do in the organization's workspaces (V0.9.91 on).
+    #[serde(default)]
+    pub guardrails: Guardrails,
 }
 
 fn auto_mode() -> String {
@@ -42,6 +55,7 @@ impl Default for OrganizationCairnPolicy {
             default_model_id: None,
             agent_mode: auto_mode(),
             model_roles: Default::default(),
+            guardrails: Default::default(),
         }
     }
 }
@@ -178,6 +192,7 @@ mod tests {
             default_model_id: Some("a".to_owned()),
             agent_mode: "jobs".to_owned(),
             model_roles: Default::default(),
+            guardrails: Default::default(),
         };
         let CairnSaved::Saved(first) = storage
             .save_organization_cairn_settings(&organization.id, 0, &policy, &owner.id)

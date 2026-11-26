@@ -160,6 +160,7 @@
 | GET | `/v1/workspaces/{workspace_id}/cairn` | auth | require_workspace_admin | — | WorkspaceCairnView |
 | PUT | `/v1/workspaces/{workspace_id}/cairn` | session or admin token | require_workspace_admin | `{offered_model_ids, default_model_id, expected_version}` | WorkspaceCairnSettings |
 | PUT | `/v1/workspaces/{workspace_id}/cairn/models/{purpose}` | session or admin token | require_workspace_admin | `{model_id, confirm_rebuild}` | WorkspaceCairnView |
+| GET | `/v1/cairn/tools` | auth | any signed-in person | — | Vec<SwitchableTool> |
 | GET | `/v1/organizations/{organization_id}/cairn` | auth | organization member, or require_cairn_reader | — | OrganizationCairnSettings |
 | GET | `/v1/organizations/{organization_id}/cairn/models` | auth | organization owner or admin, or require_cairn_admin | — | Vec<ModelView> |
 | PUT | `/v1/organizations/{organization_id}/cairn` | session or admin token | organization owner or admin, or require_cairn_admin | `{enabled_model_ids, default_model_id, agent_mode, expected_version}` | OrganizationCairnSettings |

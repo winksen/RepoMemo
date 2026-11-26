@@ -121,7 +121,7 @@ pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;
 pub use milestones::NewMilestone;
 pub use organization_cairn::{
-    OrganizationCairnPolicy, OrganizationCairnSettings, AGENT_MODES, ORGANIZATION_MODELS_MAX,
+    Guardrails, OrganizationCairnPolicy, OrganizationCairnSettings, AGENT_MODES, ORGANIZATION_MODELS_MAX,
 };
 pub use organization_templates::StoredOrganizationTemplate;
 pub use organizations::StarterSetup;

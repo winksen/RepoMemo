@@ -48,6 +48,8 @@ pub struct AgentLoopSetup {
     pub max_seconds: u64,
     /// The most tokens (read and written) one run uses; 0 sets no limit (V0.9.74). The run ends partial at the next step once it is reached.
     pub max_run_tokens: u64,
+    /// Tools turned off for this run by name (V0.9.91): they are not offered to the model and the prompt does not describe them.
+    pub disabled_tools: Vec<String>,
     /// A second model for the run (V0.9.80): it answers when the first times out, answers with a server error or is rate limited.
     pub fallback: Option<repomemo_domain::ProviderSettings>,
     /// Whether the person may change the workspace: a viewer's tool list holds no proposing tool.
@@ -189,6 +191,14 @@ fn corrections_block(corrections: &[String]) -> Option<String> {
 }
 
 /// The tools a run of this person's role may call. A person who cannot change the workspace is offered no proposing tool.
+/// Every tool the loop can be given, by name and label, for the pages that turn tools off (V0.9.91).
+pub fn cairn_tool_catalog() -> Vec<(&'static str, &'static str)> {
+    loop_tools(true, true, true)
+        .into_iter()
+        .map(|tool| (tool.name, tool.label))
+        .collect()
+}
+
 fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<LoopTool> {
     let mut tools = vec![
         atom(
@@ -1038,7 +1048,8 @@ impl RepoMemoCore {
         let message = request.message.trim().to_owned();
         let history = window(&request);
         let playbooks = self.workspace_playbooks(&request.workspace_id).await;
-        let tools = loop_tools(setup.can_write, !request.decision_offers_off, !playbooks.is_empty());
+        let mut tools = loop_tools(setup.can_write, !request.decision_offers_off, !playbooks.is_empty());
+        tools.retain(|tool| !setup.disabled_tools.iter().any(|off| off == tool.name));
         let specs = tools.iter().map(LoopTool::spec).collect::<Vec<_>>();
         let mut system = loop_system(&tools);
         if let Some(block) = personal_block(&request.personal_memory) {
@@ -1431,6 +1442,7 @@ mod tests {
             max_steps,
             max_seconds: 60,
             max_run_tokens: 0,
+            disabled_tools: Vec::new(),
             fallback: None,
             can_write,
             user_id: String::new(),

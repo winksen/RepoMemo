@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.91 (2026-11-26)
+
+An organization and a workspace can turn off any CAIRN job or tool.
+
+### Added
+- **Switches.** The organization's CAIRN panel and a workspace's Settings › AI have a *What CAIRN may do* list: CAIRN's jobs (what a person asks for from the + menu or in words) and its tools (what the model uses in a loop in Agent mode), each with a checkbox. `GET /v1/cairn/tools` lists them; the organization's and the workspace's policies keep the names turned off in a `guardrails.tools_off` list, which later guardrails join.
+- **Inheritance.** A workspace turns off more than its organization and cannot turn back on what its organization turned off: the workspace's list shows those switches locked as *Turned off by your organization*, and a workspace's save never changes them.
+- **Off means off, and says who.** A job that is off is unavailable in the + menu and in `GET .../agent/capabilities` (`available: false`, `switched_off_by: organization` or `workspace`). A request for it by menu is refused before it runs, and a job the router picked from the person's words is replaced by the same answer: *Your organization turned off “Find files”, so I cannot do that here*. A tool that is off is not offered to the model and its prompt does not describe it. Turning off a name that is neither a job nor a tool is refused with `400`.
+- **Not yet.** CAIRN's greeting still lists what it can do as before, and a job the router picked from words has already run when it is replaced (a job that changes anything only proposes, and nothing it made is stored). The MCP endpoint's tools follow later with the MCP policy (V0.9.101).
+- **A workspace that saves no models.** A workspace that saved settings but listed no model offers its organization's models, as before it saved, so saving only a switch does not turn CAIRN off.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (the list of jobs and tools, an unknown name refused, a job turned off by the organization shown and refused whether asked by menu or by words, a workspace's own switch, and the organization's staying on) was added; tests not run, and no Agent-mode run was held to see a tool missing from the model's request.
+
+### Upgrading
+- Nothing to do. Nothing is turned off until an administrator turns it off.
+
 ## V0.9.90 (2026-11-26)
 
 The workspace provider forms are retired.

@@ -381,6 +381,7 @@ pub fn agent_capabilities(ai_available: bool) -> Vec<AgentCapabilityInfo> {
             available: !tool.requires_ai || ai_available,
             group: tool.group.to_owned(),
             writes: tool.writes(),
+            switched_off_by: None,
         })
         .collect()
 }

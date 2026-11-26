@@ -65,6 +65,8 @@ pub(crate) struct WorkspaceCairnView {
     organization_default_model_id: Option<String>,
     /// The organization saved its settings: only the models it enabled are shown.
     organization_decided: bool,
+    /// What the organization turned off, which the workspace cannot turn on (V0.9.91).
+    organization_tools_off: Vec<String>,
     models: Vec<WorkspaceModel>,
     /// The embedding and vision models of the catalog the organization enabled, and the one the workspace uses now (V0.9.89).
     embedding: PurposeChoice,
@@ -115,6 +117,9 @@ pub(crate) struct WorkspaceCairnRequest {
     /// The roles that may use a model in this workspace, by model id (V0.9.87), within what the organization allows.
     #[serde(default)]
     model_roles: std::collections::BTreeMap<String, Vec<String>>,
+    /// What the workspace turns off or limits further than its organization (V0.9.91 on).
+    #[serde(default)]
+    guardrails: repomemo_storage::Guardrails,
     /// The version the caller read; 0 for a workspace that never saved any.
     expected_version: i64,
 }
@@ -179,6 +184,15 @@ pub(crate) async fn get_settings(
         .map_err(map_storage_error)?;
     let (models, organization_decided, organization_default_model_id) =
         organization_models(&state, &workspace_id, "text").await?;
+    let organization_tools_off = state
+        .storage
+        .tools_off_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .filter(|(_, by)| *by == "organization")
+        .map(|(name, _)| name)
+        .collect();
     let answering = state
         .storage
         .resolve_text_provider(&workspace_id)
@@ -199,7 +213,9 @@ pub(crate) async fn get_settings(
             let id = model.id().to_owned();
             WorkspaceModel {
                 from_organization: true,
-                offered: settings.version == 0 || settings.policy.offered_model_ids.contains(&id),
+                offered: settings.version == 0
+                    || settings.policy.offered_model_ids.is_empty()
+                    || settings.policy.offered_model_ids.contains(&id),
                 answering: answering.as_deref() == Some(id.as_str()),
                 model,
             }
@@ -209,6 +225,7 @@ pub(crate) async fn get_settings(
         settings,
         organization_default_model_id,
         organization_decided,
+        organization_tools_off,
         models,
         embedding: purpose_choice(&state, &workspace_id, "embedding").await?,
         vision: purpose_choice(&state, &workspace_id, "vision").await?,
@@ -407,10 +424,12 @@ pub(crate) async fn update_settings(
         }
     }
     let model_roles = checked_model_roles(request.model_roles, &offered)?;
+    let guardrails = crate::organization_cairn::checked_guardrails(request.guardrails)?;
     let policy = WorkspaceCairnPolicy {
         offered_model_ids: offered,
         default_model_id: request.default_model_id,
         model_roles,
+        guardrails,
     };
     let saved = state
         .storage

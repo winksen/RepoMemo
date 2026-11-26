@@ -2565,6 +2565,8 @@ export interface AgentCapabilityInfo {
   group: string;
   /** Whether the job changes the workspace once the person confirms it (V0.9.32); a viewer is not offered it. */
   writes: boolean;
+  /** Who turned the job off, `organization` or `workspace` (V0.9.91); none when it is on. */
+  switched_off_by: string | null;
 }
 
 /** What CAIRN offers to do for the person, which it does only when they confirm (V0.9.10). */
