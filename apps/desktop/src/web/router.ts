@@ -1,4 +1,4 @@
-import { ORGANIZATION_SECTIONS, SYSTEM_SECTIONS, WORKSPACE_SECTIONS, type OrganizationSection, type SystemSection, type WorkspaceSection } from "./constants";
+import { CAIRN_ADMIN_SECTIONS, ORGANIZATION_SECTIONS, SYSTEM_SECTIONS, WORKSPACE_SECTIONS, type CairnAdminSection, type OrganizationSection, type SystemSection, type WorkspaceSection } from "./constants";
 
 
 
@@ -55,6 +55,8 @@ export type Route =
   | { name: "profile" }
   | { name: "notifications" }
   | { name: "system"; section: SystemSection }
+  /** The CAIRN administration page and one of its sections (V0.9.72). */
+  | { name: "cairn-admin"; section: CairnAdminSection }
   | { name: "workspace"; workspaceId: string; section: WorkspaceSection; landing?: true }
   | { name: "artifact"; workspaceId: string; artifactId: string }
   | { name: "memory-card"; workspaceId: string; cardId: string }
@@ -77,6 +79,13 @@ export function parseRoute(pathname: string): Route {
     if (first === "profile") return { name: "profile" };
     if (first === "notifications") return { name: "notifications" };
     if (first === "system") return { name: "system", section: "overview" };
+    return { name: "not-found", workspaceId: null };
+  }
+  if (first === "cairn" && second === "admin") {
+    if (parts.length === 2) return { name: "cairn-admin", section: "overview" };
+    if (parts.length === 3 && (CAIRN_ADMIN_SECTIONS as readonly string[]).includes(third)) {
+      return { name: "cairn-admin", section: third as CairnAdminSection };
+    }
     return { name: "not-found", workspaceId: null };
   }
   if (first === "cairn") {
@@ -126,6 +135,7 @@ export function routePath(route: Exclude<Route, { name: "not-found" }>): string 
     case "profile": return "/profile";
     case "notifications": return "/notifications";
     case "system": return `/system/${route.section}`;
+    case "cairn-admin": return cairnAdminPath(route.section);
     case "workspace": return `/spaces/${encode(route.workspaceId)}/${route.section}`;
     case "artifact": return `/spaces/${encode(route.workspaceId)}/artifacts/${encode(route.artifactId)}`;
     case "memory-card": return `/spaces/${encode(route.workspaceId)}/memory-cards/${encode(route.cardId)}`;
@@ -154,6 +164,11 @@ export function legacyRedirect(pathname: string, search: string): string | null 
 }
 
 /** The address of Cairn's page, with a chat open when one is named. */
+/** The address of a section of the CAIRN administration page; Overview is the page's own address. */
+export function cairnAdminPath(section: CairnAdminSection): string {
+  return section === "overview" ? "/cairn/admin" : `/cairn/admin/${section}`;
+}
+
 export function cairnPath(chatId: string | null): string {
   return chatId ? `/cairn/${encodeURIComponent(chatId)}` : "/cairn";
 }

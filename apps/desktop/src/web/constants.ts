@@ -4,6 +4,10 @@ import { type ArtifactSummary, type Citation, type CollaborationTaskStatus, type
 export const SYSTEM_SECTIONS = ["overview", "usage", "users", "settings", "logs", "jobs", "audit", "console"] as const;
 export type SystemSection = typeof SYSTEM_SECTIONS[number];
 
+/** The sections of the CAIRN administration page (V0.9.72). The server says which of them a person may open. */
+export const CAIRN_ADMIN_SECTIONS = ["overview", "models", "organizations", "guardrails", "abilities", "memory", "usage", "history"] as const;
+export type CairnAdminSection = typeof CAIRN_ADMIN_SECTIONS[number];
+
 /** What the Retrieval page can limit a search to, by evidence state. */
 export type RetrievalState = "current" | "verified" | "needs_review" | "retired" | "all";
 export const RETRIEVAL_STATES: Record<RetrievalState, { label: string; statuses: string[] }> = {

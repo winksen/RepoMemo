@@ -44,4 +44,5 @@ export const RepositorySettings = lazily<Module<"RepositorySettings", typeof imp
 export const RepositoryDetailView = lazily<Module<"RepositoryDetailView", typeof import("./repositories/RepositoryPage")>>(
   () => import("./repositories/RepositoryPage").then((module) => ({ default: module.RepositoryDetailView })),
 );
+export const CairnAdminArea = lazily<ComponentProps<typeof import("./CairnAdminArea").default>>(() => import("./CairnAdminArea"), true);
 export const SystemArea = lazily<ComponentProps<typeof import("./SystemArea").default>>(() => import("./SystemArea"), true);

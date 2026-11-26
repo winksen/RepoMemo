@@ -1572,3 +1572,110 @@ fn cairn_administration_is_open_to_cairn_and_system_administrators_and_read_by_a
     assert!(require_cairn_admin(&subject(false, false, true, Some(token(false)))).is_err());
     assert!(require_cairn_admin(&subject(false, false, true, Some(token(true)))).is_ok());
 }
+
+#[tokio::test]
+async fn the_cairn_administration_page_shows_each_person_only_what_they_may_open() {
+    let data_dir = temp_data_dir("cairn-admin-page");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "cairn-page-root@example.com").await;
+    let (cairn, cairn_tokens) = register_account(&app, "cairn-page-cairn@example.com").await;
+    let (reader, reader_tokens) = register_account(&app, "cairn-page-reader@example.com").await;
+    let (owner, _) = register_account(&app, "cairn-page-owner@example.com").await;
+    let (stranger, _) = register_account(&app, "cairn-page-stranger@example.com").await;
+    let cairn_id = cairn_tokens["user"]["id"].as_str().unwrap().to_owned();
+    let reader_id = reader_tokens["user"]["id"].as_str().unwrap().to_owned();
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/system/users/{cairn_id}/cairn-admin"),
+            &admin,
+            json!({"enabled": true})
+        )
+        .await
+        .status(),
+        204
+    );
+    assert_eq!(
+        send(
+            "PUT",
+            format!("/v1/system/users/{reader_id}/app-admin"),
+            &admin,
+            json!({"enabled": true})
+        )
+        .await
+        .status(),
+        204
+    );
+    // An owner of an organization, and an organization that has a workspace.
+    let organization = response_json(
+        send(
+            "POST",
+            "/v1/organizations".to_owned(),
+            &owner,
+            json!({"name": "Page Org"}),
+        )
+        .await,
+    )
+    .await;
+    let organization_id = organization["id"].as_str().unwrap().to_owned();
+    let workspace = send(
+        "POST",
+        "/v1/workspaces".to_owned(),
+        &owner,
+        json!({"name": "Page Workspace", "organization_id": organization_id}),
+    )
+    .await;
+    assert!(workspace.status().is_success(), "{}", workspace.status());
+
+    let page = |who: String| {
+        let app = app.clone();
+        async move { app.oneshot(auth_request("GET", "/v1/cairn/admin", &who)).await.unwrap() }
+    };
+
+    // Everyone who has no part in administering CAIRN is refused.
+    assert_eq!(page(stranger).await.status(), 403);
+
+    // A system administrator and a CAIRN administrator see every section, today's setup and every organization.
+    for who in [admin, cairn] {
+        let view = response_json(page(who).await).await;
+        assert_eq!(view["scope"], "server");
+        assert_eq!(view["can_change"], true);
+        assert_eq!(view["sections"].as_array().unwrap().len(), 8);
+        assert!(view["organizations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|organization| organization["name"] == "Page Org"));
+        let overview = &view["overview"];
+        assert_eq!(overview["budgets"]["max_steps"], 8);
+        assert!(overview["workspaces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|workspace| workspace["workspace_name"] == "Page Workspace"
+                && workspace["organization_name"] == "Page Org"));
+    }
+
+    // An app administrator reads the same page and changes nothing.
+    let view = response_json(page(reader).await).await;
+    assert_eq!(
+        (view["scope"].clone(), view["can_change"].clone()),
+        (json!("server"), json!(false))
+    );
+
+    // An organization's owner sees only the sections that concern their organizations, and no server-wide overview.
+    let view = response_json(page(owner).await).await;
+    assert_eq!(view["scope"], "organization");
+    assert_eq!(
+        view["sections"],
+        json!(["organizations", "guardrails", "abilities", "memory", "usage"])
+    );
+    assert_eq!(view["organizations"].as_array().unwrap().len(), 1);
+    assert!(view["overview"].is_null());
+    let _ = std::fs::remove_dir_all(data_dir);
+}

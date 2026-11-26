@@ -6,6 +6,8 @@ The path an administrator follows, in order, with **who does each step**. Detail
 
 What an administrator decides about CAIRN, the assistant, and where.
 
+**The CAIRN administration page** (`/cairn/admin`) shows how CAIRN is set up: each workspace's model and mode, and the budgets and retention in force. System and CAIRN administrators see every section and app administrators read the same page. Owners and admins of an organization see only the sections that concern their organizations. The models, guardrails, abilities, memory, usage and history sections are empty until later releases fill them.
+
 | Decision | Where | What it does |
 |---|---|---|
 | **CAIRN mode** | *Settings › AI* for the workspace | *Jobs* (the router picks one job a message) or *Agent* (CAIRN calls tools in a loop). Agent mode needs a text provider with native tool calling; a workspace whose model is listed in `REPOMEMO_CAIRN_EVAL_PASSED_MODELS` starts in Agent mode unless you chose |

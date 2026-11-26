@@ -36,6 +36,15 @@ describe("parseRoute", () => {
     expect(parseRoute("/system/logs/extra")).toEqual({ name: "not-found", workspaceId: null });
   });
 
+  it("reads the CAIRN administration page, with overview as its front page, and keeps a chat's address", () => {
+    expect(parseRoute("/cairn/admin")).toEqual({ name: "cairn-admin", section: "overview" });
+    expect(parseRoute("/cairn/admin/models")).toEqual({ name: "cairn-admin", section: "models" });
+    expect(parseRoute("/cairn/admin/nothing")).toEqual({ name: "not-found", workspaceId: null });
+    expect(parseRoute("/cairn/chat-1")).toEqual({ name: "cairn", chatId: "chat-1" });
+    expect(routePath({ name: "cairn-admin", section: "overview" })).toBe("/cairn/admin");
+    expect(routePath({ name: "cairn-admin", section: "usage" })).toBe("/cairn/admin/usage");
+  });
+
   it("keeps the workspace of an address that names nothing", () => {
     expect(parseRoute("/spaces/w1/unknown")).toEqual({ name: "not-found", workspaceId: "w1" });
     expect(parseRoute("/spaces/w1/artifacts")).toEqual({ name: "not-found", workspaceId: "w1" });

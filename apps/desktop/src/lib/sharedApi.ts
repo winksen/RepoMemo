@@ -16,6 +16,7 @@ import type {
   SystemSettings,
   SystemUsage,
   SystemUser,
+  CairnAdminView,
   BackupsOverview,
   MaintenanceStatus,
   AgentCapabilities,
@@ -1769,6 +1770,10 @@ export function getSystemUsage(accessToken: string, days: number): Promise<Syste
 
 export function listSystemUsers(accessToken: string): Promise<SystemUser[]> {
   return request<SystemUser[]>("/v1/system/users", {}, accessToken);
+}
+
+export function getCairnAdmin(accessToken: string): Promise<CairnAdminView> {
+  return request<CairnAdminView>("/v1/cairn/admin", {}, accessToken);
 }
 
 export function setCairnAdmin(accessToken: string, userId: string, enabled: boolean): Promise<void> {

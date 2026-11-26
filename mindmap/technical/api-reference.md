@@ -90,6 +90,7 @@
 | PUT | `/v1/system/users/{user_id}/system-admin` | session | require_full_system_admin | SystemAdminRequest | status |
 | PUT | `/v1/system/users/{user_id}/app-admin` | session | require_full_system_admin | SystemAdminRequest | status |
 | PUT | `/v1/system/users/{user_id}/cairn-admin` | session | require_full_system_admin | SystemAdminRequest | status |
+| GET | `/v1/cairn/admin` | auth | require_cairn_reader, or an owner or admin of an organization | — | CairnAdminView |
 | POST | `/v1/system/users/{user_id}/sessions/end` | auth | require_full_system_admin, require_system_change | — | status |
 | POST | `/v1/system/users/{user_id}/unlock` | auth | require_full_system_admin, require_system_change | — | Value |
 | GET | `/v1/system/users/{user_id}/offboarding` | session | full system administrator | — | What the account owns and holds (owned places, open tasks and reviews, sessions, tokens, sent invitations) and whether it is the last system administrator |

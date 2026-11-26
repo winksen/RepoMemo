@@ -880,6 +880,38 @@ export interface SystemUsage {
   workspaces: WorkspaceUsage[];
 }
 
+/** Who the CAIRN administration page is for and what it shows (V0.9.72). */
+export interface CairnAdminView {
+  /** `server` for system, CAIRN and app administrators; `organization` for owners and admins of organizations. */
+  scope: "server" | "organization";
+  /** App administrators read the page and change nothing. */
+  can_change: boolean;
+  sections: string[];
+  organizations: { id: string; name: string }[];
+  /** Today's setup, read only; present for `server` only. */
+  overview: {
+    workspaces: {
+      workspace_id: string;
+      workspace_name: string;
+      organization_id: string;
+      organization_name: string;
+      provider_name: string | null;
+      provider_type: string | null;
+      model: string | null;
+      mode: "agent" | "jobs" | null;
+    }[];
+    budgets: {
+      max_steps: number;
+      max_run_seconds: number;
+      trace_days: number;
+      background_max_files: number;
+      background_ai_per_day: number;
+      ai_requests_per_hour: number;
+      eval_passed_models: string[];
+    };
+  } | null;
+}
+
 export interface SystemUser {
   id: string;
   email: string;

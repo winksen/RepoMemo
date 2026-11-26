@@ -22,6 +22,7 @@ export function pageTitle(route: Route, names: { workspace?: string; artifact?: 
     case "profile": return "Profile";
     case "notifications": return "Notifications";
     case "system": return `System · ${sectionLabel(route.section)}`;
+    case "cairn-admin": return `${ASSISTANT_NAME} administration · ${sectionLabel(route.section)}`;
     case "workspace": return `${names.workspace ?? "Workspace"} · ${sectionLabel(route.section, names.sectionLabels)}`;
     case "artifact": return `${names.artifact ?? "Evidence file"} · ${names.workspace ?? "Workspace"}`;
     case "memory-card": return `${names.card ?? "Memory card"} · ${names.workspace ?? "Workspace"}`;

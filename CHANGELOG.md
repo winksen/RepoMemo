@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.72 (2026-11-26)
+
+CAIRN has an administration page.
+
+### Added
+- **CAIRN administration.** The page at `/cairn/admin/{section}` has the sections Overview, Models, Organizations, Guardrails, Abilities, Memory, Usage and History. Overview shows today's setup read only: each workspace's text model, provider and mode (Agent or Jobs), and the budgets and retention in force (steps, run seconds, trace days, background files and calls, requests per person, models passed by the live evaluation). The other sections are empty states until the rows that fill them ship.
+- **Who sees what.** System and CAIRN administrators see every section; app administrators see the same and are told they cannot change it. Owners and admins of an organization see only Organizations, Guardrails, Abilities, Memory and Usage, for their own organizations. Everyone else is refused with a message, and a section a person may not open leads to the first one they may.
+- **Route.** `GET /v1/cairn/admin` answers who the page is for (`server` or `organization`), what the person may change, the sections they may open, the organizations it concerns and, for the server scope, the overview. It is the only server change of this release.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. A server test (a stranger refused; system and CAIRN administrators, an app administrator and an organization owner each shown their own sections) and a router test were added; tests not run.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.71 (2026-11-26)
 
 A system administrator can make a person a CAIRN administrator.

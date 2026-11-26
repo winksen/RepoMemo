@@ -35,7 +35,7 @@ import { pageKey } from "./web/pageTitle";
 import { type PageState } from "./web/constants";
 import { apiMessage } from "./web/format";
 import { currentLinkSecret, currentLocation, currentPathname, legacyRedirect, navigate, organizationPath, parseRoute, routePath, workspaceHomePath } from "./web/router";
-import { SystemArea } from "./web/lazy";
+import { CairnAdminArea, SystemArea } from "./web/lazy";
 import { OrganizationNavigationProvider } from "./web/navigation";
 import { LoadingCanvas } from "./web/common";
 import { AuthCanvas } from "./web/AuthCanvas";
@@ -333,6 +333,9 @@ function SharedWebAppContent() {
     case "system":
       if (!(session.is_system_admin || session.is_app_admin)) return notFound("/dashboard");
       return <SystemArea accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} section={route.section} session={session} signOut={signOut} workspaces={workspaces} />;
+
+    case "cairn-admin":
+      return <CairnAdminArea accessToken={accessToken} apiAvailable={apiAvailable} organizations={organizations} section={route.section} session={session} signOut={signOut} workspaces={workspaces} />;
 
     case "cairn":
       return <SharedCairnPage accessToken={accessToken} chatId={route.chatId} organizations={organizations} session={session} signOut={signOut} workspaces={workspaces} />;

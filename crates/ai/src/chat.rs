@@ -399,6 +399,11 @@ pub fn set_agent_default_models(models: Vec<String>) -> bool {
     AGENT_DEFAULT_MODELS.set(models).is_ok()
 }
 
+/// The models installed by [`set_agent_default_models`], for the administration page; empty until one was set.
+pub fn agent_default_models() -> Vec<String> {
+    AGENT_DEFAULT_MODELS.get().cloned().unwrap_or_default()
+}
+
 /// Whether a model has a passing live evaluation report on record, so its workspaces default to Agent mode. False for every model
 /// until the maintainer lists one.
 pub fn agent_default_for(model: Option<&str>) -> bool {

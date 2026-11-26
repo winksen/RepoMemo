@@ -21,6 +21,7 @@ mod backup;
 mod backup_copy;
 mod backup_crypto;
 mod build_info;
+mod cairn_admin;
 mod chat;
 mod check_config;
 mod collaboration;
@@ -746,6 +747,7 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/system/users/{user_id}/system-admin", put(system::set_system_admin))
         .route("/v1/system/users/{user_id}/app-admin", put(system::set_app_admin))
         .route("/v1/system/users/{user_id}/cairn-admin", put(system::set_cairn_admin))
+        .route("/v1/cairn/admin", get(cairn_admin::admin_view))
         .route(
             "/v1/system/users/{user_id}/sessions/end",
             post(system::end_user_sessions),

@@ -80,6 +80,12 @@ export const accountKeys = {
   notificationPreferences: (userId: string) => ["account", userId, "notification-preferences"] as const,
 };
 
+/** Cache keys of the CAIRN administration page. */
+export const cairnAdminKeys = {
+  all: ["cairn-admin"] as const,
+  view: () => ["cairn-admin", "view"] as const,
+};
+
 /** Cache keys of the System area (administrators only). Every key starts with `["system"]`, so one call clears them all. */
 export const systemKeys = {
   all: ["system"] as const,
