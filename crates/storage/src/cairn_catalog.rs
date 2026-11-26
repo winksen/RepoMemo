@@ -418,7 +418,8 @@ impl StorageEngine {
             repomemo_domain::bail_invalid!("The context size cannot be negative.");
         }
         self.get_cairn_connection(&new.connection_id).await?;
-        self.check_fallback(None, new.fallback_model_id.as_deref()).await?;
+        self.check_fallback(None, &new.connection_id, &new.purpose, new.fallback_model_id.as_deref())
+            .await?;
         let roles = roles_json(&new.roles)?;
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
@@ -469,8 +470,13 @@ impl StorageEngine {
         if existing.version != expected_version {
             return Ok(CairnSaved::Stale(existing));
         }
-        self.check_fallback(Some(id), change.fallback_model_id.as_deref())
-            .await?;
+        self.check_fallback(
+            Some(id),
+            &existing.connection_id,
+            &existing.purpose,
+            change.fallback_model_id.as_deref(),
+        )
+        .await?;
         let roles = roles_json(&change.roles)?;
         let saved = sqlx::query(
             "UPDATE cairn_models SET display_name = ?1, tool_mode = ?2, context_tokens = ?3, vision = ?4, evaluation_json = ?5,
@@ -499,15 +505,51 @@ impl StorageEngine {
         })
     }
 
-    /// A fallback is another model of the catalog, never the model itself.
-    async fn check_fallback(&self, model_id: Option<&str>, fallback: Option<&str>) -> Result<()> {
+    /// The rules of a fallback (V0.9.80): another model of the catalog with the same purpose that has no fallback of its own, since a
+    /// model falls back once; and one that is as local as the model, so what was kept on the network never goes to a cloud server.
+    async fn check_fallback(
+        &self,
+        model_id: Option<&str>,
+        connection_id: &str,
+        purpose: &str,
+        fallback: Option<&str>,
+    ) -> Result<()> {
         let Some(fallback) = fallback else { return Ok(()) };
         if model_id == Some(fallback) {
             repomemo_domain::bail_invalid!("A model cannot be its own fallback.");
         }
-        self.get_cairn_model(fallback)
+        let target = self
+            .get_cairn_model(fallback)
             .await
             .map_err(|_| repomemo_domain::invalid!("The fallback model is not in the catalog."))?;
+        if target.purpose != purpose {
+            repomemo_domain::bail_invalid!("A fallback does the same work as the model: choose a {purpose} model.");
+        }
+        if target.fallback_model_id.is_some() {
+            repomemo_domain::bail_invalid!(
+                "{} has a fallback of its own; a model falls back once, so choose one without.",
+                target.display_name
+            );
+        }
+        if let Some(model_id) = model_id {
+            let named_by =
+                sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM cairn_models WHERE fallback_model_id = ?1")
+                    .bind(model_id)
+                    .fetch_one(self.reader())
+                    .await?;
+            if named_by > 0 {
+                repomemo_domain::bail_invalid!(
+                    "This model is the fallback of another, so it cannot have a fallback itself: a model falls back once."
+                );
+            }
+        }
+        let own = self.get_cairn_connection(connection_id).await?;
+        let theirs = self.get_cairn_connection(&target.connection_id).await?;
+        if own.locality == "local" && theirs.locality != "local" {
+            repomemo_domain::bail_invalid!(
+                "A local model never falls back to a cloud model: what stays on your network would leave it."
+            );
+        }
         Ok(())
     }
 
@@ -748,6 +790,152 @@ mod tests {
         storage.delete_cairn_connection(&connection.id).await.unwrap();
         assert!(storage.list_cairn_connections().await.unwrap().is_empty());
         assert!(storage.list_cairn_models(None).await.unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}
+
+#[cfg(test)]
+mod fallback_tests {
+    use super::*;
+
+    async fn storage() -> (StorageEngine, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("repomemo-fallback-{}", Uuid::new_v4()));
+        let storage = StorageEngine::open(crate::StorageConfig::new(dir.clone()))
+            .await
+            .unwrap();
+        (storage, dir)
+    }
+
+    async fn connection(storage: &StorageEngine, actor: &str, locality: &str) -> CairnConnection {
+        storage
+            .create_cairn_connection(
+                NewCairnConnection {
+                    kind: if locality == "cloud" { "openrouter" } else { "ollama" }.to_owned(),
+                    name: format!("{locality} server"),
+                    base_url: format!("https://{locality}.example"),
+                    api_key: None,
+                    locality: locality.to_owned(),
+                    enabled: true,
+                },
+                actor,
+            )
+            .await
+            .unwrap()
+    }
+
+    async fn model(
+        storage: &StorageEngine,
+        actor: &str,
+        connection: &CairnConnection,
+        name: &str,
+        purpose: &str,
+    ) -> CairnModel {
+        storage
+            .create_cairn_model(
+                NewCairnModel {
+                    connection_id: connection.id.clone(),
+                    model_id: name.to_owned(),
+                    display_name: name.to_owned(),
+                    purpose: purpose.to_owned(),
+                    tool_mode: "native".to_owned(),
+                    context_tokens: 8192,
+                    vision: false,
+                    evaluation: None,
+                    fallback_model_id: None,
+                    roles: None,
+                    enabled: true,
+                },
+                actor,
+            )
+            .await
+            .unwrap()
+    }
+
+    fn change_of(model: &CairnModel, fallback: Option<&str>) -> CairnModelChange {
+        CairnModelChange {
+            display_name: model.display_name.clone(),
+            tool_mode: model.tool_mode.clone(),
+            context_tokens: model.context_tokens,
+            vision: model.vision,
+            evaluation: None,
+            fallback_model_id: fallback.map(str::to_owned),
+            roles: None,
+            enabled: true,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_fallback_is_as_local_as_the_model_does_the_same_work_and_is_the_only_one() {
+        let (storage, dir) = storage().await;
+        let actor = storage
+            .create_user("admin@example.com", "Admin", "hash")
+            .await
+            .unwrap()
+            .id;
+        let (local, cloud) = (
+            connection(&storage, &actor, "local").await,
+            connection(&storage, &actor, "cloud").await,
+        );
+        let primary = model(&storage, &actor, &local, "local-primary", "text").await;
+        let local_spare = model(&storage, &actor, &local, "local-spare", "text").await;
+        let cloud_spare = model(&storage, &actor, &cloud, "cloud-spare", "text").await;
+        let embedding = model(&storage, &actor, &local, "local-embed", "embedding").await;
+
+        // A local model never falls back to a cloud one; another local model, or another cloud one, is fine.
+        let refused = |result: Result<CairnSaved<CairnModel>>| result.unwrap_err().to_string();
+        assert!(refused(
+            storage
+                .update_cairn_model(&primary.id, 1, change_of(&primary, Some(&cloud_spare.id)), &actor)
+                .await
+        )
+        .contains("never falls back to a cloud"));
+        assert!(refused(
+            storage
+                .update_cairn_model(&primary.id, 1, change_of(&primary, Some(&embedding.id)), &actor)
+                .await
+        )
+        .contains("same work"));
+        assert!(refused(
+            storage
+                .update_cairn_model(&primary.id, 1, change_of(&primary, Some(&primary.id)), &actor)
+                .await
+        )
+        .contains("own fallback"));
+        let CairnSaved::Saved(primary) = storage
+            .update_cairn_model(&primary.id, 1, change_of(&primary, Some(&local_spare.id)), &actor)
+            .await
+            .unwrap()
+        else {
+            panic!("saved")
+        };
+        assert_eq!(primary.fallback_model_id.as_deref(), Some(local_spare.id.as_str()));
+
+        // A cloud model may fall back to a local one. A fallback falls back to nothing, and a model that is one has none.
+        let CairnSaved::Saved(_) = storage
+            .update_cairn_model(
+                &cloud_spare.id,
+                1,
+                change_of(&cloud_spare, Some(&local_spare.id)),
+                &actor,
+            )
+            .await
+            .unwrap()
+        else {
+            panic!("saved")
+        };
+        assert!(refused(
+            storage
+                .update_cairn_model(&local_spare.id, 1, change_of(&local_spare, Some(&primary.id)), &actor)
+                .await
+        )
+        .contains("falls back once"));
+        let third = model(&storage, &actor, &local, "local-third", "text").await;
+        assert!(refused(
+            storage
+                .update_cairn_model(&third.id, 1, change_of(&third, Some(&primary.id)), &actor)
+                .await
+        )
+        .contains("falls back once"));
         let _ = std::fs::remove_dir_all(dir);
     }
 }

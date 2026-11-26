@@ -210,6 +210,13 @@ pub(crate) async fn run_message(
                 .to_owned(),
         )
     });
+    // The model's fallback, when it has one and may be used (V0.9.80).
+    let fallback = match provider.as_ref() {
+        Some(provider) if crate::ai::cairn_mode_of(provider) == "agent" => {
+            crate::cairn_models::fallback_settings(state, provider).await
+        }
+        _ => None,
+    };
     // In Agent mode (V0.9.40) a message is answered by a loop that spends one AI request for each model call, so the quota is
     // not spent up front.
     let agent_setup = provider
@@ -225,6 +232,7 @@ pub(crate) async fn run_message(
                 max_steps: runtime.cairn_max_steps.clamp(1, 30) as usize,
                 max_seconds: runtime.cairn_max_run_seconds.clamp(10, 600) as u64,
                 max_run_tokens: runtime.cairn_max_run_tokens.max(0) as u64,
+                fallback,
                 can_write: !matches!(role, WorkspaceRole::Viewer) && !live.read_only,
                 user_id: subject.user_id.clone(),
                 background_max_files: runtime.cairn_background_max_files.clamp(8, 1000) as usize,

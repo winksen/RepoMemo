@@ -53,6 +53,9 @@ pub(crate) struct ChangeModelRequest {
     context_tokens: i64,
     vision: bool,
     enabled: bool,
+    /// Another model of the catalog that answers when this one times out, answers with a server error or is rate limited.
+    #[serde(default)]
+    fallback_model_id: Option<String>,
     expected_version: i64,
 }
 
@@ -94,6 +97,52 @@ pub(crate) async fn refresh_agent_defaults(storage: &repomemo_storage::StorageEn
         ),
         Err(error) => tracing::error!(error = %error, "The models with a passing evaluation could not be read"),
     }
+}
+
+/// The fallback of the catalog model a provider is linked to, as provider settings for the run (V0.9.80), or none: the model has no
+/// fallback, the fallback is off or on a connection that is off, it takes tools differently from the model (the loop speaks one
+/// protocol), or it would send what a local model keeps on the network to a cloud server. The rules are checked again here because
+/// a connection's address can change after the fallback was saved.
+pub(crate) async fn fallback_settings(
+    state: &AppState,
+    provider: &repomemo_domain::ProviderSettings,
+) -> Option<repomemo_domain::ProviderSettings> {
+    let model_id = provider.metadata.get("cairn_model_id")?.as_str()?;
+    let model = state.storage.get_cairn_model(model_id).await.ok()?;
+    let fallback = state
+        .storage
+        .get_cairn_model(model.fallback_model_id.as_deref()?)
+        .await
+        .ok()?;
+    let own = state.storage.get_cairn_connection(&model.connection_id).await.ok()?;
+    let theirs = state.storage.get_cairn_connection(&fallback.connection_id).await.ok()?;
+    let usable = fallback.enabled
+        && fallback.purpose == "text"
+        && theirs.enabled
+        && fallback.tool_mode == model.tool_mode
+        && !(own.locality == "local" && theirs.locality != "local");
+    if !usable {
+        tracing::warn!(model = %model.display_name, fallback = %fallback.display_name, "A model's fallback cannot be used");
+        return None;
+    }
+    let key = state.storage.cairn_connection_key(&theirs.id).await.ok()?;
+    Some(repomemo_domain::ProviderSettings {
+        id: String::new(),
+        workspace_id: None,
+        provider_type: theirs.kind.clone(),
+        name: format!("{} (fallback)", fallback.display_name),
+        base_url: Some(theirs.base_url.clone()),
+        model: Some(fallback.model_id.clone()),
+        embedding_model: None,
+        enabled: true,
+        metadata: serde_json::json!({
+            "purpose": "text",
+            "cloud_content_acknowledged": theirs.cloud_acknowledged_at.is_some(),
+            "tool_mode": fallback.tool_mode,
+            "context_tokens": fallback.context_tokens,
+        }),
+        api_key: key,
+    })
 }
 
 /// A live evaluation report, as `npm run cairn:eval` measures it (V0.9.79).
@@ -242,7 +291,7 @@ pub(crate) async fn change_model(
                 context_tokens: request.context_tokens,
                 vision: request.vision,
                 evaluation: existing.evaluation.clone(),
-                fallback_model_id: existing.fallback_model_id.clone(),
+                fallback_model_id: request.fallback_model_id,
                 roles: existing.roles.clone(),
                 enabled: request.enabled,
             },
@@ -277,6 +326,20 @@ pub(crate) async fn change_model(
     }
     if existing.enabled != saved.enabled {
         changes.push(format!("turned {}", if saved.enabled { "on" } else { "off" }));
+    }
+    if existing.fallback_model_id != saved.fallback_model_id {
+        changes.push(match &saved.fallback_model_id {
+            Some(id) => format!(
+                "fallback {}",
+                state
+                    .storage
+                    .get_cairn_model(id)
+                    .await
+                    .map(|model| model.display_name)
+                    .unwrap_or_else(|_| id.clone())
+            ),
+            None => "fallback removed".to_owned(),
+        });
     }
     refresh_agent_defaults(&state.storage).await;
     audit(

@@ -48,6 +48,8 @@ pub struct AgentLoopSetup {
     pub max_seconds: u64,
     /// The most tokens (read and written) one run uses; 0 sets no limit (V0.9.74). The run ends partial at the next step once it is reached.
     pub max_run_tokens: u64,
+    /// A second model for the run (V0.9.80): it answers when the first times out, answers with a server error or is rate limited.
+    pub fallback: Option<repomemo_domain::ProviderSettings>,
     /// Whether the person may change the workspace: a viewer's tool list holds no proposing tool.
     pub can_write: bool,
     /// The person the run is for: what is found in chats is theirs alone (V0.9.52).
@@ -995,8 +997,35 @@ impl RepoMemoCore {
         if !settings.enabled || settings.workspace_id.as_deref() != Some(request.workspace_id.as_str()) {
             repomemo_domain::bail_invalid!("The selected provider is not enabled for this workspace.");
         }
+        let primary_model = settings.model.clone().unwrap_or_default();
         let provider = provider_from_settings(settings)?;
-        self.loop_with(&provider, request, setup).await
+        let fallback_model = setup
+            .fallback
+            .as_ref()
+            .and_then(|fallback| fallback.model.clone())
+            .unwrap_or_default();
+        let fallback = match setup.fallback.clone() {
+            Some(settings) => Some(provider_from_settings(settings)?),
+            None => None,
+        };
+        let provider = repomemo_ai::FallbackProvider::new(provider, fallback);
+        let mut outcome = self.loop_with(&provider, request, setup).await?;
+        if let Some(reason) = provider.used_fallback().then(|| provider.fallback_reason()).flatten() {
+            let said = format!("{primary_model} {reason}, so {fallback_model} answered.");
+            outcome.reply.warnings.push(said.clone());
+            if let Some(trace) = outcome.trace.as_mut() {
+                trace.steps.push(AgentStep {
+                    position: trace.steps.len() as i64 + 1,
+                    kind: "note".to_owned(),
+                    tool: None,
+                    summary: shorten(&format!("Fallback: {said}"), 160),
+                    evidence: Vec::new(),
+                    duration_ms: 0,
+                    error: None,
+                });
+            }
+        }
+        Ok(outcome)
     }
 
     /// The loop over any provider, so that it can be run against a scripted one.
@@ -1402,6 +1431,7 @@ mod tests {
             max_steps,
             max_seconds: 60,
             max_run_tokens: 0,
+            fallback: None,
             can_write,
             user_id: String::new(),
             background_max_files: 8,

@@ -100,6 +100,7 @@ fn setup() -> AgentLoopSetup {
         max_steps: 8,
         max_seconds: 60,
         max_run_tokens: 0,
+        fallback: None,
         can_write: true,
         user_id: String::new(),
         background_max_files: 8,

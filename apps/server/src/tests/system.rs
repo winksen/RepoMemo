@@ -2188,3 +2188,88 @@ async fn an_evaluation_report_is_attached_to_a_model_and_only_a_native_model_tha
     assert!(audit.contains("cairn_model_evaluated"));
     let _ = std::fs::remove_dir_all(data_dir);
 }
+
+#[tokio::test]
+async fn a_local_model_is_never_given_a_cloud_fallback() {
+    let data_dir = temp_data_dir("cairn-fallback");
+    let app = router(ServerConfig::for_test(data_dir.clone())).await.unwrap();
+    let send = |method: &'static str, uri: String, who: &str, body: Value| {
+        let app = app.clone();
+        let request = json_request(method, &uri, who, body);
+        async move { app.oneshot(request).await.unwrap() }
+    };
+    let (admin, _) = register_account(&app, "fallback-root@example.com").await;
+    let local = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &admin,
+            json!({"kind": "ollama", "name": "Office Ollama", "base_url": "http://127.0.0.1:11434"}),
+        )
+        .await,
+    )
+    .await;
+    let cloud = response_json(
+        send(
+            "POST",
+            "/v1/cairn/connections".to_owned(),
+            &admin,
+            json!({"kind": "openrouter", "name": "OpenRouter", "api_key": "sk-or-fallback", "cloud_content_acknowledged": true}),
+        )
+        .await,
+    )
+    .await;
+    let add = |connection: &Value, name: &str| {
+        let body =
+            json!({"connection_id": connection["id"], "model_id": name, "purpose": "text", "tool_mode": "native"});
+        let send = &send;
+        let admin = admin.clone();
+        async move { response_json(send("POST", "/v1/cairn/models".to_owned(), &admin, body).await).await }
+    };
+    let primary = add(&local, "llama3.1:8b").await;
+    let local_spare = add(&local, "qwen2.5:7b").await;
+    let cloud_spare = add(&cloud, "openai/gpt-4o-mini").await;
+    let uri = format!("/v1/cairn/models/{}", primary["id"].as_str().unwrap());
+    let with = |fallback: &Value, version: &Value| json!({"display_name": "llama3.1:8b", "tool_mode": "native", "context_tokens": 0, "vision": false, "enabled": true, "fallback_model_id": fallback, "expected_version": version});
+
+    // A local model with a cloud fallback is refused at save, with the reason.
+    let refused = send(
+        "PUT",
+        uri.clone(),
+        &admin,
+        with(&cloud_spare["id"], &primary["version"]),
+    )
+    .await;
+    assert_eq!(refused.status(), 400);
+    assert!(response_json(refused)
+        .await
+        .to_string()
+        .contains("never falls back to a cloud"));
+    // Another local model is accepted, and the change is audited.
+    let saved = send(
+        "PUT",
+        uri.clone(),
+        &admin,
+        with(&local_spare["id"], &primary["version"]),
+    )
+    .await;
+    assert_eq!(saved.status(), 200);
+    let saved = response_json(saved).await;
+    assert_eq!(saved["fallback_model_id"], local_spare["id"]);
+    // It can be taken away again.
+    let cleared = response_json(send("PUT", uri, &admin, with(&Value::Null, &saved["version"])).await).await;
+    assert_eq!(cleared["fallback_model_id"], Value::Null);
+    let audit = response_json(
+        app.clone()
+            .oneshot(auth_request("GET", "/v1/system/audit", &admin))
+            .await
+            .unwrap(),
+    )
+    .await
+    .to_string();
+    assert!(
+        audit.contains("fallback qwen2.5:7b") && audit.contains("fallback removed"),
+        "{audit}"
+    );
+    let _ = std::fs::remove_dir_all(data_dir);
+}

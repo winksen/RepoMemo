@@ -2,6 +2,22 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.80 (2026-11-26)
+
+A catalog model can name a fallback that answers when it fails.
+
+### Added
+- **Fallback model.** *Edit* on a model in Models › Models has a *Fallback model*. The fallback answers when the model times out, answers with a server error (`5xx`) or is rate limited (`429`). It does so once for the run: after it answered, the rest of the run goes to it, so a model that is down is not waited for at every step. A refusal that would repeat, such as a rejected key or an unknown model, is not retried: it is shown as it is.
+- **The rules, at save.** A fallback is another model of the catalog with the same purpose that has no fallback of its own, since a model falls back once, and that is not itself the fallback of another model. A local model never falls back to a cloud model: what stays on the network would leave it. The rules are checked again when a run starts, because a connection's address can change after a fallback was saved, and a fallback that takes tools differently from the model is not used.
+- **The answer says so.** When the fallback answered, the answer carries a warning (*llama3.1:8b did not answer in time, so qwen2.5:7b answered*) and the run's history has a note step. The change of a fallback is an audit event.
+- **Which runs.** CAIRN's Agent mode uses the fallback of the catalog model its workspace's provider is linked to (V0.9.78). Jobs mode, Ask and summaries call the provider as before and have no fallback until the catalog serves them (V0.9.84).
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. Tests were added for the fallback provider (a failing model falls back once and the fallback answers the rest, a repeating refusal is not hidden), for the rules at save in storage and through the API (a local model with a cloud fallback is refused); tests not run, and no fallback was tried against a real failing model.
+
+### Upgrading
+- Nothing to do. No model has a fallback until an administrator chooses one.
+
 ## V0.9.79 (2026-11-26)
 
 Evaluation reports are attached to catalog models, and Agent mode follows them.

@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 
 mod catalog;
 mod chat;
+mod fallback;
 mod openai;
 
 pub use catalog::{
@@ -18,6 +19,7 @@ pub use catalog::{
 };
 pub use chat::*;
 use chat::{ollama_chat_body, ollama_chat_response, openrouter_chat_body, openrouter_chat_response};
+pub use fallback::{is_fallback_error, FallbackProvider};
 pub use openai::OpenAiCompatibleProvider;
 
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:11434";
@@ -926,8 +928,33 @@ async fn checked(response: reqwest::Response, action: &str) -> Result<reqwest::R
         300..=399 => " The provider answered with a redirect, which is not followed; enter the final address as the base URL.",
         _ => "",
     };
-    bail!("{action} (HTTP {}).{hint}", status.as_u16())
+    Err(anyhow::Error::new(ProviderHttpError::new(
+        status.as_u16(),
+        format!("{action} (HTTP {}).{hint}", status.as_u16()),
+    )))
 }
+
+/// A provider answered with an error status. It reads as before, and carries the status so a caller can tell a refusal that would
+/// repeat from one a fallback model can answer (V0.9.80).
+#[derive(Debug)]
+pub struct ProviderHttpError {
+    pub status: u16,
+    message: String,
+}
+
+impl ProviderHttpError {
+    pub fn new(status: u16, message: String) -> Self {
+        Self { status, message }
+    }
+}
+
+impl std::fmt::Display for ProviderHttpError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for ProviderHttpError {}
 
 fn error_message(value: &Value) -> Option<String> {
     let error = value.get("error")?;

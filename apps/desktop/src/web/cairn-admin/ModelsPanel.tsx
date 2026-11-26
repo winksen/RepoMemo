@@ -34,7 +34,9 @@ const TOOL_MODES = [
 ];
 const TOOL_LABELS: Record<string, string> = Object.fromEntries(TOOL_MODES.map((mode) => [mode.value, mode.label]));
 
-interface Draft { model: CairnModel; displayName: string; toolMode: string; contextTokens: string; vision: boolean; enabled: boolean }
+interface Draft { model: CairnModel; displayName: string; toolMode: string; contextTokens: string; vision: boolean; enabled: boolean; fallbackId: string }
+
+const NO_FALLBACK = "none";
 
 /** The models of the connections, added from what a server offers and tested for the tools they take (V0.9.77). */
 export function ModelsPanel({ accessToken, canChange }: { accessToken: string; canChange: boolean }) {
@@ -50,7 +52,7 @@ export function ModelsPanel({ accessToken, canChange }: { accessToken: string; c
     if (!draft) return;
     setIsBusy(true);
     try {
-      await changeCairnModel(accessToken, draft.model.id, { display_name: draft.displayName, tool_mode: draft.toolMode, context_tokens: Number(draft.contextTokens) || 0, vision: draft.vision, enabled: draft.enabled, expected_version: draft.model.version });
+      await changeCairnModel(accessToken, draft.model.id, { display_name: draft.displayName, tool_mode: draft.toolMode, context_tokens: Number(draft.contextTokens) || 0, vision: draft.vision, enabled: draft.enabled, fallback_model_id: draft.fallbackId === NO_FALLBACK ? null : draft.fallbackId, expected_version: draft.model.version });
       showToast("success", `${draft.displayName} was saved.`);
       setDraft(null);
       await reload();
@@ -88,10 +90,10 @@ export function ModelsPanel({ accessToken, canChange }: { accessToken: string; c
         <td>{model.purpose === "text" ? (TOOL_LABELS[model.tool_mode] ?? model.tool_mode) : <span className="shared-muted-copy">—</span>}</td>
         <td>{model.context_tokens ? model.context_tokens.toLocaleString() : <span className="shared-muted-copy">Not tested</span>}</td>
         <td>{model.purpose === "text" ? <Evaluation model={model} /> : <span className="shared-muted-copy">—</span>}</td>
-        <td>{model.enabled ? "On" : <span className="shared-muted-copy">Off</span>}{model.uses ? ` · used ${model.uses}×` : ""}</td>
+        <td>{model.enabled ? "On" : <span className="shared-muted-copy">Off</span>}{model.uses ? ` · used ${model.uses}×` : ""}{model.fallback_model_id ? <small className="shared-muted-copy"> · falls back to {models?.find((other) => other.id === model.fallback_model_id)?.display_name ?? "another model"}</small> : null}</td>
         <td>{canChange ? <ActionMenu items={[
           { label: "Test", icon: <Play size={ICON_SIZE.sm} />, onSelect: () => void test(model) },
-          { label: "Edit", icon: <PencilSimple size={ICON_SIZE.sm} />, onSelect: () => setDraft({ model, displayName: model.display_name, toolMode: model.tool_mode, contextTokens: String(model.context_tokens), vision: model.vision, enabled: model.enabled }) },
+          { label: "Edit", icon: <PencilSimple size={ICON_SIZE.sm} />, onSelect: () => setDraft({ model, displayName: model.display_name, toolMode: model.tool_mode, contextTokens: String(model.context_tokens), vision: model.vision, enabled: model.enabled, fallbackId: model.fallback_model_id ?? NO_FALLBACK }) },
           { label: "Delete", icon: <Trash size={ICON_SIZE.sm} />, onSelect: () => setRemoving(model), destructive: true },
         ]} label={`Actions for ${model.display_name}`} /> : null}</td>
       </tr>)}</tbody>
@@ -102,6 +104,7 @@ export function ModelsPanel({ accessToken, canChange }: { accessToken: string; c
         <Field label="Name"><Input autoComplete="off" onChange={(event) => setDraft({ ...draft, displayName: event.target.value })} value={draft.displayName} /></Field>
         {draft.model.purpose === "text" ? <Field label="Tools"><Dropdown aria-label="How the model takes tools" onValueChange={(toolMode) => setDraft({ ...draft, toolMode })} options={TOOL_MODES} value={draft.toolMode} /></Field> : null}
         <Field label="Context size (tokens)"><Input inputMode="numeric" min={0} onChange={(event) => setDraft({ ...draft, contextTokens: event.target.value })} type="number" value={draft.contextTokens} /></Field>
+        <Field hint="Answers when this model times out, answers with a server error or is rate limited, once for the run. A local model never falls back to a cloud one." label="Fallback model"><Dropdown aria-label="Fallback model" onValueChange={(fallbackId) => setDraft({ ...draft, fallbackId })} options={[{ label: "No fallback", value: NO_FALLBACK }, ...(models ?? []).filter((other) => other.id !== draft.model.id && other.purpose === draft.model.purpose).map((other) => ({ label: `${other.display_name} · ${nameOf(other.connection_id)}`, value: other.id }))]} value={draft.fallbackId} /></Field>
         <Checkbox checked={draft.vision} label="Understands images" onCheckedChange={(vision) => setDraft({ ...draft, vision })} />
         <Checkbox checked={draft.enabled} label="On" onCheckedChange={(enabled) => setDraft({ ...draft, enabled })} />
       </> : null}

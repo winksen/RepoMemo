@@ -1815,7 +1815,7 @@ export function addCairnModel(accessToken: string, input: { connection_id: strin
   return request<CairnModel>("/v1/cairn/models", { method: "POST", body: JSON.stringify(input) }, accessToken);
 }
 
-export function changeCairnModel(accessToken: string, id: string, input: { display_name: string; tool_mode: string; context_tokens: number; vision: boolean; enabled: boolean; expected_version: number }): Promise<CairnModel> {
+export function changeCairnModel(accessToken: string, id: string, input: { display_name: string; tool_mode: string; context_tokens: number; vision: boolean; enabled: boolean; fallback_model_id: string | null; expected_version: number }): Promise<CairnModel> {
   return request<CairnModel>(`/v1/cairn/models/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(input) }, accessToken);
 }
 
