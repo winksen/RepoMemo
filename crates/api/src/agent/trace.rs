@@ -167,6 +167,7 @@ mod tests {
             memory_cards: Vec::new(),
             changeset: None,
             trust: None,
+            ai_unavailable_reason: None,
         }
     }
 

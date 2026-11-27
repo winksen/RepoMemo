@@ -2897,6 +2897,11 @@ export interface AgentReply {
   changeset: AgentChangeset | null;
   /** How far the sources an answer cites can be trusted (V0.9.45); only a run of the loop has it. */
   trust: AgentTrust | null;
+  /**
+   * Why the reply was made without AI when no model could be used for it (V0.9.142): none enabled, the workspace's AI policy or
+   * the person's allowance. Empty for a reply a model wrote, and for one made by a job while a model was available.
+   */
+  ai_unavailable_reason: string | null;
 }
 
 /** What the sources an answer rests on are like: their review state and where they came from. */

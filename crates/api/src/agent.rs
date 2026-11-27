@@ -281,6 +281,23 @@ impl RepoMemoCore {
         request: AgentRequest,
         loop_setup: Option<AgentLoopSetup>,
     ) -> Result<AgentOutcome> {
+        // A reply made with no model says why (V0.9.142): the server's reason, or that none is enabled.
+        let without_model = request.provider_id.is_none().then(|| {
+            request
+                .ai_unavailable_reason
+                .clone()
+                .unwrap_or_else(|| "No AI model is enabled for this workspace.".to_owned())
+        });
+        let mut outcome = self.answer_message(request, loop_setup).await?;
+        if let Some(reason) = without_model {
+            if !outcome.reply.generated {
+                outcome.reply.ai_unavailable_reason = Some(reason);
+            }
+        }
+        Ok(outcome)
+    }
+
+    async fn answer_message(&self, request: AgentRequest, loop_setup: Option<AgentLoopSetup>) -> Result<AgentOutcome> {
         if let Some(setup) = loop_setup {
             let message = request.message.trim();
             // A job picked from the + menu runs inside the loop too (V0.9.134), and so does a message about an uploaded file (V0.9.135).
@@ -634,6 +651,7 @@ fn reply(markdown: impl Into<String>) -> AgentReply {
         memory_cards: Vec::new(),
         changeset: None,
         trust: None,
+        ai_unavailable_reason: None,
     }
 }
 

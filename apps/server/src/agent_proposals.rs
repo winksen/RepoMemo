@@ -736,6 +736,7 @@ mod tests {
                     outcome: None,
                 }),
                 trust: None,
+                ai_unavailable_reason: None,
             },
             created_at: String::new(),
         }

@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.142 (2026-11-27)
+
+Replies no longer say how they were matched: one standing note says AI responses can be inaccurate, and a reply made without AI says why.
+
+### Changed
+- **No routing notes.** The *matched from your wording*, *interpreted by …* and *worked out with its tools* lines are gone, and so is the *AI-generated* chip on each reply.
+- **One standing note.** Under the message box: *AI responses can be inaccurate. Check the cited sources.*
+- **Answered without AI.** A reply made with no model carries that label and the reason the server gives: none enabled, the workspace's AI policy, or the person's allowance.
+
+### Checks
+- `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` and `npm run typecheck` pass; the generated types are current; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.141 (2026-11-27)
 
 CAIRN's loop instructions say what its tools can and cannot see and how to work, before the rules it already had.

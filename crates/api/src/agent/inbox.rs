@@ -88,6 +88,7 @@ pub fn inbox_turn(client: &str, note: bool, title: &str, body: &str) -> Result<(
         memory_cards: Vec::new(),
         changeset: None,
         trust: None,
+        ai_unavailable_reason: None,
     };
     Ok((format!("{client} proposes: {title}"), reply))
 }

@@ -674,6 +674,8 @@ export interface AgentReply {
   warnings: string[];
   /** Earlier turns of the chat that went with the question. */
   context_turns?: number;
+  /** Why the reply was made without AI, when no model could be used for it (V0.9.142). */
+  ai_unavailable_reason?: string | null;
   /** Actions CAIRN proposes; each waits for the person to confirm it (V0.9.10). */
   proposals?: AgentProposal[];
   /** Every file the reply found, by id, to select from (V0.9.26); `files` holds the first of them. */

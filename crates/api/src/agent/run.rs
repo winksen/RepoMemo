@@ -716,6 +716,7 @@ fn finish(
         },
         changeset,
         trust: gathered.trust,
+        ai_unavailable_reason: None,
     };
     AgentOutcome {
         reply,
@@ -1927,6 +1928,7 @@ mod tests {
             memory_cards: Vec::new(),
             changeset: None,
             trust: None,
+            ai_unavailable_reason: None,
         };
         for (user, title, answer) in [
             (
@@ -2471,6 +2473,29 @@ The payment queue stalled for twenty minutes."
         assert_eq!(trace.steps[1].tool.as_deref(), Some("find_files"));
         assert!(trace.steps[1].error.is_none());
         assert_eq!(trace.state, "answered");
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// V0.9.142: a reply made with no model says why.
+    #[tokio::test]
+    async fn a_reply_made_without_a_model_carries_the_reason() {
+        let (core, data_dir) = core("no-ai").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let mut none = request(&workspace_id, "find retry-policy");
+        none.provider_id = None;
+        let outcome = core.run_agent_with(none.clone(), None).await.unwrap();
+        assert!(!outcome.reply.generated);
+        assert_eq!(
+            outcome.reply.ai_unavailable_reason.as_deref(),
+            Some("No AI model is enabled for this workspace.")
+        );
+        // The reason the server gives (the workspace's AI policy, for example) is kept as it is.
+        none.ai_unavailable_reason = Some("Your workspace keeps AI to owners and admins.".to_owned());
+        let outcome = core.run_agent_with(none, None).await.unwrap();
+        assert_eq!(
+            outcome.reply.ai_unavailable_reason.as_deref(),
+            Some("Your workspace keeps AI to owners and admins.")
+        );
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

@@ -633,6 +633,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           <IconButton appearance="plain" busy={isBusy} className="shared-assistant-send" disabled={isLoadingChat || !draft.trim()} label="Send" size="sm" type="submit"><ArrowElbowDownLeft size={ICON_SIZE.lg} /></IconButton>
         </div>
         <div className="shared-assistant-model">{capabilities?.models && capabilities.models.length > 1 ? <ModelPicker models={capabilities.models} onChange={setChatModelId} selected={chatModelId} /> : null}{budgetNote(capabilities?.budget)}{capabilities?.models && capabilities.models.length > 1 ? null : <p>{capabilities ? (capabilities.provider_name ? `Model: ${capabilities.model ?? "provider default"} · ${capabilities.provider_name}` : "No AI provider: file lookup and search only") : ""}</p>}</div>
+      <p className="shared-ai-generated-note">{AI_CAN_BE_WRONG}</p>
       </form> : <form className="shared-assistant-composer" onSubmit={submit}>
         <div className="shared-assistant-actions" role="group" aria-label={`${ASSISTANT_NAME} actions`}>
           {orderCapabilities(capabilities?.capabilities ?? [], template?.assistant).map((capability) => {
@@ -651,6 +652,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
           <span>Enter or {submitShortcutLabel()} sends; Shift+Enter adds a line.</span>
           <span>{capabilities?.provider_name ? <><Brain size={ICON_SIZE.sm} /> AI actions use {capabilities.provider_name}. Search and file lookup stay on the server.</> : "No AI provider is enabled, so file lookup and search are available. An administrator can enable AI in Settings."}</span>
         </div>
+        <p className="shared-ai-generated-note">{AI_CAN_BE_WRONG}</p>
       </form>}
     </div>
   </section></StepsOpenContext.Provider>;
@@ -660,14 +662,8 @@ function capabilityLabel(capabilities: AgentCapabilities | null, id: AgentCapabi
   return capabilities?.capabilities.find((capability) => capability.id === id)?.label ?? id.replace(/_/g, " ");
 }
 
-function routingNote(reply: AgentReply, capabilities: AgentCapabilities | null) {
-  if (reply.routing === "agent") return "worked out with its tools";
-  if (!reply.capability) return null;
-  const label = capabilityLabel(capabilities, reply.capability);
-  if (reply.routing === "rules") return `${label} · matched from your wording`;
-  if (reply.routing === "model") return `${label} · interpreted by ${capabilities?.provider_name ?? "the AI provider"}`;
-  return label;
-}
+/** The one standing line under the message box (V0.9.142): no reply says how it was routed. */
+const AI_CAN_BE_WRONG = "AI responses can be inaccurate. Check the cited sources.";
 
 const EVIDENCE_PREVIEW_LIMIT = 5;
 
@@ -782,14 +778,13 @@ function Proposal({ deciding, onDecide, proposal, turnId }: { deciding: string |
 }
 
 function Reply({ accessToken, canManage, canSummarize, capabilities, deciding, isBusy, onActOnCard, onActOnSelection, onChangeset, onDecide, onOpenArtifact, onPlaybook, onSelection, onSummarize, reply, selection, turnId }: { accessToken: string; canManage: boolean; canSummarize: boolean; capabilities: AgentCapabilities | null; deciding: string | null; isBusy: boolean; onActOnCard: (card: MemoryCardSummary, action: "update" | "delete") => void; onActOnSelection: (action: "move" | "trash" | "status") => void; onChangeset: (turnId: string, action: "confirm" | "dismiss", proposalIds: string[], confirmCounts: Record<string, number>) => void; onSelection: (ids: string[]) => void; selection: string[]; onDecide: (proposal: AgentProposal, action: "confirm" | "dismiss", confirmCount?: number) => void; onOpenArtifact: (artifactId: string) => void; onPlaybook: () => void; onSummarize: (artifactId: string, title: string) => void; reply: AgentReply; turnId: string }) {
-  const note = routingNote(reply, capabilities);
   const earlier = reply.context_turns ?? 0;
   // Found files, or the choices offered when a file name was ambiguous.
   const offerSummary = canSummarize && !(reply.capability === "summarize_file" && reply.generated);
   return <div className="shared-assistant-reply">
     <div className="shared-assistant-reply-meta">
-      <span><CairnIcon size={ICON_SIZE.sm} /> {ASSISTANT_NAME}{note ? ` · ${note}` : ""}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
-      {reply.generated ? <span className="shared-assistant-generated">AI-generated · verify against the cited sources</span> : null}
+      <span><CairnIcon size={ICON_SIZE.sm} /> {ASSISTANT_NAME}{earlier > 0 ? ` · read ${earlier} earlier ${earlier === 1 ? "message" : "messages"}` : ""}</span>
+      {!reply.generated && reply.ai_unavailable_reason ? <span className="shared-assistant-no-ai" title={reply.ai_unavailable_reason}>Answered without AI · {reply.ai_unavailable_reason}</span> : null}
     </div>
     <div className="shared-markdown"><SafeMarkdown>{reply.reply_markdown}</SafeMarkdown></div>
     {reply.warnings.length ? <div className="shared-ai-overview-warning">{reply.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div> : null}

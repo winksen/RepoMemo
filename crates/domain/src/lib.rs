@@ -3322,6 +3322,10 @@ pub struct AgentReply {
     /// How far the sources an answer cites can be trusted (V0.9.45); only a run of the loop has it.
     #[serde(default)]
     pub trust: Option<AgentTrust>,
+    /// Why the reply was made without AI when no model could be used for it (V0.9.142): none enabled, the workspace's AI policy or
+    /// the person's allowance. Empty for a reply a model wrote, and for one made by a job while a model was available.
+    #[serde(default)]
+    pub ai_unavailable_reason: Option<String>,
 }
 
 /// What the sources an answer rests on are like: their review state and where they came from.

@@ -237,6 +237,7 @@ mod tests {
                 outcome: None,
             }),
             trust: None,
+            ai_unavailable_reason: None,
         };
         let copy = neutralize_for_copy(&reply);
         assert_eq!(copy.proposals[0].state, AgentProposalState::Dismissed);

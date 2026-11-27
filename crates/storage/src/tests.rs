@@ -3434,6 +3434,7 @@ async fn a_run_trace_is_kept_with_its_steps_and_goes_with_its_chat_and_its_age()
         memory_cards: Vec::new(),
         changeset: None,
         trust: None,
+        ai_unavailable_reason: None,
     };
     let turn = storage
         .append_agent_turn(&conversation.id, "Hi", &AgentMessage::default(), &reply)
@@ -3586,6 +3587,7 @@ async fn a_person_finds_their_own_earlier_chats_and_nothing_deleted_or_anyone_el
         memory_cards: Vec::new(),
         changeset: None,
         trust: None,
+        ai_unavailable_reason: None,
     };
     let anas = storage
         .create_agent_conversation(&workspace.id, &ana.id, "Retries")
@@ -3688,6 +3690,7 @@ async fn a_shared_chat_is_read_searched_and_copied_by_others_until_it_is_unshare
         memory_cards: Vec::new(),
         changeset: None,
         trust: None,
+        ai_unavailable_reason: None,
     };
     let chat = storage
         .create_agent_conversation(&workspace.id, &ana.id, "Backoff")

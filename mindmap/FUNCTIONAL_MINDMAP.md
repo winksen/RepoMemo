@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.141` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.142` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.142 — Replies no longer say how they were matched: one standing note says AI responses can be inaccurate, and a reply made without AI says why.
+
+- **Honest and quiet labels.** A reply no longer explains how CAIRN matched it. One line under the message box warns that AI can be wrong, and only a reply made without AI is labelled, with the reason.
+
+Checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` and `npm run typecheck` pass; the generated types are current; docs:check passes. Tests not run; not opened in a browser.
 
 ## V0.9.141 — CAIRN's loop instructions say what its tools can and cannot see and how to work, before the rules it already had.
 
