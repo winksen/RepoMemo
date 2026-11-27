@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.136 (2026-11-27)
+
+The file query can sort by size, modified, created or title, and filter by dates and a minimum size.
+
+### Added
+- **Sorting.** The file query in storage takes a sort (size, modified, created or title) and a direction. Without one it keeps the newest change first, then the path.
+- **Filters.** Files changed after or before a time, and files of at least a number of bytes. The total counts only what matches.
+- **Stable paging.** The id breaks ties under every sort, so an offset page or a cursor page never repeats or skips a file.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.135 (2026-11-27)
 
 A message about an uploaded file goes to the loop with the file already named and cited by its handle.

@@ -997,6 +997,139 @@ async fn the_artifact_query_filters_by_folder_repository_and_kind_and_folders_co
     let _ = std::fs::remove_dir_all(data_dir);
 }
 
+/// V0.9.136: the artifact query sorts by size, dates or title in either direction, filters by a date window and a
+/// minimum size, and pages stably under a sort.
+#[tokio::test]
+async fn the_artifact_query_sorts_by_size_and_dates_and_pages_stably_under_a_sort() {
+    use super::{ArtifactQuery, ArtifactSort};
+    let (storage, data_dir) = temp_storage("query-sort").await;
+    let workspace = storage.create_workspace("Sorted").await.unwrap();
+    let source = storage
+        .create_or_get_source(&workspace.id, SourceType::Folder, "fixture", Some("fixture"))
+        .await
+        .unwrap();
+    let mut ids = std::collections::HashMap::new();
+    // Three files of known sizes and dates; two share a size, so the id has to break the tie.
+    for (path, size, day) in [
+        ("small.md", 10_i64, "2026-01-10"),
+        ("big.md", 5_000, "2026-03-10"),
+        ("mid.md", 300, "2026-02-10"),
+    ] {
+        let bytes = path.as_bytes();
+        let content_hash = StorageEngine::content_hash(bytes);
+        storage.store_blob(&content_hash, bytes, None).await.unwrap();
+        let artifact = storage
+            .store_artifact(NewArtifact {
+                workspace_id: workspace.id.clone(),
+                source_id: source.id.clone(),
+                artifact_type: ArtifactType::MarkdownDoc,
+                title: path.to_owned(),
+                path: path.to_owned(),
+                content_hash,
+                mime_type: None,
+                language: None,
+                size_bytes: size,
+                metadata: json!({}),
+            })
+            .await
+            .unwrap()
+            .artifact;
+        sqlx::query("UPDATE artifacts SET updated_at = ?1, created_at = ?1 WHERE id = ?2")
+            .bind(format!("{day}T12:00:00+00:00"))
+            .bind(&artifact.id)
+            .execute(&storage.pool)
+            .await
+            .unwrap();
+        ids.insert(path, artifact.id);
+    }
+    let ask = |query: ArtifactQuery| {
+        let storage = &storage;
+        let workspace_id = workspace.id.clone();
+        async move {
+            let (found, total) = storage
+                .query_artifacts(&ArtifactQuery { workspace_id, ..query })
+                .await
+                .unwrap();
+            (found.into_iter().map(|file| file.title).collect::<Vec<_>>(), total)
+        }
+    };
+    // The largest of the three files comes first, and the order reverses.
+    let (found, total) = ask(ArtifactQuery {
+        sort: Some(ArtifactSort::Size),
+        descending: true,
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(
+        (found, total),
+        (vec!["big.md".to_owned(), "mid.md".to_owned(), "small.md".to_owned()], 3)
+    );
+    let (found, _) = ask(ArtifactQuery {
+        sort: Some(ArtifactSort::Size),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(found, ["small.md", "mid.md", "big.md"]);
+    let (found, _) = ask(ArtifactQuery {
+        sort: Some(ArtifactSort::Title),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(found, ["big.md", "mid.md", "small.md"]);
+    let (found, _) = ask(ArtifactQuery {
+        sort: Some(ArtifactSort::Modified),
+        descending: true,
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(found, ["big.md", "mid.md", "small.md"]);
+    let (found, _) = ask(ArtifactQuery {
+        sort: Some(ArtifactSort::Created),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!(found, ["small.md", "mid.md", "big.md"]);
+    // A date window and a minimum size narrow the list; the total counts only what matches.
+    let (found, total) = ask(ArtifactQuery {
+        modified_after: Some("2026-02-01".to_owned()),
+        modified_before: Some("2026-03-01".to_owned()),
+        ..Default::default()
+    })
+    .await;
+    assert_eq!((found, total), (vec!["mid.md".to_owned()], 1));
+    let (found, total) = ask(ArtifactQuery {
+        min_bytes: Some(300),
+        sort: Some(ArtifactSort::Size),
+        descending: true,
+        ..Default::default()
+    })
+    .await;
+    assert_eq!((found, total), (vec!["big.md".to_owned(), "mid.md".to_owned()], 2));
+    // Paging is stable under a sort, by offset and by cursor.
+    let paged = |after: Option<String>, offset: i64| ArtifactQuery {
+        sort: Some(ArtifactSort::Size),
+        descending: true,
+        limit: Some(1),
+        offset,
+        after_id: after,
+        ..Default::default()
+    };
+    let (first, _) = ask(paged(None, 0)).await;
+    let (second, _) = ask(paged(None, 1)).await;
+    let (third, _) = ask(paged(None, 2)).await;
+    assert_eq!(
+        (first[0].as_str(), second[0].as_str(), third[0].as_str()),
+        ("big.md", "mid.md", "small.md")
+    );
+    let (after_big, _) = ask(paged(Some(ids["big.md"].clone()), 0)).await;
+    let (after_mid, _) = ask(paged(Some(ids["mid.md"].clone()), 0)).await;
+    assert_eq!((after_big[0].as_str(), after_mid[0].as_str()), ("mid.md", "small.md"));
+
+    storage.pool.close().await;
+    drop(storage);
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
 #[tokio::test]
 async fn unreferenced_blobs_are_collected_after_the_grace_period() {
     let (storage, data_dir) = temp_storage("blob-gc").await;

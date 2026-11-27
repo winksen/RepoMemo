@@ -28,6 +28,48 @@ pub struct ArtifactQuery {
     pub limit: Option<i64>,
     pub offset: i64,
     pub after_id: Option<String>,
+    /// What the files are ordered by (V0.9.136); `None` keeps the newest change first, then the path.
+    pub sort: Option<ArtifactSort>,
+    /// With a sort: largest, latest or last in the alphabet first.
+    pub descending: bool,
+    /// Only files changed at or after this time (an RFC 3339 time, or a date).
+    pub modified_after: Option<String>,
+    /// Only files changed before this time (an RFC 3339 time, or a date).
+    pub modified_before: Option<String>,
+    /// Only files of at least this many bytes.
+    pub min_bytes: Option<i64>,
+}
+
+/// How the artifact query orders its page. A closed set: what a request says is mapped to one of these, so no text from a request
+/// ever reaches the `ORDER BY`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArtifactSort {
+    Size,
+    Modified,
+    Created,
+    Title,
+}
+
+impl ArtifactSort {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "size" => Some(Self::Size),
+            "modified" | "updated" => Some(Self::Modified),
+            "created" => Some(Self::Created),
+            "title" | "name" => Some(Self::Title),
+            _ => None,
+        }
+    }
+
+    /// The expression the sort reads, for the table (or the cursor's alias) it is read from.
+    fn column(self, table: &str) -> String {
+        match self {
+            Self::Size => format!("{table}.size_bytes"),
+            Self::Modified => format!("{table}.updated_at"),
+            Self::Created => format!("{table}.created_at"),
+            Self::Title => format!("lower({table}.title)"),
+        }
+    }
 }
 
 /// One kind of file: all of these hold together. A web view of the evidence section (Word files,
@@ -149,6 +191,18 @@ fn push_artifact_filters<'a>(query: &mut QueryBuilder<'a, Sqlite>, request: &'a 
     if request.ledger_only {
         query.push(" AND NOT EXISTS (SELECT 1 FROM repo_files WHERE repo_files.artifact_id = artifacts.id)");
     }
+    if let Some(after) = &request.modified_after {
+        query.push(" AND artifacts.updated_at >= ");
+        query.push_bind(after);
+    }
+    if let Some(before) = &request.modified_before {
+        query.push(" AND artifacts.updated_at < ");
+        query.push_bind(before);
+    }
+    if let Some(bytes) = request.min_bytes {
+        query.push(" AND artifacts.size_bytes >= ");
+        query.push_bind(bytes);
+    }
     if !request.kinds.is_empty() {
         query.push(" AND (");
         for (index, kind) in request.kinds.iter().enumerate() {
@@ -224,9 +278,32 @@ impl StorageEngine {
         if let Some(after_id) = &request.after_id {
             rows.push(" AND EXISTS (SELECT 1 FROM artifacts cursor WHERE cursor.id = ")
                 .push_bind(after_id.clone());
-            rows.push(" AND cursor.workspace_id = artifacts.workspace_id AND (artifacts.updated_at < cursor.updated_at OR (artifacts.updated_at = cursor.updated_at AND artifacts.path > cursor.path) OR (artifacts.updated_at = cursor.updated_at AND artifacts.path = cursor.path AND artifacts.id > cursor.id)))");
+            match request.sort {
+                // A sorted page continues after the cursor in the sort's own order, with the id breaking ties.
+                Some(sort) => {
+                    let (column, cursor_column) = (sort.column("artifacts"), sort.column("cursor"));
+                    let beyond = if request.descending { "<" } else { ">" };
+                    rows.push(format!(
+                        " AND cursor.workspace_id = artifacts.workspace_id AND ({column} {beyond} {cursor_column} OR ({column} = {cursor_column} AND artifacts.id > cursor.id)))"
+                    ));
+                }
+                None => {
+                    rows.push(" AND cursor.workspace_id = artifacts.workspace_id AND (artifacts.updated_at < cursor.updated_at OR (artifacts.updated_at = cursor.updated_at AND artifacts.path > cursor.path) OR (artifacts.updated_at = cursor.updated_at AND artifacts.path = cursor.path AND artifacts.id > cursor.id)))");
+                }
+            }
         }
-        rows.push(" ORDER BY artifacts.updated_at DESC, artifacts.path ASC, artifacts.id ASC");
+        match request.sort {
+            Some(sort) => {
+                rows.push(format!(
+                    " ORDER BY {} {}, artifacts.id ASC",
+                    sort.column("artifacts"),
+                    if request.descending { "DESC" } else { "ASC" }
+                ));
+            }
+            None => {
+                rows.push(" ORDER BY artifacts.updated_at DESC, artifacts.path ASC, artifacts.id ASC");
+            }
+        }
         if let Some(limit) = request.limit {
             rows.push(" LIMIT ");
             rows.push_bind(limit.max(1));

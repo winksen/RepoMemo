@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.135` (2026-11-27)
+> **Current:** `V0.9.136` (2026-11-27)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md) · [CAIRN administration plan](plans/2026-11-26-0.9-cairn-administration.md) · [ADR 0007](../docs/decisions/0007-cairn-models-are-a-system-catalog-chosen-per-organization.md) · [CAIRN tool choice plan](plans/2026-11-27-0.9-cairn-tool-choice.md) · [ADR 0008](../docs/decisions/0008-cairn-asks-the-model-first-whenever-there-is-one.md)
 
@@ -159,7 +159,7 @@
 | **V0.9.133** | 🧪 2026-11-27 | BA. Model first | 🔧 | Greetings answered by the model | Send greetings and questions about CAIRN to the model when there is one, and keep the built-in replies for no model | "Salam" calls the model with a provider and gets the built-in reply without one |
 | **V0.9.134** | 🧪 2026-11-27 | BA. Model first | 🔧 | A picked job inside the loop | Run a job picked from the + menu as the loop's first tool call, so the model can follow up with other tools | Picking Summarize calls the summarize tool first and the model may then read or search |
 | **V0.9.135** | 🧪 2026-11-27 | BA. Model first | 🔧 | Uploaded files in the loop | Send a message about an uploaded file to the loop with the file already named and cited by its handle | "What is this file about" reads the uploaded file by its handle, and a viewer still cannot propose |
-| **V0.9.136** | 🔜 | BB. Tools for the model | ✨ | File query sorting and size | Let the file query sort by size, modified, created or title, in either direction, and filter by dates and a minimum size | The largest of three files comes first, a date window narrows the list, and paging is stable under a sort |
+| **V0.9.136** | 🧪 2026-11-27 | BB. Tools for the model | ✨ | File query sorting and size | Let the file query sort by size, modified, created or title, in either direction, and filter by dates and a minimum size | The largest of three files comes first, a date window narrows the list, and paging is stable under a sort |
 | **V0.9.137** | 🔜 | BB. Tools for the model | ✨ | Query files tool | Give the loop and MCP a read tool that filters, sorts and counts files and shows each one's size and modified date | "What is the largest file" is answered with one query_files call, and a file in a closed folder never appears |
 | **V0.9.138** | 🔜 | BB. Tools for the model | ✨ | Groups and totals | Let query_files group files by kind or top folder with counts and total size, largest first | "Which folder takes the most space" is answered with one call, and filters apply before the grouping |
 | **V0.9.139** | 🔜 | BB. Tools for the model | 🔧 | Tool descriptions for the model | Rewrite every tool's description as what it does, when to use it, which tool to use instead and what it returns, and derive the routing hints from it | A test finds those parts in every loop tool's description |

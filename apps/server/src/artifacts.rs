@@ -535,6 +535,7 @@ pub(crate) async fn query_artifacts(
                 page.offset.unwrap_or(0) as i64
             },
             after_id: page.cursor.clone(),
+            ..Default::default()
         })
         .await
         .map_err(map_storage_error)?;
