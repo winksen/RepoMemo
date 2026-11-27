@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.127 (2026-11-27)
+
+The plan for CAIRN choosing its own tools is recorded; no code changes.
+
+### Added
+- **Tool choice plan.** [The plan](mindmap/plans/2026-11-27-0.9-cairn-tool-choice.md) for V0.9.127 to V0.9.145: whenever a model is available it reads the request and picks among CAIRN's tools, with keywords kept for the no-model case.
+- **ADR 0008.** [CAIRN asks the model first whenever there is one](docs/decisions/0008-cairn-asks-the-model-first-whenever-there-is-one.md); ADR 0006 is marked as amended by it.
+- **Rows V0.9.127 to V0.9.145** in the roadmap and the 0.9 release index.
+
+### Checks
+- docs:check passes; no code changed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.126 (2026-11-27)
 
 Cairn's rail holds only chats, with an Administration button above the user button.

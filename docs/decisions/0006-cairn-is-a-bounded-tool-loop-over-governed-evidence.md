@@ -1,6 +1,6 @@
 # 0006: CAIRN Is a Bounded Tool Loop Over Governed Evidence
 
-Status: proposed
+Status: proposed; amended by [ADR 0008](0008-cairn-asks-the-model-first-whenever-there-is-one.md) (the router is no longer the default while a model is available)
 
 Date: 2026-11-22
 

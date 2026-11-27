@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.126` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.127` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.127 — The plan for CAIRN choosing its own tools is recorded; no code changes.
+
+- **Plan only.** CAIRN's behavior does not change in this release. The plan makes the model choose the tool whenever one is available, adds a file query tool and honest reply labels, and measures the result.
+
+Checks: docs:check passes; no code changed.
 
 ## V0.9.126 — Cairn's rail holds only chats, with an Administration button above the user button.
 
