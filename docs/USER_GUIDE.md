@@ -426,7 +426,7 @@ The chat is a small set of jobs that CAIRN picks from what you write, in three k
 
 **Share a chat.** Choose *Share with the workspace* in a chat's menu and everyone in the workspace can find it under *Shared with the workspace* and continue it in a chat of their own. Only you can confirm what it proposed, and *Stop sharing* takes it away at once.
 
-**Ask about the files themselves.** In Agent mode CAIRN can filter, sort and count the workspace's files by their properties: "what is the largest file?", "which PDFs changed since March?", "files over 5 MB". Each file comes with its size and the day it was changed, and CAIRN says how many files match. It reads the index, so it never sees a folder an administrator closed to CAIRN. An outside agent connected over MCP has the same `query_files` tool.
+**Ask about the files themselves.** In Agent mode CAIRN can filter, sort and count the workspace's files by their properties: "what is the largest file?", "which PDFs changed since March?", "files over 5 MB", "which folder takes the most space?". It can also total the files by kind or by top folder, largest first. Each file comes with its size and the day it was changed, and CAIRN says how many files match. It reads the index, so it never sees a folder an administrator closed to CAIRN. An outside agent connected over MCP has the same `query_files` tool.
 
 **Ask about your work.** In Agent mode CAIRN can look at your tasks and projects: "what is blocking the migration project?", "what is overdue and assigned to me?", "what is T-12 waiting for?". It answers from the tasks, their dependencies and the files they link, naming each task by its key, and it changes nothing.
 

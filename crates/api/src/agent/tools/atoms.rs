@@ -260,7 +260,18 @@ struct FileQuery {
     sort: Option<repomemo_storage::ArtifactSort>,
     descending: bool,
     limit: usize,
+    group_by: Option<FileGrouping>,
 }
+
+/// What `query_files` groups the matching files by (V0.9.138).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FileGrouping {
+    Kind,
+    Folder,
+}
+
+/// The most groups one result lists.
+const GROUPS_MAX: usize = 20;
 
 impl FileQuery {
     /// The request in words, for a message that nothing matched.
@@ -372,7 +383,14 @@ fn file_query_from(arguments: &Value) -> std::result::Result<FileQuery, String> 
         .unwrap_or(sort != Some(repomemo_storage::ArtifactSort::Title));
     let language = Some(arg_text(arguments, "language")).filter(|language| !language.is_empty());
     let folder = Some(arg_text(arguments, "folder")).filter(|folder| !folder.is_empty());
+    let group_by = match arg_text(arguments, "group_by").to_ascii_lowercase().as_str() {
+        "" | "none" => None,
+        "kind" | "type" => Some(FileGrouping::Kind),
+        "folder" | "top_folder" | "directory" => Some(FileGrouping::Folder),
+        other => return Err(format!("group_by must be kind or folder, not “{other}”.")),
+    };
     Ok(FileQuery {
+        group_by,
         text: arg_text(arguments, "text"),
         kinds,
         kind_words,
@@ -410,6 +428,20 @@ pub(in crate::agent) fn human_size(bytes: i64) -> String {
         unit = next;
     }
     format!("{value:.1} {unit}")
+}
+
+/// The kind a file counts under when files are grouped by kind: the name of the kind it belongs to ("PDFs", "Word documents"), else
+/// its extension, else `other`.
+fn kind_group(path: &str) -> String {
+    let extension = format!(".{}", kind_label(path));
+    match crate::agent::filters::KINDS
+        .iter()
+        .find(|kind| kind.extensions.contains(&extension.as_str()))
+    {
+        Some(kind) => kind.plural.to_owned(),
+        None if extension == ".file" => "other".to_owned(),
+        None => extension.trim_start_matches('.').to_owned(),
+    }
 }
 
 /// The kind of a file as a result line shows it: its extension, or `file`.
@@ -726,6 +758,83 @@ impl RepoMemoCore {
         })
     }
 
+    /// The matching files counted by kind or by top folder, largest group first (V0.9.138). The filters have already been applied.
+    async fn grouped_files(
+        &self,
+        workspace_id: &str,
+        files: &[ArtifactSummary],
+        grouping: FileGrouping,
+        total_bytes: i64,
+    ) -> Result<ToolOutput> {
+        let mut groups: std::collections::BTreeMap<String, (usize, i64)> = std::collections::BTreeMap::new();
+        let mut add = |name: String, bytes: i64| {
+            let entry = groups.entry(name).or_default();
+            entry.0 += 1;
+            entry.1 += bytes.max(0);
+        };
+        match grouping {
+            FileGrouping::Kind => {
+                for file in files {
+                    add(kind_group(&file.path), file.size_bytes);
+                }
+            }
+            FileGrouping::Folder => {
+                // A file belongs to the top folder that holds it, however deep; a file in no folder is counted apart.
+                let mut owner = std::collections::HashMap::<String, String>::new();
+                for folder in self
+                    .storage
+                    .list_folders(workspace_id)
+                    .await?
+                    .into_iter()
+                    .filter(|folder| folder.parent_id.is_none())
+                {
+                    let (_, ids) = self.storage.folder_subtree(&folder.id).await?;
+                    for id in ids {
+                        owner.insert(id, folder.name.clone());
+                    }
+                }
+                for file in files {
+                    add(
+                        owner.get(&file.id).cloned().unwrap_or_else(|| "(no folder)".to_owned()),
+                        file.size_bytes,
+                    );
+                }
+            }
+        }
+        let mut ordered = groups.into_iter().collect::<Vec<_>>();
+        ordered.sort_by(|a, b| {
+            b.1 .1
+                .cmp(&a.1 .1)
+                .then(b.1 .0.cmp(&a.1 .0))
+                .then_with(|| a.0.cmp(&b.0))
+        });
+        let count = ordered.len();
+        let mut lines = ordered
+            .iter()
+            .take(GROUPS_MAX)
+            .map(|(name, (files, bytes))| {
+                format!(
+                    "{name}: {files} {} · {}",
+                    plural(*files, "file", "files"),
+                    human_size(*bytes)
+                )
+            })
+            .collect::<Vec<_>>();
+        lines.push(format!(
+            "{count} {} over {} {} ({} in total){}",
+            plural(count, "group", "groups"),
+            files.len(),
+            plural(files.len(), "file", "files"),
+            human_size(total_bytes),
+            if count > GROUPS_MAX {
+                format!("; the largest {GROUPS_MAX} are shown")
+            } else {
+                String::new()
+            }
+        ));
+        Ok(ToolOutput::text(bounded(&lines, TOOL_OUTPUT_CHARS)))
+    }
+
     /// Files by their properties (V0.9.137): the ones that match, in the order asked for, each with its size and the day it was
     /// changed, and how many match and how large they are together. It reads the index, never the disk, and leaves out what CAIRN
     /// may not read: closed folders and a quarantined connector's files.
@@ -769,6 +878,9 @@ impl RepoMemoCore {
         }
         let total = files.len();
         let total_bytes = files.iter().map(|file| file.size_bytes.max(0)).sum::<i64>();
+        if let Some(grouping) = query.group_by {
+            return self.grouped_files(&workspace_id, &files, grouping, total_bytes).await;
+        }
         let limit = query.limit.clamp(1, LIST_FILES_MAX);
         let states = self.lifecycle_by_file(&workspace_id).await;
         let mut handles = Vec::new();
@@ -1185,6 +1297,80 @@ mod tests {
             .await
             .unwrap();
         assert!(wrong.for_model.contains("sort must be"), "{}", wrong.for_model);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// V0.9.138: which folder takes the most space is one call, and the filters apply before the grouping.
+    #[tokio::test]
+    async fn query_files_groups_by_folder_and_kind_with_counts_and_sizes() {
+        let (core, data_dir) = core("query-groups").await;
+        let workspace = core.create_workspace("Groups".to_owned()).await.unwrap();
+        let docs = core
+            .storage
+            .create_folder(&workspace.id, None, "Docs", None)
+            .await
+            .unwrap();
+        let media = core
+            .storage
+            .create_folder(&workspace.id, None, "Media", None)
+            .await
+            .unwrap();
+        let deep = core
+            .storage
+            .create_folder(&workspace.id, Some(&media.id), "Raw", None)
+            .await
+            .unwrap();
+        for (title, size, folder) in [
+            ("a.md", 100, Some(&docs.id)),
+            ("b.md", 200, Some(&docs.id)),
+            ("c.md", 5_000, Some(&deep.id)),
+            ("d.md", 700, None),
+        ] {
+            let file = note(&core, &workspace.id, title, &"x".repeat(size)).await;
+            if let Some(folder) = folder {
+                core.storage.set_artifact_folder(&file.id, Some(folder)).await.unwrap();
+            }
+        }
+        let mut ledger = EvidenceLedger::new(&workspace.id);
+        let by_folder = core
+            .tool_query_files(&mut ledger, &json!({ "group_by": "folder" }))
+            .await
+            .unwrap();
+        let lines = by_folder.for_model.lines().collect::<Vec<_>>();
+        // The deepest file counts under its top folder, and the largest group comes first.
+        assert!(lines[0].starts_with("Media: 1 file"), "{}", by_folder.for_model);
+        assert!(lines[1].starts_with("(no folder): 1 file"), "{}", by_folder.for_model);
+        assert!(lines[2].starts_with("Docs: 2 files"), "{}", by_folder.for_model);
+        assert!(lines[3].starts_with("3 groups over 4 files"), "{}", by_folder.for_model);
+        // The filters narrow the files before they are grouped.
+        let narrowed = core
+            .tool_query_files(&mut ledger, &json!({ "group_by": "folder", "min_bytes": 150 }))
+            .await
+            .unwrap();
+        assert!(
+            narrowed.for_model.contains("Media: 1 file") && narrowed.for_model.contains("Docs: 1 file"),
+            "{}",
+            narrowed.for_model
+        );
+        assert!(
+            narrowed.for_model.contains("3 groups over 3 files"),
+            "{}",
+            narrowed.for_model
+        );
+        let by_kind = core
+            .tool_query_files(&mut ledger, &json!({ "group_by": "kind" }))
+            .await
+            .unwrap();
+        assert!(
+            by_kind.for_model.starts_with("Markdown files: 4 files"),
+            "{}",
+            by_kind.for_model
+        );
+        let wrong = core
+            .tool_query_files(&mut ledger, &json!({ "group_by": "colour" }))
+            .await
+            .unwrap();
+        assert!(wrong.for_model.contains("group_by must be"), "{}", wrong.for_model);
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

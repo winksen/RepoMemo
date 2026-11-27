@@ -289,7 +289,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "query_files",
             "Query files",
-            "Filter, sort and count the workspace's files by their properties: name, kind, folder, language, size and modified date. Use it for questions such as the largest or newest files, how many files changed this year, or the files over a size. Each file comes with its handle, size and modified date, and the end says how many files match and how large they are together. It reads the index, never the disk.",
+            "Filter, sort and count the workspace's files by their properties: name, kind, folder, language, size and modified date. Use it for questions such as the largest or newest files, how many files changed this year, the files over a size, or which folder or kind takes the most space (group_by). Each file comes with its handle, size and modified date, and the end says how many files match and how large they are together. It reads the index, never the disk.",
             json!({
                 "type": "object",
                 "properties": {
@@ -300,6 +300,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
                     "modified_after": { "type": "string", "description": "Only files changed on or after this date, such as 2026-01-01" },
                     "modified_before": { "type": "string", "description": "Only files changed before this date, such as 2026-04-01" },
                     "min_bytes": { "type": "string", "description": "Only files of at least this size: a number of bytes, or 500 KB, 2 MB" },
+                    "group_by": { "type": "string", "description": "kind or folder: count the matching files by kind or by top folder, with each group's total size, largest first; the filters apply before the grouping" },
                     "sort": { "type": "string", "description": "size, modified, created or name; without it the newest change comes first" },
                     "descending": { "type": "boolean", "description": "Largest, latest or newest first (the default for size and dates); false for the smallest or oldest first" },
                     "limit": { "type": "integer", "description": format!("At most {LIST_FILES_MAX}, 20 by default") }
