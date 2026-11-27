@@ -46,6 +46,18 @@ export function allowedSections(view: CairnAdminView | null | undefined): CairnA
   return CAIRN_ADMIN_SECTIONS.filter((section) => view?.sections.includes(section));
 }
 
+/** Tabs of the CAIRN administration, shown in the layout's navigation slot like the System area's. */
+export function CairnAdminNavigation({ active, onNavigate, sections }: { active: CairnAdminSection; onNavigate: (section: CairnAdminSection) => void; sections: CairnAdminSection[] }) {
+  return <nav aria-label="CAIRN administration sections" className="shared-workspace-topbar">
+    <div className="shared-workspace-tabs">
+      {sections.map((section) => {
+        const isActive = section === active;
+        return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} key={section} onClick={() => onNavigate(section)} type="button" variant="secondary">{SECTION_LABELS[section].icon}<span className="shared-workspace-tab-label">{SECTION_LABELS[section].label}</span></Button>;
+      })}
+    </div>
+  </nav>;
+}
+
 /** The run budgets: one number each, changed together and applied to the next run (V0.9.74). A CAIRN administrator edits; others read. */
 function BudgetsPanel({ accessToken, budgets, canChange, onChanged }: { accessToken: string; budgets: CairnBudget[]; canChange: boolean; onChanged: () => void }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});

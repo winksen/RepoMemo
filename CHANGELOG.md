@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.121 (2026-11-27)
+
+The CAIRN administration uses the System layout: the usual rail and its sections as tabs.
+
+### Changed
+- **Same layout as System.** The administration page keeps the main rail (workspaces and organizations, with the Organizations and System entries below) and shows its sections as tabs above the page, like System. The section list that replaced the rail on this page is gone.
+
+### Checks
+- Type-checked; `npm run docs:check` passes. Not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.120 (2026-11-27)
 
 The organization section of the CAIRN administration opens again.
