@@ -695,6 +695,7 @@ async fn import_cairn_settings(
         default_model_id: default,
         model_roles: Default::default(),
         guardrails: Default::default(),
+        welcome: Default::default(),
     };
     if let Err(error) = state
         .storage

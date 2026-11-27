@@ -28,6 +28,8 @@ import { RetentionFields } from "./RetentionFields";
 import { McpPolicy } from "./McpPolicy";
 import { PersonalMemoryPolicy } from "./PersonalMemoryPolicy";
 import { PreferenceDefaults, type PreferenceDefaultsValue } from "./PreferenceDefaults";
+import { WelcomeFields, questionsFromText, sameWelcome } from "./WelcomeFields";
+import type { Welcome } from "../../types";
 import type { Guardrails } from "../../types";
 
 const MODES = [
@@ -36,6 +38,11 @@ const MODES = [
   { label: "Jobs: every workspace that has not chosen", value: "jobs" },
 ];
 const TOOL_LABELS: Record<string, string> = { none: "No tools", json: "Tools as JSON", native: "Native tools" };
+
+/** A welcome as it is kept: trimmed, with no blank or repeated question. */
+function cleanWelcome(value: Welcome | undefined): Welcome {
+  return { greeting: (value?.greeting ?? "").trim(), questions: questionsFromText((value?.questions ?? []).join(String.fromCharCode(10))) };
+}
 
 /** The defaults as they are kept: empty text is no default. */
 function normalizedDefaults(value: PreferenceDefaultsValue): PreferenceDefaultsValue {
@@ -64,16 +71,17 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
   const [knowledgeId, setKnowledgeId] = useState<string>(settings.knowledge_workspace_id ?? "none");
   const [workspaces] = useSystemData<{ workspace_id: string; name: string }[]>(cairnAdminKeys.organizationWorkspaces(organizationId), async () => (await getSharedOrganizationOverview(accessToken, organizationId)).workspaces, { failure: "The organization's workspaces could not be loaded.", silentError: true });
   const [defaults, setDefaults] = useState<PreferenceDefaultsValue>(settings.preference_defaults ?? {});
+  const [welcome, setWelcome] = useState<Welcome>(settings.welcome ?? { greeting: "", questions: [] });
   const [isBusy, setIsBusy] = useState(false);
   const textModels = models;
   const defaultChoices = models.filter((model) => model.purpose === "text");
   const defaultId = chosen.includes(fallbackDefault) ? fallbackDefault : (defaultChoices.find((model) => chosen.includes(model.id))?.id ?? "");
-  const dirty = JSON.stringify(normalizedDefaults(defaults)) !== JSON.stringify(normalizedDefaults(settings.preference_defaults ?? {})) || instructions.trim() !== (settings.instructions ?? "").trim() || knowledgeId !== (settings.knowledge_workspace_id ?? "none") || JSON.stringify([[...chosen].sort(), defaultId || null, mode, limitsFor(roles, chosen), { ...guardrails, tools_off: [...toolsOff].sort() }]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode, settings.model_roles ?? {}, { ...(settings.guardrails ?? { tools_off: [] }), tools_off: [...(settings.guardrails?.tools_off ?? [])].sort() }]);
+  const dirty = !sameWelcome(cleanWelcome(welcome), cleanWelcome(settings.welcome)) || JSON.stringify(normalizedDefaults(defaults)) !== JSON.stringify(normalizedDefaults(settings.preference_defaults ?? {})) || instructions.trim() !== (settings.instructions ?? "").trim() || knowledgeId !== (settings.knowledge_workspace_id ?? "none") || JSON.stringify([[...chosen].sort(), defaultId || null, mode, limitsFor(roles, chosen), { ...guardrails, tools_off: [...toolsOff].sort() }]) !== JSON.stringify([[...settings.enabled_model_ids].sort(), settings.default_model_id, settings.agent_mode, settings.model_roles ?? {}, { ...(settings.guardrails ?? { tools_off: [] }), tools_off: [...(settings.guardrails?.tools_off ?? [])].sort() }]);
 
   async function save() {
     setIsBusy(true);
     try {
-      await saveOrganizationCairn(accessToken, organizationId, { enabled_model_ids: chosen, default_model_id: defaultId || null, agent_mode: mode, model_roles: limitsFor(roles, chosen), guardrails, instructions, knowledge_workspace_id: knowledgeId === "none" ? null : knowledgeId, preference_defaults: normalizedDefaults(defaults), expected_version: settings.version });
+      await saveOrganizationCairn(accessToken, organizationId, { enabled_model_ids: chosen, default_model_id: defaultId || null, agent_mode: mode, model_roles: limitsFor(roles, chosen), guardrails, instructions, knowledge_workspace_id: knowledgeId === "none" ? null : knowledgeId, preference_defaults: normalizedDefaults(defaults), welcome: cleanWelcome(welcome), expected_version: settings.version });
       showToast("success", "The organization's CAIRN settings were saved.");
       onSaved();
     } catch (error) { showToast("error", apiMessage(error, "The settings could not be saved.")); }
@@ -100,6 +108,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
     <Field hint={`Read into every run in the organization's workspaces, after the rules and before a workspace's own CAIRN.md. They never change the rules or what a person may do. Each save is a new version, named in the run's trace. At most 4,000 characters.`} label="Instructions for CAIRN"><Textarea disabled={!canChange} maxLength={4000} onChange={(event) => setInstructions(event.target.value)} rows={5} value={instructions} /></Field>
     <Field hint="Its current memory cards and verified playbooks are offered in the organization's other workspaces, only to the people who can read it." label="Knowledge workspace"><Dropdown aria-label="Knowledge workspace" disabled={!canChange} onValueChange={setKnowledgeId} options={[{ label: "None", value: "none" }, ...(workspaces ?? []).map((workspace) => ({ label: workspace.name, value: workspace.workspace_id }))]} value={knowledgeId} /></Field>
     <PreferenceDefaults disabled={!canChange} onChange={setDefaults} value={defaults} />
+    <WelcomeFields disabled={!canChange} onChange={setWelcome} value={welcome} />
     <ToolSwitches accessToken={accessToken} disabled={!canChange} off={toolsOff} onChange={setToolsOff} />
     <ChangeLimitFields disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />
     <SecretsSetting disabled={!canChange} guardrails={guardrails} onChange={setGuardrails} />

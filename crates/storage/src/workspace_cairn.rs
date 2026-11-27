@@ -21,6 +21,9 @@ pub struct WorkspaceCairnPolicy {
     /// What the workspace turns off or limits further than its organization (V0.9.91 on).
     #[serde(default)]
     pub guardrails: crate::organization_cairn::Guardrails,
+    /// The workspace's greeting and starter questions (V0.9.116); they replace its organization's where set.
+    #[serde(default)]
+    pub welcome: crate::organization_cairn::Welcome,
 }
 
 /// A workspace's settings with the version to name when changing them. `version` is 0 for a workspace that never saved any.

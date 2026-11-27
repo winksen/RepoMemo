@@ -584,8 +584,16 @@ export interface AgentCapabilities {
   budget?: { runs_limit: number | null; tokens_limit: number | null; runs_used: number; tokens_used: number; resets_at: string } | null;
   /** The abilities the workspace offers, run with their /command (V0.9.106). */
   abilities?: OfferedAbility[];
+  /** CAIRN's greeting and starter questions for the workspace; empty where nobody wrote any (V0.9.116). */
+  welcome?: Welcome;
   /** What the person chose that the chat itself applies (V0.9.114). */
   preferences?: { steps_open: boolean };
+}
+
+/** CAIRN's greeting line and starter questions, written by an organization or a workspace (V0.9.116). */
+export interface Welcome {
+  greeting: string;
+  questions: string[];
 }
 
 /** What a person prefers about CAIRN (V0.9.114). Nothing set means the organization's default or CAIRN's. */
@@ -959,6 +967,8 @@ export interface OrganizationCairnSettings {
   instructions?: string;
   /** The organization's knowledge workspace: its current memory cards and verified playbooks are offered in the other workspaces (V0.9.110). */
   knowledge_workspace_id?: string | null;
+  /** The organization's greeting and starter questions (V0.9.116). */
+  welcome?: Welcome;
   /** What people who have not chosen get (V0.9.115): language, length, steps open and Agent or Jobs. */
   preference_defaults?: Omit<CairnPreferences, "models" | "updated_at" | "organization_defaults"> | null;
   updated_at: string | null;
@@ -1066,6 +1076,8 @@ export interface WorkspaceCairnView {
   default_model_id: string | null;
   model_roles: Record<string, string[]>;
   guardrails: Guardrails;
+  /** The workspace's greeting and starter questions (V0.9.116). */
+  welcome?: Welcome;
   updated_at: string | null;
   updated_by: string | null;
   /** What the organization turned off, which the workspace cannot turn on (V0.9.91). */

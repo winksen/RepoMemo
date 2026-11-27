@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.115` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.116` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.116 — Organizations and workspaces write CAIRN's greeting and starter questions.
+
+- **Greeting and starter questions.** An organization's administrators and a workspace's administrators can write CAIRN's greeting line (one line, 120 characters) and up to six starter questions (140 characters each). Set, they replace the standard greeting and the template's suggested questions in the chat; a workspace's own replace its organization's, each chosen apart.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.115 — Organizations set preference defaults for people who have not chosen.
 

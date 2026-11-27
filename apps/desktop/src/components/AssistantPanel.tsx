@@ -10,7 +10,7 @@ import type { SharedConversation } from "../generated/domain";
 import { RoutinesPanel } from "./RoutinesPanel";
 import { ViewAtCommit } from "../web/common";
 import { useTemplate } from "../web/workspace/data";
-import { orderCapabilities, suggestedQuestions } from "../web/templateAssistant";
+import { orderCapabilities, starterQuestions } from "../web/templateAssistant";
 import { CairnIcon } from "./CairnIcon";
 import { ModelPicker } from "./ModelPicker";
 import { ChatOptions } from "./ChatOptions";
@@ -583,19 +583,19 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
         </article>) : variant === "page"
           ? <div className="shared-assistant-welcome">
             <CairnIcon size={56} weight="fill" />
-            <strong>How can I help?</strong>
+            <strong>{capabilities?.welcome?.greeting || "How can I help?"}</strong>
           </div>
           : <div className="shared-assistant-intro">
           <CairnIcon size={22} />
-          <strong>Hi, I&apos;m {ASSISTANT_NAME}. What do you need from this workspace?</strong>
+          <strong>{capabilities?.welcome?.greeting || <>Hi, I&apos;m {ASSISTANT_NAME}. What do you need from this workspace?</>}</strong>
           <span>Pick an action below or just type. Requests are matched to one of these actions; anything else gets a short reply for now. Chats are saved so you can come back to them.</span>
         </div>}
         <div ref={threadEnd} />
       </div>
       {variant === "page" ? <form className="shared-assistant-composer shared-assistant-composer-page" onSubmit={submit}>
         {composerHeader}
-        {!draft.trim() && !turns.length && suggestedQuestions(template?.assistant).length ? <div aria-label="Suggested questions" className="shared-assistant-suggestions" role="group">
-          {suggestedQuestions(template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
+        {!draft.trim() && !turns.length && starterQuestions(capabilities?.welcome?.questions, template?.assistant).length ? <div aria-label="Suggested questions" className="shared-assistant-suggestions" role="group">
+          {starterQuestions(capabilities?.welcome?.questions, template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
         </div> : null}
         <input aria-label="Attach files" className="shared-upload-native-input" hidden multiple onChange={(event) => { const chosen = Array.from(event.target.files ?? []); event.target.value = ""; void uploadFiles(chosen); }} ref={fileInput} type="file" />
         <div className="shared-assistant-box">
@@ -640,8 +640,8 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
             return <Button aria-pressed={selected === capability.id} className={selected === capability.id ? "active" : ""} disabled={!capability.available || isBusy || isLoadingChat} key={capability.id} onClick={() => choose(capability.id)} title={capability.available ? capability.description : `${capability.description} Needs an AI provider enabled in Settings.`} type="button" variant="secondary"><Icon size={ICON_SIZE.sm} />{capability.label}</Button>;
           })}
         </div>
-        {!draft.trim() && !turns.length && suggestedQuestions(template?.assistant).length ? <div aria-label="Suggested questions" className="shared-assistant-suggestions" role="group">
-          {suggestedQuestions(template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
+        {!draft.trim() && !turns.length && starterQuestions(capabilities?.welcome?.questions, template?.assistant).length ? <div aria-label="Suggested questions" className="shared-assistant-suggestions" role="group">
+          {starterQuestions(capabilities?.welcome?.questions, template?.assistant).map((question) => <Button disabled={isBusy || isLoadingChat} key={question} onClick={() => { setDraft(question); input.current?.focus(); }} type="button" variant="secondary">{question}</Button>)}
         </div> : null}
         <div className="shared-assistant-input">
           <Textarea aria-label={`Message ${ASSISTANT_NAME}`} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} placeholder={selectedInfo?.placeholder ?? "Ask, search, or name a file…"} ref={input} rows={2} value={draft} />

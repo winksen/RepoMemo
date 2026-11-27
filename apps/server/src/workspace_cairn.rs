@@ -133,6 +133,9 @@ pub(crate) struct WorkspaceCairnRequest {
     /// What the workspace turns off or limits further than its organization (V0.9.91 on).
     #[serde(default)]
     guardrails: repomemo_storage::Guardrails,
+    /// The workspace's greeting and starter questions (V0.9.116).
+    #[serde(default)]
+    welcome: repomemo_storage::Welcome,
     /// The version the caller read; 0 for a workspace that never saved any.
     expected_version: i64,
 }
@@ -596,11 +599,13 @@ pub(crate) async fn update_settings(
             }
         }
     }
+    let welcome = request.welcome.checked().map_err(map_storage_error)?;
     let policy = WorkspaceCairnPolicy {
         offered_model_ids: offered,
         default_model_id: request.default_model_id,
         model_roles,
         guardrails,
+        welcome,
     };
     let saved = state
         .storage
@@ -642,7 +647,9 @@ pub(crate) async fn update_settings(
     // Routines the new limits no longer allow are paused with the reason, not deleted (V0.9.99).
     let _ = state.storage.enforce_routine_limits(&workspace_id).await;
     let detail = format!(
-        "{detail} Guardrails from {} to {}. Role limits from {} to {}.",
+        "{detail} Welcome from {} to {}. Guardrails from {} to {}. Role limits from {} to {}.",
+        serde_json::to_string(&before.policy.welcome).unwrap_or_default(),
+        serde_json::to_string(&saved.policy.welcome).unwrap_or_default(),
         serde_json::to_string(&before.policy.guardrails).unwrap_or_default(),
         serde_json::to_string(&saved.policy.guardrails).unwrap_or_default(),
         serde_json::to_string(&before.policy.model_roles).unwrap_or_default(),

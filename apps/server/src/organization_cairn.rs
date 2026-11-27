@@ -41,6 +41,9 @@ pub(crate) struct SettingsRequest {
     /// What people who have not chosen get (V0.9.115).
     #[serde(default)]
     preference_defaults: repomemo_storage::CairnPreferences,
+    /// The organization's greeting and starter questions (V0.9.116).
+    #[serde(default)]
+    welcome: repomemo_storage::Welcome,
     /// The version the caller read; 0 for an organization that never saved any.
     expected_version: i64,
 }
@@ -362,6 +365,7 @@ pub(crate) async fn update_settings(
         .map(|language| language.trim().to_owned())
         .filter(|language| !language.is_empty());
     preference_defaults.check().map_err(map_storage_error)?;
+    let welcome = request.welcome.checked().map_err(map_storage_error)?;
     let instructions = request.instructions.trim().to_owned();
     if instructions.chars().count() > repomemo_storage::ORGANIZATION_INSTRUCTIONS_CHARS {
         return Err(ApiError::bad_request(format!(
@@ -383,6 +387,7 @@ pub(crate) async fn update_settings(
         instructions,
         knowledge_workspace_id,
         preference_defaults,
+        welcome,
     };
     let saved = state
         .storage
@@ -437,7 +442,9 @@ pub(crate) async fn update_settings(
             before.policy.agent_mode,
             saved.policy.agent_mode
         ) + &format!(
-            " Preference defaults from {} to {}. Knowledge workspace from {:?} to {:?}. Instructions from {:?} to {:?}. Guardrails from {} to {}. Role limits from {} to {}.",
+            " Welcome from {} to {}. Preference defaults from {} to {}. Knowledge workspace from {:?} to {:?}. Instructions from {:?} to {:?}. Guardrails from {} to {}. Role limits from {} to {}.",
+            serde_json::to_string(&before.policy.welcome).unwrap_or_default(),
+            serde_json::to_string(&saved.policy.welcome).unwrap_or_default(),
             serde_json::to_string(&before.policy.preference_defaults).unwrap_or_default(),
             serde_json::to_string(&saved.policy.preference_defaults).unwrap_or_default(),
             before.policy.knowledge_workspace_id,

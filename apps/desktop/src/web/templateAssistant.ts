@@ -16,6 +16,12 @@ export function suggestedQuestions(assistant: Pick<TemplateAssistant, "suggestio
   return (assistant?.suggestions ?? []).map((text) => text.trim()).filter((text, index, all) => text && all.indexOf(text) === index);
 }
 
+/** The questions offered to start a chat (V0.9.116): the ones an organization or a workspace wrote, else the template's. */
+export function starterQuestions(written: string[] | null | undefined, assistant: Pick<TemplateAssistant, "suggestions"> | null | undefined): string[] {
+  const own = (written ?? []).map((text) => text.trim()).filter((text, index, all) => text && all.indexOf(text) === index);
+  return own.length ? own : suggestedQuestions(assistant);
+}
+
 /** The kinds of evidence the Retrieval page suggests as chips, only those the workspace has files of when that is known. */
 export function retrievalChips(chips: string[] | null | undefined, present: string[] | null | undefined): string[] {
   const wanted = (chips ?? []).filter((kind, index, all) => all.indexOf(kind) === index);

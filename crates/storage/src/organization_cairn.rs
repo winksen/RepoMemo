@@ -139,6 +139,69 @@ pub struct OrganizationCairnPolicy {
     /// A person's own choice wins. The models are not defaults: the organization's default model is its own setting.
     #[serde(default)]
     pub preference_defaults: crate::cairn_preferences::CairnPreferences,
+    /// The organization's greeting and starter questions (V0.9.116).
+    #[serde(default)]
+    pub welcome: Welcome,
+}
+
+/// CAIRN's greeting line and starter questions (V0.9.116), written by an organization or a workspace. Set, they replace the template's
+/// suggested questions and the standard greeting; a workspace's own replaces its organization's.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Welcome {
+    /// One line shown where CAIRN says hello; empty keeps the standard one.
+    #[serde(default)]
+    pub greeting: String,
+    /// Up to six questions offered to start a chat; none keeps the template's.
+    #[serde(default)]
+    pub questions: Vec<String>,
+}
+
+/// The longest greeting, and question, in characters, and the most questions.
+pub const GREETING_CHARS: usize = 120;
+pub const QUESTION_CHARS: usize = 140;
+pub const QUESTIONS_MAX: usize = 6;
+
+impl Welcome {
+    /// The greeting and questions as they are kept: trimmed, without blanks or repeats, within the bounds.
+    pub fn checked(self) -> Result<Welcome> {
+        let greeting = self.greeting.trim().to_owned();
+        if greeting.contains('\n') || greeting.chars().count() > GREETING_CHARS {
+            repomemo_domain::bail_invalid!("The greeting is one line of at most {GREETING_CHARS} characters.");
+        }
+        let mut questions: Vec<String> = Vec::new();
+        for question in self.questions {
+            let question = question.trim().to_owned();
+            if question.is_empty() || questions.contains(&question) {
+                continue;
+            }
+            if question.contains('\n') || question.chars().count() > QUESTION_CHARS {
+                repomemo_domain::bail_invalid!(
+                    "A starter question is one line of at most {QUESTION_CHARS} characters."
+                );
+            }
+            questions.push(question);
+        }
+        if questions.len() > QUESTIONS_MAX {
+            repomemo_domain::bail_invalid!("There are at most {QUESTIONS_MAX} starter questions.");
+        }
+        Ok(Welcome { greeting, questions })
+    }
+
+    /// This welcome where it says something, the other where it does not: the greeting and the questions are chosen apart.
+    pub fn or(self, other: Welcome) -> Welcome {
+        Welcome {
+            greeting: if self.greeting.is_empty() {
+                other.greeting
+            } else {
+                self.greeting
+            },
+            questions: if self.questions.is_empty() {
+                other.questions
+            } else {
+                self.questions
+            },
+        }
+    }
 }
 
 /// The most characters of the organization's instructions.
@@ -159,6 +222,7 @@ impl Default for OrganizationCairnPolicy {
             instructions: String::new(),
             knowledge_workspace_id: None,
             preference_defaults: Default::default(),
+            welcome: Default::default(),
         }
     }
 }
@@ -299,6 +363,7 @@ mod tests {
             instructions: String::new(),
             knowledge_workspace_id: None,
             preference_defaults: Default::default(),
+            welcome: Default::default(),
         };
         let CairnSaved::Saved(first) = storage
             .save_organization_cairn_settings(&organization.id, 0, &policy, &owner.id)

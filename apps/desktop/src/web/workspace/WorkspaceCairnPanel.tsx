@@ -27,6 +27,7 @@ import { RoutineLimits } from "../cairn-admin/RoutineLimits";
 import { McpPolicy } from "../cairn-admin/McpPolicy";
 import { PersonalMemoryPolicy } from "../cairn-admin/PersonalMemoryPolicy";
 import { WorkspaceAbilities } from "../cairn-admin/WorkspaceAbilities";
+import { WelcomeFields, questionsFromText, sameWelcome } from "../cairn-admin/WelcomeFields";
 import type { Guardrails } from "../../types";
 
 const TOOL_LABELS: Record<string, string> = { none: "No tools", json: "Tools as JSON", native: "Native tools" };
@@ -82,15 +83,17 @@ function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: stri
   const [guardrails, setGuardrails] = useState<Guardrails>(view.guardrails ?? { tools_off: [] });
   const toolsOff = guardrails.tools_off;
   const setToolsOff = (tools_off: string[]) => setGuardrails((current) => ({ ...current, tools_off }));
+  const [welcome, setWelcome] = useState<{ greeting: string; questions: string[] }>(view.welcome ?? { greeting: "", questions: [] });
   const [isBusy, setIsBusy] = useState(false);
   const defaultId = offered.includes(preferred) ? preferred : "";
   const saved = view.models.filter((model) => model.offered).map((model) => model.id).sort();
-  const dirty = JSON.stringify([[...offered].sort(), defaultId || null, limitsFor(roles, offered), { ...guardrails, tools_off: [...toolsOff].sort() }]) !== JSON.stringify([saved, view.default_model_id, view.model_roles ?? {}, { ...(view.guardrails ?? { tools_off: [] }), tools_off: [...(view.guardrails?.tools_off ?? [])].sort() }]);
+  const cleanWelcome = { greeting: welcome.greeting.trim(), questions: questionsFromText(welcome.questions.join(String.fromCharCode(10))) };
+  const dirty = !sameWelcome(cleanWelcome, { greeting: view.welcome?.greeting ?? "", questions: view.welcome?.questions ?? [] }) || JSON.stringify([[...offered].sort(), defaultId || null, limitsFor(roles, offered), { ...guardrails, tools_off: [...toolsOff].sort() }]) !== JSON.stringify([saved, view.default_model_id, view.model_roles ?? {}, { ...(view.guardrails ?? { tools_off: [] }), tools_off: [...(view.guardrails?.tools_off ?? [])].sort() }]);
 
   async function save() {
     setIsBusy(true);
     try {
-      await saveWorkspaceCairn(accessToken, workspaceId, { offered_model_ids: offered, default_model_id: defaultId || null, model_roles: limitsFor(roles, offered), guardrails, expected_version: view.version });
+      await saveWorkspaceCairn(accessToken, workspaceId, { offered_model_ids: offered, default_model_id: defaultId || null, model_roles: limitsFor(roles, offered), guardrails, welcome: cleanWelcome, expected_version: view.version });
       showToast("success", "The workspace's models were saved.");
       onSaved();
     } catch (error) { showToast("error", apiMessage(error, "The models could not be saved.")); }
@@ -115,6 +118,7 @@ function Editor({ accessToken, onSaved, view, workspaceId }: { accessToken: stri
     <ChangeLimitFields ceiling={view.organization_limits} guardrails={guardrails} onChange={setGuardrails} />
     <McpPolicy guardrails={guardrails} onChange={setGuardrails} />
     <PersonalMemoryPolicy guardrails={guardrails} onChange={setGuardrails} />
+    <WelcomeFields onChange={setWelcome} value={welcome} />
     <RoutineLimits guardrails={guardrails} onChange={setGuardrails} />
     <BudgetFields guardrails={guardrails} onChange={setGuardrails} />
     <SecretsSetting guardrails={guardrails} onChange={setGuardrails} organizationMasksPersonal={Boolean(view.organization_limits.mask_personal_data)} organizationStrict={Boolean(view.organization_limits.strict_citations)} organizationRefuses={view.organization_limits.secrets_for_cloud === "refuse"} />

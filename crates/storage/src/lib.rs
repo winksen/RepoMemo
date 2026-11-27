@@ -133,11 +133,11 @@ pub use memory_revisions::{
 pub use mentions::{MentionRow, MentionWrite, WorkspaceFileIndex};
 pub use mfa::recovery_code_hash;
 pub use milestones::NewMilestone;
-pub use organization_cairn::ORGANIZATION_INSTRUCTIONS_CHARS;
 pub use organization_cairn::{
     Guardrails, OrganizationCairnPolicy, OrganizationCairnSettings, AGENT_MODES, DEFAULT_MAX_CHANGES, MAX_DAILY_RUNS,
     MAX_DAILY_TOKENS, MAX_MONTHLY_TOKENS, MAX_RETENTION_DAYS, ORGANIZATION_MODELS_MAX,
 };
+pub use organization_cairn::{Welcome, ORGANIZATION_INSTRUCTIONS_CHARS, QUESTIONS_MAX};
 pub use organization_templates::StoredOrganizationTemplate;
 pub use organizations::StarterSetup;
 pub use outbound::{retry_delay_seconds, DueDelivery, MAX_DELIVERY_ATTEMPTS, OUTBOUND_EVENTS};

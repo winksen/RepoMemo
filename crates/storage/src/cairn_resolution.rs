@@ -579,6 +579,21 @@ impl StorageEngine {
         Ok(own.over(&defaults))
     }
 
+    /// The greeting and starter questions of a workspace (V0.9.116): its own, and its organization's where it wrote none.
+    pub async fn welcome_for_workspace(&self, workspace_id: &str) -> Result<crate::organization_cairn::Welcome> {
+        let own = self.get_workspace_cairn_settings(workspace_id).await?.policy.welcome;
+        let organization = match self.workspace_organization(workspace_id).await? {
+            Some(organization_id) => {
+                self.get_organization_cairn_settings(&organization_id)
+                    .await?
+                    .policy
+                    .welcome
+            }
+            None => Default::default(),
+        };
+        Ok(own.or(organization))
+    }
+
     /// The organization's knowledge workspace for a workspace of it: none when the organization has not chosen one, and none for the
     /// knowledge workspace itself. The server still checks that the person can read it.
     pub async fn knowledge_workspace_for(&self, workspace_id: &str) -> Result<Option<String>> {
@@ -1156,6 +1171,7 @@ mod tests {
                     instructions: String::new(),
                     knowledge_workspace_id: None,
                     preference_defaults: Default::default(),
+                    welcome: Default::default(),
                 },
                 &setup.actor,
             )
@@ -1276,6 +1292,7 @@ mod tests {
                             default_model_id: default,
                             model_roles: Default::default(),
                             guardrails: Default::default(),
+                            welcome: Default::default(),
                         },
                         None,
                     )
@@ -1349,6 +1366,7 @@ mod tests {
                     default_model_id: Some(setup.other.id.clone()),
                     model_roles: Default::default(),
                     guardrails: Default::default(),
+                    welcome: Default::default(),
                 },
                 Some(&setup.actor),
             )
@@ -1425,6 +1443,7 @@ mod tests {
                     default_model_id: None,
                     model_roles: Default::default(),
                     guardrails: Default::default(),
+                    welcome: Default::default(),
                 },
                 None,
             )

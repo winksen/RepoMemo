@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.116 (2026-11-27)
+
+Organizations and workspaces write CAIRN's greeting and starter questions.
+
+### Added
+- **Greeting.** One line, at most 120 characters, shown where CAIRN says hello in the chat. Empty keeps the standard one.
+- **Starter questions.** Up to six, one per line, at most 140 characters each, shown as buttons on an empty chat in place of the template's suggested questions (V0.9.7). Blanks and repeats are dropped.
+- **Two places.** In the organization's CAIRN settings (for all its workspaces) and in a workspace's CAIRN settings. A workspace's own greeting replaces its organization's, and its own questions replace its organization's; the greeting and the questions are chosen apart, so a workspace can write only the questions and keep the organization's greeting.
+- **Versioned and audited.** They are part of the settings: a stale save is refused like any other, and the audit event holds the welcome before and after.
+- **No migration.** Settings that never had a welcome read as empty, so every chat keeps what it showed.
+
+### Not yet
+- **A workspace with no organization model** does not show the workspace's fields: the form says to wait for its organization's models.
+- **Template questions** are not copied into the field to edit.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added or run, and no chat was opened.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.115 (2026-11-27)
 
 Organizations set preference defaults for people who have not chosen.

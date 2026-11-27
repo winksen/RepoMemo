@@ -37,6 +37,8 @@ pub(crate) struct AgentCapabilitiesResponse {
     models: Vec<OfferedModel>,
     /// What the person has left of today's CAIRN budgets; none when no budget is set (V0.9.96).
     budget: Option<repomemo_storage::PersonBudget>,
+    /// CAIRN's greeting and starter questions for the workspace (V0.9.116); empty where nobody wrote any.
+    welcome: repomemo_storage::Welcome,
     /// What the person chose for how CAIRN works for them (V0.9.114), for the chat to apply.
     preferences: PreferencesNote,
     /// The abilities the workspace offers (V0.9.106): its organization's that are on and its own, each run with its /command.
@@ -173,7 +175,13 @@ pub(crate) async fn list_agent_capabilities(
             model.default = &model.id == preferred;
         }
     }
+    let welcome = state
+        .storage
+        .welcome_for_workspace(&workspace_id)
+        .await
+        .map_err(map_storage_error)?;
     Ok(Json(AgentCapabilitiesResponse {
+        welcome,
         preferences: PreferencesNote {
             steps_open: person.steps_open.unwrap_or(false),
         },
