@@ -159,9 +159,8 @@ pub(crate) async fn list_agent_capabilities(
     let abilities = crate::cairn_abilities::offered(&state, &workspace_id, agent_mode).await?;
     let person = state
         .storage
-        .get_cairn_preferences(&subject.user_id)
+        .effective_cairn_preferences(&subject.user_id, &workspace_id)
         .await
-        .map(|(preferences, _)| preferences)
         .unwrap_or_default();
     // The picker shows the person's preferred model as the one that answers, while it is offered here.
     let mut models = models;
@@ -317,9 +316,8 @@ pub(crate) async fn run_message(
     // The person's own preferences (V0.9.114): settings they chose, read into their own runs only.
     let preferences = state
         .storage
-        .get_cairn_preferences(&subject.user_id)
+        .effective_cairn_preferences(&subject.user_id, &workspace_id)
         .await
-        .map(|(preferences, _)| preferences)
         .unwrap_or_default();
     let requested_model = request.model_id.clone().filter(|id| !id.trim().is_empty());
     if let Some(model_id) = &requested_model {

@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.114` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.115` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.115 — Organizations set preference defaults for people who have not chosen.
+
+- **Organization preference defaults.** An organization's administrators set defaults for the answer language, the length of answers, whether the steps show open and Agent or Jobs. A person's own choice in their profile always wins; where they chose nothing, the organization's default applies in that organization's workspaces. Profile says which values are the organization's.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.114 — People choose how CAIRN works for them in their profile.
 

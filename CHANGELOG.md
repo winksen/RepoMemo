@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.115 (2026-11-27)
+
+Organizations set preference defaults for people who have not chosen.
+
+### Added
+- **Defaults in the organization's settings.** Four fields under the model settings: the answer language, the length of answers, whether "What CAIRN did" shows open, and Agent or Jobs. Saving them is a versioned change with the values before and after in the audit event.
+- **A person's choice wins.** A field the person set in their profile is used as they set it. Where they set nothing, the organization's default applies in that organization's workspaces, in the run (language, length, Agent or Jobs) and in the chat (steps open). A person who belongs to two organizations gets each organization's default in its own workspaces.
+- **Profile says so.** Under each field the profile names the organization's default when it has one ("Your organization's default: brief"), so a person can see which values are not theirs.
+- **Defaults, not limits.** Nothing here stops a person choosing differently, and the preferred model stays a person's own: an organization's default model is its own setting.
+- **No migration.** The defaults are part of the stored settings; an organization with none reads as no defaults.
+
+### Not yet
+- **Workspaces** cannot set their own defaults.
+- **The profile's hint** lists the values of every organization the person belongs to when they differ, joined by "or".
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added or run, and neither screen was opened.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.114 (2026-11-27)
 
 People choose how CAIRN works for them in their profile.

@@ -560,6 +560,25 @@ impl StorageEngine {
         Ok(paused)
     }
 
+    /// A person's preferences as they apply in a workspace (V0.9.115): their own, with the organization's defaults where they chose none.
+    pub async fn effective_cairn_preferences(
+        &self,
+        user_id: &str,
+        workspace_id: &str,
+    ) -> Result<crate::cairn_preferences::CairnPreferences> {
+        let (own, _) = self.get_cairn_preferences(user_id).await?;
+        let defaults = match self.workspace_organization(workspace_id).await? {
+            Some(organization_id) => {
+                self.get_organization_cairn_settings(&organization_id)
+                    .await?
+                    .policy
+                    .preference_defaults
+            }
+            None => Default::default(),
+        };
+        Ok(own.over(&defaults))
+    }
+
     /// The organization's knowledge workspace for a workspace of it: none when the organization has not chosen one, and none for the
     /// knowledge workspace itself. The server still checks that the person can read it.
     pub async fn knowledge_workspace_for(&self, workspace_id: &str) -> Result<Option<String>> {
@@ -1136,6 +1155,7 @@ mod tests {
                     guardrails: Default::default(),
                     instructions: String::new(),
                     knowledge_workspace_id: None,
+                    preference_defaults: Default::default(),
                 },
                 &setup.actor,
             )

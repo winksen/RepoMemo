@@ -17,6 +17,15 @@ const LENGTHS = [{ label: "No preference", value: NONE }, { label: "Brief", valu
 const STEPS = [{ label: "No preference (closed)", value: NONE }, { label: "Open", value: "open" }, { label: "Closed", value: "closed" }];
 const MODES = [{ label: "No preference", value: NONE }, { label: "Agent", value: "agent" }, { label: "Jobs", value: "jobs" }];
 
+/** What the person's organizations set for a field, as text, so the profile can say which values are the organization's (V0.9.115). */
+function organizationValue(preferences: CairnPreferences, field: "language" | "length" | "steps_open" | "mode"): string {
+  const values = (preferences.organization_defaults ?? [])
+    .map((entry) => entry[field])
+    .filter((value) => value !== null && value !== undefined && value !== "")
+    .map(String);
+  return [...new Set(values)].join(" or ");
+}
+
 /**
  * The person's CAIRN preferences (V0.9.114): the model they prefer in each workspace, the language and length of answers, whether the
  * steps of a run show open, and Agent or Jobs. They are settings the person chose, not memory; only their own runs read them, and a
@@ -61,10 +70,10 @@ export function CairnPreferencesPanel({ accessToken, workspaces }: { accessToken
   return <section className="shared-profile-panel" id="cairn-preferences">
     <PanelHeading description="Your own choices, used only in your requests" icon={SlidersHorizontal} title={`${ASSISTANT_NAME} preferences`} />
     <form onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <Field hint="For example French or Português. Empty leaves it to your organization or to the language you write in." label="Answer language"><Input maxLength={40} onChange={(event) => setDraft({ ...draft, language: event.target.value })} value={draft.language ?? ""} /></Field>
-      <Field label="Length of answers"><Dropdown aria-label="Length of answers" onValueChange={(value) => setDraft({ ...draft, length: value === NONE ? null : (value as CairnPreferences["length"]) })} options={LENGTHS} value={draft.length ?? NONE} /></Field>
-      <Field label={`Steps under an answer ("What ${ASSISTANT_NAME} did")`}><Dropdown aria-label="Steps under an answer" onValueChange={(value) => setDraft({ ...draft, steps_open: value === NONE ? null : value === "open" })} options={STEPS} value={draft.steps_open == null ? NONE : draft.steps_open ? "open" : "closed"} /></Field>
-      <Field hint="Where a workspace's model can run in both. Jobs answers by CAIRN's rules, and abilities need Agent." label="Agent or Jobs"><Dropdown aria-label="Agent or Jobs" onValueChange={(value) => setDraft({ ...draft, mode: value === NONE ? null : (value as CairnPreferences["mode"]) })} options={MODES} value={draft.mode ?? NONE} /></Field>
+      <Field hint={`For example French or Português. Empty leaves it to ${organizationValue(saved, "language") ? `your organization (${organizationValue(saved, "language")})` : "the language you write in"}.`} label="Answer language"><Input maxLength={40} onChange={(event) => setDraft({ ...draft, language: event.target.value })} value={draft.language ?? ""} /></Field>
+      <Field hint={organizationValue(saved, "length") ? `Your organization's default: ${organizationValue(saved, "length")}.` : undefined} label="Length of answers"><Dropdown aria-label="Length of answers" onValueChange={(value) => setDraft({ ...draft, length: value === NONE ? null : (value as CairnPreferences["length"]) })} options={LENGTHS} value={draft.length ?? NONE} /></Field>
+      <Field hint={organizationValue(saved, "steps_open") ? `Your organization's default: ${organizationValue(saved, "steps_open") === "true" ? "open" : "closed"}.` : undefined} label={`Steps under an answer ("What ${ASSISTANT_NAME} did")`}><Dropdown aria-label="Steps under an answer" onValueChange={(value) => setDraft({ ...draft, steps_open: value === NONE ? null : value === "open" })} options={STEPS} value={draft.steps_open == null ? NONE : draft.steps_open ? "open" : "closed"} /></Field>
+      <Field hint={`Where a workspace's model can run in both. Jobs answers by CAIRN's rules, and abilities need Agent.${organizationValue(saved, "mode") ? ` Your organization's default: ${organizationValue(saved, "mode")}.` : ""}`} label="Agent or Jobs"><Dropdown aria-label="Agent or Jobs" onValueChange={(value) => setDraft({ ...draft, mode: value === NONE ? null : (value as CairnPreferences["mode"]) })} options={MODES} value={draft.mode ?? NONE} /></Field>
       <div>
         <p className="shared-eyebrow">Preferred model by workspace</p>
         {models.length ? <ul className="shared-personal-memory">{models.map(([workspaceId, modelId]) => <li key={workspaceId}>

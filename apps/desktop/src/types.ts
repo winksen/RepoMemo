@@ -597,6 +597,8 @@ export interface CairnPreferences {
   steps_open?: boolean | null;
   mode?: "agent" | "jobs" | null;
   updated_at?: string | null;
+  /** What the person's organizations set for people who have not chosen (V0.9.115); only those that set any. */
+  organization_defaults?: { organization_id: string; organization_name: string; language: string | null; length: string | null; steps_open: boolean | null; mode: string | null }[];
 }
 
 /** An ability as the chat offers it. */
@@ -957,6 +959,8 @@ export interface OrganizationCairnSettings {
   instructions?: string;
   /** The organization's knowledge workspace: its current memory cards and verified playbooks are offered in the other workspaces (V0.9.110). */
   knowledge_workspace_id?: string | null;
+  /** What people who have not chosen get (V0.9.115): language, length, steps open and Agent or Jobs. */
+  preference_defaults?: Omit<CairnPreferences, "models" | "updated_at" | "organization_defaults"> | null;
   updated_at: string | null;
   updated_by: string | null;
 }

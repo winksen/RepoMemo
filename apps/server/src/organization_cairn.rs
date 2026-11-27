@@ -38,6 +38,9 @@ pub(crate) struct SettingsRequest {
     /// The organization's knowledge workspace (V0.9.110).
     #[serde(default)]
     knowledge_workspace_id: Option<String>,
+    /// What people who have not chosen get (V0.9.115).
+    #[serde(default)]
+    preference_defaults: repomemo_storage::CairnPreferences,
     /// The version the caller read; 0 for an organization that never saved any.
     expected_version: i64,
 }
@@ -351,6 +354,14 @@ pub(crate) async fn update_settings(
             ));
         }
     }
+    // Preference defaults are the four settings; a model is a person's own choice.
+    let mut preference_defaults = request.preference_defaults;
+    preference_defaults.models.clear();
+    preference_defaults.language = preference_defaults
+        .language
+        .map(|language| language.trim().to_owned())
+        .filter(|language| !language.is_empty());
+    preference_defaults.check().map_err(map_storage_error)?;
     let instructions = request.instructions.trim().to_owned();
     if instructions.chars().count() > repomemo_storage::ORGANIZATION_INSTRUCTIONS_CHARS {
         return Err(ApiError::bad_request(format!(
@@ -371,6 +382,7 @@ pub(crate) async fn update_settings(
         guardrails,
         instructions,
         knowledge_workspace_id,
+        preference_defaults,
     };
     let saved = state
         .storage
@@ -425,7 +437,9 @@ pub(crate) async fn update_settings(
             before.policy.agent_mode,
             saved.policy.agent_mode
         ) + &format!(
-            " Knowledge workspace from {:?} to {:?}. Instructions from {:?} to {:?}. Guardrails from {} to {}. Role limits from {} to {}.",
+            " Preference defaults from {} to {}. Knowledge workspace from {:?} to {:?}. Instructions from {:?} to {:?}. Guardrails from {} to {}. Role limits from {} to {}.",
+            serde_json::to_string(&before.policy.preference_defaults).unwrap_or_default(),
+            serde_json::to_string(&saved.policy.preference_defaults).unwrap_or_default(),
             before.policy.knowledge_workspace_id,
             saved.policy.knowledge_workspace_id,
             before.policy.instructions,

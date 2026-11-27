@@ -135,6 +135,10 @@ pub struct OrganizationCairnPolicy {
     /// workspace of the organization, to the people who can read it. None until the organization chooses one.
     #[serde(default)]
     pub knowledge_workspace_id: Option<String>,
+    /// What people who have not chosen get (V0.9.115): the language and length of answers, whether steps show open, and Agent or Jobs.
+    /// A person's own choice wins. The models are not defaults: the organization's default model is its own setting.
+    #[serde(default)]
+    pub preference_defaults: crate::cairn_preferences::CairnPreferences,
 }
 
 /// The most characters of the organization's instructions.
@@ -154,6 +158,7 @@ impl Default for OrganizationCairnPolicy {
             guardrails: Default::default(),
             instructions: String::new(),
             knowledge_workspace_id: None,
+            preference_defaults: Default::default(),
         }
     }
 }
@@ -293,6 +298,7 @@ mod tests {
             guardrails: Default::default(),
             instructions: String::new(),
             knowledge_workspace_id: None,
+            preference_defaults: Default::default(),
         };
         let CairnSaved::Saved(first) = storage
             .save_organization_cairn_settings(&organization.id, 0, &policy, &owner.id)

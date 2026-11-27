@@ -36,6 +36,42 @@ pub struct CairnPreferences {
 }
 
 impl CairnPreferences {
+    /// These preferences where they are set, the defaults where they are not (V0.9.115): a person's own choice wins. The models are the
+    /// person's alone.
+    pub fn over(&self, defaults: &CairnPreferences) -> CairnPreferences {
+        CairnPreferences {
+            models: self.models.clone(),
+            language: self.language.clone().or_else(|| defaults.language.clone()),
+            length: self.length.clone().or_else(|| defaults.length.clone()),
+            steps_open: self.steps_open.or(defaults.steps_open),
+            mode: self.mode.clone().or_else(|| defaults.mode.clone()),
+        }
+    }
+
+    /// Whether the values are ones that may be kept.
+    pub fn check(&self) -> Result<()> {
+        if let Some(language) = &self.language {
+            if language.chars().count() > LANGUAGE_CHARS || language.contains('\n') {
+                repomemo_domain::bail_invalid!("A language is at most {LANGUAGE_CHARS} characters on one line.");
+            }
+        }
+        if self
+            .length
+            .as_deref()
+            .is_some_and(|length| !ANSWER_LENGTHS.contains(&length))
+        {
+            repomemo_domain::bail_invalid!("An answer is brief, standard or detailed.");
+        }
+        if self
+            .mode
+            .as_deref()
+            .is_some_and(|mode| !matches!(mode, "agent" | "jobs"))
+        {
+            repomemo_domain::bail_invalid!("The mode is Agent or Jobs.");
+        }
+        Ok(())
+    }
+
     /// The note a run is given about how to answer, when the person set a language or a length; none otherwise.
     pub fn style_note(&self) -> Option<String> {
         let mut lines = Vec::new();
@@ -74,25 +110,7 @@ impl StorageEngine {
 
     /// Saves a person's preferences, checked.
     pub async fn save_cairn_preferences(&self, user_id: &str, preferences: &CairnPreferences) -> Result<()> {
-        if let Some(language) = &preferences.language {
-            if language.chars().count() > LANGUAGE_CHARS || language.contains('\n') {
-                repomemo_domain::bail_invalid!("A language is at most {LANGUAGE_CHARS} characters on one line.");
-            }
-        }
-        if preferences
-            .length
-            .as_deref()
-            .is_some_and(|length| !ANSWER_LENGTHS.contains(&length))
-        {
-            repomemo_domain::bail_invalid!("An answer is brief, standard or detailed.");
-        }
-        if preferences
-            .mode
-            .as_deref()
-            .is_some_and(|mode| !matches!(mode, "agent" | "jobs"))
-        {
-            repomemo_domain::bail_invalid!("The mode is Agent or Jobs.");
-        }
+        preferences.check()?;
         if preferences.models.len() > PREFERRED_MODELS_MAX {
             repomemo_domain::bail_invalid!("Preferred models are kept for at most {PREFERRED_MODELS_MAX} workspaces.");
         }
