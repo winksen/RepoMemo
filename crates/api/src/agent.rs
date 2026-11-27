@@ -339,21 +339,18 @@ impl RepoMemoCore {
                 clean_subject(message)
             };
             Some((capability, AgentRouting::Explicit, subject))
-        } else if let Some((capability, subject)) =
-            route_by_rules(message).or_else(|| route_by_phrases(message, &phrases))
-        {
-            Some((capability, AgentRouting::Rules, subject))
         } else if let Some(provider_id) = request.provider_id.as_deref() {
-            match self.route_by_model(&request.workspace_id, provider_id, message).await {
-                Ok(Some((capability, subject))) => Some((capability, AgentRouting::Model, subject)),
-                Ok(None) => None,
+            // With a model the model reads the message first; the keyword rules and the template's phrases run only when it
+            // fails (V0.9.131).
+            match self.provider_of_workspace(&request.workspace_id, provider_id).await {
+                Ok(provider) => route_with_model(&provider, message, &phrases, &mut warnings).await,
                 Err(error) => {
                     warnings.push(format!("The AI provider could not interpret this message: {error:#}"));
-                    None
+                    route_by_keywords(message, &phrases)
                 }
             }
         } else {
-            None
+            route_by_keywords(message, &phrases)
         };
 
         let Some((capability, routing, mut subject)) = routed else {
@@ -396,18 +393,17 @@ impl RepoMemoCore {
         Ok(answer)
     }
 
-    async fn route_by_model(
+    /// The workspace's provider, when it is enabled for the workspace.
+    async fn provider_of_workspace(
         &self,
         workspace_id: &str,
         provider_id: &str,
-        message: &str,
-    ) -> Result<Option<(AgentCapability, String)>> {
+    ) -> Result<repomemo_ai::ConfiguredProvider> {
         let settings = self.storage.get_provider_settings(provider_id).await?;
         if !settings.enabled || settings.workspace_id.as_deref() != Some(workspace_id) {
             repomemo_domain::bail_invalid!("The selected provider is not enabled for this workspace.");
         }
-        let provider = provider_from_settings(settings)?;
-        classify_with(&provider, message).await
+        provider_from_settings(settings)
     }
 
     /// What CAIRN's own replies may say: whether an AI provider is enabled, and the workspace's name and how many files are
@@ -478,6 +474,31 @@ impl RepoMemoCore {
                 warnings.push(format!("The AI provider could not answer this message: {error:#}"));
                 unmatched_reply(&self.chatter_context(request).await)
             }
+        }
+    }
+}
+
+/// The keyword rules, then the phrases the workspace's template adds: the path of a workspace with no model, and of a model that
+/// failed.
+fn route_by_keywords(message: &str, phrases: &[PhraseRule]) -> Option<(AgentCapability, AgentRouting, String)> {
+    route_by_rules(message)
+        .or_else(|| route_by_phrases(message, phrases))
+        .map(|(capability, subject)| (capability, AgentRouting::Rules, subject))
+}
+
+/// Routes a message with a model first (V0.9.131): the model's choice, or none when it says the message is not one of the jobs.
+/// Only a model that fails leaves the choice to the keyword rules, with a warning.
+pub(crate) async fn route_with_model<P: AiProvider + ?Sized>(
+    provider: &P,
+    message: &str,
+    phrases: &[PhraseRule],
+    warnings: &mut Vec<String>,
+) -> Option<(AgentCapability, AgentRouting, String)> {
+    match classify_with(provider, message).await {
+        Ok(chosen) => chosen.map(|(capability, subject)| (capability, AgentRouting::Model, subject)),
+        Err(error) => {
+            warnings.push(format!("The AI provider could not interpret this message: {error:#}"));
+            route_by_keywords(message, phrases)
         }
     }
 }

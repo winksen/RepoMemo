@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.131 (2026-11-27)
+
+With a model, the model reads the message and picks the job before any keyword rule does.
+
+### Changed
+- **The model before keywords.** When a message reaches the router with a model available, the model picks the job. The keyword rules and the template's phrases run only when there is no model, or when the model fails (the reply then carries a warning).
+- **A model that says none** is not overruled by keywords: CAIRN answers in its own voice through the model. A request such as *analyze the size of files in this repo* is no longer matched by its words.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.130 (2026-11-27)
 
 A model that cannot follow the JSON tool protocol still gets an answer: it picks one job, the job runs and answers.

@@ -503,3 +503,50 @@ fn the_routers_keyword_lists_do_not_grow() {
         "the count looks wrong ({total}); did the lists move?"
     );
 }
+
+/// V0.9.131: with a model the model chooses; the keyword rules and the template's phrases run only when it fails.
+#[tokio::test]
+async fn the_model_chooses_the_job_before_the_keyword_rules_read_the_message() {
+    use repomemo_ai::{ChatResponse, ScriptedProvider};
+    let message = "analyze the size of files in this repo";
+    // The keyword rules alone would take this for the Analyze job.
+    assert_eq!(
+        route(message).map(|(capability, _)| capability),
+        Some(AgentCapability::AnalyzeFiles)
+    );
+    let provider = ScriptedProvider::new(vec![ChatResponse::text(
+        "{\"capability\": \"workspace_overview\", \"subject\": \"\"}",
+    )]);
+    let mut warnings = Vec::new();
+    let routed = route_with_model(&provider, message, &[], &mut warnings).await;
+    assert_eq!(
+        routed.map(|(capability, routing, _)| (capability, routing)),
+        Some((AgentCapability::WorkspaceOverview, AgentRouting::Model))
+    );
+    assert!(warnings.is_empty());
+    assert_eq!(provider.requests().len(), 1);
+}
+
+#[tokio::test]
+async fn a_model_that_says_none_is_not_overruled_by_keywords() {
+    use repomemo_ai::{ChatResponse, ScriptedProvider};
+    let provider = ScriptedProvider::new(vec![ChatResponse::text("{\"capability\": \"none\"}")]);
+    let mut warnings = Vec::new();
+    let routed = route_with_model(&provider, "analyze the size of files in this repo", &[], &mut warnings).await;
+    assert!(routed.is_none());
+    assert!(warnings.is_empty());
+}
+
+#[tokio::test]
+async fn a_failing_model_leaves_the_choice_to_the_keyword_rules_with_a_warning() {
+    use repomemo_ai::ScriptedProvider;
+    let provider = ScriptedProvider::with_results(vec![Err(anyhow::anyhow!("the provider is down"))]);
+    let mut warnings = Vec::new();
+    let routed = route_with_model(&provider, "find the readme file", &[], &mut warnings).await;
+    assert_eq!(
+        routed.map(|(capability, routing, _)| (capability, routing)),
+        Some((AgentCapability::FindFiles, AgentRouting::Rules))
+    );
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("could not interpret"));
+}
