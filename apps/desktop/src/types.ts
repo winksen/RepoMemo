@@ -630,6 +630,18 @@ export interface OfferedModel {
   /** It takes tools, so CAIRN can work in a loop with it. */
   agent: boolean;
   default: boolean;
+  /** The latest tool-choice report attached to the model (V0.9.144); none when it was never measured. */
+  evaluation?: OfferedEvaluation | null;
+}
+
+/** What the model picker shows of a model's evaluation report. */
+export interface OfferedEvaluation {
+  tool_accuracy: number;
+  citation_precision: number;
+  cases_run: number;
+  /** The day the run was made, `YYYY-MM-DD`. */
+  run_on: string;
+  passed: boolean;
 }
 
 export interface AgentMessage {

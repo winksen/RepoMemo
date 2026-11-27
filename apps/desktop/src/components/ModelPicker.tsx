@@ -1,9 +1,19 @@
-import type { OfferedModel } from "../types";
+import type { CairnEvaluation, OfferedEvaluation, OfferedModel } from "../types";
 import { Dropdown } from "./ui/dropdown";
 
-/** What a model is called in the picker: its name, where it runs and, when it takes tools, that CAIRN can work with it as an agent. */
+/**
+ * A model's latest tool-choice score and the day it was measured (V0.9.144), or that it never was. A report that did not pass is
+ * shown as such, not hidden.
+ */
+export function toolChoiceNote(evaluation: OfferedEvaluation | CairnEvaluation | null | undefined): string {
+  if (!evaluation) return "Not measured";
+  const score = `Tool choice ${Math.round(evaluation.tool_accuracy * 100)}% · ${evaluation.run_on}`;
+  return evaluation.passed ? score : `${score} · did not pass`;
+}
+
+/** What a model is called in the picker: its name, where it runs, that CAIRN can work with it as an agent when it takes tools, and its score. */
 export function modelLabel(model: OfferedModel): string {
-  return `${model.name} · ${model.locality === "cloud" ? "Cloud" : "Local"}${model.agent ? " · Agent" : ""}`;
+  return `${model.name} · ${model.locality === "cloud" ? "Cloud" : "Local"}${model.agent ? " · Agent" : ""} · ${toolChoiceNote(model.evaluation)}`;
 }
 
 /**

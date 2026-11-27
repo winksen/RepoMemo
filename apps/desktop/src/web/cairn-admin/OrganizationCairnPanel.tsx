@@ -1,3 +1,4 @@
+import { toolChoiceNote } from "../../components/ModelPicker";
 import { useState } from "react";
 import { Cloud, HardDrives, Sparkle } from "@phosphor-icons/react";
 import { getOrganizationCairn, getSharedOrganizationOverview, listOrganizationCairnModels, saveOrganizationCairn } from "../../lib/sharedApi";
@@ -94,7 +95,7 @@ function Editor({ accessToken, canChange, models, onSaved, organizationId, setti
         <td><Badge icon={model.locality === "cloud" ? <Cloud size={ICON_SIZE.sm} /> : <HardDrives size={ICON_SIZE.sm} />}>{model.locality === "cloud" ? "Cloud" : "Local"}</Badge></td>
         <td>{model.purpose === "text" ? (TOOL_LABELS[model.tool_mode] ?? model.tool_mode) : <span className="shared-muted-copy">—</span>}</td>
         <td>{model.context_tokens ? model.context_tokens.toLocaleString() : <span className="shared-muted-copy">Not tested</span>}</td>
-        <td>{model.evaluation ? <Tooltip content={`Citation precision ${model.evaluation.citation_precision.toFixed(2)}, tool accuracy ${model.evaluation.tool_accuracy.toFixed(2)}`}><span><Badge>{model.evaluation.passed ? "Passed" : "Failed"} · {model.evaluation.run_on}</Badge></span></Tooltip> : <span className="shared-muted-copy">Not evaluated</span>}</td>
+        <td>{model.evaluation ? <Tooltip content={`Citation precision ${model.evaluation.citation_precision.toFixed(2)}, tool accuracy ${model.evaluation.tool_accuracy.toFixed(2)}`}><span><Badge>{toolChoiceNote(model.evaluation)}</Badge></span></Tooltip> : <span className="shared-muted-copy">Not measured</span>}</td>
         <td><RoleLimitSelect disabled={!canChange || !chosen.includes(model.id)} label={model.display_name} onChange={(limit) => setRoles((current) => withLimit(current, model.id, limit))} roles={roles[model.id]} /></td>
       </tr>)}</tbody>
     </Table>

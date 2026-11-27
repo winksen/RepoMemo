@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.143` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.144` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.144 — Each model's latest tool-choice score and date, or Not measured, shows in the chat's model picker and in the catalog.
+
+- **Models are chosen with evidence.** People and administrators see, next to each model's name, how well it chose CAIRN's tools when the maintainer last measured it. The score informs the choice; it never picks a model.
+
+Checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` and `npm run typecheck` pass; the generated types are current; docs:check passes. Tests not run; not opened in a browser.
 
 ## V0.9.143 — The CAIRN evaluation set gains seven cases on choosing the right tool: file sizes, counts, folder totals, a misspelled name, a greeting and a French request.
 

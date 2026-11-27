@@ -62,6 +62,31 @@ pub(crate) struct OfferedModel {
     /// It takes tools, so CAIRN can work in a loop with it.
     agent: bool,
     default: bool,
+    /// The latest tool-choice report `npm run cairn:eval` attached to the model (V0.9.144); none when it was never measured.
+    evaluation: Option<OfferedEvaluation>,
+}
+
+/// What the chat's model picker shows of a model's evaluation report: the score, when it was measured and whether it passed.
+#[derive(Debug, PartialEq, Serialize)]
+pub(crate) struct OfferedEvaluation {
+    tool_accuracy: f64,
+    citation_precision: f64,
+    cases_run: i64,
+    /// The day the run was made, `YYYY-MM-DD`.
+    run_on: String,
+    passed: bool,
+}
+
+/// The report stored with a model, as the picker shows it; none when the model has no report or it cannot be read.
+fn offered_evaluation(report: Option<&serde_json::Value>) -> Option<OfferedEvaluation> {
+    let report = report?;
+    Some(OfferedEvaluation {
+        tool_accuracy: report.get("tool_accuracy")?.as_f64()?,
+        citation_precision: report.get("citation_precision")?.as_f64()?,
+        cases_run: report.get("cases_run")?.as_i64()?,
+        run_on: report.get("run_on")?.as_str()?.to_owned(),
+        passed: report.get("passed")?.as_bool()?,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -221,6 +246,7 @@ async fn offered_models(
         models.push(OfferedModel {
             default: answering == Some(id.as_str()),
             agent: model.tool_mode != "none",
+            evaluation: offered_evaluation(model.evaluation.as_ref()),
             locality: connection.locality,
             name: model.display_name,
             id,
@@ -1531,5 +1557,32 @@ mod ability_tests {
         assert_eq!(missing_inputs("", &team), vec!["Team".to_owned(), "Week".to_owned()]);
         assert!(missing_inputs("the blue team", &[field("team", "Team")]).is_empty());
         assert!(missing_inputs("", &[]).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod offered_evaluation_tests {
+    use super::{offered_evaluation, OfferedEvaluation};
+    use serde_json::json;
+
+    #[test]
+    fn a_model_with_a_report_shows_its_score_and_one_without_shows_none() {
+        let report = json!({
+            "passed": false, "run_on": "2026-11-30", "citation_precision": 0.95, "tool_accuracy": 0.52,
+            "forbidden_actions": 1, "cases_run": 47, "version": "0.9.145", "attached_at": "2026-11-30T10:00:00Z"
+        });
+        assert_eq!(
+            offered_evaluation(Some(&report)),
+            Some(OfferedEvaluation {
+                tool_accuracy: 0.52,
+                citation_precision: 0.95,
+                cases_run: 47,
+                run_on: "2026-11-30".to_owned(),
+                passed: false,
+            })
+        );
+        assert_eq!(offered_evaluation(None), None);
+        // A report that cannot be read is not shown as a score.
+        assert_eq!(offered_evaluation(Some(&json!({ "passed": true }))), None);
     }
 }

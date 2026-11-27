@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.144 (2026-11-27)
+
+Each model's latest tool-choice score and date, or Not measured, shows in the chat's model picker and in the catalog.
+
+### Added
+- **Score in the picker.** Each model of the chat's picker shows *Tool choice 87% · 2026-11-30*, the score of the latest report attached to it, or *Not measured* when it has none.
+- **Failures shown.** A report that did not pass reads *Tool choice 52% · 2026-11-30 · did not pass*; it is not hidden.
+- **Catalog.** The Models table of the CAIRN administration and the organization's model list show the same note in place of *Passed* and *Failed*, with the citation precision and tool accuracy in the tooltip, and *Not measured* in place of *Not evaluated*.
+
+### Checks
+- `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` and `npm run typecheck` pass; the generated types are current; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.143 (2026-11-27)
 
 The CAIRN evaluation set gains seven cases on choosing the right tool: file sizes, counts, folder totals, a misspelled name, a greeting and a French request.

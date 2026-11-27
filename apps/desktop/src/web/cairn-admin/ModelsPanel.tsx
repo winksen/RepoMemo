@@ -3,6 +3,7 @@ import { Cloud, Cpu, HardDrives, MagnifyingGlass, PencilSimple, Play, Trash } fr
 import { addCairnModel, changeCairnModel, deleteCairnModel, findCairnModels, listCairnConnections, listCairnModels, testCairnModel } from "../../lib/sharedApi";
 import { cairnAdminKeys } from "../../lib/queryClient";
 import type { AvailableCairnModel, CairnConnection, CairnModel } from "../../types";
+import { toolChoiceNote } from "../../components/ModelPicker";
 import { ActionMenu } from "../../components/ui/action-menu";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -117,9 +118,9 @@ export function ModelsPanel({ accessToken, canChange }: { accessToken: string; c
 /** Whether a model passed the live evaluation, and when; the report is shown beside the model; Agent mode follows the model's tool calling (V0.9.129). */
 function Evaluation({ model }: { model: CairnModel }) {
   const report = model.evaluation;
-  if (!report) return <span className="shared-muted-copy">Not evaluated</span>;
+  if (!report) return <span className="shared-muted-copy">Not measured</span>;
   const detail = `Citation precision ${report.citation_precision.toFixed(2)}, tool accuracy ${report.tool_accuracy.toFixed(2)}, ${report.forbidden_actions} forbidden action${report.forbidden_actions === 1 ? "" : "s"}, ${report.cases_run} cases${report.version ? ` at V${report.version}` : ""}`;
-  return <Tooltip content={detail}><span><Badge>{report.passed ? "Passed" : "Failed"} · {report.run_on}</Badge></span></Tooltip>;
+  return <Tooltip content={detail}><span><Badge>{toolChoiceNote(report)}</Badge></span></Tooltip>;
 }
 
 /** What a server offers: the administrator chooses, and gives each model a purpose. */
