@@ -38,6 +38,7 @@ mod artifacts;
 mod cairn_abilities;
 mod cairn_catalog;
 mod cairn_memory;
+mod cairn_preferences;
 mod cairn_resolution;
 mod cairn_retention;
 mod cairn_usage;
@@ -106,6 +107,7 @@ pub use cairn_catalog::{
     NewCairnModel, CATALOG_NAME_CHARS, CONNECTION_KINDS, MODEL_PURPOSES, TOOL_MODES,
 };
 pub use cairn_memory::{MemoryFigures, RoutineFigures};
+pub use cairn_preferences::{CairnPreferences, ANSWER_LENGTHS};
 pub use cairn_resolution::{
     ChangeLimits, McpPolicy, OrganizationBudget, PersonBudget, PersonalMemoryPolicy, ResolvedTextProvider,
     RoutineLimits, TextResolution, CATALOG_PROVIDER_PREFIX,

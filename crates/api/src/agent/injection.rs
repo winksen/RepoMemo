@@ -104,6 +104,7 @@ fn setup() -> AgentLoopSetup {
         ability: None,
         organization_instructions: None,
         knowledge_workspace: None,
+        style: None,
         fallback: None,
         can_write: true,
         user_id: String::new(),

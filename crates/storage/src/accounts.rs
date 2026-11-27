@@ -389,6 +389,11 @@ impl StorageEngine {
             .bind(user_id)
             .execute(&mut *tx)
             .await?;
+        // And so are the preferences they chose (V0.9.114).
+        sqlx::query("DELETE FROM person_cairn_preferences WHERE user_id = ?1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
         report.notifications = sqlx::query("DELETE FROM workspace_notifications WHERE user_id = ?1")
             .bind(user_id)
             .execute(&mut *tx)

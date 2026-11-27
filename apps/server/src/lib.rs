@@ -25,6 +25,7 @@ mod cairn_abilities;
 mod cairn_admin;
 mod cairn_connections;
 mod cairn_models;
+mod cairn_preferences;
 mod cairn_tools;
 mod catalog_migration;
 mod chat;
@@ -773,6 +774,10 @@ fn routes(state: AppState, config: &ServerConfig) -> Router {
         .route("/v1/cairn/admin", get(cairn_admin::admin_view))
         .route("/v1/cairn/admin/budgets", put(cairn_admin::update_budgets))
         .route("/v1/cairn/tools", get(cairn_tools::list_tools))
+        .route(
+            "/v1/profile/cairn",
+            get(cairn_preferences::get_preferences).put(cairn_preferences::save_preferences),
+        )
         .route("/v1/cairn/admin/usage", get(cairn_admin::usage))
         .route("/v1/cairn/admin/history", get(cairn_admin::history))
         .route("/v1/cairn/admin/memory", get(cairn_admin::memory_overview))

@@ -24,6 +24,7 @@ import type {
   CairnModelTest,
   CairnAbility,
   CairnAbilityInput,
+  CairnPreferences,
   CairnPlaybook,
   CairnTool,
   CairnUsageRow,
@@ -1921,6 +1922,14 @@ export function pauseCairnRoutine(accessToken: string, routineId: string): Promi
 
 export function resumeCairnRoutine(accessToken: string, routineId: string): Promise<unknown> {
   return request(`/v1/cairn/admin/routines/${encodeURIComponent(routineId)}/resume`, { method: "POST", body: "{}" }, accessToken);
+}
+
+export function getCairnPreferences(accessToken: string): Promise<CairnPreferences> {
+  return request<CairnPreferences>("/v1/profile/cairn", {}, accessToken);
+}
+
+export function saveCairnPreferences(accessToken: string, preferences: Omit<CairnPreferences, "updated_at">): Promise<CairnPreferences> {
+  return request<CairnPreferences>("/v1/profile/cairn", { method: "PUT", body: JSON.stringify(preferences) }, accessToken);
 }
 
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {

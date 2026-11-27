@@ -2,6 +2,28 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.114 (2026-11-27)
+
+People choose how CAIRN works for them in their profile.
+
+### Added
+- **Profile › CAIRN preferences.** A form with the answer language (free text, such as French), the length of answers (brief, standard, detailed), whether "What CAIRN did" shows open, and Agent or Jobs. Saved with one button and a toast.
+- **Preferred model by workspace.** Choose a workspace, then one of the models it offers you; the choice is listed and can be removed. A chat that has no model of its own uses it, and the picker shows it as the one that answers. A preferred model the workspace stops offering, or stops offering to your role, is ignored: the chat uses what the workspace resolves.
+- **Read as settings.** Language and length go into the run as a short note, "the person's own preferences for how you answer (settings they chose, not memory)", that cannot change the rules, what CAIRN may do or what it cites. They are not memory entries: Profile's memory list and its export do not hold them.
+- **Jobs.** A person who prefers Jobs gets Jobs where the workspace's model could run in both. Abilities need Agent mode and say so.
+- **Personal.** Only the person's own runs read them. They are not in workspace archives, are deleted with the account and when it is anonymized.
+- **Migration 0109.** `person_cairn_preferences`.
+
+### Not yet
+- **Organization defaults** for people who have not chosen are V0.9.115.
+- **The note's effect** was not tried against a model, and only runs of the Agent loop read it; Jobs answers do not.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. One unit test was added (the note); no test was run and the Profile was not opened.
+
+### Upgrading
+- The migration runs on start. Nothing else to do.
+
 ## V0.9.113 (2026-11-27)
 
 Administrators see CAIRN's routines across workspaces and can pause or resume them.

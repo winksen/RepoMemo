@@ -166,6 +166,8 @@
 | POST | `/v1/cairn/admin/routines/{routine_id}/pause` | managing | change access to the routine's organization | — | AgentRoutine |
 | POST | `/v1/cairn/admin/routines/{routine_id}/resume` | managing | change access to the routine's organization | — | AgentRoutine |
 | GET | `/v1/cairn/admin/history` | auth | require_cairn_reader, or an owner or admin of an organization | — | Vec<HistoryEntry> |
+| GET | `/v1/profile/cairn` | auth | — | — | PreferencesView |
+| PUT | `/v1/profile/cairn` | managing | — | CairnPreferences | PreferencesView |
 | GET | `/v1/cairn/tools` | auth | any signed-in person | — | Vec<SwitchableTool> |
 | GET | `/v1/organizations/{organization_id}/cairn` | auth | organization member, or require_cairn_reader | — | OrganizationCairnSettings |
 | GET | `/v1/organizations/{organization_id}/cairn/abilities` | auth | organization member, or require_cairn_reader | — | Vec<CairnAbility> |

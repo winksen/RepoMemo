@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.113` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.114` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.114 — People choose how CAIRN works for them in their profile.
+
+- **CAIRN preferences.** In Profile, a person chooses the model they prefer in each workspace (from the models it offers them), the language and length of answers (brief, standard, detailed), whether the steps under an answer show open or closed, and Agent or Jobs where both are possible. They are settings the person chose, not memory: they apply only to the person's own requests.
+
+Checks: formatted, linted and type-checked; docs:check; one unit test added, not run.
 
 ## V0.9.113 — Administrators see CAIRN's routines across workspaces and can pause or resume them.
 

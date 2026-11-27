@@ -584,6 +584,19 @@ export interface AgentCapabilities {
   budget?: { runs_limit: number | null; tokens_limit: number | null; runs_used: number; tokens_used: number; resets_at: string } | null;
   /** The abilities the workspace offers, run with their /command (V0.9.106). */
   abilities?: OfferedAbility[];
+  /** What the person chose that the chat itself applies (V0.9.114). */
+  preferences?: { steps_open: boolean };
+}
+
+/** What a person prefers about CAIRN (V0.9.114). Nothing set means the organization's default or CAIRN's. */
+export interface CairnPreferences {
+  /** The preferred catalog model of a workspace, by workspace id. */
+  models: Record<string, string>;
+  language?: string | null;
+  length?: "brief" | "standard" | "detailed" | null;
+  steps_open?: boolean | null;
+  mode?: "agent" | "jobs" | null;
+  updated_at?: string | null;
 }
 
 /** An ability as the chat offers it. */

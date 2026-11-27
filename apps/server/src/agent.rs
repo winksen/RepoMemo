@@ -37,8 +37,17 @@ pub(crate) struct AgentCapabilitiesResponse {
     models: Vec<OfferedModel>,
     /// What the person has left of today's CAIRN budgets; none when no budget is set (V0.9.96).
     budget: Option<repomemo_storage::PersonBudget>,
+    /// What the person chose for how CAIRN works for them (V0.9.114), for the chat to apply.
+    preferences: PreferencesNote,
     /// The abilities the workspace offers (V0.9.106): its organization's that are on and its own, each run with its /command.
     abilities: Vec<crate::cairn_abilities::OfferedAbility>,
+}
+
+/// The preferences the chat itself applies.
+#[derive(Debug, Serialize)]
+pub(crate) struct PreferencesNote {
+    /// Whether "What CAIRN did" shows open.
+    steps_open: bool,
 }
 
 /// A model offered in a workspace, as the chat's picker shows it.
@@ -148,7 +157,27 @@ pub(crate) async fn list_agent_capabilities(
         None => (None, None),
     };
     let abilities = crate::cairn_abilities::offered(&state, &workspace_id, agent_mode).await?;
+    let person = state
+        .storage
+        .get_cairn_preferences(&subject.user_id)
+        .await
+        .map(|(preferences, _)| preferences)
+        .unwrap_or_default();
+    // The picker shows the person's preferred model as the one that answers, while it is offered here.
+    let mut models = models;
+    if let Some(preferred) = person
+        .models
+        .get(&workspace_id)
+        .filter(|id| models.iter().any(|model| &model.id == *id))
+    {
+        for model in &mut models {
+            model.default = &model.id == preferred;
+        }
+    }
     Ok(Json(AgentCapabilitiesResponse {
+        preferences: PreferencesNote {
+            steps_open: person.steps_open.unwrap_or(false),
+        },
         abilities,
         capabilities,
         provider_name,
@@ -285,6 +314,13 @@ pub(crate) async fn run_message(
     };
     // The model of the chat: the one the person picks now, else the one the chat has. A model that is not offered here is refused,
     // and one the chat has that is no longer offered is replaced by what the workspace resolves, with a note (V0.9.86).
+    // The person's own preferences (V0.9.114): settings they chose, read into their own runs only.
+    let preferences = state
+        .storage
+        .get_cairn_preferences(&subject.user_id)
+        .await
+        .map(|(preferences, _)| preferences)
+        .unwrap_or_default();
     let requested_model = request.model_id.clone().filter(|id| !id.trim().is_empty());
     if let Some(model_id) = &requested_model {
         let offered = state
@@ -296,9 +332,22 @@ pub(crate) async fn run_message(
             return Err(ApiError::bad_request("That model is not offered in this workspace."));
         }
     }
-    let chosen_model = requested_model
+    let mut chosen_model = requested_model
         .clone()
         .or_else(|| existing.as_ref().and_then(|conversation| conversation.model_id.clone()));
+    // With no choice for this chat, the person's preferred model of the workspace, while it is still offered there.
+    if chosen_model.is_none() {
+        if let Some(preferred) = preferences.models.get(&workspace_id) {
+            let offered = state
+                .storage
+                .offered_text_model_ids_for(&workspace_id, Some(role_name(&role)))
+                .await
+                .map_err(map_storage_error)?;
+            if offered.contains(preferred) {
+                chosen_model = Some(preferred.clone());
+            }
+        }
+    }
     let resolution = state
         .storage
         .resolve_text_provider_for(&workspace_id, chosen_model.as_deref(), Some(role_name(&role)))
@@ -369,6 +418,8 @@ pub(crate) async fn run_message(
     let mut agent_setup = provider
         .as_ref()
         .filter(|provider| crate::ai::cairn_mode_of(provider) == "agent")
+        // A person who prefers Jobs gets Jobs, where both are possible (V0.9.114).
+        .filter(|_| preferences.mode.as_deref() != Some("jobs"))
         .map(|provider| {
             let traits = repomemo_ai::ModelTraits::from_metadata(&provider.metadata);
             let runtime = state.settings();
@@ -385,6 +436,7 @@ pub(crate) async fn run_message(
                     .chain((!personal_memory_on).then(|| "propose_personal_memory".to_owned()))
                     .collect(),
                 ability: None,
+                style: preferences.style_note(),
                 organization_instructions: organization_instructions.clone(),
                 knowledge_workspace,
                 fallback,
@@ -413,7 +465,7 @@ pub(crate) async fn run_message(
                 let missing = missing_inputs(rest, &ability.inputs);
                 if agent_setup.is_none() {
                     ability_refusal = Some(repomemo_api::lookup_reply(format!(
-                        "{} ({}) needs Agent mode, which this workspace's model does not run in. An administrator can choose a model that takes tools.",
+                        "{} ({}) needs Agent mode. It is not on for you here: this workspace's model may not run in it, or you chose Jobs in your preferences.",
                         ability.name, ability.command
                     )));
                 } else if !missing.is_empty() {

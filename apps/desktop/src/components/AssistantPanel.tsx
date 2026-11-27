@@ -1,7 +1,7 @@
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { SafeMarkdown } from "./SafeMarkdown";
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BookmarkSimple, Brain, FolderSimple, Notebook, Paperclip, FileMagnifyingGlass as FileSearch, FileText, ClockCounterClockwise as History, SquaresFour as Dashboard, Chat as Message, Question, PencilSimple as Pencil, Plus, ArrowsClockwise as Refresh, MagnifyingGlass as Search, PaperPlaneTilt as Send, Trash, X as Clear, ArrowElbowDownLeft, Sparkle } from "@phosphor-icons/react";
 import { continueSharedConversation, listSharedWithWorkspace, shareSharedAgentConversation, offerSharedAgentPlaybook, attachSharedAgentFile, confirmSharedAgentProposal, deleteSharedAgentConversation, dismissSharedAgentProposal, getSharedAgentCapabilities, cancelSharedAgentRun, confirmSharedAgentChangeset, dismissSharedAgentChangeset, getSharedAgentConversation, getSharedAgentRun, startSharedAgentRun, streamSharedAgentRun, listSharedAgentConversations, renameSharedAgentConversation, sendSharedAgentMessage, uploadSharedArtifact } from "../lib/sharedApi";
@@ -535,7 +535,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
     </Dialog>
     : null;
 
-  return <section className="shared-assistant" aria-label={`${ASSISTANT_NAME}, the workspace assistant`}>
+  return <StepsOpenContext.Provider value={capabilities?.preferences?.steps_open ?? false}><section className="shared-assistant" aria-label={`${ASSISTANT_NAME}, the workspace assistant`}>
     {dialog}
     {moveDialog}
     {statusDialog}
@@ -653,7 +653,7 @@ export function AssistantPanel({ accessToken, composerHeader, hideChatList = fal
         </div>
       </form>}
     </div>
-  </section>;
+  </section></StepsOpenContext.Provider>;
 }
 
 function capabilityLabel(capabilities: AgentCapabilities | null, id: AgentCapability) {
@@ -698,10 +698,15 @@ function traceDuration(milliseconds: number) {
   return milliseconds < 1000 ? `${milliseconds} ms` : `${(milliseconds / 1000).toFixed(1)} s`;
 }
 
+/** Whether "What CAIRN did" shows open, from the person's preferences (V0.9.114). */
+const StepsOpenContext = createContext(false);
+
 /** What CAIRN did for one answer (V0.9.39): its steps, one line each, fetched when the list is opened. A trace is personal and expires, so an older answer may have none. */
 function RunTrace({ accessToken, onSavePlaybook, turnId }: { accessToken: string; onSavePlaybook?: () => void; turnId: string }) {
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "none">("idle");
   const [run, setRun] = useState<AgentRun | null>(null);
+  const openByPreference = useContext(StepsOpenContext);
+  useEffect(() => { if (openByPreference) void open(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   async function open(isOpen: boolean) {
     if (!isOpen || status !== "idle") return;
     setStatus("loading");
@@ -712,7 +717,7 @@ function RunTrace({ accessToken, onSavePlaybook, turnId }: { accessToken: string
       setStatus("none");
     }
   }
-  return <details className="shared-assistant-trace" onToggle={(event) => void open(event.currentTarget.open)}>
+  return <details className="shared-assistant-trace" onToggle={(event) => void open(event.currentTarget.open)} open={openByPreference || undefined}>
     <summary>What {ASSISTANT_NAME} did</summary>
     {status === "loading" ? <p className="shared-muted-copy">Loading the steps…</p> : null}
     {status === "none" ? <p className="shared-muted-copy">There is no record of the steps behind this answer. Answers from before runs were recorded, and old ones, have none.</p> : null}

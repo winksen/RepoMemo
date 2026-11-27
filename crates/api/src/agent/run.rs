@@ -75,6 +75,8 @@ Write the answer in this shape:
 /// What the server gives a run: how the model takes tools, the budgets, what the person may do and how to pay for a model call.
 #[derive(Clone)]
 pub struct AgentLoopSetup {
+    /// How the person prefers answers (V0.9.114): a short note built from the settings they chose, not from memory.
+    pub style: Option<String>,
     /// The organization's knowledge workspace the person may read (V0.9.110): its current memory cards and verified playbooks join
     /// the run's. The server sets it only after checking that the person can read that workspace.
     pub knowledge_workspace: Option<String>,
@@ -1131,6 +1133,9 @@ impl RepoMemoCore {
         if let Some(block) = corrections_block(&request.corrections) {
             system = format!("{system}\n\n{block}");
         }
+        if let Some(note) = &setup.style {
+            system = format!("{system}\n\n{note}");
+        }
         // The organization's instructions come after the rules and before the workspace's own CAIRN.md (V0.9.109).
         if let Some((text, _)) = &setup.organization_instructions {
             system = format!(
@@ -1530,6 +1535,7 @@ mod tests {
             ability: None,
             organization_instructions: None,
             knowledge_workspace: None,
+            style: None,
             fallback: None,
             can_write,
             user_id: String::new(),
