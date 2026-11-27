@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.140 (2026-11-27)
+
+When a tool finds no file, it lists up to five closest matches with their handles and names the tool to try next.
+
+### Changed
+- **Misses that point the way.** When a name matches no file, CAIRN lists up to five files whose names are closest, so a misspelled name still finds its file. The model gets their handles, to read at once, and is told to try `query_files` for properties or `search_evidence` for content.
+- **Everywhere a file is named.** The tools *read_file*, *file_facts* and *review_file*, and the jobs *Find files*, *Summarize file* and the file changes, use the same candidates. Without a model the reply lists them by path.
+- **Empty workspace.** A workspace with no files says so instead of listing nothing.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.139 (2026-11-27)
 
 Every tool CAIRN gives the model says what it does, when to use it, which tool to use instead and what it returns.

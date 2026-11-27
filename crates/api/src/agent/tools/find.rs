@@ -18,7 +18,23 @@ impl RepoMemoCore {
         if matches.is_empty() {
             // Nothing is named like that, but the words may appear inside files.
             let passages = self.search_passages(workspace_id, subject).await?;
-            let mut result = reply(if passages.is_empty() {
+            let closest = if passages.is_empty() {
+                self.closest_files(workspace_id, subject, CLOSEST_SHOWN)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            let mut result = reply(if passages.is_empty() && !closest.is_empty() {
+                format!(
+                    "No file names, paths or indexed content match “{subject}”. The closest files are: {}.",
+                    closest
+                        .iter()
+                        .map(|file| file.path.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            } else if passages.is_empty() {
                 format!("No file names, paths or indexed content match “{subject}”.")
             } else {
                 format!(
@@ -217,6 +233,66 @@ impl RepoMemoCore {
 
     /// Files whose title or path contains every word of `subject`, best first:
     /// exact names, then names starting with or containing the phrase.
+    /// The files whose names are closest to what was asked for, best first (V0.9.140): a misspelled name still finds its file. A file
+    /// counts when its title or file name is close to the words, or holds one of them.
+    pub(in crate::agent) async fn closest_files(
+        &self,
+        workspace_id: &str,
+        wanted: &str,
+        limit: usize,
+    ) -> Result<Vec<ArtifactSummary>> {
+        let wanted = wanted.trim().to_lowercase();
+        if wanted.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut scored = self
+            .cairn_artifacts(workspace_id)
+            .await?
+            .into_iter()
+            .filter_map(|file| {
+                let score = name_closeness(&wanted, &file);
+                (score >= CLOSE_ENOUGH).then_some((score, file))
+            })
+            .collect::<Vec<_>>();
+        scored.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.1.path.cmp(&b.1.path))
+        });
+        Ok(scored.into_iter().take(limit).map(|(_, file)| file).collect())
+    }
+
+    /// What a person is told when no file matches a name: the closest files by name, and what to try next (V0.9.140). A workspace
+    /// with no files says so.
+    pub(in crate::agent) async fn no_match_message(&self, workspace_id: &str, wanted: &str, next: &str) -> String {
+        let closest = self
+            .closest_files(workspace_id, wanted, CLOSEST_SHOWN)
+            .await
+            .unwrap_or_default();
+        if closest.is_empty()
+            && self
+                .cairn_artifacts(workspace_id)
+                .await
+                .is_ok_and(|files| files.is_empty())
+        {
+            return "This workspace has no files yet.".to_owned();
+        }
+        let mut text = format!("No file name or path matches “{wanted}”.");
+        if !closest.is_empty() {
+            text.push_str(&format!(
+                " The closest files are: {}.",
+                closest
+                    .iter()
+                    .map(|file| file.path.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+        }
+        text.push(' ');
+        text.push_str(next);
+        text
+    }
+
     /// The files of a workspace that CAIRN may read: those outside the folders a workspace administrator closed to it (V0.9.93).
     pub(in crate::agent) async fn cairn_artifacts(&self, workspace_id: &str) -> Result<Vec<ArtifactSummary>> {
         let closed = self.storage.closed_artifact_ids(workspace_id).await?;
@@ -383,9 +459,10 @@ impl RepoMemoCore {
         }
         let mut matches = self.match_files(&request.workspace_id, wanted).await?;
         if matches.is_empty() {
-            return Ok(Err(reply(format!(
-                "No file name or path matches “{wanted}”. Use Find files to look it up first."
-            ))));
+            return Ok(Err(reply(
+                self.no_match_message(&request.workspace_id, wanted, "Use Find files to look it up first.")
+                    .await,
+            )));
         }
         let clear = matches.len() == 1 || (matches[0].exact && !matches[1].exact);
         if !clear {
@@ -411,6 +488,55 @@ impl RepoMemoCore {
 pub(in crate::agent) struct ResolvedFiles {
     pub(in crate::agent) files: Vec<ArtifactSummary>,
     pub(in crate::agent) description: String,
+}
+
+/// How many closest files a miss names.
+pub(in crate::agent) const CLOSEST_SHOWN: usize = 5;
+/// How close a name has to be, from 0 to 1, to be offered.
+const CLOSE_ENOUGH: f64 = 0.5;
+
+/// How close the words asked for are to a file's name, from 0 to 1: the best of the title and the file name, with or without its
+/// extension, by edit distance; a name that holds the words, or that the words hold, counts as at least 0.8.
+fn name_closeness(wanted: &str, file: &ArtifactSummary) -> f64 {
+    let name = file.path.rsplit('/').next().unwrap_or(&file.path).to_lowercase();
+    let title = file.title.to_lowercase();
+    let stem = |text: &str| {
+        text.rsplit_once('.')
+            .map_or(text.to_owned(), |(stem, _)| stem.to_owned())
+    };
+    let wanted_stem = stem(wanted);
+    let mut best = 0.0_f64;
+    for candidate in [name.clone(), stem(&name), title.clone(), stem(&title)] {
+        for asked in [wanted, wanted_stem.as_str()] {
+            if asked.is_empty() || candidate.is_empty() {
+                continue;
+            }
+            best = best.max(similarity(asked, &candidate));
+            if asked.chars().count() >= 3 && (candidate.contains(asked) || asked.contains(candidate.as_str())) {
+                best = best.max(0.8);
+            }
+        }
+    }
+    best
+}
+
+/// `1 - distance / length` of the longer text, by edit distance.
+fn similarity(a: &str, b: &str) -> f64 {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    let longest = a.len().max(b.len());
+    if longest == 0 || a.len().abs_diff(b.len()) * 2 > longest {
+        return 0.0;
+    }
+    let mut previous = (0..=b.len()).collect::<Vec<_>>();
+    for (row, left) in a.iter().enumerate() {
+        let mut current = vec![row + 1];
+        for (column, right) in b.iter().enumerate() {
+            let substitution = previous[column] + usize::from(left != right);
+            current.push(substitution.min(previous[column + 1] + 1).min(current[column] + 1));
+        }
+        previous = current;
+    }
+    1.0 - previous[b.len()] as f64 / longest as f64
 }
 
 pub(in crate::agent) struct FileMatch {

@@ -4,6 +4,7 @@
 //! calls themselves: another workspace's files, and files of a quarantined connector, are never returned.
 
 use crate::agent::run::{arg_list, arg_text};
+use crate::agent::tools::find::CLOSEST_SHOWN;
 use crate::agent::*;
 
 /// The most characters one tool result gives the model.
@@ -587,7 +588,7 @@ impl RepoMemoCore {
     /// The file a name, a path or an id means in this workspace: the one file, or what to say instead.
     pub(in crate::agent) async fn tool_file(
         &self,
-        ledger: &EvidenceLedger,
+        ledger: &mut EvidenceLedger,
         file: &str,
     ) -> Result<std::result::Result<ArtifactSummary, String>> {
         let file = file.trim();
@@ -612,7 +613,7 @@ impl RepoMemoCore {
         }
         let matches = self.match_files(ledger.workspace_id(), file).await?;
         match matches.as_slice() {
-            [] => Ok(Err(format!("No file in this workspace is named like \"{file}\"."))),
+            [] => Ok(Err(self.miss_for_model(ledger, file).await?)),
             [only] => Ok(Ok(only.artifact.clone())),
             [first, rest @ ..] if first.exact && !rest.iter().any(|other| other.exact) => {
                 Ok(Ok(first.artifact.clone()))
@@ -642,11 +643,7 @@ impl RepoMemoCore {
         };
         let detail = match self.storage.get_artifact(&summary.id).await {
             Ok(detail) if detail.summary.workspace_id == ledger.workspace_id() => detail,
-            _ => {
-                return Ok(ToolOutput::text(format!(
-                    "No file in this workspace is named like \"{file}\"."
-                )))
-            }
+            _ => return Ok(ToolOutput::text(self.miss_for_model(ledger, file).await?)),
         };
         let mut all = detail.chunks;
         all.sort_by_key(|chunk| chunk.chunk_index);
@@ -714,6 +711,35 @@ impl RepoMemoCore {
             for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
             handles,
         })
+    }
+
+    /// What the model is told when no file is named like what it asked for (V0.9.140): the closest files with handles it can read at
+    /// once, and the tools to try next. A workspace with no files says so.
+    async fn miss_for_model(&self, ledger: &mut EvidenceLedger, file: &str) -> Result<String> {
+        let workspace_id = ledger.workspace_id().to_owned();
+        let closest = self.closest_files(&workspace_id, file, CLOSEST_SHOWN).await?;
+        if closest.is_empty() && self.cairn_artifacts(&workspace_id).await?.is_empty() {
+            return Ok("This workspace has no files yet.".to_owned());
+        }
+        let mut text = format!("No file in this workspace is named like \"{file}\".");
+        if closest.is_empty() {
+            text.push_str(
+                " Use query_files to filter files by kind, size or date, or search_evidence to search inside files.",
+            );
+            return Ok(text);
+        }
+        let states = self.lifecycle_by_file(&workspace_id).await;
+        let mut listed = Vec::new();
+        for found in &closest {
+            let state = states.get(&found.id).map(String::as_str).or(Some("active"));
+            let handle = ledger.handle_for(EvidenceKind::File, &found.id, None, &found.title, &found.path, state);
+            listed.push(format!("[{handle}] {}", found.path));
+        }
+        text.push_str(&format!(
+            " The closest files are: {}. Use read_file with one of those handles, query_files to filter files by kind, size or date, or search_evidence to search inside files.",
+            listed.join("; ")
+        ));
+        Ok(text)
     }
 
     /// The files a filter means ("the pdfs in Finance"), by path, each with a handle and its state.
@@ -1213,6 +1239,72 @@ mod tests {
             Ok(Some("2026-03-01".to_owned()))
         );
         assert!(date_argument(&json!({ "d": "last year" }), "d").is_err());
+    }
+
+    /// V0.9.140: a misspelled file name gets the right file among the candidates, with handles and the tools to try next, and an
+    /// empty workspace says so.
+    #[tokio::test]
+    async fn a_miss_lists_the_closest_files_and_names_the_tool_to_try_next() {
+        let (core, data_dir) = core("misses").await;
+        let empty = core.create_workspace("Empty".to_owned()).await.unwrap();
+        let mut ledger = EvidenceLedger::new(&empty.id);
+        let nothing = core.tool_read_file(&mut ledger, "retry-polcy.md", 0, 1).await.unwrap();
+        assert_eq!(nothing.for_model, "This workspace has no files yet.");
+
+        let workspace = core.create_workspace("Misses".to_owned()).await.unwrap();
+        note(
+            &core,
+            &workspace.id,
+            "retry-policy.md",
+            "# Retries
+
+Retries wait twice as long.",
+        )
+        .await;
+        note(
+            &core,
+            &workspace.id,
+            "deploy-guide.md",
+            "# Deploy
+
+How to deploy.",
+        )
+        .await;
+        let mut ledger = EvidenceLedger::new(&workspace.id);
+        let missed = core.tool_read_file(&mut ledger, "retry-polcy.md", 0, 1).await.unwrap();
+        assert!(
+            missed.for_model.contains("No file in this workspace is named like"),
+            "{}",
+            missed.for_model
+        );
+        assert!(
+            missed.for_model.contains("[E1] retry-policy.md"),
+            "{}",
+            missed.for_model
+        );
+        assert!(!missed.for_model.contains("deploy-guide.md"), "{}", missed.for_model);
+        assert!(missed.for_model.contains("query_files") && missed.for_model.contains("search_evidence"));
+        // The handle it was given reads the file at once.
+        let read = core.tool_read_file(&mut ledger, "E1", 0, 1).await.unwrap();
+        assert!(read.for_model.contains("twice as long"), "{}", read.for_model);
+        // Facts about a missing file point the same way; a name nothing is close to says what to try.
+        let facts = core.tool_file_facts(&mut ledger, "retry-polcy").await.unwrap();
+        assert!(facts.for_model.contains("retry-policy.md"), "{}", facts.for_model);
+        let far = core.tool_file_facts(&mut ledger, "zzzzqqqq").await.unwrap();
+        assert!(
+            far.for_model.contains("query_files") && !far.for_model.contains("closest files"),
+            "{}",
+            far.for_model
+        );
+
+        // The router's reply without a model names the same candidates.
+        let reply = core.agent_find_files(&workspace.id, "retry-polcy").await.unwrap();
+        assert!(
+            reply.reply_markdown.contains("closest files are: retry-policy.md"),
+            "{}",
+            reply.reply_markdown
+        );
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 
     /// V0.9.137: "what is the largest file" is one call; a file in a closed folder never appears.

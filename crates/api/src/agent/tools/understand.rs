@@ -32,9 +32,10 @@ impl RepoMemoCore {
                 let mut matches = self.match_files(&request.workspace_id, subject).await?;
                 let clear_winner = matches.len() == 1 || (matches.len() > 1 && matches[0].exact && !matches[1].exact);
                 if matches.is_empty() {
-                    return Ok(reply(format!(
-                        "No file name or path matches “{subject}”. Use Find files to look it up first."
-                    )));
+                    return Ok(reply(
+                        self.no_match_message(&request.workspace_id, subject, "Use Find files to look it up first.")
+                            .await,
+                    ));
                 }
                 if !clear_winner {
                     let mut result = reply(format!("Several files match “{subject}”. Pick the one to summarize."));
