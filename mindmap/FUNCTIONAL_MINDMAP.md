@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.117` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.118` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.118 — Guides for CAIRN administration: tiers, guardrails, abilities, preferences and refusals.
+
+- **Guides.** The administrator guide has a CAIRN administration section: the four tiers and what each decides, the pages of the administration page, the guardrails in the rough order a request meets them, abilities, instructions and the knowledge workspace, preferences and welcome. The user guide explains the model picker, preferences, abilities, exporting or deleting memory, and why CAIRN may refuse or answer differently.
+
+Checks: docs:check; documentation only, no code changed.
 
 ## V0.9.117 — Security review of CAIRN administration, with three fixes.
 

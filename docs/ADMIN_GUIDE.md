@@ -21,6 +21,40 @@ What an administrator decides about CAIRN, the assistant, and where.
 
 The open findings of the latest reviews are in [the CAIRN security review](../mindmap/security/2026-11-25-cairn-review.md) and [the CAIRN administration review](../mindmap/security/2026-11-27-cairn-administration-review.md). Reference: [API](../mindmap/technical/api-reference.md) · [settings](DEVELOPMENT_COMMANDS.md).
 
+## CAIRN administration (0.9.70 to 0.9.119)
+
+Who decides what about CAIRN, in four tiers. A lower tier can only be **stricter** than the one above it; where it is not, the page says why and the server refuses.
+
+| Tier | Who | What they decide |
+|---|---|---|
+| **The server** | CAIRN administrators and system administrators (app administrators read) | The **catalog**: the connections to model servers (Ollama, OpenRouter, any OpenAI-compatible address; the key is write-only and sealed, and a connection that leaves your network must be confirmed) and the models on them (what each is for, whether it takes tools, its context, its live evaluation, its fallback). The run budgets. |
+| **The organization** | Its owners and admins (and the server's administrators) | Which catalog models it uses and its default, Agent mode, which roles may use which model, the **guardrails**, its instructions, its knowledge workspace, its preference defaults, its greeting and starter questions, and its abilities |
+| **The workspace** | Its administrators | Which of the organization's models it offers and its default, stricter guardrails, the folders closed to CAIRN, its embedding and vision model, its own abilities and which of the organization's it keeps on, its greeting and starter questions |
+| **The person** | Anyone who may use AI | The model of a chat (from the list offered), their preferences, their personal memory |
+
+**The administration page** (`/cairn/admin/{section}`; the rail's *Administration* tab): *Overview*, *Models* (connections and models), *Organizations* (an organization's settings), *Abilities*, *Memory* (cards, playbooks and routines of the workspaces, in figures), *Usage* (runs, tokens, failures and fallbacks over 7 or 30 days, in figures, never a message or a person; a group of fewer than five people shows only its size) and *History* (every change, with who and the values before and after; the same events are in System › Audit). Owners and admins of an organization see only their own organizations, and the History matches events by the organization's and its workspaces' ids.
+
+**Guardrails, in the rough order a request meets them.**
+
+1. *Who may use AI* in the workspace (Settings › AI) decides whether CAIRN uses a model for that role.
+2. *Which model.* The organization's models, narrowed by the workspace, narrowed by the role limits; the person's choice or preference is used only if it is still offered. A workspace with no model chosen by its organization keeps its own provider until it moves to the catalog.
+3. *Per-person daily budgets* (runs and tokens), then the organization's *monthly token budget* (administrators are told at 80 and 100 percent; at the cap CAIRN stops, or keeps to models on your network).
+4. *Tools and jobs turned off* by the organization or the workspace: the two lists add up, and a workspace cannot turn one on.
+5. *Closed folders*: a workspace closes folders (and their subfolders) to CAIRN.
+6. *Before a cloud model sees anything*: secrets are masked or the request is refused, and, if set, email addresses and phone numbers are masked.
+7. *Strict citations*: an answer about the workspace's content that cites nothing it read is not shown, and says what was read.
+8. *Changes*: at most so many changes per confirmation, and the number typed above a threshold.
+
+Also set here: *routine limits* (routines a person and a workspace may have, the schedules allowed, event routines), *MCP and inbox* (whether outside agents are served, may propose, and how many proposals wait), *personal memory* (on or off for the organization's workspaces, and a cap on entries per person: a workspace can only turn it off) and *retention* (days to keep run history, chats and personal memory in the organization's workspaces; the shorter of this and the server's applies, and the settings page shows what a change would delete before you save it).
+
+**Abilities.** A procedure taught to CAIRN: a name, a `/command`, instructions, the tools it may use (only registered ones), the fields it asks first and an output template. Organizations and workspaces keep up to 100 each; every publish is a new version and older ones are kept; a workspace's command cannot repeat its organization's. An ability can narrow a run but never widen it: it keeps only those of its tools the run already has, so it gives no tool and no right. It needs Agent mode, and the trace and the answer end with "Ability: name, version N". A verified playbook becomes an ability in one step (*Workspace settings › Playbooks*), and the two show each other.
+
+**Instructions and the knowledge workspace.** The organization's instructions (4,000 characters) are read into every Agent-mode run in its workspaces, after the rules and before the workspace's `CAIRN.md`, and the run's trace begins with their version. The knowledge workspace's current memory cards and verified playbooks are offered in the others, only to people who can read it; a chat that used its cards cannot be shared.
+
+**Preferences and welcome.** People set their own language, length, steps and Agent or Jobs in their profile; the organization's defaults apply where they chose nothing. The greeting and up to six starter questions replace the standard ones.
+
+**Open items of the latest review** are in [the CAIRN administration review](../mindmap/security/2026-11-27-cairn-administration-review.md): the audit text keeps what administrators write in full, and one administrator can change instructions and abilities for a whole organization. No setting was added to `DEVELOPMENT_COMMANDS.md` and no console command: the run budgets are on the page, and the evaluation is still `npm run cairn:eval`.
+
 ## AI usage and limits (0.8)
 
 The calls the server makes on its own for a workspace (embedding batches and image descriptions) are counted **in the database**, so a limit stops them the same way before and after a restart. **API:** `GET /v1/workspaces/{id}/ai-usage` shows the limit and where it comes from (the workspace's own, the server's default or none), today's calls, the calls a limit refused, what is left, the last days by kind, how many files, passages and stored vectors the workspace holds, and which providers are on for text, embedding and vision. `PUT /v1/workspaces/{id}/ai-limit` with `{"daily_calls": 200}` sets the workspace's own daily limit, `0` removes the limit, and `null` returns to the server's default. At the limit, embedding and image description stop (and say why on the job) and resume the next UTC day. **Keyword search never calls an AI provider**, so it keeps working when AI is off, not configured, over its limit or failing; only semantic matching, Ask and summaries need a provider. No screen yet.

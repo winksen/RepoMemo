@@ -2,6 +2,27 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.118 (2026-11-27)
+
+Guides for CAIRN administration: tiers, guardrails, abilities, preferences and refusals.
+
+### Added
+- **Administrator guide.** A section, CAIRN administration (0.9.70 to 0.9.119): the four tiers (the server, the organization, the workspace, the person) and that a lower tier can only be stricter; the sections of the administration page and who sees them; the guardrails in the rough order a request meets them; routine limits, MCP and inbox, personal memory and retention; abilities, instructions, the knowledge workspace, preferences and the welcome; and the review's open items.
+- **User guide.** How to choose a model and set preferences, what the organization's defaults mean, exporting or deleting what CAIRN remembers, how abilities run from the + menu or a command, and a list of why CAIRN may refuse or answer differently, with who decided.
+
+### Checked
+- **The API reference** already has a row for each route added since V0.9.70; `npm run docs:check` counts 444 routes against it.
+- **The console and settings.** No console command and no server setting was added since V0.9.70 (the run budgets are edited on the page, the evaluation is still `npm run cairn:eval`), so the commands reference is unchanged.
+
+### Not yet
+- **Screens were not opened** while writing, and the guides describe the code as it is read, not as it was tried. The walkthrough with a real provider is V0.9.119.
+
+### Checks
+- `npm run docs:check` passes (links and counts). Documentation only: no code changed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.117 (2026-11-27)
 
 Security review of CAIRN administration, with three fixes.
