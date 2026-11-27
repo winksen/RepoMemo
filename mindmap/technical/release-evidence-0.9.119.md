@@ -199,6 +199,91 @@ Walk each row once. A row that fails becomes a numbered fix row inserted before 
 | V0.9.117 | CAIRN administration security review | AU. CAIRN closing | pending | | |
 | V0.9.118 | CAIRN administration guides | AU. CAIRN closing | pending | | |
 
+## V0.9.145: tool choice evidence
+
+Prepared 2026-11-27 for the [tool choice plan](../plans/2026-11-27-0.9-cairn-tool-choice.md) (V0.9.127 to V0.9.145, [ADR 0008](../../docs/decisions/0008-cairn-asks-the-model-first-whenever-there-is-one.md)). **Nothing in this section has been run**: the author started no server, no browser or desktop app, used no AI provider, ran no live evaluation and executed no test (the project's rule is that the maintainer runs and tests the app). Every result below is `pending` until the maintainer fills it in.
+
+### Checks run for V0.9.127 to V0.9.144
+
+| Check | Result | Scope |
+|---|---|---|
+| Version, migration lock, documentation links and counts (`npm run docs:check`) | Pass | At each release |
+| Clippy with warnings denied, whole workspace, all targets | Pass | At each release that changed Rust; it compiles every Rust test and runs none |
+| TypeScript (`npm run typecheck`) and the generated types check | Pass | At V0.9.129, V0.9.142 and V0.9.144; they compile every web test |
+| Rust format | Pass | `cargo fmt --all` |
+| Executing any Rust or web test, including the 47 scripted evaluation cases | **Not run** | The maintainer's own run is owed |
+| A live evaluation of a model (`npm run cairn:eval`) | **Not run** | Needs a provider and a token |
+
+### Live evaluation, before and after
+
+Run `npm run cairn:eval` with the same model at the baseline (V0.9.126, 40 cases) and at V0.9.144 or later (47 cases), and with one smaller local model at V0.9.144 or later. Keep each report as `mindmap/technical/cairn-eval-<version>-<model>.md` and attach it to the model in the catalog, so its score shows in the picker.
+
+| Model | Version | Cases | Tool accuracy | Citation precision | Forbidden actions | Passed | Date |
+|---|---|---|---|---|---|---|---|
+| The baseline model | V0.9.126 | 40 | pending | pending | pending | pending | |
+| The baseline model | V0.9.144 or later | 47 | pending | pending | pending | pending | |
+| A smaller local model | V0.9.144 or later | 47 | pending | pending | pending | pending | |
+
+The point of the comparison is the seven new cases (c41 to c47): *analyze the size of files in this repo* must call `query_files` and not `analyze_files`.
+
+### The walkthrough (a test server, one workspace with files of different sizes and a folder or two)
+
+1. **The request of the screenshot.** Write *analyze the size of files in this repo* with a model. CAIRN calls `query_files` (see *What CAIRN did*), names the largest files with their sizes, and no reply says how it was matched. The same request with no model enabled says it was *answered without AI* and why.
+2. **The second request of the screenshot.** Repeat the other request the maintainer sent in the screenshot; it is chosen by the model, and a lookup that finds nothing names the closest files.
+3. **A greeting.** *Salam* with a model is answered by the model, in the person's language; with no model, by the built-in reply.
+4. **A picked job.** Pick *Find files* from the + menu and type a name: the first step of *What CAIRN did* is that job, and CAIRN may then read or search further.
+5. **An uploaded file.** Attach a file and ask *what is this file about*: CAIRN reads that file by its handle and cites it. A viewer's upload cannot propose a change.
+6. **No model.** Disable AI for the workspace: lookups and searches still work by the keyword rules, and each reply is labelled *Answered without AI* with the reason.
+7. **A misspelled name.** Ask about *retry-polcy.md*: the closest files are listed with what to try next.
+8. **Sizes, counts and folders.** *What is the largest file*, *how many PDFs changed this year*, *which folder takes the most space*: one call each, and a file in a folder closed to CAIRN never appears.
+9. **The model that cannot follow the format.** With a model that does not return clean JSON, the run falls back to one job (*What CAIRN did* says so) instead of ending partial.
+10. **The picker.** A model with a report shows *Tool choice 87% · date*, a failing one says *did not pass*, and one without says *Not measured*.
+
+| Step | Result | Date | Notes (what stopped you, if anything) |
+|---|---|---|---|
+| 1. The request of the screenshot | pending | | |
+| 2. The second request of the screenshot | pending | | |
+| 3. A greeting | pending | | |
+| 4. A picked job | pending | | |
+| 5. An uploaded file | pending | | |
+| 6. No model | pending | | |
+| 7. A misspelled name | pending | | |
+| 8. Sizes, counts and folders | pending | | |
+| 9. The model that cannot follow the format | pending | | |
+| 10. The picker | pending | | |
+
+A step that fails becomes a numbered fix row inserted before V0.9.145; do not edit a row to pass.
+
+### Every row of the tool choice line, to validate
+
+| Row | Title | Track | Result | Date | Notes |
+|---|---|---|---|---|---|
+| V0.9.127 | CAIRN tool choice plan | AU. CAIRN closing | pending | | |
+| V0.9.128 | Unknown tool mode tried as JSON | BA. Model first | pending | | |
+| V0.9.129 | Agent mode whenever the model takes tools | BA. Model first | pending | | |
+| V0.9.130 | One-job fallback | BA. Model first | pending | | |
+| V0.9.131 | The model before keywords | BA. Model first | pending | | |
+| V0.9.132 | Answers written from a job's result | BA. Model first | pending | | |
+| V0.9.133 | Greetings answered by the model | BA. Model first | pending | | |
+| V0.9.134 | A picked job inside the loop | BA. Model first | pending | | |
+| V0.9.135 | Uploaded files in the loop | BA. Model first | pending | | |
+| V0.9.136 | File query sorting and size | BB. Tools for the model | pending | | |
+| V0.9.137 | Query files tool | BB. Tools for the model | pending | | |
+| V0.9.138 | Groups and totals | BB. Tools for the model | pending | | |
+| V0.9.139 | Tool descriptions for the model | BB. Tools for the model | pending | | |
+| V0.9.140 | Misses that point the way | BB. Tools for the model | pending | | |
+| V0.9.141 | Loop instructions | BB. Tools for the model | pending | | |
+| V0.9.142 | Reply labels | BC. Honest labels | pending | | |
+| V0.9.143 | Tool-choice evaluation cases | BD. Measured | pending | | |
+| V0.9.144 | Model score in the picker | BD. Measured | pending | | |
+
+### What was found while building, to look at
+
+- A job picked from the + menu and a message about an uploaded file now run in the loop, but the web client only follows a run live (step by step, with Stop) for a message with no picked job and no upload. They answer, but without live steps. A follow-up row if the walkthrough shows it matters.
+- A reply made by a provider that failed does not carry a reason of its own: the warning says what happened, and *Answered without AI* is for a workspace with no usable model.
+- `query_files` groups *by folder* by the folders of the workspace's folder tree; the files of a connected repository, which sit in no folder, are counted as *(no folder)*.
+- The scripted cases c41 to c47 were written without being run; if one fails, check its script before the code.
+
 ## Open items carried into 0.10
 
 - From the [administration review](../security/2026-11-27-cairn-administration-review.md): **CR-5** (the audit trail holds the full text of what administrators write) and **CR-6** (no second approval for instructions and abilities).

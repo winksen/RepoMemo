@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.144` (2026-11-27)
+> **Current:** `V0.9.145` (2026-11-27)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md) · [CAIRN administration plan](plans/2026-11-26-0.9-cairn-administration.md) · [ADR 0007](../docs/decisions/0007-cairn-models-are-a-system-catalog-chosen-per-organization.md) · [CAIRN tool choice plan](plans/2026-11-27-0.9-cairn-tool-choice.md) · [ADR 0008](../docs/decisions/0008-cairn-asks-the-model-first-whenever-there-is-one.md)
 
@@ -168,7 +168,7 @@
 | **V0.9.142** | 🧪 2026-11-27 | BC. Honest labels | 🔧 | Reply labels | Remove the routing notes and the AI-generated chip, add one standing note that AI responses can be inaccurate, and label replies made without AI with the reason | No reply says how it was matched, the note sits under the message box, and a reply without a model says why |
 | **V0.9.143** | 🧪 2026-11-27 | BD. Measured | ✨ | Tool-choice evaluation cases | Add evaluation cases for file sizes, counts, folder totals, a misspelled name, a greeting and a French request, including the request that matched Analyze by its words | The scripted run passes, and the size request forbids analyze_files |
 | **V0.9.144** | 🧪 2026-11-27 | BD. Measured | ✨ | Model score in the picker | Show each model's latest tool-choice score and date, or Not measured, in the chat's model picker and the catalog | A model with a report shows its score, a failing one says so, and one without says Not measured |
-| **V0.9.145** | 🔜 | BD. Measured | 📘 | Tool choice evidence | Record the maintainer's evaluation on the baseline model and a small local one, and walk through the screenshot's requests, a greeting, a picked job, an upload and no model | Both reports and the baseline are recorded, and failing rows have fix rows before this one |
+| **V0.9.145** | 🧪 2026-11-27 | BD. Measured | 📘 | Tool choice evidence | Record the maintainer's evaluation on the baseline model and a small local one, and walk through the screenshot's requests, a greeting, a picked job, an upload and no model | Both reports and the baseline are recorded, and failing rows have fix rows before this one |
 
 ## Verification and handoff
 

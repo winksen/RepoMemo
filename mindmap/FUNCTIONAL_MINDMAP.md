@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.144` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.145` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.145 — The tool choice evidence is prepared: the evaluation and walkthrough sheets are in the closing record, and every result is pending the maintainer's run.
+
+- **Nothing changes on screen.** This release prepares the maintainer's evaluation. The scores will show in the model picker once the reports are attached.
+
+Checks: docs:check passes. Not run: any test, `npm run cairn:eval`, the walkthrough.
 
 ## V0.9.144 — Each model's latest tool-choice score and date, or Not measured, shows in the chat's model picker and in the catalog.
 

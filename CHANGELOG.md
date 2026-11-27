@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.145 (2026-11-27)
+
+The tool choice evidence is prepared: the evaluation and walkthrough sheets are in the closing record, and every result is pending the maintainer's run.
+
+### Added
+- **Closing record.** A V0.9.145 section in [the closing record](mindmap/technical/release-evidence-0.9.119.md): the checks run for V0.9.127 to V0.9.144, a table for the baseline model (V0.9.126, 40 cases), the same model at V0.9.144 or later (47 cases) and a smaller local model, and a ten-step walkthrough (the request of the screenshot, a greeting, a picked job, an uploaded file, no model, a misspelled name, sizes and folders, a model that cannot follow the format, the picker).
+- **Rows to validate.** Every row of V0.9.127 to V0.9.144 with a result column.
+- **Decisions and gaps.** The plan records the decisions made during the line, and the record lists what was found while building, including that a picked job and an upload answer in the loop without live steps.
+
+### Checks
+- docs:check passes. Not run: any test, `npm run cairn:eval`, the walkthrough.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.144 (2026-11-27)
 
 Each model's latest tool-choice score and date, or Not measured, shows in the chat's model picker and in the catalog.
