@@ -272,9 +272,10 @@ impl RepoMemoCore {
         self.run_agent_router(request).await
     }
 
-    /// Answers a message, with the tool loop when the workspace is in Agent mode (V0.9.40). A job picked from the + menu, a
-    /// message about an uploaded file and a workspace with no provider keep the router, which is also the fallback when no loop is
-    /// set up. A greeting goes to the loop like any message when there is a model (V0.9.133).
+    /// Answers a message, with the tool loop when the workspace is in Agent mode (V0.9.40). A message about an uploaded file, a
+    /// picked job with no text and a workspace with no provider keep the router, which is also the fallback when no loop is set
+    /// up. A greeting goes to the loop like any message when there is a model (V0.9.133), and so does a job picked from the +
+    /// menu, as the loop's first tool call (V0.9.134).
     pub async fn run_agent_with(
         &self,
         request: AgentRequest,
@@ -282,11 +283,8 @@ impl RepoMemoCore {
     ) -> Result<AgentOutcome> {
         if let Some(setup) = loop_setup {
             let message = request.message.trim();
-            if request.capability.is_none()
-                && request.artifact_id.is_none()
-                && request.provider_id.is_some()
-                && !message.is_empty()
-            {
+            // A job picked from the + menu runs inside the loop too (V0.9.134); one about a file keeps the router until V0.9.135.
+            if request.artifact_id.is_none() && request.provider_id.is_some() && !message.is_empty() {
                 return self.run_loop(request, setup).await;
             }
         }

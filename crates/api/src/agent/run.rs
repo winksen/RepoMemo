@@ -1125,8 +1125,33 @@ impl RepoMemoCore {
         if let Some(ability) = &setup.ability {
             tools.retain(|tool| ability.tools.iter().any(|name| name == tool.name));
         }
+        // A job picked from the + menu runs inside the loop as its first tool call (V0.9.134): the loop offers its tool, and the model
+        // is told to call it first with the message; it may follow up with other tools after.
+        let mut must_call_first: Option<(&'static str, &'static str)> = None;
+        if let Some(capability) = request.capability {
+            let picked = tool_for(capability);
+            let allowed = (!picked.writes() || setup.can_write)
+                && !setup.disabled_tools.iter().any(|off| off == picked.name)
+                && setup
+                    .ability
+                    .as_ref()
+                    .is_none_or(|ability| ability.tools.iter().any(|name| name == picked.name));
+            if allowed {
+                if !tools.iter().any(|tool| tool.name == picked.name) {
+                    tools.push(job(capability));
+                }
+                must_call_first = Some((picked.name, picked.label));
+            }
+        }
         let specs = tools.iter().map(LoopTool::spec).collect::<Vec<_>>();
         let mut system = loop_system(&tools);
+        if let Some((name, label)) = must_call_first {
+            system = format!(
+                "{system}
+
+The person chose the job “{label}” from the menu. Call the tool {name} first, with their message as its subject. Then use other tools only if its result is not enough, and answer."
+            );
+        }
         if let Some(block) = personal_block(&request.personal_memory) {
             system = format!("{system}\n\n{block}");
         }
@@ -1398,8 +1423,23 @@ impl RepoMemoCore {
             ));
             for call in &turn.tool_calls {
                 let called = Instant::now();
-                let (for_model, evidence, error, summary) = self
-                    .call_loop_tool(
+                // Until the job the person picked has been called, any other tool is turned back with what to do.
+                let turned_back = must_call_first.filter(|(name, _)| *name != call.name);
+                if must_call_first.is_some_and(|(name, _)| name == call.name) {
+                    must_call_first = None;
+                }
+                let (for_model, evidence, error, summary) = if let Some((name, label)) = turned_back {
+                    let problem = format!(
+                        "The person chose the job “{label}”. Call {name} first, with their message as its subject; after that you may use other tools."
+                    );
+                    (
+                        problem.clone(),
+                        Vec::new(),
+                        Some(problem),
+                        format!("Called {} before the chosen job", shorten(&call.name, 40)),
+                    )
+                } else {
+                    self.call_loop_tool(
                         &tools,
                         call,
                         &request,
@@ -1409,7 +1449,8 @@ impl RepoMemoCore {
                         &mut ledger,
                         &mut gathered,
                     )
-                    .await;
+                    .await
+                };
                 let is_proposal = tools.iter().any(|tool| tool.name == call.name && tool.proposes) && error.is_none();
                 gathered.step(
                     if is_proposal { "proposal" } else { "tool" },
@@ -2178,6 +2219,53 @@ mod tests {
         assert_eq!(spent.load(Ordering::SeqCst), 2);
         assert_eq!(outcome.trace.unwrap().state, "partial");
         assert!(outcome.reply.reply_markdown.contains("AI allowance is used up"));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_picked_job_is_the_first_tool_call_and_the_model_may_follow_up() {
+        let (core, data_dir) = core("picked").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call("find_files", json!({ "subject": "retry" })),
+            ChatResponse::call("read_file", json!({ "file": "retry-policy.md" })),
+            ChatResponse::text("Retries wait twice as long each time [E1]."),
+        ]);
+        let mut picked = request(&workspace_id, "retry");
+        picked.capability = Some(AgentCapability::FindFiles);
+        let outcome = core.loop_with(&provider, picked, setup(8, true)).await.unwrap();
+        let trace = outcome.trace.unwrap();
+        assert_eq!(trace.steps[0].tool.as_deref(), Some("find_files"));
+        assert!(trace.steps[0].error.is_none());
+        assert_eq!(trace.steps[1].tool.as_deref(), Some("read_file"));
+        // The model was offered the job's tool and told which job the person chose.
+        let first = &provider.requests()[0];
+        assert!(first.tools.iter().any(|tool| tool.name == "find_files"));
+        assert!(first.messages[0].content.contains("Call the tool find_files first"));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_model_that_calls_another_tool_before_the_picked_job_is_turned_back_and_recovers() {
+        let (core, data_dir) = core("picked-wrong").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call("search_evidence", json!({ "query": "retry" })),
+            ChatResponse::call("find_files", json!({ "subject": "retry" })),
+            ChatResponse::text("Found retry-policy.md."),
+        ]);
+        let mut picked = request(&workspace_id, "retry");
+        picked.capability = Some(AgentCapability::FindFiles);
+        let outcome = core.loop_with(&provider, picked, setup(8, true)).await.unwrap();
+        let trace = outcome.trace.unwrap();
+        assert!(trace.steps[0]
+            .error
+            .as_deref()
+            .unwrap_or_default()
+            .contains("Call find_files first"));
+        assert_eq!(trace.steps[1].tool.as_deref(), Some("find_files"));
+        assert!(trace.steps[1].error.is_none());
+        assert_eq!(trace.state, "answered");
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

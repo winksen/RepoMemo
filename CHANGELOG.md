@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.134 (2026-11-27)
+
+A job picked from the + menu runs as the loop's first tool call, so the model can follow up with other tools.
+
+### Changed
+- **Picked jobs in the loop.** With a model that takes tools, a job picked from the + menu no longer skips the loop. The loop offers the job's tool, tells the model the person chose it and to call it first with their message, and lets it follow up with other tools before it answers.
+- **First call enforced.** A model that calls another tool first gets an error that names the chosen tool, and can recover. A job with no typed text, one about an uploaded file, and a workspace without a model keep the router.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.133 (2026-11-27)
 
 Greetings and questions about CAIRN go to the model when there is one; the built-in replies are for a workspace with no model.
