@@ -420,7 +420,6 @@ function SharedWebAppContent() {
     {clientPlatform.nativeNotices ? <NoticeWatcher accessToken={accessToken} userId={session.user.id} workspaceIds={workspaces.map((entry) => entry.workspace.id)} /> : null}
     <SharedShell
       accessToken={accessToken}
-      cairnAdmin={cairnAdminSections(session, organizations).length > 0}
       chatsOnly={route.name === "cairn"}
       defaultOrganizationId={workspaceOrganization?.id ?? organizations[0]?.id}
       onNavigate={navigate}
