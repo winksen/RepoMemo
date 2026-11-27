@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.130 (2026-11-27)
+
+A model that cannot follow the JSON tool protocol still gets an answer: it picks one job, the job runs and answers.
+
+### Changed
+- **One-job fallback.** When the model's reply cannot be read as a tool call or an answer, even after being asked again, CAIRN no longer ends the run as partial. The model picks one job, the job runs, and its reply is the answer.
+- **Trace.** *What CAIRN did* shows a note, *Fell back to one job*, and the job that ran. A readable reply after one failure continues the loop as before.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.129 (2026-11-27)
 
 Every model that takes tools runs CAIRN's loop, unless the organization, the workspace or the person chose Jobs.

@@ -41,7 +41,6 @@ type Handler = for<'a> fn(&'a RepoMemoCore, ToolRun<'a>) -> ToolFuture<'a>;
 
 pub(in crate::agent) struct CairnTool {
     /// Snake case and stable: the name the model calls and the evaluation set refers to.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub name: &'static str,
     /// The job the + menu offers for this tool.
     pub capability: AgentCapability,

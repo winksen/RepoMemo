@@ -407,20 +407,7 @@ impl RepoMemoCore {
             repomemo_domain::bail_invalid!("The selected provider is not enabled for this workspace.");
         }
         let provider = provider_from_settings(settings)?;
-        let raw = provider
-            .generate(GenerateRequest {
-                system: Some("You classify requests. You reply with JSON only.".to_owned()),
-                prompt: format!(
-                    "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:
-{}
-Reply with JSON only, no prose: {{\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}}. The user's message is the context below.",
-                    classifier_catalog()
-                ),
-                context: message.to_owned(),
-                options: json!({ "temperature": 0.0 }),
-            })
-            .await?;
-        Ok(parse_model_route(&raw, message))
+        classify_with(&provider, message).await
     }
 
     /// What CAIRN's own replies may say: whether an AI provider is enabled, and the workspace's name and how many files are
@@ -493,6 +480,27 @@ Reply with JSON only, no prose: {{\"capability\": \"<id>\", \"subject\": \"<the 
             }
         }
     }
+}
+
+/// Asks a model which one job fits a message, and with what subject (the one-job path of V0.9.130).
+pub(crate) async fn classify_with<P: AiProvider + ?Sized>(
+    provider: &P,
+    message: &str,
+) -> Result<Option<(AgentCapability, String)>> {
+    let raw = provider
+        .generate(GenerateRequest {
+            system: Some("You classify requests. You reply with JSON only.".to_owned()),
+            prompt: format!(
+                "You route requests for RepoMemo, a workspace of technical files. Choose the one capability that fits the user's message:
+{}
+Reply with JSON only, no prose: {{\"capability\": \"<id>\", \"subject\": \"<the file name, search words or question, without the instruction>\"}}. The user's message is the context below.",
+                classifier_catalog()
+            ),
+            context: message.to_owned(),
+            options: json!({ "temperature": 0.0 }),
+        })
+        .await?;
+    Ok(parse_model_route(&raw, message))
 }
 
 /// A reply made of what a lookup found, with no AI behind it (V0.9.60).

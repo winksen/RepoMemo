@@ -1255,6 +1255,51 @@ impl RepoMemoCore {
             let turn = match turn {
                 Ok(turn) => turn,
                 Err(error) if error.downcast_ref::<InvalidToolReply>().is_some() => {
+                    // The model cannot follow the JSON protocol: it picks one job, the job runs and answers (V0.9.130).
+                    gathered.step(
+                        "note",
+                        None,
+                        "Fell back to one job: the model's reply could not be read".to_owned(),
+                        Vec::new(),
+                        asked.elapsed(),
+                        Some(shorten(&format!("{error:#}"), 200)),
+                    );
+                    if (setup.consume_quota)().is_ok() {
+                        let chosen = super::classify_with(provider, &message).await;
+                        if let Ok(Some((capability, subject))) = chosen {
+                            let ran_at = Instant::now();
+                            let job = super::tools::tool_for(capability);
+                            let result = if job.requires_ai && request.provider_id.is_none() {
+                                Ok(super::reply(
+                                    "This needs an AI provider, and none is enabled for this workspace. Nothing was sent anywhere.",
+                                ))
+                            } else {
+                                self.run_tool(capability, &request, &subject, &history).await
+                            };
+                            let mut answer = result.unwrap_or_else(|error| {
+                                let mut failed = super::reply(super::trace::FAILED_REPLY);
+                                failed.warnings.push(format!("{error:#}"));
+                                failed
+                            });
+                            gathered.step(
+                                "tool",
+                                Some(job.name),
+                                format!("Ran {} for the message", job.label),
+                                Vec::new(),
+                                ran_at.elapsed(),
+                                None,
+                            );
+                            answer.capability = Some(capability);
+                            answer.routing = AgentRouting::Model;
+                            answer.subject = subject;
+                            let mut warnings = std::mem::take(&mut gathered.warnings);
+                            warnings.append(&mut answer.warnings);
+                            answer.warnings = warnings;
+                            let mut outcome = finish(&request, String::new(), gathered, "answered", history.len());
+                            outcome.reply = answer;
+                            return Ok(outcome);
+                        }
+                    }
                     let text = partial_markdown(
                         "the model did not answer in the format I need to use my tools",
                         &ran,
@@ -2127,6 +2172,60 @@ mod tests {
         assert_eq!(spent.load(Ordering::SeqCst), 2);
         assert_eq!(outcome.trace.unwrap().state, "partial");
         assert!(outcome.reply.reply_markdown.contains("AI allowance is used up"));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_model_that_cannot_follow_the_json_protocol_falls_back_to_one_job() {
+        let (core, data_dir) = core("fallback").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let mut json = setup(8, true);
+        json.tool_mode = ToolMode::Json;
+        // Two unreadable replies in a row, then the model picks a job that needs no AI.
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::text("Sure, let me think about that."),
+            ChatResponse::text("Still not a JSON object."),
+            ChatResponse::text("{\"capability\": \"find_files\", \"subject\": \"retry-policy\"}"),
+        ]);
+        let outcome = core
+            .loop_with(&provider, request(&workspace_id, "find the retry policy"), json)
+            .await
+            .unwrap();
+        assert_eq!(outcome.reply.capability, Some(AgentCapability::FindFiles));
+        assert_eq!(outcome.reply.routing, AgentRouting::Model);
+        assert!(outcome.reply.files.iter().any(|file| file.title == "retry-policy.md"));
+        let trace = outcome.trace.unwrap();
+        assert_eq!(trace.state, "answered");
+        assert!(trace
+            .steps
+            .iter()
+            .any(|step| step.summary.starts_with("Fell back to one job")));
+        assert!(trace
+            .steps
+            .iter()
+            .any(|step| step.tool.as_deref() == Some("find_files")));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn one_unreadable_reply_is_retried_and_the_loop_continues() {
+        let (core, data_dir) = core("retry-json").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let mut json = setup(8, true);
+        json.tool_mode = ToolMode::Json;
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::text("not json"),
+            ChatResponse::text("{\"answer\": \"Retries wait twice as long.\"}"),
+        ]);
+        let outcome = core
+            .loop_with(&provider, request(&workspace_id, "How do retries work?"), json)
+            .await
+            .unwrap();
+        assert_eq!(outcome.reply.routing, AgentRouting::Agent);
+        assert_eq!(outcome.reply.reply_markdown, "Retries wait twice as long.");
+        let trace = outcome.trace.unwrap();
+        assert_eq!(trace.state, "answered");
+        assert!(!trace.steps.iter().any(|step| step.summary.starts_with("Fell back")));
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
