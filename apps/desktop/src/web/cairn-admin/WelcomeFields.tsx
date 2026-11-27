@@ -8,6 +8,11 @@ export function questionsFromText(text: string): string[] {
   return text.split(String.fromCharCode(10)).map((line) => line.trim()).filter((line, index, all) => line && all.indexOf(line) === index).slice(0, 6);
 }
 
+/** A welcome as it is kept: trimmed, with no blank or repeated question. */
+export function cleanWelcome(value: Welcome | undefined): Welcome {
+  return { greeting: (value?.greeting ?? "").trim(), questions: questionsFromText((value?.questions ?? []).join(String.fromCharCode(10))) };
+}
+
 /** Whether two welcomes say the same, for a form's dirty check. */
 export function sameWelcome(left: Welcome | undefined, right: Welcome | undefined): boolean {
   return (left?.greeting ?? "").trim() === (right?.greeting ?? "").trim() && JSON.stringify(left?.questions ?? []) === JSON.stringify(right?.questions ?? []);

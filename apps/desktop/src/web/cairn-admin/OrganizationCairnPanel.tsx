@@ -28,7 +28,7 @@ import { RetentionFields } from "./RetentionFields";
 import { McpPolicy } from "./McpPolicy";
 import { PersonalMemoryPolicy } from "./PersonalMemoryPolicy";
 import { PreferenceDefaults, type PreferenceDefaultsValue } from "./PreferenceDefaults";
-import { WelcomeFields, questionsFromText, sameWelcome } from "./WelcomeFields";
+import { WelcomeFields, cleanWelcome, sameWelcome } from "./WelcomeFields";
 import type { Welcome } from "../../types";
 import type { Guardrails } from "../../types";
 
@@ -38,11 +38,6 @@ const MODES = [
   { label: "Jobs: every workspace that has not chosen", value: "jobs" },
 ];
 const TOOL_LABELS: Record<string, string> = { none: "No tools", json: "Tools as JSON", native: "Native tools" };
-
-/** A welcome as it is kept: trimmed, with no blank or repeated question. */
-function cleanWelcome(value: Welcome | undefined): Welcome {
-  return { greeting: (value?.greeting ?? "").trim(), questions: questionsFromText((value?.questions ?? []).join(String.fromCharCode(10))) };
-}
 
 /** The defaults as they are kept: empty text is no default. */
 function normalizedDefaults(value: PreferenceDefaultsValue): PreferenceDefaultsValue {

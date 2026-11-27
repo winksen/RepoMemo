@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.119` (2026-11-27)
+> **Current:** `V0.9.120` (2026-11-27)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md) · [CAIRN administration plan](plans/2026-11-26-0.9-cairn-administration.md) · [ADR 0007](../docs/decisions/0007-cairn-models-are-a-system-catalog-chosen-per-organization.md)
 
@@ -143,6 +143,7 @@
 | **V0.9.117** | 🧪 2026-11-27 | AU. CAIRN closing | 🔒 | CAIRN administration security review | Review the administration tiers, key migration, inheritance, model and role boundaries, masking, abilities, the knowledge workspace, usage and history | No open high or medium finding remains, and fixes are rows inserted before the guides |
 | **V0.9.118** | 🧪 2026-11-27 | AU. CAIRN closing | 📘 | CAIRN administration guides | Document the tiers, catalog, inheritance, guardrails, abilities, preferences, retention and usage in the admin, user, API and command guides and the mindmaps | An organization admin can enable two models, narrow them in a workspace, add an ability and set a budget from the guides |
 | **V0.9.119** | 🧪 2026-11-27 | AU. CAIRN closing | 📘 | CAIRN line evidence | Walk through every unvalidated CAIRN row with a real provider, and record a live evaluation per supported model and the release evidence (formerly V0.9.70) | Every row since V0.9.0 is ✅ or narrowed in the guides, each claimed model has a passing report, and the 0.10 pilot starts from this candidate |
+| **V0.9.120** | 🧪 2026-11-27 | AU. CAIRN closing | 🐞 | Organization administration section fix | Make the Organizations section of the CAIRN administration page draw again by moving the welcome helper next to the others | The page opens with no console error and the organization's settings can be saved |
 
 ## Verification and handoff
 

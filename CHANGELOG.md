@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.120 (2026-11-27)
+
+The organization section of the CAIRN administration opens again.
+
+### Fixed
+- **`/cairn/admin/organizations` did not display.** The page threw `cleanWelcome is not defined` while drawing the organization's settings. The helper now lives with the other welcome helpers in `WelcomeFields.tsx` and is imported from there.
+
+### Checks
+- Type-checked; `npm run docs:check` passes. Not opened in a browser: if the error stays after a reload, a hard reload (Ctrl+Shift+R) clears a stale hot-update.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.119 (2026-11-27)
 
 The CAIRN line's closing record is prepared; every walkthrough result is pending.
