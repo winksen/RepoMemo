@@ -22,7 +22,7 @@ mod filters;
 mod inbox;
 mod memory;
 mod notes;
-use filters::{parse_filter, FileFilter};
+use filters::{extensions_for_kind, parse_filter, FileFilter};
 mod files;
 use files::{
     choose_folder, file_command, files_help, is_set_reference, move_reply, rename_reply, status_reply, trash_reply,

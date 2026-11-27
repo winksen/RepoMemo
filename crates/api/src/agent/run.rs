@@ -287,6 +287,26 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
             }),
         ),
         atom(
+            "query_files",
+            "Query files",
+            "Filter, sort and count the workspace's files by their properties: name, kind, folder, language, size and modified date. Use it for questions such as the largest or newest files, how many files changed this year, or the files over a size. Each file comes with its handle, size and modified date, and the end says how many files match and how large they are together. It reads the index, never the disk.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "Words in the file's title or path" },
+                    "kinds": { "type": "array", "items": { "type": "string" }, "description": "File kinds such as pdf, word, spreadsheet, markdown, or an extension such as rs" },
+                    "folder": { "type": "string", "description": "A folder name or path; its subfolders are included" },
+                    "language": { "type": "string", "description": "A programming language such as rust" },
+                    "modified_after": { "type": "string", "description": "Only files changed on or after this date, such as 2026-01-01" },
+                    "modified_before": { "type": "string", "description": "Only files changed before this date, such as 2026-04-01" },
+                    "min_bytes": { "type": "string", "description": "Only files of at least this size: a number of bytes, or 500 KB, 2 MB" },
+                    "sort": { "type": "string", "description": "size, modified, created or name; without it the newest change comes first" },
+                    "descending": { "type": "boolean", "description": "Largest, latest or newest first (the default for size and dates); false for the smallest or oldest first" },
+                    "limit": { "type": "integer", "description": format!("At most {LIST_FILES_MAX}, 20 by default") }
+                }
+            }),
+        ),
+        atom(
             "file_facts",
             "File facts",
             "What is known about one file besides its text: its review state, owner, reviewer, versions, source and what names it.",
@@ -748,6 +768,7 @@ impl RepoMemoCore {
             "search_evidence" => arg_text(arguments, "query"),
             "read_file" | "file_facts" => arg_text(arguments, "file"),
             "list_files" => arg_text(arguments, "filter"),
+            "query_files" => arg_text(arguments, "text"),
             "search_chats" => arg_text(arguments, "query"),
             "review_file" => arg_text(arguments, "file"),
             "get_task" | "propose_task_comment" | "propose_task_status" => arg_text(arguments, "key"),
@@ -793,6 +814,7 @@ impl RepoMemoCore {
                 )
                 .await
             }
+            "query_files" => self.tool_query_files(ledger, arguments).await,
             "file_facts" => self.tool_file_facts(ledger, &arg_text(arguments, "file")).await,
             "workspace_brief" => self.tool_workspace_brief(ledger).await,
             "search_chats" => {
@@ -1511,7 +1533,13 @@ The person chose the job “{label}” from the menu. Call the tool {name} first
 }
 
 /// The read tools an outside agent may use over MCP (V0.9.66): the same tools CAIRN reads with, each taking the workspace it is about.
-const MCP_TOOLS: [&str; 4] = ["search_evidence", "read_file", "list_files", "file_facts"];
+const MCP_TOOLS: [&str; 5] = [
+    "search_evidence",
+    "read_file",
+    "list_files",
+    "query_files",
+    "file_facts",
+];
 
 /// What MCP lists: the read tools' definitions, with the workspace added to each.
 pub fn mcp_tool_specs() -> Vec<ToolSpec> {
@@ -1572,6 +1600,7 @@ impl RepoMemoCore {
                 )
                 .await?
             }
+            "query_files" => self.tool_query_files(&mut ledger, arguments).await?,
             _ => self.tool_file_facts(&mut ledger, &arg_text(arguments, "file")).await?,
         };
         let mut text = output.for_model;
@@ -2000,8 +2029,14 @@ mod tests {
     fn mcp_lists_only_the_read_tools_and_each_takes_a_workspace() {
         let specs = mcp_tool_specs();
         let names = specs.iter().map(|spec| spec.name.as_str()).collect::<Vec<_>>();
-        assert_eq!(names.len(), 4);
-        for name in ["search_evidence", "read_file", "list_files", "file_facts"] {
+        assert_eq!(names.len(), 5);
+        for name in [
+            "search_evidence",
+            "read_file",
+            "list_files",
+            "query_files",
+            "file_facts",
+        ] {
             assert!(names.contains(&name), "{name}");
         }
         assert!(names.iter().all(|name| !name.starts_with("propose_")));
@@ -2289,6 +2324,45 @@ The payment queue stalled for twenty minutes."
             .tools
             .iter()
             .all(|tool| !tool.name.starts_with("propose_") || tool.name == "propose_personal_memory"));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn the_largest_file_is_one_query_files_call_and_mcp_lists_it_too() {
+        let (core, data_dir) = core("largest").await;
+        let workspace = core.create_workspace("Largest".to_owned()).await.unwrap();
+        for (title, size) in [("small.md", 40), ("huge.md", 30_000)] {
+            core.import_text(
+                workspace.id.clone(),
+                title.to_owned(),
+                "x".repeat(size),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+        }
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call("query_files", json!({ "sort": "size", "descending": true, "limit": 1 })),
+            ChatResponse::text("The largest file is huge.md [E1]."),
+        ]);
+        let outcome = core
+            .loop_with(
+                &provider,
+                request(&workspace.id, "what is the largest file"),
+                setup(8, true),
+            )
+            .await
+            .unwrap();
+        let trace = outcome.trace.unwrap();
+        assert_eq!(trace.steps[0].tool.as_deref(), Some("query_files"));
+        assert!(trace.steps[0].error.is_none());
+        assert_eq!(outcome.reply.citations[0].title, "huge.md");
+        // The same tool is served over MCP, with the sources list.
+        let listed = core
+            .mcp_call(&workspace.id, "query_files", &json!({ "sort": "size", "limit": 1 }))
+            .await
+            .unwrap();
+        assert!(listed.contains("huge.md") && listed.contains("Sources:"), "{listed}");
         let _ = std::fs::remove_dir_all(data_dir);
     }
 

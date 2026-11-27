@@ -54,35 +54,10 @@ impl RepoMemoCore {
     ) -> Result<std::result::Result<Vec<ArtifactSummary>, String>> {
         let in_folder = match &filter.folder {
             None => None,
-            Some(wanted) => {
-                let folders = self.storage.list_folders(workspace_id).await?;
-                match choose_folder(wanted, &folders) {
-                    FolderChoice::One(found) => {
-                        let (_, ids) = self.storage.folder_subtree(&found.id).await?;
-                        Some(ids.into_iter().collect::<std::collections::HashSet<_>>())
-                    }
-                    FolderChoice::Many(names) => {
-                        return Ok(Err(format!(
-                            "Several folders match “{wanted}”: {}. Say which one by its full path.",
-                            names.join(", ")
-                        )))
-                    }
-                    FolderChoice::Missing(names) if names.is_empty() => {
-                        return Ok(Err("This workspace has no folders yet.".to_owned()))
-                    }
-                    FolderChoice::Missing(names) => {
-                        return Ok(Err(format!(
-                            "I can't find a folder named “{wanted}”. The folders here are: {}.",
-                            names.join(", ")
-                        )))
-                    }
-                    FolderChoice::TopLevel => {
-                        return Ok(Err(
-                            "Name a folder to look in; I cannot list only the top level.".to_owned()
-                        ))
-                    }
-                }
-            }
+            Some(wanted) => match self.folder_file_ids(workspace_id, wanted).await? {
+                Ok(ids) => Some(ids),
+                Err(problem) => return Ok(Err(problem)),
+            },
         };
         let mut files = self
             .cairn_artifacts(workspace_id)
@@ -93,6 +68,31 @@ impl RepoMemoCore {
             .collect::<Vec<_>>();
         files.sort_by_key(|file| file.path.to_lowercase());
         Ok(Ok(files))
+    }
+
+    /// The ids of the files in the folder a request names, with its subfolders; or what to say when the folder cannot be told.
+    pub(in crate::agent) async fn folder_file_ids(
+        &self,
+        workspace_id: &str,
+        wanted: &str,
+    ) -> Result<std::result::Result<std::collections::HashSet<String>, String>> {
+        let folders = self.storage.list_folders(workspace_id).await?;
+        Ok(match choose_folder(wanted, &folders) {
+            FolderChoice::One(found) => {
+                let (_, ids) = self.storage.folder_subtree(&found.id).await?;
+                Ok(ids.into_iter().collect())
+            }
+            FolderChoice::Many(names) => Err(format!(
+                "Several folders match “{wanted}”: {}. Say which one by its full path.",
+                names.join(", ")
+            )),
+            FolderChoice::Missing(names) if names.is_empty() => Err("This workspace has no folders yet.".to_owned()),
+            FolderChoice::Missing(names) => Err(format!(
+                "I can't find a folder named “{wanted}”. The folders here are: {}.",
+                names.join(", ")
+            )),
+            FolderChoice::TopLevel => Err("Name a folder to look in; I cannot list only the top level.".to_owned()),
+        })
     }
 
     /// "The Word documents", "pdfs in the Finance folder": every file the filter means, said in words.

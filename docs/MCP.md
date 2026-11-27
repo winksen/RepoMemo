@@ -29,6 +29,7 @@ Each tool except the first takes a `workspace` (its id).
 | `search_evidence` | Passages that match, each with a handle |
 | `read_file` | A file's indexed text, a few passages at a time |
 | `list_files` | Files by kind, folder or name |
+| `query_files` | Files filtered, sorted and counted by their properties: name, kind, folder, language, size and modified date, with each file's size and date and the total |
 | `file_facts` | A file's type, size, state and last review |
 | `propose_memory`, `propose_note` | Nothing is saved. The proposal appears as a message in your **CAIRN inbox** chat for that workspace, naming the agent by the name you gave the token and quoting what it wrote as data. You confirm or dismiss it like any proposal. It needs you to be able to change the workspace, and at most 50 may wait at once. |
 

@@ -3,6 +3,7 @@
 //! the whole run. Nothing here changes anything, and everything is limited to the one workspace of the run by the storage
 //! calls themselves: another workspace's files, and files of a quarantined connector, are never returned.
 
+use crate::agent::run::{arg_list, arg_text};
 use crate::agent::*;
 
 /// The most characters one tool result gives the model.
@@ -244,6 +245,179 @@ pub(in crate::agent) fn bounded(lines: &[String], limit: usize) -> String {
         }
     }
     out
+}
+
+/// What `query_files` was asked for, read from the model's arguments.
+struct FileQuery {
+    text: String,
+    kinds: Vec<repomemo_storage::KindFilter>,
+    kind_words: Vec<String>,
+    folder: Option<String>,
+    language: Option<String>,
+    modified_after: Option<String>,
+    modified_before: Option<String>,
+    min_bytes: Option<i64>,
+    sort: Option<repomemo_storage::ArtifactSort>,
+    descending: bool,
+    limit: usize,
+}
+
+impl FileQuery {
+    /// The request in words, for a message that nothing matched.
+    fn describe(&self) -> String {
+        let mut parts = Vec::new();
+        if !self.text.is_empty() {
+            parts.push(format!("“{}” in the name or path", self.text));
+        }
+        if !self.kind_words.is_empty() {
+            parts.push(format!("of kind {}", self.kind_words.join(" or ")));
+        }
+        if let Some(folder) = &self.folder {
+            parts.push(format!("in the folder {folder}"));
+        }
+        if let Some(language) = &self.language {
+            parts.push(format!("in {language}"));
+        }
+        if let Some(after) = &self.modified_after {
+            parts.push(format!("modified since {after}"));
+        }
+        if let Some(before) = &self.modified_before {
+            parts.push(format!("modified before {before}"));
+        }
+        if let Some(bytes) = self.min_bytes {
+            parts.push(format!("of at least {}", human_size(bytes)));
+        }
+        if parts.is_empty() {
+            "that request".to_owned()
+        } else {
+            parts.join(", ")
+        }
+    }
+}
+
+/// A date (`2026-03-01`) or a time (RFC 3339), as the index compares them.
+fn date_argument(arguments: &Value, key: &str) -> std::result::Result<Option<String>, String> {
+    let text = arg_text(arguments, key);
+    if text.is_empty() {
+        return Ok(None);
+    }
+    let valid = chrono::NaiveDate::parse_from_str(&text, "%Y-%m-%d").is_ok()
+        || chrono::DateTime::parse_from_rfc3339(&text).is_ok();
+    if valid {
+        Ok(Some(text))
+    } else {
+        Err(format!("{key} must be a date such as 2026-03-01, not “{text}”."))
+    }
+}
+
+/// A size in bytes, or with a unit: `1048576`, `500 KB`, `2 MB`, `1.5 GB`.
+fn size_argument(arguments: &Value, key: &str) -> std::result::Result<Option<i64>, String> {
+    let text = match arguments.get(key) {
+        Some(Value::Number(number)) => number.to_string(),
+        Some(Value::String(text)) => text.trim().to_owned(),
+        _ => return Ok(None),
+    };
+    if text.is_empty() {
+        return Ok(None);
+    }
+    let lower = text.to_ascii_lowercase().replace(' ', "");
+    let split = lower
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(lower.len());
+    let (number, unit) = lower.split_at(split);
+    let factor = match unit {
+        "" | "b" => 1.0,
+        "k" | "kb" => 1024.0,
+        "m" | "mb" => 1024.0 * 1024.0,
+        "g" | "gb" => 1024.0 * 1024.0 * 1024.0,
+        _ => {
+            return Err(format!(
+                "{key} must be a number of bytes, or a size such as 500 KB, not “{text}”."
+            ))
+        }
+    };
+    match number.parse::<f64>() {
+        Ok(value) if value >= 0.0 => Ok(Some((value * factor) as i64)),
+        _ => Err(format!(
+            "{key} must be a number of bytes, or a size such as 500 KB, not “{text}”."
+        )),
+    }
+}
+
+fn file_query_from(arguments: &Value) -> std::result::Result<FileQuery, String> {
+    let mut kinds = Vec::new();
+    let kind_words = arg_list(arguments, "kinds");
+    for word in &kind_words {
+        let extensions = match extensions_for_kind(word) {
+            Some(extensions) => extensions.iter().map(|extension| (*extension).to_owned()).collect(),
+            // Not a word for a kind: it may be an extension itself ("rs", ".toml").
+            None => vec![word.trim().to_owned()],
+        };
+        kinds.push(repomemo_storage::KindFilter {
+            extensions,
+            ..Default::default()
+        });
+    }
+    let sort = match arg_text(arguments, "sort").as_str() {
+        "" => None,
+        word => Some(
+            repomemo_storage::ArtifactSort::parse(word)
+                .ok_or_else(|| format!("sort must be size, modified, created or name, not “{word}”."))?,
+        ),
+    };
+    // Largest, latest and newest first unless the model says otherwise; names run from A.
+    let descending = arguments
+        .get("descending")
+        .and_then(Value::as_bool)
+        .unwrap_or(sort != Some(repomemo_storage::ArtifactSort::Title));
+    let language = Some(arg_text(arguments, "language")).filter(|language| !language.is_empty());
+    let folder = Some(arg_text(arguments, "folder")).filter(|folder| !folder.is_empty());
+    Ok(FileQuery {
+        text: arg_text(arguments, "text"),
+        kinds,
+        kind_words,
+        folder,
+        language,
+        modified_after: date_argument(arguments, "modified_after")?,
+        modified_before: date_argument(arguments, "modified_before")?,
+        min_bytes: size_argument(arguments, "min_bytes")?,
+        sort,
+        descending,
+        limit: arguments
+            .get("limit")
+            .and_then(|value| {
+                value
+                    .as_u64()
+                    .or_else(|| value.as_str().and_then(|text| text.trim().parse().ok()))
+            })
+            .map_or(20, |value| value as usize),
+    })
+}
+
+/// A size as people read it: `812 B`, `4.2 KB`, `1.3 GB`.
+pub(in crate::agent) fn human_size(bytes: i64) -> String {
+    let bytes = bytes.max(0) as f64;
+    if bytes < 1024.0 {
+        return format!("{} B", bytes as i64);
+    }
+    let mut value = bytes / 1024.0;
+    let mut unit = "KB";
+    for next in ["MB", "GB"] {
+        if value < 1024.0 {
+            break;
+        }
+        value /= 1024.0;
+        unit = next;
+    }
+    format!("{value:.1} {unit}")
+}
+
+/// The kind of a file as a result line shows it: its extension, or `file`.
+fn kind_label(path: &str) -> String {
+    path.rsplit_once('.')
+        .map(|(_, extension)| extension.to_ascii_lowercase())
+        .filter(|extension| !extension.is_empty() && extension.len() <= 8 && !extension.contains('/'))
+        .unwrap_or_else(|| "file".to_owned())
 }
 
 fn state_note(state: Option<&str>) -> String {
@@ -552,6 +726,81 @@ impl RepoMemoCore {
         })
     }
 
+    /// Files by their properties (V0.9.137): the ones that match, in the order asked for, each with its size and the day it was
+    /// changed, and how many match and how large they are together. It reads the index, never the disk, and leaves out what CAIRN
+    /// may not read: closed folders and a quarantined connector's files.
+    pub(in crate::agent) async fn tool_query_files(
+        &self,
+        ledger: &mut EvidenceLedger,
+        arguments: &Value,
+    ) -> Result<ToolOutput> {
+        let workspace_id = ledger.workspace_id().to_owned();
+        let query = match file_query_from(arguments) {
+            Ok(query) => query,
+            Err(problem) => return Ok(ToolOutput::text(problem)),
+        };
+        let folder_ids = match query.folder.as_deref() {
+            None => None,
+            Some(wanted) => match self.folder_file_ids(&workspace_id, wanted).await? {
+                Ok(ids) => Some(ids),
+                Err(problem) => return Ok(ToolOutput::text(problem)),
+            },
+        };
+        let (mut files, _) = self
+            .storage
+            .query_artifacts(&repomemo_storage::ArtifactQuery {
+                workspace_id: workspace_id.clone(),
+                text: query.text.clone(),
+                languages: query.language.iter().cloned().collect(),
+                kinds: query.kinds.clone(),
+                sort: query.sort,
+                descending: query.descending,
+                modified_after: query.modified_after.clone(),
+                modified_before: query.modified_before.clone(),
+                min_bytes: query.min_bytes,
+                hide_quarantined: true,
+                ..Default::default()
+            })
+            .await?;
+        let closed = self.storage.closed_artifact_ids(&workspace_id).await?;
+        files.retain(|file| !closed.contains(&file.id) && folder_ids.as_ref().is_none_or(|ids| ids.contains(&file.id)));
+        if files.is_empty() {
+            return Ok(ToolOutput::text(format!("No files match {}.", query.describe())));
+        }
+        let total = files.len();
+        let total_bytes = files.iter().map(|file| file.size_bytes.max(0)).sum::<i64>();
+        let limit = query.limit.clamp(1, LIST_FILES_MAX);
+        let states = self.lifecycle_by_file(&workspace_id).await;
+        let mut handles = Vec::new();
+        let mut lines = Vec::new();
+        for file in files.iter().take(limit) {
+            let state = states.get(&file.id).map(String::as_str).or(Some("active"));
+            let handle = ledger.handle_for(EvidenceKind::File, &file.id, None, &file.title, &file.path, state);
+            if let Some(label) = untrusted_label(&file.artifact_type, &file.path) {
+                ledger.mark_untrusted(&handle, label);
+            }
+            lines.push(format!(
+                "[{handle}] {} · {} · {} · modified {}{}",
+                file.path,
+                kind_label(&file.path),
+                human_size(file.size_bytes),
+                file.updated_at.get(..10).unwrap_or(&file.updated_at),
+                state_note(state)
+            ));
+            handles.push(handle);
+        }
+        lines.push(format!(
+            "Showing {} of {total} {} ({} in total)",
+            handles.len(),
+            plural(total, "file", "files"),
+            human_size(total_bytes)
+        ));
+        Ok(ToolOutput {
+            for_model: bounded(&lines, TOOL_OUTPUT_CHARS),
+            handles,
+        })
+    }
+
     /// What is known about a file apart from its text: its state, who owns and reviews it, its versions, where it came from
     /// and what names it.
     pub(in crate::agent) async fn tool_file_facts(
@@ -835,6 +1084,108 @@ mod tests {
             .unwrap();
         core.index_artifact(file.id.clone()).await.unwrap();
         file
+    }
+
+    #[test]
+    fn sizes_read_and_read_back_the_way_people_write_them() {
+        assert_eq!(human_size(0), "0 B");
+        assert_eq!(human_size(812), "812 B");
+        assert_eq!(human_size(4_300), "4.2 KB");
+        assert_eq!(human_size(3 * 1024 * 1024), "3.0 MB");
+        assert_eq!(size_argument(&json!({ "n": "500 KB" }), "n"), Ok(Some(512_000)));
+        assert_eq!(size_argument(&json!({ "n": 2048 }), "n"), Ok(Some(2048)));
+        assert_eq!(size_argument(&json!({ "n": "1.5 MB" }), "n"), Ok(Some(1_572_864)));
+        assert!(size_argument(&json!({ "n": "big" }), "n").is_err());
+        assert_eq!(
+            date_argument(&json!({ "d": "2026-03-01" }), "d"),
+            Ok(Some("2026-03-01".to_owned()))
+        );
+        assert!(date_argument(&json!({ "d": "last year" }), "d").is_err());
+    }
+
+    /// V0.9.137: "what is the largest file" is one call; a file in a closed folder never appears.
+    #[tokio::test]
+    async fn query_files_answers_the_largest_file_in_one_call_and_never_shows_a_closed_folder() {
+        let (core, data_dir) = core("query-files").await;
+        let workspace = core.create_workspace("Sizes".to_owned()).await.unwrap();
+        note(&core, &workspace.id, "small.md", &"s".repeat(40)).await;
+        note(&core, &workspace.id, "mid.md", &"m".repeat(900)).await;
+        let big = note(&core, &workspace.id, "big.md", &"b".repeat(20_000)).await;
+        let private = note(&core, &workspace.id, "private.md", &"p".repeat(90_000)).await;
+
+        let mut ledger = EvidenceLedger::new(&workspace.id);
+        let largest = core
+            .tool_query_files(&mut ledger, &json!({ "sort": "size", "descending": true, "limit": 1 }))
+            .await
+            .unwrap();
+        let first_line = largest.for_model.lines().next().unwrap();
+        assert!(first_line.contains("private.md"), "{}", largest.for_model);
+        assert!(
+            largest.for_model.contains("Showing 1 of 4 files"),
+            "{}",
+            largest.for_model
+        );
+        assert_eq!(largest.handles.len(), 1);
+
+        // Close the folder that holds the largest file: it is no longer listed, and the totals leave it out.
+        let folder = core
+            .storage
+            .create_folder(&workspace.id, None, "Private", None)
+            .await
+            .unwrap();
+        core.storage
+            .set_artifact_folder(&private.id, Some(&folder.id))
+            .await
+            .unwrap();
+        let policy: repomemo_storage::WorkspaceCairnPolicy =
+            serde_json::from_value(json!({ "guardrails": { "closed_folder_ids": [folder.id] } })).unwrap();
+        core.storage
+            .save_workspace_cairn_settings(&workspace.id, 0, &policy, None)
+            .await
+            .unwrap();
+        let mut ledger = EvidenceLedger::new(&workspace.id);
+        let largest = core
+            .tool_query_files(&mut ledger, &json!({ "sort": "size", "limit": 1 }))
+            .await
+            .unwrap();
+        assert!(
+            largest.for_model.lines().next().unwrap().contains(&big.title),
+            "{}",
+            largest.for_model
+        );
+        assert!(!largest.for_model.contains("private.md"));
+        assert!(
+            largest.for_model.contains("Showing 1 of 3 files"),
+            "{}",
+            largest.for_model
+        );
+
+        // Dates, kinds and sizes narrow the list, and a request nothing matches says so.
+        let none = core
+            .tool_query_files(&mut ledger, &json!({ "modified_after": "2999-01-01" }))
+            .await
+            .unwrap();
+        assert!(none.for_model.starts_with("No files match"), "{}", none.for_model);
+        let pdfs = core
+            .tool_query_files(&mut ledger, &json!({ "kinds": ["pdf"] }))
+            .await
+            .unwrap();
+        assert!(pdfs.for_model.starts_with("No files match"), "{}", pdfs.for_model);
+        let over = core
+            .tool_query_files(&mut ledger, &json!({ "min_bytes": "10 KB" }))
+            .await
+            .unwrap();
+        assert!(
+            over.for_model.contains("big.md") && over.for_model.contains("Showing 1 of 1 file"),
+            "{}",
+            over.for_model
+        );
+        let wrong = core
+            .tool_query_files(&mut ledger, &json!({ "sort": "colour" }))
+            .await
+            .unwrap();
+        assert!(wrong.for_model.contains("sort must be"), "{}", wrong.for_model);
+        let _ = std::fs::remove_dir_all(data_dir);
     }
 
     #[tokio::test]

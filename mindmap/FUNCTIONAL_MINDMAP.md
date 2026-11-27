@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.136` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.137` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.137 — CAIRN and MCP get a read tool that filters, sorts and counts files and shows each one's size and modified date.
+
+- **Questions about size and age.** *What is the largest file?* or *which PDFs changed since March?* is answered by one call, with each file's size and date and the total. An outside agent connected over MCP has the same tool.
+
+Checks: `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
 
 ## V0.9.136 — The file query can sort by size, modified, created or title, and filter by dates and a minimum size.
 

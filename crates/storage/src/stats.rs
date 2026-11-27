@@ -38,6 +38,8 @@ pub struct ArtifactQuery {
     pub modified_before: Option<String>,
     /// Only files of at least this many bytes.
     pub min_bytes: Option<i64>,
+    /// Leave out the files of a quarantined connector (V0.8.2), as every read path of CAIRN does.
+    pub hide_quarantined: bool,
 }
 
 /// How the artifact query orders its page. A closed set: what a request says is mapped to one of these, so no text from a request
@@ -190,6 +192,10 @@ fn push_artifact_filters<'a>(query: &mut QueryBuilder<'a, Sqlite>, request: &'a 
     }
     if request.ledger_only {
         query.push(" AND NOT EXISTS (SELECT 1 FROM repo_files WHERE repo_files.artifact_id = artifacts.id)");
+    }
+    if request.hide_quarantined {
+        query.push(" AND ");
+        query.push(super::connector_quarantine::NOT_QUARANTINED);
     }
     if let Some(after) = &request.modified_after {
         query.push(" AND artifacts.updated_at >= ");

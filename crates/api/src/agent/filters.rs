@@ -169,6 +169,14 @@ fn kind_of(word: &str) -> Option<usize> {
         .position(|kind| kind.words.iter().any(|known| *known == word || *known == singular))
 }
 
+/// The extensions a word or phrase for a kind of file stands for ("pdf", "word documents"), when it names one.
+pub(crate) fn extensions_for_kind(phrase: &str) -> Option<&'static [&'static str]> {
+    phrase
+        .split_whitespace()
+        .find_map(kind_of)
+        .map(|index| KINDS[index].extensions)
+}
+
 impl FileFilter {
     /// Whether the filter says anything about kind or folder, beyond a name.
     pub(crate) fn is_structured(&self) -> bool {

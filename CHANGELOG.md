@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.137 (2026-11-27)
+
+CAIRN and MCP get a read tool that filters, sorts and counts files and shows each one's size and modified date.
+
+### Added
+- **`query_files`.** A read tool for the loop and for MCP. It takes words in the title or path, kinds (pdf, word, an extension), a folder, a language, modified-after and modified-before dates, a minimum size (bytes, or 500 KB), a sort (size, modified, created or name), a direction and a limit of at most 40.
+- **What it returns.** One line per file: handle, path, kind, size and modified date; then *Showing N of M files (X in total)*. A request nothing matches says so in words, and a bad date, size or sort is explained to the model.
+- **What it never shows.** Files in a folder closed to CAIRN, files of a quarantined connector and files of other workspaces. Sizes come from the index, never the disk.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.136 (2026-11-27)
 
 The file query can sort by size, modified, created or title, and filter by dates and a minimum size.
