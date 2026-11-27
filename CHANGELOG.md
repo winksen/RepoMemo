@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.132 (2026-11-27)
+
+The model writes the reply from the result of a job that used no AI, and says when the result does not answer.
+
+### Added
+- **Answers written from a result.** When a model picked a lookup job (find files, find a symbol, search content, recall), the model reads the job's result and the request and writes a short reply. It says when the result does not answer the request and names the closest files.
+- **Sources kept.** The job's citations, files, proposals and actions stay on the reply; only its text is replaced.
+- **Provider failures.** If the provider fails, the job's own reply is shown with a warning.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.131 (2026-11-27)
 
 With a model, the model reads the message and picks the job before any keyword rule does.

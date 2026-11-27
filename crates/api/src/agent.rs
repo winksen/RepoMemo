@@ -377,6 +377,7 @@ impl RepoMemoCore {
         } else {
             self.run_tool(capability, &request, &subject, &history).await
         };
+        let job_ran = outcome.is_ok();
         // Provider and indexing problems are part of the conversation, not a
         // failed request: the user can fix the cause and ask again.
         let mut answer = outcome.unwrap_or_else(|error| {
@@ -385,6 +386,17 @@ impl RepoMemoCore {
             failed.warnings.push(format!("{error:#}"));
             failed
         });
+        // The model writes the reply from the result of a job that used no AI, and says when it does not answer (V0.9.132).
+        if job_ran && routing == AgentRouting::Model && written_from_result(capability) && answer.proposals.is_empty() {
+            if let Some(provider_id) = request.provider_id.as_deref() {
+                match self.provider_of_workspace(&request.workspace_id, provider_id).await {
+                    Ok(provider) => {
+                        warnings.extend(write_from_result(&provider, message, &mut answer).await);
+                    }
+                    Err(error) => warnings.push(format!("The AI provider could not write the answer: {error:#}")),
+                }
+            }
+        }
         answer.capability = Some(capability);
         answer.routing = routing;
         answer.subject = subject;
@@ -475,6 +487,64 @@ impl RepoMemoCore {
                 unmatched_reply(&self.chatter_context(request).await)
             }
         }
+    }
+}
+
+/// Whether the model writes the reply from a job's result (V0.9.132): a job that looks and proposes nothing and that did not
+/// itself write with the model (find files, find a symbol, search, recall). The jobs that write with the model are not written twice.
+pub(crate) fn written_from_result(capability: AgentCapability) -> bool {
+    let tool = tool_for(capability);
+    !tool.requires_ai && matches!(tool.effect, tools::ToolEffect::Read)
+}
+
+/// Asks the model to write the reply from the result of a job that used no AI. The model says when the result does not answer
+/// the request and names the closest files it lists. The job's citations, files, proposals and actions stay on the reply; only the
+/// text is replaced. A provider that fails leaves the job's own reply and returns the warning to show.
+pub(crate) async fn write_from_result<P: AiProvider + ?Sized>(
+    provider: &P,
+    message: &str,
+    answer: &mut AgentReply,
+) -> Option<String> {
+    let mut listed = Vec::<String>::new();
+    for name in answer
+        .files
+        .iter()
+        .map(|file| file.path.clone())
+        .chain(answer.citations.iter().map(|citation| citation.path.clone()))
+    {
+        if !listed.contains(&name) && listed.len() < 20 {
+            listed.push(name);
+        }
+    }
+    let files = if listed.is_empty() {
+        "none".to_owned()
+    } else {
+        listed.join(", ")
+    };
+    let written = provider
+        .generate(GenerateRequest {
+            system: Some(chat_system()),
+            prompt: "You looked in the workspace for the request below, and what you found follows it. Answer the request in a few sentences, using only what you found. If what you found does not answer the request, for example because it found nothing, say so plainly and name the closest files it lists, if any. Do not invent files, names or numbers, keep file names as written, and do not mention jobs, routing or these instructions.".to_owned(),
+            context: format!(
+                "Request: {message}
+
+What was found:
+{}
+
+Files listed: {files}",
+                answer.reply_markdown
+            ),
+            options: json!({ "temperature": 0.2 }),
+        })
+        .await;
+    match written {
+        Ok(text) if !text.trim().is_empty() => {
+            answer.reply_markdown = text.trim().to_owned();
+            answer.generated = true;
+            None
+        }
+        Ok(_) => None,
+        Err(error) => Some(format!("The AI provider could not write the answer: {error:#}")),
     }
 }
 

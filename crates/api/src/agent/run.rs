@@ -1276,6 +1276,7 @@ impl RepoMemoCore {
                             } else {
                                 self.run_tool(capability, &request, &subject, &history).await
                             };
+                            let job_ran = result.is_ok();
                             let mut answer = result.unwrap_or_else(|error| {
                                 let mut failed = super::reply(super::trace::FAILED_REPLY);
                                 failed.warnings.push(format!("{error:#}"));
@@ -1289,6 +1290,11 @@ impl RepoMemoCore {
                                 ran_at.elapsed(),
                                 None,
                             );
+                            // A job that used no AI hands its result to the model to write the reply (V0.9.132).
+                            if job_ran && super::written_from_result(capability) && answer.proposals.is_empty() {
+                                let warning = super::write_from_result(provider, &message, &mut answer).await;
+                                answer.warnings.extend(warning);
+                            }
                             answer.capability = Some(capability);
                             answer.routing = AgentRouting::Model;
                             answer.subject = subject;
@@ -2186,6 +2192,7 @@ mod tests {
             ChatResponse::text("Sure, let me think about that."),
             ChatResponse::text("Still not a JSON object."),
             ChatResponse::text("{\"capability\": \"find_files\", \"subject\": \"retry-policy\"}"),
+            ChatResponse::text("The closest match is retry-policy.md."),
         ]);
         let outcome = core
             .loop_with(&provider, request(&workspace_id, "find the retry policy"), json)
@@ -2194,6 +2201,9 @@ mod tests {
         assert_eq!(outcome.reply.capability, Some(AgentCapability::FindFiles));
         assert_eq!(outcome.reply.routing, AgentRouting::Model);
         assert!(outcome.reply.files.iter().any(|file| file.title == "retry-policy.md"));
+        // The model wrote the reply from the job's result, and the job's files stay on it.
+        assert_eq!(outcome.reply.reply_markdown, "The closest match is retry-policy.md.");
+        assert!(outcome.reply.generated);
         let trace = outcome.trace.unwrap();
         assert_eq!(trace.state, "answered");
         assert!(trace

@@ -550,3 +550,72 @@ async fn a_failing_model_leaves_the_choice_to_the_keyword_rules_with_a_warning()
     assert_eq!(warnings.len(), 1);
     assert!(warnings[0].contains("could not interpret"));
 }
+
+fn citation(title: &str, path: &str) -> repomemo_domain::Citation {
+    repomemo_domain::Citation {
+        artifact_id: format!("id-{title}"),
+        chunk_id: None,
+        title: title.to_owned(),
+        path: path.to_owned(),
+        start_line: None,
+        end_line: None,
+        confidence: None,
+        commit: None,
+        last_author: None,
+        last_changed_at: None,
+    }
+}
+
+/// V0.9.132: a lookup that found nothing gets an answer written by the model, with the job's citations kept.
+#[tokio::test]
+async fn the_model_writes_the_reply_from_a_jobs_result_and_the_citations_stay() {
+    use repomemo_ai::{ChatResponse, ScriptedProvider};
+    let mut answer = lookup_reply("No file name or path matches “size”.");
+    answer.citations = vec![citation("deploy.md", "ops/deploy.md")];
+    let provider = ScriptedProvider::new(vec![ChatResponse::text(
+        "Nothing matches that, but the closest file is ops/deploy.md.",
+    )]);
+    let warning = write_from_result(&provider, "what is the size of the deploy notes", &mut answer).await;
+    assert!(warning.is_none());
+    assert_eq!(
+        answer.reply_markdown,
+        "Nothing matches that, but the closest file is ops/deploy.md."
+    );
+    assert!(answer.generated);
+    assert_eq!(answer.citations.len(), 1);
+    // The model was shown the request, the job's result and the files it lists.
+    let shown = &provider.requests()[0];
+    let seen = shown
+        .messages
+        .iter()
+        .map(|message| message.content.as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(seen.contains("what is the size of the deploy notes"));
+    assert!(seen.contains("No file name or path matches"));
+    assert!(seen.contains("ops/deploy.md"));
+}
+
+#[tokio::test]
+async fn a_failing_provider_keeps_the_jobs_own_reply_and_says_so() {
+    use repomemo_ai::ScriptedProvider;
+    let mut answer = lookup_reply("Found 2 files.");
+    let provider = ScriptedProvider::with_results(vec![Err(anyhow::anyhow!("timed out"))]);
+    let warning = write_from_result(&provider, "find the files", &mut answer).await;
+    assert_eq!(answer.reply_markdown, "Found 2 files.");
+    assert!(!answer.generated);
+    assert!(warning.unwrap().contains("could not write the answer"));
+}
+
+#[test]
+fn only_jobs_that_look_without_the_model_are_written_from_their_result() {
+    assert!(written_from_result(AgentCapability::FindFiles));
+    assert!(written_from_result(AgentCapability::FindSymbol));
+    assert!(written_from_result(AgentCapability::SearchContent));
+    assert!(written_from_result(AgentCapability::RecallMemory));
+    // These write with the model themselves, or propose a change the person confirms.
+    assert!(!written_from_result(AgentCapability::AskQuestion));
+    assert!(!written_from_result(AgentCapability::SummarizeFile));
+    assert!(!written_from_result(AgentCapability::ManageFiles));
+    assert!(!written_from_result(AgentCapability::SaveMemory));
+}
