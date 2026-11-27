@@ -2,6 +2,24 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.119 (2026-11-27)
+
+The CAIRN line's closing record is prepared; every walkthrough result is pending.
+
+### Added
+- **The closing record.** [release-evidence-0.9.119.md](mindmap/technical/release-evidence-0.9.119.md): what V0.9.70 to V0.9.118 delivered and where each is described; the checks that were run and the ones that were not; an eleven-step walkthrough for a test server with a real provider, two organizations (one whose name contains the other's, to check the History) and three workspaces; a table for the live evaluation of each model the guides name; a table of the 119 rows of the line (V0.9.0 to V0.9.118) to validate; and the open items carried into 0.10.
+
+### What this release is not
+- **No walkthrough was performed.** This release's own row asked for the maintainer's walkthrough with a real provider and a live evaluation per model. Nothing here started a server, used a provider or ran an evaluation, so every result is pending, every row of the line stays built and not validated, and the 0.10 pilot does not start from a validated candidate yet.
+- **Narrower than the plan.** The memory overview shows cards, those needing review, the last write and playbooks, not open upkeep findings, unused playbooks or corrections; it does not turn upkeep on for several workspaces at once. Trying an ability in a scratch chat on the administration page was not built.
+- **Little test coverage.** Every release from V0.9.97 on had at most a unit test or two, and none was run.
+
+### Checks
+- `npm run docs:check` passes (links and counts). Documentation only: no code changed.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.118 (2026-11-27)
 
 Guides for CAIRN administration: tiers, guardrails, abilities, preferences and refusals.

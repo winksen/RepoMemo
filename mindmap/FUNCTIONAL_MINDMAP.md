@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.118` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.119` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.119 — The CAIRN line's closing record is prepared; every walkthrough result is pending.
+
+- **Closing record.** The record for the CAIRN line lists what V0.9.70 to V0.9.118 delivered, an eleven-step walkthrough for a test server with a real provider and two organizations, the live evaluation each model needs, every row of the line to validate, and the open items carried into 0.10. Nothing in it has been performed, so every row stays built and not validated.
+
+Checks: docs:check; documentation only, no code changed; no walkthrough performed.
 
 ## V0.9.118 — Guides for CAIRN administration: tiers, guardrails, abilities, preferences and refusals.
 
