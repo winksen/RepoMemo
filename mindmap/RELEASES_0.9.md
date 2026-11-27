@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.125` (2026-11-27)
+> **Current:** `V0.9.126` (2026-11-27)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md) · [CAIRN administration plan](plans/2026-11-26-0.9-cairn-administration.md) · [ADR 0007](../docs/decisions/0007-cairn-models-are-a-system-catalog-chosen-per-organization.md)
 
@@ -149,6 +149,7 @@
 | **V0.9.123** | 🧪 2026-11-27 | AU. CAIRN closing | 🐞 | Active line on administration tabs | Draw the sliding line under the active tab in the CAIRN administration and System tab bars | Both tab bars show the line under the active tab, as the organization's do |
 | **V0.9.124** | 🧪 2026-11-27 | AU. CAIRN closing | 🐞 | CAIRN admin kept in Cairn's rail | Remove the CAIRN admin entry from the main rail, keep it in Cairn's rail, and show System in both | The main rail shows Organizations and System, and Cairn's rail keeps its Administration tab |
 | **V0.9.125** | 🧪 2026-11-27 | AU. CAIRN closing | 🐞 | Administration in Cairn's rail with tabs | Return the CAIRN administration to Cairn's rail, with its sections as tabs, and take System out of Cairn's rail | /cairn/admin loads in Cairn's rail with a tab per section, and the main rail shows Organizations and System |
+| **V0.9.126** | 🧪 2026-11-27 | AU. CAIRN closing | 🐞 | Administration button in Cairn's rail | Replace Cairn's Chats and Administration tabs with a rail of chats and an Administration button above the user button | Cairn's rail lists chats on every Cairn page and ends with an Administration button, like the main rail's |
 
 ## Verification and handoff
 

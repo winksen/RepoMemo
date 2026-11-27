@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.126 (2026-11-27)
+
+Cairn's rail holds only chats, with an Administration button above the user button.
+
+### Changed
+- **No Chats and Administration tabs.** Cairn's rail is the list of chats on every Cairn page, administration included.
+- **Administration button.** Above the user button, in the style of the main rail's buttons, for people who may open the administration. It is highlighted on `/cairn/admin/...`, where the sections are the tabs above the page.
+
+### Checks
+- Type-checked; `npm run docs:check` passes. Not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.125 (2026-11-27)
 
 The CAIRN administration is back in Cairn's rail, with its sections as tabs; the main rail is Organizations and System.

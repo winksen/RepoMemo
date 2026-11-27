@@ -7,7 +7,7 @@ import { rememberCairnWorkspace } from "../web/cairn";
 import { CairnButton } from "./CairnButton";
 import { NotificationsMenu } from "./NotificationsMenu";
 import { UserMenu } from "./UserMenu";
-import { Bell, Buildings as Building, CaretDown as ChevronDown, MagnifyingGlass as Search, SignOut as Logout, Moon, HardDrives as Server, LockKey as Shield, Sun, UserCircle } from "@phosphor-icons/react";
+import { Bell, Buildings as Building, CaretDown as ChevronDown, MagnifyingGlass as Search, Sparkle, SignOut as Logout, Moon, HardDrives as Server, LockKey as Shield, Sun, UserCircle } from "@phosphor-icons/react";
 import type { SharedSession } from "../types";
 import { openCommandPalette } from "../lib/assistantBridge";
 import { MAIN_CONTENT_ID } from "../web/RouteAnnouncer";
@@ -67,9 +67,11 @@ const ShellContext = createContext<ShellSlots | null>(null);
  * for all of them, so `SharedWebApp` keeps ONE copy mounted while the page inside it changes, and moving from page
  * to page redraws only the page, never the bar or the rail (V0.8.25).
  */
-function LayoutFrame({ accessToken, chatsOnly = false, session, sidebar, signOut, onNavigate, defaultOrganizationId, navigation, aside, children, slots }: {
+function LayoutFrame({ accessToken, cairnAdmin = false, chatsOnly = false, session, sidebar, signOut, onNavigate, defaultOrganizationId, navigation, aside, children, slots }: {
   /** Lets the bell list the notifications in a dropdown; without it (a bare frame) the bell opens their page. */
   accessToken?: string;
+  /** On Cairn's pages: the person may open the CAIRN administration, so the rail ends with a button for it. */
+  cairnAdmin?: boolean;
   /** The rail holds only what `sidebar` gives it: no Organizations, System, session or server notes (Cairn's page). */
   chatsOnly?: boolean;
   session: SharedSession;
@@ -104,7 +106,7 @@ function LayoutFrame({ accessToken, chatsOnly = false, session, sidebar, signOut
     <div className="shared-home-frame" data-wide={chatsOnly ? "true" : undefined}>
       <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
         <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={ICON_SIZE.md} /></Button>
-        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{chatsOnly ? null : <><AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><DesktopServerNote signedIn /></>}<UserMenu onNavigate={onNavigate} session={session} signOut={signOut} /></div>
+        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{chatsOnly ? (cairnAdmin ? <CairnAdministrationButton onNavigate={onNavigate} /> : null) : <><AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><DesktopServerNote signedIn /></>}<UserMenu onNavigate={onNavigate} session={session} signOut={signOut} /></div>
       </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {slots ? <div className="shared-shell-slot" ref={slots.setNavigation} /> : navigation}
@@ -122,8 +124,9 @@ function LayoutFrame({ accessToken, chatsOnly = false, session, sidebar, signOut
  * into the frame's slots; the rail comes from here, so it does not blink while a page loads.
  * `scrollKey` changes with the page: the content starts at the top again.
  */
-export function SharedShell({ accessToken, chatsOnly = false, children, defaultOrganizationId, scrollKey, session, sidebar, signOut, onNavigate }: {
+export function SharedShell({ accessToken, cairnAdmin, chatsOnly = false, children, defaultOrganizationId, scrollKey, session, sidebar, signOut, onNavigate }: {
   accessToken?: string;
+  cairnAdmin?: boolean;
   chatsOnly?: boolean;
   children: ReactNode;
   defaultOrganizationId?: string;
@@ -139,7 +142,7 @@ export function SharedShell({ accessToken, chatsOnly = false, children, defaultO
   const slots = useMemo(() => ({ navigation, content, aside }), [navigation, content, aside]);
   useEffect(() => { content?.scrollTo?.({ top: 0 }); }, [content, scrollKey]);
   return <ShellContext.Provider value={slots}>
-    <LayoutFrame accessToken={accessToken} chatsOnly={chatsOnly} defaultOrganizationId={defaultOrganizationId} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut} slots={{ setNavigation, setContent, setAside }} />
+    <LayoutFrame accessToken={accessToken} cairnAdmin={cairnAdmin} chatsOnly={chatsOnly} defaultOrganizationId={defaultOrganizationId} onNavigate={onNavigate} session={session} sidebar={sidebar} signOut={signOut} slots={{ setNavigation, setContent, setAside }} />
     {children}
   </ShellContext.Provider>;
 }
@@ -188,6 +191,14 @@ export function ShellContent({ children }: { children: ReactNode }) {
   const slots = useContext(ShellContext);
   if (!slots) return <>{children}</>;
   return slots.content ? createPortal(children, slots.content) : null;
+}
+
+/** The bottom of Cairn's rail: a button to the CAIRN administration, styled like the main rail's. */
+function CairnAdministrationButton({ onNavigate }: { onNavigate: (to: string) => void }) {
+  const inAdmin = window.location.pathname === "/cairn/admin" || window.location.pathname.startsWith("/cairn/admin/");
+  return <section aria-label="Administration" className="shared-rail-system">
+    <Tooltip content="Administer CAIRN" side="right"><Button aria-current={inAdmin ? "page" : undefined} className={`shared-rail-organization${inAdmin ? " active" : ""}`} onClick={() => onNavigate("/cairn/admin")} type="button" variant="secondary"><Sparkle size={ICON_SIZE.lg} weight={inAdmin ? "fill" : "regular"} /><span>Administration</span></Button></Tooltip>
+  </section>;
 }
 
 /** The bottom of the rail: every organization (everyone) and the System pages (administrators). Each is highlighted on its own pages. */

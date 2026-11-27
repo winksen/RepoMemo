@@ -420,12 +420,13 @@ function SharedWebAppContent() {
     {clientPlatform.nativeNotices ? <NoticeWatcher accessToken={accessToken} userId={session.user.id} workspaceIds={workspaces.map((entry) => entry.workspace.id)} /> : null}
     <SharedShell
       accessToken={accessToken}
+      cairnAdmin={cairnAdminSections(session, organizations).length > 0}
       chatsOnly={route.name === "cairn" || route.name === "cairn-admin"}
       defaultOrganizationId={workspaceOrganization?.id ?? organizations[0]?.id}
       onNavigate={navigate}
       scrollKey={pageKey(route)}
       session={session}
-      sidebar={route.name === "cairn" ? <CairnRail accessToken={accessToken} chatId={route.chatId} organizations={organizations} session={session} workspaces={workspaces} /> : route.name === "cairn-admin" ? <CairnRail accessToken={accessToken} chatId={null} organizations={organizations} section={route.section} session={session} workspaces={workspaces} /> : <OrganizationRail organizations={organizations} workspaceId={routedWorkspaceId ?? undefined} workspaces={workspaces} />}
+      sidebar={route.name === "cairn" ? <CairnRail accessToken={accessToken} chatId={route.chatId} workspaces={workspaces} /> : route.name === "cairn-admin" ? <CairnRail accessToken={accessToken} chatId={null} workspaces={workspaces} /> : <OrganizationRail organizations={organizations} workspaceId={routedWorkspaceId ?? undefined} workspaces={workspaces} />}
       signOut={signOut}
     >
       {renderPage()}
