@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.141 (2026-11-27)
+
+CAIRN's loop instructions say what its tools can and cannot see and how to work, before the rules it already had.
+
+### Changed
+- **Three sections.** The prompt of every loop run now has *The workspace* (what the tools can and cannot see: indexed files and their properties, memory cards, tasks and chats; no web, no commands, no unindexed files, some folders possibly closed), *How to work* (cheap tools before reading whole files, independent calls in the same turn, one short question when the request is unclear, stop once the question is answered) and *Answering*.
+- **Earlier rules kept.** *Answering* holds the V0.9.126 rules word for word: use tools before answering, cite handles, propose changes only, memory cards, quoted data, outdated sources, the person's language.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.140 (2026-11-27)
 
 When a tool finds no file, it lists up to five closest matches with their handles and names the tool to try next.
