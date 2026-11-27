@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.112` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.113` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.113 — Administrators see CAIRN's routines across workspaces and can pause or resume them.
+
+- **Routines overview.** The Memory section also lists the routines of the organizations a person administers: its workspace, title, owner, how it runs, whether it is paused and why, failures in a row and when it last ran. An administrator can pause an active routine and resume a paused one. The routine's prompt is never shown.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.112 — The administration page shows the state of CAIRN's memory across workspaces.
 

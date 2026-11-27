@@ -105,7 +105,7 @@ pub use cairn_catalog::{
     CairnConnection, CairnConnectionChange, CairnModel, CairnModelChange, CairnSaved, NewCairnConnection,
     NewCairnModel, CATALOG_NAME_CHARS, CONNECTION_KINDS, MODEL_PURPOSES, TOOL_MODES,
 };
-pub use cairn_memory::MemoryFigures;
+pub use cairn_memory::{MemoryFigures, RoutineFigures};
 pub use cairn_resolution::{
     ChangeLimits, McpPolicy, OrganizationBudget, PersonBudget, PersonalMemoryPolicy, ResolvedTextProvider,
     RoutineLimits, TextResolution, CATALOG_PROVIDER_PREFIX,

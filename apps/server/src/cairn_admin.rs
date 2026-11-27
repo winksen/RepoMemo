@@ -11,8 +11,8 @@ use serde_json::Value;
 
 use crate::{
     map_storage_error,
-    system::{cairn_budgets, change_cairn_budgets, require_cairn_admin, require_cairn_reader, CairnBudget},
-    ApiError, AppState, AuthenticatedSubject, ReadingSubject,
+    system::{audit, cairn_budgets, change_cairn_budgets, require_cairn_admin, require_cairn_reader, CairnBudget},
+    ApiError, AppState, AuthenticatedSubject, ManagingSubject, ReadingSubject,
 };
 
 /// Every section of the page, in the order it is shown.
@@ -335,6 +335,134 @@ pub(crate) async fn memory_overview(
         });
     }
     Ok(Json(rows))
+}
+
+/// The organizations whose figures the caller may see: none given means every organization.
+async fn visible_organizations(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+) -> Result<Option<Vec<String>>, ApiError> {
+    if require_cairn_reader(subject).is_ok() {
+        return Ok(None);
+    }
+    let own: Vec<String> = state
+        .storage
+        .list_organizations_for_user(&subject.user_id)
+        .await
+        .map_err(map_storage_error)?
+        .into_iter()
+        .filter(|organization| {
+            !organization.guest && matches!(organization.role, OrganizationRole::Owner | OrganizationRole::Admin)
+        })
+        .map(|organization| organization.id)
+        .collect();
+    if own.is_empty() {
+        return Err(ApiError::forbidden());
+    }
+    Ok(Some(own))
+}
+
+/// CAIRN's routines across workspaces (V0.9.113): who owns each, how it runs, whether it is paused and why, how it last went. No
+/// prompt is shown. The same people as the memory overview see them.
+pub(crate) async fn routines_overview(
+    ReadingSubject(subject): ReadingSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<repomemo_storage::RoutineFigures>>, ApiError> {
+    let organizations = visible_organizations(&state, &subject).await?;
+    Ok(Json(
+        state
+            .storage
+            .cairn_routines(organizations.as_deref())
+            .await
+            .map_err(map_storage_error)?,
+    ))
+}
+
+async fn switch_routine(
+    state: &AppState,
+    subject: &AuthenticatedSubject,
+    routine_id: &str,
+    pause: bool,
+) -> Result<Json<repomemo_domain::AgentRoutine>, ApiError> {
+    let routine = state
+        .storage
+        .get_agent_routine(routine_id)
+        .await
+        .map_err(map_storage_error)?;
+    // The people who may change the CAIRN settings of the routine's organization may pause and resume its routines.
+    let organization_id = state
+        .storage
+        .workspace_organization(&routine.workspace_id)
+        .await
+        .map_err(map_storage_error)?;
+    match &organization_id {
+        Some(organization_id) => {
+            crate::organization_cairn::require_access(state, subject, organization_id, true).await?
+        }
+        None => require_cairn_admin(subject)?,
+    }
+    let after = if pause {
+        state
+            .storage
+            .pause_agent_routine(routine_id, "Paused by an administrator.")
+            .await
+            .map_err(map_storage_error)?;
+        state
+            .storage
+            .get_agent_routine(routine_id)
+            .await
+            .map_err(map_storage_error)?
+    } else {
+        state
+            .storage
+            .resume_agent_routine(routine_id)
+            .await
+            .map_err(map_storage_error)?
+    };
+    let organization_name = match &organization_id {
+        Some(id) => state
+            .storage
+            .list_organizations_for_system_admin(&subject.user_id)
+            .await
+            .ok()
+            .and_then(|all| all.into_iter().find(|organization| &organization.id == id))
+            .map_or_else(|| id.clone(), |organization| organization.name),
+        None => String::new(),
+    };
+    audit(
+        state,
+        subject,
+        if pause {
+            "cairn_routine_paused"
+        } else {
+            "cairn_routine_resumed"
+        },
+        format!(
+            "{} the routine {} of {} in {organization_name} (workspace {}).",
+            if pause { "Paused" } else { "Resumed" },
+            routine.title,
+            routine.owner_name,
+            routine.workspace_id
+        ),
+    )
+    .await;
+    Ok(Json(after))
+}
+
+pub(crate) async fn pause_routine(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    axum::extract::Path(routine_id): axum::extract::Path<String>,
+) -> Result<Json<repomemo_domain::AgentRoutine>, ApiError> {
+    switch_routine(&state, &subject, &routine_id, true).await
+}
+
+pub(crate) async fn resume_routine(
+    ManagingSubject(subject): ManagingSubject,
+    State(state): State<AppState>,
+    axum::extract::Path(routine_id): axum::extract::Path<String>,
+) -> Result<Json<repomemo_domain::AgentRoutine>, ApiError> {
+    switch_routine(&state, &subject, &routine_id, false).await
 }
 
 /// Who the page is for, and what it shows today.

@@ -23,6 +23,7 @@ import { UsagePanel } from "./UsagePanel";
 import { HistoryPanel } from "./HistoryPanel";
 import { AbilitiesPanel } from "./AbilitiesPanel";
 import { MemoryPanel } from "./MemoryPanel";
+import { RoutinesPanel } from "./RoutinesPanel";
 import { OrganizationCairnPanel } from "./OrganizationCairnPanel";
 import { Dropdown } from "../../components/ui/dropdown";
 
@@ -142,7 +143,7 @@ export function CairnAdminPanel({ accessToken, section, view, isLoading, onReloa
   const { label, intro, empty } = SECTION_LABELS[section];
   return <section className="shared-page-content rm-system-page">
     <PageHeader actions={<RefreshButton isLoading={isLoading} onClick={onReload} />} description={view.can_change ? intro : `${intro} You can read this page; only CAIRN and system administrators change it.`} title={`CAIRN administration · ${label}`} />
-    {section === "memory" ? <MemoryPanel accessToken={accessToken} /> : section === "abilities" ? <AbilitiesSection accessToken={accessToken} view={view} /> : section === "history" ? <HistoryPanel accessToken={accessToken} /> : section === "usage" ? <UsagePanel accessToken={accessToken} /> : section === "organizations" ? <OrganizationsSection accessToken={accessToken} view={view} /> : section === "models" ? <><ConnectionsPanel accessToken={accessToken} canChange={view.can_change} /><ModelsPanel accessToken={accessToken} canChange={view.can_change} /><p className="shared-muted-copy">{empty}</p></> : section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : <EmptyState description={empty} icon={SECTION_LABELS[section].icon} title="Nothing here yet" />}
+    {section === "memory" ? <><MemoryPanel accessToken={accessToken} /><RoutinesPanel accessToken={accessToken} canChange={view.can_change} /></> : section === "abilities" ? <AbilitiesSection accessToken={accessToken} view={view} /> : section === "history" ? <HistoryPanel accessToken={accessToken} /> : section === "usage" ? <UsagePanel accessToken={accessToken} /> : section === "organizations" ? <OrganizationsSection accessToken={accessToken} view={view} /> : section === "models" ? <><ConnectionsPanel accessToken={accessToken} canChange={view.can_change} /><ModelsPanel accessToken={accessToken} canChange={view.can_change} /><p className="shared-muted-copy">{empty}</p></> : section === "overview" ? <OverviewSection accessToken={accessToken} onChanged={onReload} view={view} /> : <EmptyState description={empty} icon={SECTION_LABELS[section].icon} title="Nothing here yet" />}
   </section>;
 }
 

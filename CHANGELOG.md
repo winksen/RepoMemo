@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.113 (2026-11-27)
+
+Administrators see CAIRN's routines across workspaces and can pause or resume them.
+
+### Added
+- **The routines table.** Under Memory, one row for each routine of the workspaces of the organizations a person administers: organization, workspace, title, owner, how it runs (every day, week or month, or when files are indexed or go out of date), its state with the reason when it is paused, failures in a row, and its last run. The count of paused routines is in the heading.
+- **Pause and resume.** An action menu on each row. Pausing says "Paused by an administrator."; resuming sets the next run from today and forgets the failures, as it does for the owner. Both are toasts and audit events (`cairn_routine_paused`, `cairn_routine_resumed`) that appear in the History section.
+- **Who.** CAIRN, system and app administrators see every organization; owners and admins see their own. Those who may change an organization's CAIRN settings (CAIRN and system administrators, and that organization's owners and admins) may pause and resume its routines; app administrators read only.
+- **No prompt.** A routine's prompt is its owner's; the table and the response do not carry it.
+
+### Not yet
+- **Limits.** A routine that an organization's limits no longer allow is paused again the next time those settings are saved, so resuming it may not last.
+- **Running one now** stays with its owner.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added or run, and the table was not opened.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.112 (2026-11-27)
 
 The administration page shows the state of CAIRN's memory across workspaces.

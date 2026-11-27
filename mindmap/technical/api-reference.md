@@ -162,6 +162,9 @@
 | PUT | `/v1/workspaces/{workspace_id}/cairn/models/{purpose}` | session or admin token | require_workspace_admin | `{model_id, confirm_rebuild}` | WorkspaceCairnView |
 | GET | `/v1/cairn/admin/usage` | auth | require_cairn_reader, or an owner or admin of an organization | `?days=7|30` | UsageView |
 | GET | `/v1/cairn/admin/memory` | auth | require_cairn_reader, or an owner or admin of an organization | — | Vec<MemoryRow> |
+| GET | `/v1/cairn/admin/routines` | auth | require_cairn_reader, or an owner or admin of an organization | — | Vec<RoutineFigures> |
+| POST | `/v1/cairn/admin/routines/{routine_id}/pause` | managing | change access to the routine's organization | — | AgentRoutine |
+| POST | `/v1/cairn/admin/routines/{routine_id}/resume` | managing | change access to the routine's organization | — | AgentRoutine |
 | GET | `/v1/cairn/admin/history` | auth | require_cairn_reader, or an owner or admin of an organization | — | Vec<HistoryEntry> |
 | GET | `/v1/cairn/tools` | auth | any signed-in person | — | Vec<SwitchableTool> |
 | GET | `/v1/organizations/{organization_id}/cairn` | auth | organization member, or require_cairn_reader | — | OrganizationCairnSettings |

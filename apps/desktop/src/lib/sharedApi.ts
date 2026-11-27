@@ -1895,6 +1895,34 @@ export function getCairnMemory(accessToken: string): Promise<{ organization_id: 
   return request(`/v1/cairn/admin/memory`, {}, accessToken);
 }
 
+export interface CairnRoutineRow {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  workspace_id: string;
+  workspace_name: string;
+  title: string;
+  owner_name: string;
+  runs: string;
+  state: "active" | "paused";
+  pause_reason: string | null;
+  failures: number;
+  last_run_at: string | null;
+  next_run_date: string;
+}
+
+export function getCairnRoutines(accessToken: string): Promise<CairnRoutineRow[]> {
+  return request<CairnRoutineRow[]>(`/v1/cairn/admin/routines`, {}, accessToken);
+}
+
+export function pauseCairnRoutine(accessToken: string, routineId: string): Promise<unknown> {
+  return request(`/v1/cairn/admin/routines/${encodeURIComponent(routineId)}/pause`, { method: "POST", body: "{}" }, accessToken);
+}
+
+export function resumeCairnRoutine(accessToken: string, routineId: string): Promise<unknown> {
+  return request(`/v1/cairn/admin/routines/${encodeURIComponent(routineId)}/resume`, { method: "POST", body: "{}" }, accessToken);
+}
+
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {
   return request<CairnTool[]>("/v1/cairn/tools", {}, accessToken);
 }
