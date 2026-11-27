@@ -619,3 +619,23 @@ fn only_jobs_that_look_without_the_model_are_written_from_their_result() {
     assert!(!written_from_result(AgentCapability::ManageFiles));
     assert!(!written_from_result(AgentCapability::SaveMemory));
 }
+
+/// V0.9.133: with a model a greeting is the model's to answer; the built-in replies are for a workspace with none.
+#[test]
+fn greetings_are_answered_by_cairn_only_without_a_model() {
+    assert!(chatter_answered_by_cairn("salam", false).is_some());
+    assert!(chatter_answered_by_cairn("who are you?", false).is_some());
+    assert!(chatter_answered_by_cairn("salam", true).is_none());
+    assert!(chatter_answered_by_cairn("what can you do", true).is_none());
+    // A message that is not chatter is not CAIRN's own to answer either way.
+    assert!(chatter_answered_by_cairn("find the readme file", false).is_none());
+}
+
+#[test]
+fn a_model_that_fails_on_a_greeting_leaves_the_built_in_reply() {
+    let context = ChatterContext::default();
+    assert!(!built_in_reply(&context, "salam").reply_markdown.is_empty());
+    assert!(!built_in_reply(&context, "gibberish xyzzy plugh")
+        .reply_markdown
+        .is_empty());
+}

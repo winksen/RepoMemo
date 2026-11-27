@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.132` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.133` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.133 — Greetings and questions about CAIRN go to the model when there is one; the built-in replies are for a workspace with no model.
+
+- **CAIRN answers in the person's own words.** A greeting or a question about CAIRN is answered by the model in the person's language when one is available. Without a model the same built-in replies appear.
+
+Checks: `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
 
 ## V0.9.132 — The model writes the reply from the result of a job that used no AI, and says when the result does not answer.
 

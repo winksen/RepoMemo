@@ -1,6 +1,6 @@
 # RepoMemo releases: 0.9 → 0.10 (CAIRN)
 
-> **Current:** `V0.9.132` (2026-11-27)
+> **Current:** `V0.9.133` (2026-11-27)
 
 > **Theme:** CAIRN, an agent over the team's governed evidence · **Baseline:** V0.8.67 · **Related:** [Roadmap](ROADMAP.md#the-09x-line-cairn-agent) · [CAIRN agent review](analysis/2026-11-22-cairn-agent-review.md) · [CAIRN harness plan](plans/2026-11-22-0.9-cairn-harness.md) · [ADR 0006](../docs/decisions/0006-cairn-is-a-bounded-tool-loop-over-governed-evidence.md) · [CAIRN administration plan](plans/2026-11-26-0.9-cairn-administration.md) · [ADR 0007](../docs/decisions/0007-cairn-models-are-a-system-catalog-chosen-per-organization.md) · [CAIRN tool choice plan](plans/2026-11-27-0.9-cairn-tool-choice.md) · [ADR 0008](../docs/decisions/0008-cairn-asks-the-model-first-whenever-there-is-one.md)
 
@@ -156,7 +156,7 @@
 | **V0.9.130** | 🧪 2026-11-27 | BA. Model first | 🔧 | One-job fallback | When the model cannot follow the JSON protocol, let it pick one job, run it and answer, instead of ending the run partial | A model that twice replies in a form the loop cannot read still gets an answer from a job, and the trace says it fell back |
 | **V0.9.131** | 🧪 2026-11-27 | BA. Model first | 🔧 | The model before keywords | Ask the model to pick the job before the keyword rules and template phrases, which run only without a model or when it fails | "Analyze the size of files" with a model is never matched by its words, and the router's tests pass without a provider |
 | **V0.9.132** | 🧪 2026-11-27 | BA. Model first | ✨ | Answers written from a job's result | Let the model write the reply from the result of a job that used no AI, saying when the result does not answer the request and keeping its citations | A lookup that finds nothing gets an answer that names the closest files, and a failing provider returns the job's own reply |
-| **V0.9.133** | 🔜 | BA. Model first | 🔧 | Greetings answered by the model | Send greetings and questions about CAIRN to the model when there is one, and keep the built-in replies for no model | "Salam" calls the model with a provider and gets the built-in reply without one |
+| **V0.9.133** | 🧪 2026-11-27 | BA. Model first | 🔧 | Greetings answered by the model | Send greetings and questions about CAIRN to the model when there is one, and keep the built-in replies for no model | "Salam" calls the model with a provider and gets the built-in reply without one |
 | **V0.9.134** | 🔜 | BA. Model first | 🔧 | A picked job inside the loop | Run a job picked from the + menu as the loop's first tool call, so the model can follow up with other tools | Picking Summarize calls the summarize tool first and the model may then read or search |
 | **V0.9.135** | 🔜 | BA. Model first | 🔧 | Uploaded files in the loop | Send a message about an uploaded file to the loop with the file already named and cited by its handle | "What is this file about" reads the uploaded file by its handle, and a viewer still cannot propose |
 | **V0.9.136** | 🔜 | BB. Tools for the model | ✨ | File query sorting and size | Let the file query sort by size, modified, created or title, in either direction, and filter by dates and a minimum size | The largest of three files comes first, a date window narrows the list, and paging is stable under a sort |

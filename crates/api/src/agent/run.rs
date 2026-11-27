@@ -2182,6 +2182,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_greeting_goes_to_the_model_in_the_loop() {
+        let (core, data_dir) = core("greeting").await;
+        let workspace_id = workspace_with_a_note(&core).await;
+        let provider = ScriptedProvider::new(vec![ChatResponse::text("Wa alaykum salam! How can I help?")]);
+        let outcome = core
+            .loop_with(&provider, request(&workspace_id, "salam"), setup(8, true))
+            .await
+            .unwrap();
+        assert_eq!(provider.requests().len(), 1);
+        assert_eq!(outcome.reply.reply_markdown, "Wa alaykum salam! How can I help?");
+        assert_eq!(outcome.reply.routing, AgentRouting::Agent);
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
     async fn a_model_that_cannot_follow_the_json_protocol_falls_back_to_one_job() {
         let (core, data_dir) = core("fallback").await;
         let workspace_id = workspace_with_a_note(&core).await;

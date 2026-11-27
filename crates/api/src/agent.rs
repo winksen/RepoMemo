@@ -272,9 +272,9 @@ impl RepoMemoCore {
         self.run_agent_router(request).await
     }
 
-    /// Answers a message, with the tool loop when the workspace is in Agent mode (V0.9.40). Chatter, a job picked from the +
-    /// menu, a message about an uploaded file and a workspace with no provider keep the router, which is also the fallback
-    /// when no loop is set up.
+    /// Answers a message, with the tool loop when the workspace is in Agent mode (V0.9.40). A job picked from the + menu, a
+    /// message about an uploaded file and a workspace with no provider keep the router, which is also the fallback when no loop is
+    /// set up. A greeting goes to the loop like any message when there is a model (V0.9.133).
     pub async fn run_agent_with(
         &self,
         request: AgentRequest,
@@ -286,7 +286,6 @@ impl RepoMemoCore {
                 && request.artifact_id.is_none()
                 && request.provider_id.is_some()
                 && !message.is_empty()
-                && recognise_chatter(message).is_none()
             {
                 return self.run_loop(request, setup).await;
             }
@@ -318,9 +317,10 @@ impl RepoMemoCore {
         } else {
             None
         };
-        // A greeting, "who are you" or "what can you do" is answered by CAIRN itself, with no AI and no search (V0.9.1).
+        // Without a model, a greeting, "who are you" or "what can you do" is answered by CAIRN itself, with no AI and no search
+        // (V0.9.1). With a model the model answers it (V0.9.133).
         if request.capability.is_none() && request.artifact_id.is_none() {
-            if let Some(chatter) = recognise_chatter(message) {
+            if let Some(chatter) = chatter_answered_by_cairn(message, request.provider_id.is_some()) {
                 let context = self.chatter_context(&request).await;
                 return Ok(chatter_reply(chatter, &context));
             }
@@ -456,7 +456,7 @@ impl RepoMemoCore {
         warnings: &mut Vec<String>,
     ) -> AgentReply {
         let Some(provider_id) = request.provider_id.as_deref() else {
-            return unmatched_reply(&self.chatter_context(request).await);
+            return built_in_reply(&self.chatter_context(request).await, message);
         };
         let written: Result<String> = async {
             let settings = self.storage.get_provider_settings(provider_id).await?;
@@ -481,12 +481,30 @@ impl RepoMemoCore {
                 answer.context_turns = history.len() as i64;
                 answer
             }
-            Ok(_) => unmatched_reply(&self.chatter_context(request).await),
+            Ok(_) => built_in_reply(&self.chatter_context(request).await, message),
             Err(error) => {
                 warnings.push(format!("The AI provider could not answer this message: {error:#}"));
-                unmatched_reply(&self.chatter_context(request).await)
+                built_in_reply(&self.chatter_context(request).await, message)
             }
         }
+    }
+}
+
+/// What CAIRN says by itself when the model could not answer: the reply to a greeting or a question about it, or what it can do.
+fn built_in_reply(context: &ChatterContext, message: &str) -> AgentReply {
+    match recognise_chatter(message) {
+        Some(chatter) => chatter_reply(chatter, context),
+        None => unmatched_reply(context),
+    }
+}
+
+/// The built-in reply to a greeting or a question about CAIRN, which only a workspace with no model gets (V0.9.133): with a model
+/// the message goes to the model like any other.
+pub(crate) fn chatter_answered_by_cairn(message: &str, has_model: bool) -> Option<chatter::Chatter> {
+    if has_model {
+        None
+    } else {
+        recognise_chatter(message)
     }
 }
 
