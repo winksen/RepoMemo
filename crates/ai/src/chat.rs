@@ -346,21 +346,22 @@ pub struct ModelTraits {
 impl Default for ModelTraits {
     fn default() -> Self {
         Self {
-            tool_mode: ToolMode::None,
+            tool_mode: ToolMode::Json,
             context_tokens: DEFAULT_CONTEXT_TOKENS,
         }
     }
 }
 
 impl ModelTraits {
-    /// The traits stored in a provider's metadata; a model nobody tested takes no tools.
+    /// The traits stored in a provider's metadata. A model nobody tested or set is tried through the JSON protocol (V0.9.128); only
+    /// an explicit `none` keeps a model from taking tools.
     pub fn from_metadata(metadata: &Value) -> Self {
         Self {
             tool_mode: metadata
                 .get("tool_mode")
                 .and_then(Value::as_str)
                 .and_then(ToolMode::parse)
-                .unwrap_or(ToolMode::None),
+                .unwrap_or(ToolMode::Json),
             context_tokens: metadata
                 .get("context_tokens")
                 .and_then(Value::as_u64)
@@ -870,6 +871,16 @@ mod tests {
         let unknown = ModelTraits::from_metadata(&json!({}));
         assert_eq!(unknown, ModelTraits::default());
         assert!(!ModelTraits::is_known(&json!({})));
+        // Nobody set the tool mode: the model is tried through the JSON protocol; an explicit none stays none.
+        assert_eq!(unknown.tool_mode, ToolMode::Json);
+        assert_eq!(
+            ModelTraits::from_metadata(&json!({ "tool_mode": "none" })).tool_mode,
+            ToolMode::None
+        );
+        assert_eq!(
+            ModelTraits::from_metadata(&json!({ "tool_mode": "native" })).tool_mode,
+            ToolMode::Native
+        );
         assert_eq!(
             ModelTraits::from_metadata(&json!({ "context_tokens": 3 })).context_tokens,
             512

@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.128 (2026-11-27)
+
+A model whose tool calling nobody set is tried through the JSON protocol instead of being kept out of the loop.
+
+### Changed
+- **Unknown tool mode.** A model with no recorded tool calling is read as taking tools through the JSON protocol. Only an explicit `none` keeps a model from taking tools; `native` and `json` are unchanged.
+- **Settings form.** It still shows *not set* for such a model: the mode is read, not stored.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.127 (2026-11-27)
 
 The plan for CAIRN choosing its own tools is recorded; no code changes.
