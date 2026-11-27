@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.128` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.129` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.129 — Every model that takes tools runs CAIRN's loop, unless the organization, the workspace or the person chose Jobs.
+
+- **The loop is the default.** A workspace whose model takes tools answers in Agent mode without anyone testing the model or listing it. Jobs stay available as a choice, and a model that takes no tools answers with jobs.
+
+Checks: `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` and `npm run typecheck` pass; docs:check passes. Tests not run; not opened in a browser.
 
 ## V0.9.128 — A model whose tool calling nobody set is tried through the JSON protocol instead of being kept out of the loop.
 

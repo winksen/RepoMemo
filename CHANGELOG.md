@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.129 (2026-11-27)
+
+Every model that takes tools runs CAIRN's loop, unless the organization, the workspace or the person chose Jobs.
+
+### Changed
+- **Agent mode follows the model.** A text model with native or JSON tool calling, or one whose tool calling nobody set, answers in Agent mode. A model set to *none* answers with jobs, and a choice of *Jobs* by an administrator, an organization or a person is kept.
+- **No list or evaluation needed.** `REPOMEMO_CAIRN_EVAL_PASSED_MODELS` and a passing catalog report no longer decide the mode; the report is only shown beside the model. The *Agent by default* mark is gone from the catalog.
+- **Settings.** Choosing Agent for a model set to *none* is refused with a message that says to set Tool calling to native or JSON.
+
+### Checks
+- `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings` and `npm run typecheck` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Workspaces whose model takes tools but was not on the default list now answer in Agent mode. To keep a workspace on jobs, choose *Jobs* in Settings › AI.
+
 ## V0.9.128 (2026-11-27)
 
 A model whose tool calling nobody set is tried through the JSON protocol instead of being kept out of the loop.

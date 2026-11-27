@@ -267,30 +267,15 @@ pub(crate) fn provider_endpoint(provider_type: &str, base_url: Option<&str>) -> 
     )
 }
 
-/// How CAIRN answers in the workspace of a provider (V0.9.47). What an administrator chose wins (Agent only for a model that takes
-/// tools). With no choice, a native tool-calling model that has a passing live evaluation report on record starts in Agent mode,
-/// and every other model, and every model until a report is recorded, in Jobs mode.
+/// How CAIRN answers in the workspace of a provider (V0.9.129). A model that takes tools (native, JSON, or one nobody set) runs
+/// the tool loop, unless an administrator, an organization or a person chose Jobs. A model set to `none` answers through jobs.
+/// The default list of evaluated models and the catalog's passing reports no longer decide; they are shown, not required.
 pub(crate) fn cairn_mode_of(provider: &ProviderSettings) -> &'static str {
-    cairn_mode_with(provider, &repomemo_ai::catalog_model_passed)
-}
-
-/// [`cairn_mode_of`] with the check of which catalog models have a passing report given, so a test need not share the global one.
-fn cairn_mode_with(provider: &ProviderSettings, catalog_passed: &dyn Fn(&str) -> bool) -> &'static str {
     let tool_mode = repomemo_ai::ModelTraits::from_metadata(&provider.metadata).tool_mode;
     match provider.metadata.get("cairn_mode").and_then(serde_json::Value::as_str) {
-        Some("agent") if tool_mode != repomemo_ai::ToolMode::None => "agent",
-        Some("agent") | Some("jobs") => "jobs",
-        _ if tool_mode == repomemo_ai::ToolMode::Native
-            && (repomemo_ai::agent_default_for(provider.model.as_deref())
-                || provider
-                    .metadata
-                    .get("cairn_model_id")
-                    .and_then(serde_json::Value::as_str)
-                    .is_some_and(catalog_passed)) =>
-        {
-            "agent"
-        }
-        _ => "jobs",
+        Some("jobs") => "jobs",
+        _ if tool_mode == repomemo_ai::ToolMode::None => "jobs",
+        _ => "agent",
     }
 }
 
@@ -368,8 +353,8 @@ fn provider_metadata(
         metadata["cairn_mode"] = json!("jobs");
     }
     if mode == "agent" {
-        if traits.tool_mode == repomemo_ai::ToolMode::None || !(known || manual) {
-            return Err("Agent mode needs a model that takes tools: test the connection first, or set Tool calling to native or JSON.".to_owned());
+        if traits.tool_mode == repomemo_ai::ToolMode::None {
+            return Err("Agent mode needs a model that takes tools: set Tool calling to native or JSON.".to_owned());
         }
         metadata["cairn_mode"] = json!("agent");
     }
@@ -420,7 +405,7 @@ mod provider_metadata_tests {
 
 #[cfg(test)]
 mod catalog_default_tests {
-    use super::cairn_mode_with;
+    use super::cairn_mode_of;
     use repomemo_domain::ProviderSettings;
     use serde_json::json;
 
@@ -440,22 +425,22 @@ mod catalog_default_tests {
     }
 
     #[test]
-    fn a_native_model_of_the_catalog_with_a_passing_report_starts_in_agent_mode() {
-        let linked = |tool_mode: &str, id: &str| {
-            provider(json!({"purpose": "text", "tool_mode": tool_mode, "context_tokens": 32000, "cairn_model_id": id}))
-        };
-        let nothing = |_: &str| false;
-        let passed = |id: &str| id == "unit-test-passed";
-        // Nothing is on record: every workspace starts in Jobs mode.
-        assert_eq!(cairn_mode_with(&linked("native", "unit-test-passed"), &nothing), "jobs");
-        assert_eq!(cairn_mode_with(&linked("native", "unit-test-passed"), &passed), "agent");
-        // Only a model that takes tools natively, and only the one that passed.
-        assert_eq!(cairn_mode_with(&linked("json", "unit-test-passed"), &passed), "jobs");
-        assert_eq!(cairn_mode_with(&linked("native", "unit-test-failed"), &passed), "jobs");
-        // What an administrator chose wins.
-        let chosen = provider(
-            json!({"purpose": "text", "tool_mode": "native", "cairn_model_id": "unit-test-passed", "cairn_mode": "jobs"}),
-        );
-        assert_eq!(cairn_mode_with(&chosen, &passed), "jobs");
+    fn a_model_that_takes_tools_runs_the_loop_whether_or_not_it_is_listed() {
+        let with =
+            |tool_mode: &str| provider(json!({"purpose": "text", "tool_mode": tool_mode, "context_tokens": 32000}));
+        // An unlisted native model and a JSON model are agents; so is one whose tool mode nobody set.
+        assert_eq!(cairn_mode_of(&with("native")), "agent");
+        assert_eq!(cairn_mode_of(&with("json")), "agent");
+        assert_eq!(cairn_mode_of(&provider(json!({"purpose": "text"}))), "agent");
+        // A model set to none never takes tools.
+        assert_eq!(cairn_mode_of(&with("none")), "jobs");
+    }
+
+    #[test]
+    fn jobs_chosen_by_an_administrator_is_kept() {
+        let chosen = provider(json!({"purpose": "text", "tool_mode": "native", "cairn_mode": "jobs"}));
+        assert_eq!(cairn_mode_of(&chosen), "jobs");
+        let forced = provider(json!({"purpose": "text", "tool_mode": "none", "cairn_mode": "agent"}));
+        assert_eq!(cairn_mode_of(&forced), "jobs");
     }
 }

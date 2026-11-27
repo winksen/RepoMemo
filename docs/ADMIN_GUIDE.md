@@ -10,7 +10,7 @@ What an administrator decides about CAIRN, the assistant, and where.
 
 | Decision | Where | What it does |
 |---|---|---|
-| **CAIRN mode** | *Settings › AI* for the workspace | *Jobs* (the router picks one job a message) or *Agent* (CAIRN calls tools in a loop). Agent mode needs a text provider with native tool calling; a workspace whose model is listed in `REPOMEMO_CAIRN_EVAL_PASSED_MODELS` starts in Agent mode unless you chose |
+| **CAIRN mode** | *Settings › AI* for the workspace | *Jobs* (the router picks one job a message) or *Agent* (CAIRN calls tools in a loop). Any text provider that takes tools (native, JSON, or one nobody set) answers in Agent mode unless the organization, the workspace or the person chose *Jobs*; a model set to *none* answers with jobs |
 | **Who may use AI** | *Settings › AI*, *Who can use AI* | The role below which CAIRN answers without a model. It also decides who a routine, a chat across workspaces and an analysis can spend AI for |
 | **Budgets** | server settings | `REPOMEMO_CAIRN_MAX_STEPS` (model calls in one request, 8), `REPOMEMO_CAIRN_MAX_RUN_SECONDS` (90), `REPOMEMO_CAIRN_BACKGROUND_MAX_FILES` (files one analysis reads, 200) and each person's `REPOMEMO_AI_REQUESTS_PER_HOUR`. Every model call counts against the hour |
 | **Retention** | server settings | `REPOMEMO_CAIRN_TRACE_DAYS` (90): how long *What CAIRN did* is kept. Chats stay until their owner deletes them; personal memory until its owner deletes it or the account goes |

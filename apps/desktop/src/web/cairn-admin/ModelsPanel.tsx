@@ -114,12 +114,12 @@ export function ModelsPanel({ accessToken, canChange }: { accessToken: string; c
   </section>;
 }
 
-/** Whether a model passed the live evaluation, and when; a passing model that takes tools natively starts in Agent mode (V0.9.79). */
+/** Whether a model passed the live evaluation, and when; the report is shown beside the model; Agent mode follows the model's tool calling (V0.9.129). */
 function Evaluation({ model }: { model: CairnModel }) {
   const report = model.evaluation;
   if (!report) return <span className="shared-muted-copy">Not evaluated</span>;
   const detail = `Citation precision ${report.citation_precision.toFixed(2)}, tool accuracy ${report.tool_accuracy.toFixed(2)}, ${report.forbidden_actions} forbidden action${report.forbidden_actions === 1 ? "" : "s"}, ${report.cases_run} cases${report.version ? ` at V${report.version}` : ""}`;
-  return <Tooltip content={detail}><span><Badge>{report.passed ? "Passed" : "Failed"} · {report.run_on}</Badge>{report.passed && model.tool_mode === "native" ? <small className="shared-muted-copy"> · Agent by default</small> : null}</span></Tooltip>;
+  return <Tooltip content={detail}><span><Badge>{report.passed ? "Passed" : "Failed"} · {report.run_on}</Badge></span></Tooltip>;
 }
 
 /** What a server offers: the administrator chooses, and gives each model a purpose. */
