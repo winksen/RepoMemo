@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.142` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.143` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.143 — The CAIRN evaluation set gains seven cases on choosing the right tool: file sizes, counts, folder totals, a misspelled name, a greeting and a French request.
+
+- **Tool choice is measured.** The maintainer can run the new cases against a model and see whether it picks the file query for questions about size, count and folders, and not an analysis.
+
+Checks: `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass (the build cache of `target/debug/incremental`, 17.5 GB, was deleted to free the disk); docs:check passes. The scripted cases were not run; no model was evaluated.
 
 ## V0.9.142 — Replies no longer say how they were matched: one standing note says AI responses can be inaccurate, and a reply made without AI says why.
 

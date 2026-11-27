@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.143 (2026-11-27)
+
+The CAIRN evaluation set gains seven cases on choosing the right tool: file sizes, counts, folder totals, a misspelled name, a greeting and a French request.
+
+### Added
+- **Cases c41 to c47.** *Analyze the size of files in this repo* (the request an earlier router matched to Analyze by its words) expects `query_files` and forbids `analyze_files`; *what is the largest file*; *how many PDFs were changed this year*; *which folder takes the most space* (`group_by: folder`); a misspelled file name recovered through the closest files; a greeting answered by the model; and the size question in French.
+- **Thresholds unchanged.** The scripted run of the 47 cases passes in tests, and `npm run cairn:eval` now runs all 47 against a real model.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass (the build cache of `target/debug/incremental`, 17.5 GB, was deleted to free the disk); docs:check passes. The scripted cases were not run; no model was evaluated.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.142 (2026-11-27)
 
 Replies no longer say how they were matched: one standing note says AI responses can be inaccurate, and a reply made without AI says why.

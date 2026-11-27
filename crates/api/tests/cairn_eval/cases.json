@@ -1108,6 +1108,185 @@
         "cited": [],
         "state": "answered"
       }
+    },
+    {
+      "id": "c41",
+      "message": "Analyze the size of files in this repo.",
+      "script": [
+        {
+          "tool": "query_files",
+          "args": {
+            "sort": "size",
+            "descending": true,
+            "limit": 5
+          }
+        },
+        {
+          "answer": "The largest files are the first ones listed [E1]."
+        }
+      ],
+      "expect": {
+        "tools": [
+          "query_files"
+        ],
+        "forbidden_tools": [
+          "analyze_files",
+          "summarize_file"
+        ],
+        "state": "answered"
+      }
+    },
+    {
+      "id": "c42",
+      "message": "What is the largest file?",
+      "script": [
+        {
+          "tool": "query_files",
+          "args": {
+            "sort": "size",
+            "descending": true,
+            "limit": 1
+          }
+        },
+        {
+          "answer": "The largest file is the one listed above [E1]."
+        }
+      ],
+      "expect": {
+        "tools": [
+          "query_files"
+        ],
+        "forbidden_tools": [
+          "analyze_files"
+        ],
+        "state": "answered"
+      }
+    },
+    {
+      "id": "c43",
+      "message": "How many PDFs were changed this year?",
+      "script": [
+        {
+          "tool": "query_files",
+          "args": {
+            "kinds": [
+              "pdf"
+            ],
+            "modified_after": "2026-01-01"
+          }
+        },
+        {
+          "answer": "No PDF files match: this workspace has none that changed this year."
+        }
+      ],
+      "expect": {
+        "tools": [
+          "query_files"
+        ],
+        "forbidden_tools": [
+          "analyze_files"
+        ],
+        "state": "answered"
+      }
+    },
+    {
+      "id": "c44",
+      "message": "Which folder takes the most space?",
+      "script": [
+        {
+          "tool": "query_files",
+          "args": {
+            "group_by": "folder"
+          }
+        },
+        {
+          "answer": "Every file sits at the top level, so no folder takes space of its own."
+        }
+      ],
+      "expect": {
+        "tools": [
+          "query_files"
+        ],
+        "forbidden_tools": [
+          "analyze_files"
+        ],
+        "state": "answered"
+      }
+    },
+    {
+      "id": "c45",
+      "message": "What does retry-polcy.md say?",
+      "script": [
+        {
+          "tool": "read_file",
+          "args": {
+            "file": "retry-polcy.md"
+          }
+        },
+        {
+          "tool": "read_file",
+          "args": {
+            "file": "E1"
+          }
+        },
+        {
+          "answer": "Retries wait twice as long each time [E1]."
+        }
+      ],
+      "expect": {
+        "tools": [
+          "read_file",
+          "read_file"
+        ],
+        "ordered": true,
+        "cited": [
+          "retry-policy.md"
+        ],
+        "state": "answered"
+      }
+    },
+    {
+      "id": "c46",
+      "message": "Salam, how are you?",
+      "script": [
+        {
+          "answer": "Wa alaykum salam! I am well, and ready to help you with this workspace."
+        }
+      ],
+      "expect": {
+        "tools": [],
+        "cited": [],
+        "forbidden_tools": [
+          "analyze_files"
+        ],
+        "state": "answered"
+      }
+    },
+    {
+      "id": "c47",
+      "message": "Quel est le plus gros fichier ?",
+      "script": [
+        {
+          "tool": "query_files",
+          "args": {
+            "sort": "size",
+            "descending": true,
+            "limit": 1
+          }
+        },
+        {
+          "answer": "Le plus gros fichier est celui indiqué ci-dessus [E1]."
+        }
+      ],
+      "expect": {
+        "tools": [
+          "query_files"
+        ],
+        "forbidden_tools": [
+          "analyze_files"
+        ],
+        "state": "answered"
+      }
     }
   ]
 }

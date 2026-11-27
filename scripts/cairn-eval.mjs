@@ -6,11 +6,11 @@
 //     npm run cairn:eval -- --workspace <empty workspace id> --provider <provider name> --model <model name>
 //
 // With --catalog-model <id> (V0.9.79) the report is also attached to that model of the model catalog (CAIRN administration >
-// Models), so the Models table shows it and a tool-calling model that passed is offered Agent mode by default. The token then needs
+// Models), so the Models table shows its score and date. The token then needs
 // the system scope and its owner must be a CAIRN or system administrator.
 //
 // It loads the fixture of crates/api/tests/cairn_eval into the workspace (so use an empty one made for this), sends each of the
-// 40 messages, reads what CAIRN did from the run each answer records, and writes
+// 47 messages, reads what CAIRN did from the run each answer records, and writes
 // mindmap/technical/cairn-eval-<version>-<model>.md with citation precision, tool accuracy, forbidden actions, steps, tokens and
 // time. Cases that need another role or a tiny budget (viewer, budget) are skipped: the scripted run covers them.
 //
@@ -132,7 +132,7 @@ const slug = model.toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/^-|-$/g, 
 const lines = [
   `# CAIRN evaluation: ${model} at V${version}`,
   "",
-  `Run on ${new Date().toISOString().slice(0, 10)} against provider "${provider}" with the 40 cases of \`crates/api/tests/cairn_eval\` (${done.length} run, ${results.filter((result) => result.skipped).length} skipped, ${results.filter((result) => result.failed).length} failed to run).`,
+  `Run on ${new Date().toISOString().slice(0, 10)} against provider "${provider}" with the ${set.cases.length} cases of \`crates/api/tests/cairn_eval\` (${done.length} run, ${results.filter((result) => result.skipped).length} skipped, ${results.filter((result) => result.failed).length} failed to run).`,
   "",
   "| Measure | Result | Threshold |",
   "|---|---|---|",

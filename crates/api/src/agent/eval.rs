@@ -1,5 +1,5 @@
 //! The CAIRN evaluation set (V0.9.46). `tests/cairn_eval/` holds a fixture workspace (36 documents, a connector issue and a mail
-//! that carry instructions, review states and two memory cards) and 40 cases. Each case is a message, what a model that does
+//! that carry instructions, review states and two memory cards) and 47 cases (40 from V0.9.46, and 7 on choosing the right tool from V0.9.143). Each case is a message, what a model that does
 //! this well would do (a script of tool calls and an answer) and what must be true of the run: the tools called, the files
 //! cited, the tools and files that must not appear, the end state.
 //!
@@ -225,7 +225,7 @@ struct Totals {
 #[tokio::test]
 async fn the_scripted_cases_pass_and_meet_the_thresholds() {
     let set: Set = serde_json::from_str(&read("cases.json")).unwrap();
-    assert_eq!(set.cases.len(), 40);
+    assert_eq!(set.cases.len(), 47);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -397,9 +397,9 @@ fn the_helpers_compare_what_was_called_with_what_was_wanted() {
 }
 
 #[test]
-fn the_set_has_forty_cases_with_unique_ids_and_a_script_each() {
+fn the_set_has_forty_seven_cases_with_unique_ids_and_a_script_each() {
     let set: Set = serde_json::from_str(&read("cases.json")).unwrap();
-    assert_eq!(set.cases.len(), 40);
+    assert_eq!(set.cases.len(), 47);
     let mut ids = std::collections::HashSet::new();
     for case in &set.cases {
         assert!(ids.insert(case.id.clone()), "{} is repeated", case.id);
