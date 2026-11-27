@@ -2,6 +2,19 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.123 (2026-11-27)
+
+The tabs of the administration pages show the line under the active tab.
+
+### Fixed
+- **Missing line under the active tab.** The tabs of the CAIRN administration (V0.9.121) and of System had no line under the active tab. They now use the same sliding indicator as the other tab bars.
+
+### Checks
+- Type-checked; `npm run docs:check` passes. Not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.122 (2026-11-27)
 
 A CAIRN admin entry in both rails, next to System; Organizations stays on the main pages.

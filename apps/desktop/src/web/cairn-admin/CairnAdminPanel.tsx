@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Brain, Buildings, ChartBar, ClockCounterClockwise, Compass, Cpu, ShieldCheck, Sparkle } from "@phosphor-icons/react";
 import { getCairnAdmin, updateCairnBudgets } from "../../lib/sharedApi";
 import { cairnAdminKeys } from "../../lib/queryClient";
+import { useTabIndicator } from "../tabIndicator";
 import type { CairnAdminView, CairnBudget } from "../../types";
 import { Button } from "../../components/ui/button";
 import { Field } from "../../components/ui/field";
@@ -48,12 +49,14 @@ export function allowedSections(view: CairnAdminView | null | undefined): CairnA
 
 /** Tabs of the CAIRN administration, shown in the layout's navigation slot like the System area's. */
 export function CairnAdminNavigation({ active, onNavigate, sections }: { active: CairnAdminSection; onNavigate: (section: CairnAdminSection) => void; sections: CairnAdminSection[] }) {
+  const { ref: tabsRef, indicator } = useTabIndicator();
   return <nav aria-label="CAIRN administration sections" className="shared-workspace-topbar">
-    <div className="shared-workspace-tabs">
+    <div className="shared-workspace-tabs" ref={tabsRef}>
       {sections.map((section) => {
         const isActive = section === active;
         return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} key={section} onClick={() => onNavigate(section)} type="button" variant="secondary">{SECTION_LABELS[section].icon}<span className="shared-workspace-tab-label">{SECTION_LABELS[section].label}</span></Button>;
       })}
+      {indicator}
     </div>
   </nav>;
 }

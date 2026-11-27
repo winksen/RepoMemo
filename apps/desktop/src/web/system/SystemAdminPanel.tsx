@@ -1,3 +1,4 @@
+import { useTabIndicator } from "../tabIndicator";
 import type { ReactNode } from "react";
 import { SlidersHorizontal as Adjustments, ChartBar, ClipboardText as ClipboardList, FileText, HardDrives as Server, Terminal, Wrench as Tool, Users } from "@phosphor-icons/react";
 import { SystemConsole } from "../../components/SystemConsole";
@@ -30,12 +31,14 @@ const SECTION_LABELS: Record<SystemSection, { label: string; icon: ReactNode }> 
 
 /** Tabs of the System area, shown in the layout's navigation slot. */
 export function SystemNavigation({ active, onNavigate }: { active: SystemSection; onNavigate: (section: SystemSection) => void }) {
+  const { ref: tabsRef, indicator } = useTabIndicator();
   return <nav aria-label="System sections" className="shared-workspace-topbar">
-    <div className="shared-workspace-tabs">
+    <div className="shared-workspace-tabs" ref={tabsRef}>
       {SYSTEM_SECTIONS.map((section) => {
         const isActive = section === active;
         return <Button aria-current={isActive ? "page" : undefined} className={isActive ? "active" : ""} key={section} onClick={() => onNavigate(section)} type="button" variant="secondary">{SECTION_LABELS[section].icon}<span className="shared-workspace-tab-label">{SECTION_LABELS[section].label}</span></Button>;
       })}
+      {indicator}
     </div>
   </nav>;
 }
