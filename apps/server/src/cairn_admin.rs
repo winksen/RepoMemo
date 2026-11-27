@@ -270,6 +270,73 @@ pub(crate) async fn history(
     ))
 }
 
+#[derive(Debug, Serialize)]
+pub(crate) struct MemoryRow {
+    #[serde(flatten)]
+    figures: repomemo_storage::MemoryFigures,
+    /// Verified, well formed playbooks of the workspace.
+    playbooks: usize,
+    /// It is its organization's knowledge workspace (V0.9.110).
+    knowledge: bool,
+}
+
+/// CAIRN's memory across workspaces (V0.9.112): for each workspace, its memory cards, those needing review, the date of the last card
+/// written and its verified playbooks, and which workspace is its organization's knowledge workspace. Figures only: no card text and no
+/// person. CAIRN, system and app administrators see every organization, owners and admins their own.
+pub(crate) async fn memory_overview(
+    ReadingSubject(subject): ReadingSubject,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<MemoryRow>>, ApiError> {
+    let organizations: Option<Vec<String>> = if require_cairn_reader(&subject).is_ok() {
+        None
+    } else {
+        let own: Vec<String> = state
+            .storage
+            .list_organizations_for_user(&subject.user_id)
+            .await
+            .map_err(map_storage_error)?
+            .into_iter()
+            .filter(|organization| {
+                !organization.guest && matches!(organization.role, OrganizationRole::Owner | OrganizationRole::Admin)
+            })
+            .map(|organization| organization.id)
+            .collect();
+        if own.is_empty() {
+            return Err(ApiError::forbidden());
+        }
+        Some(own)
+    };
+    let figures = state
+        .storage
+        .cairn_memory_figures(organizations.as_deref())
+        .await
+        .map_err(map_storage_error)?;
+    let mut knowledge: std::collections::HashMap<String, Option<String>> = std::collections::HashMap::new();
+    let mut rows = Vec::with_capacity(figures.len());
+    for figures in figures {
+        if !knowledge.contains_key(&figures.organization_id) {
+            let chosen = state
+                .storage
+                .get_organization_cairn_settings(&figures.organization_id)
+                .await
+                .map_err(map_storage_error)?
+                .policy
+                .knowledge_workspace_id;
+            knowledge.insert(figures.organization_id.clone(), chosen);
+        }
+        let is_knowledge = knowledge
+            .get(&figures.organization_id)
+            .and_then(Option::as_deref)
+            .is_some_and(|chosen| chosen == figures.workspace_id);
+        rows.push(MemoryRow {
+            playbooks: state.core.list_playbooks(&figures.workspace_id).await.len(),
+            knowledge: is_knowledge,
+            figures,
+        });
+    }
+    Ok(Json(rows))
+}
+
 /// Who the page is for, and what it shows today.
 pub(crate) async fn admin_view(
     ReadingSubject(subject): ReadingSubject,

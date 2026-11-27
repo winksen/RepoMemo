@@ -2,6 +2,26 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.112 (2026-11-27)
+
+The administration page shows the state of CAIRN's memory across workspaces.
+
+### Added
+- **The Memory section.** A table with one row for each workspace of the organizations a person administers: its organization, its memory cards, the cards that need review because the evidence they cite changed, when a card was last written, and its verified playbooks. The organization's knowledge workspace is marked. The totals are in the heading.
+- **Figures only.** The response holds counts and a date for each workspace: no card text, no title, no person. A card is opened in its own workspace by someone who can read it.
+- **Who sees what.** CAIRN, system and app administrators see every organization; owners and admins of an organization see their own. Anyone else gets a refusal.
+- **Refresh.** The refresh button reloads the figures.
+
+### Not yet
+- **Routines** are not in this section; the routines overview is V0.9.113.
+- **Speed.** The figures are worked out when the section opens, one workspace at a time, so a server with very many workspaces will open it slowly. Nothing was measured.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added or run, and the section was not opened.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.111 (2026-11-26)
 
 Organizations set a personal memory policy, and people can export or delete their memory.

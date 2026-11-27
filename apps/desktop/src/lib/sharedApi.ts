@@ -1891,6 +1891,10 @@ export function makeAbilityFromPlaybook(accessToken: string, workspaceId: string
   return request<CairnAbility>(`/v1/workspaces/${encodeURIComponent(workspaceId)}/cairn/playbooks/${encodeURIComponent(artifactId)}/ability`, { method: "POST", body: JSON.stringify({ command }) }, accessToken);
 }
 
+export function getCairnMemory(accessToken: string): Promise<{ organization_id: string; organization_name: string; workspace_id: string; workspace_name: string; cards: number; needing_review: number; last_written: string | null; playbooks: number; knowledge: boolean }[]> {
+  return request(`/v1/cairn/admin/memory`, {}, accessToken);
+}
+
 export function listCairnTools(accessToken: string): Promise<CairnTool[]> {
   return request<CairnTool[]>("/v1/cairn/tools", {}, accessToken);
 }
