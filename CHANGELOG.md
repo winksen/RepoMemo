@@ -2,6 +2,21 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.139 (2026-11-27)
+
+Every tool CAIRN gives the model says what it does, when to use it, which tool to use instead and what it returns.
+
+### Changed
+- **Descriptions written for the model.** Each tool of the loop, the atoms and the jobs alike, has four parts: what it does; when to use it; which tool to use instead (named); and what it returns. The model chooses between tools by reading these.
+- **One source for the classifier.** The one-job classifier lists the *when* part of the same guidance, so the model in the loop and the classifier read the same text.
+- **Unchanged for people.** The + menu and CAIRN's description of itself keep their short wording.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.138 (2026-11-27)
 
 query_files can group files by kind or top folder, with counts and total size, largest first.

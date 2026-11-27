@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.138` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.139` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.139 — Every tool CAIRN gives the model says what it does, when to use it, which tool to use instead and what it returns.
+
+- **Better tool choice.** The model is told, tool by tool, when to prefer another tool, so a question about file sizes goes to the file query and not to a search of what files say.
+
+Checks: `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
 
 ## V0.9.138 — query_files can group files by kind or top folder, with counts and total size, largest first.
 

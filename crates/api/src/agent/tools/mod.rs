@@ -39,6 +39,25 @@ pub(in crate::agent) struct ToolRun<'a> {
 type ToolFuture<'a> = Pin<Box<dyn Future<Output = Result<AgentReply>> + Send + 'a>>;
 type Handler = for<'a> fn(&'a RepoMemoCore, ToolRun<'a>) -> ToolFuture<'a>;
 
+/// What a tool says about itself to the model: what it does, when to use it, which tool to use instead, and what it returns.
+pub(in crate::agent) struct ToolGuide {
+    pub does: &'static str,
+    /// A verb phrase: the tool is for the person's message when the message is to this. The routing classifier lists it.
+    pub when: &'static str,
+    pub instead: &'static str,
+    pub returns: &'static str,
+}
+
+impl ToolGuide {
+    /// The four parts as one description.
+    pub fn text(&self) -> String {
+        format!(
+            "{} Use it to {}. {} Returns {}.",
+            self.does, self.when, self.instead, self.returns
+        )
+    }
+}
+
 pub(in crate::agent) struct CairnTool {
     /// Snake case and stable: the name the model calls and the evaluation set refers to.
     pub name: &'static str,
@@ -48,8 +67,8 @@ pub(in crate::agent) struct CairnTool {
     /// What the person and the model read about the job.
     pub description: &'static str,
     pub placeholder: &'static str,
-    /// One line for the routing classifier: when this job fits a message.
-    pub routing_hint: &'static str,
+    /// What the model reads about the tool, in four parts (V0.9.139); the routing classifier reads the same `when`.
+    pub guide: ToolGuide,
     /// JSON Schema of the arguments, for the loop (V0.9.40) and the MCP surface.
     #[cfg_attr(not(test), allow(dead_code))]
     pub parameters: fn() -> Value,
@@ -63,6 +82,11 @@ pub(in crate::agent) struct CairnTool {
 }
 
 impl CairnTool {
+    /// One line for the routing classifier: when this job fits a message.
+    pub fn routing_hint(&self) -> &'static str {
+        self.guide.when
+    }
+
     /// The id the job has in the API, such as `find_files`.
     pub fn capability_id(&self) -> String {
         serde_json::to_value(self.capability)
@@ -176,7 +200,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Find files",
         description: "Match file names and paths in this workspace.",
         placeholder: "File name, part of a path, or an extension like .pdf",
-        routing_hint: "locate files by name, path or type",
+        guide: ToolGuide {
+            does: "Match file names and paths in this workspace.",
+            when: "locate files by name, path or type",
+            instead: "For file sizes, dates or counts use query_files instead; for what is inside files use search_evidence.",
+            returns: "the matching files with their paths, or a note that none match",
+        },
         parameters: find_files_schema,
         effect: ToolEffect::Read,
         requires_ai: false,
@@ -190,7 +219,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Find a symbol",
         description: "Find where a function, class or method is defined in indexed code.",
         placeholder: "Function, class or method name",
-        routing_hint: "locate where a function, class or method is defined in code",
+        guide: ToolGuide {
+            does: "Find where a function, class or method is defined in indexed code.",
+            when: "locate where a function, class or method is defined in code",
+            instead: "To read the code around it use read_file; for words inside files use search_evidence.",
+            returns: "the matching definitions with their file and line",
+        },
         parameters: find_symbol_schema,
         effect: ToolEffect::Read,
         requires_ai: false,
@@ -204,7 +238,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Search content",
         description: "Find passages inside indexed files.",
         placeholder: "Words or a phrase to look for",
-        routing_hint: "find passages inside files that mention some words",
+        guide: ToolGuide {
+            does: "Find passages inside indexed files.",
+            when: "find passages inside files that mention some words",
+            instead: "To search by file name use find_files; to choose among files by size or date use query_files.",
+            returns: "the matching passages, each with the file it comes from",
+        },
         parameters: search_content_schema,
         effect: ToolEffect::Read,
         requires_ai: false,
@@ -218,7 +257,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Summarize a file",
         description: "Summarize one indexed file, with the passages it used.",
         placeholder: "Which file should be summarized?",
-        routing_hint: "summarize one named file",
+        guide: ToolGuide {
+            does: "Summarize one indexed file, with the passages it used.",
+            when: "summarize one named file",
+            instead: "To read the file yourself use read_file; to summarize several files use analyze_files.",
+            returns: "a short summary of the file with its sources",
+        },
         parameters: summarize_file_schema,
         effect: ToolEffect::Read,
         requires_ai: true,
@@ -232,7 +276,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Ask a question",
         description: "Answer from indexed evidence, with citations.",
         placeholder: "What do you want to know?",
-        routing_hint: "answer a question using the workspace content",
+        guide: ToolGuide {
+            does: "Answer a question from the workspace's indexed evidence, with citations.",
+            when: "answer a question using the workspace content",
+            instead: "For file properties such as size or date use query_files; to find a file by name use find_files.",
+            returns: "a written answer with the sources it rests on",
+        },
         parameters: ask_question_schema,
         effect: ToolEffect::Read,
         requires_ai: true,
@@ -246,7 +295,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Workspace overview",
         description: "Brief the whole workspace from indexed excerpts.",
         placeholder: "No input needed",
-        routing_hint: "describe the whole workspace",
+        guide: ToolGuide {
+            does: "Brief the whole workspace from indexed excerpts.",
+            when: "describe the whole workspace",
+            instead: "For counts and sizes use query_files; for one file use summarize_file.",
+            returns: "a short description of what the workspace holds",
+        },
         parameters: no_arguments_schema,
         effect: ToolEffect::Read,
         requires_ai: true,
@@ -260,7 +314,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Save as memory",
         description: "Turn my last answer, or a sentence you write, into a memory card that cites its evidence. I save it only when you confirm.",
         placeholder: "What should I remember? Leave it empty to save my last answer",
-        routing_hint: "save the last answer, or a fact the user states, as a memory card",
+        guide: ToolGuide {
+            does: "Propose a memory card from the last answer, or from a sentence the person gives, citing its evidence.",
+            when: "save the last answer, or a fact the user states, as a memory card",
+            instead: "To change a card that exists use propose_memory_change; to write a note file use propose_note.",
+            returns: "a proposal the person confirms; nothing is saved before that",
+        },
         parameters: propose_memory_schema,
         effect: ToolEffect::Propose,
         requires_ai: false,
@@ -274,7 +333,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Manage files",
         description: "Move files to a folder, rename one, send them to the trash or mark them verified, outdated or needing review. I do it only when you confirm.",
         placeholder: "For example: move retry-policy.md to Runbooks",
-        routing_hint: "move a named file to a folder, rename it, or move it to the trash",
+        guide: ToolGuide {
+            does: "Propose moving files to a folder, renaming one, sending them to the trash, or marking them verified, outdated or needing review.",
+            when: "move a named file to a folder, rename it, or move it to the trash",
+            instead: "To change a memory card use propose_memory_change; to add a file use propose_note.",
+            returns: "a proposal the person confirms; nothing changes before that",
+        },
         parameters: propose_file_changes_schema,
         effect: ToolEffect::Propose,
         requires_ai: false,
@@ -288,7 +352,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Summarize chat",
         description: "Summarize this whole conversation: what was asked, found and left open.",
         placeholder: "No input needed",
-        routing_hint: "summarize this whole conversation",
+        guide: ToolGuide {
+            does: "Summarize this whole conversation: what was asked, found and left open.",
+            when: "summarize this whole conversation",
+            instead: "To summarize a file use summarize_file; to find an earlier chat use search_chats.",
+            returns: "a short summary of the chat",
+        },
         parameters: no_arguments_schema,
         effect: ToolEffect::Read,
         requires_ai: true,
@@ -302,7 +371,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Analyze files",
         description: "Read several files together, such as all the Word documents or the files you selected, and write one analysis, for a question if you give one.",
         placeholder: "Which files, and what to look for? For example: the pdfs in Finance for payment terms",
-        routing_hint: "analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for",
+        guide: ToolGuide {
+            does: "Read several files together, such as all the Word documents or the files the person selected, and write one analysis.",
+            when: "analyze, review or go through several files together, such as all the Word documents, the pdfs in a folder or the selected files; the subject is the files and what to look for",
+            instead: "For one file use summarize_file; for counts, sizes or dates of files use query_files.",
+            returns: "one analysis of the set, with the files it read",
+        },
         parameters: analyze_files_schema,
         effect: ToolEffect::Read,
         requires_ai: true,
@@ -316,7 +390,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Recall memory",
         description: "Search the team's memory cards, or list the newest, and show what each says and cites.",
         placeholder: "What to look for in memory? Leave it empty to list the newest cards",
-        routing_hint: "look in the team's saved memory cards, such as what was decided about a topic, or list them",
+        guide: ToolGuide {
+            does: "Search the team's memory cards, or list the newest, and show what each says and cites.",
+            when: "look in the team's saved memory cards, such as what was decided about a topic, or list them",
+            instead: "For what files say use search_evidence; to change a card use propose_memory_change.",
+            returns: "the matching cards with their review state and sources",
+        },
         parameters: recall_memory_schema,
         effect: ToolEffect::Read,
         requires_ai: false,
@@ -330,7 +409,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Manage memory",
         description: "Change, add to, rename or delete a memory card. I do it only when you confirm.",
         placeholder: "For example: rename the memory card “Retry policy” to Backoff policy",
-        routing_hint: "change, add to, rename or delete a named memory card",
+        guide: ToolGuide {
+            does: "Propose changing, adding to, renaming or deleting a memory card.",
+            when: "change, add to, rename or delete a named memory card",
+            instead: "To save a new card use propose_memory; to find a card first use recall_memory.",
+            returns: "a proposal the person confirms; nothing changes before that",
+        },
         parameters: propose_memory_change_schema,
         effect: ToolEffect::Propose,
         requires_ai: false,
@@ -344,7 +428,12 @@ pub(in crate::agent) static TOOLS: &[CairnTool] = &[
         label: "Create note",
         description: "Write a note into the workspace from a sentence you give, or from my last answer with its sources. It is indexed like any file, and I create it only when you confirm.",
         placeholder: "For example: create a note titled Pager rota: Alice is on call in March",
-        routing_hint: "write a new note into the workspace from a sentence or from the last answer",
+        guide: ToolGuide {
+            does: "Propose a note written into the workspace from a sentence, or from the last answer with its sources.",
+            when: "write a new note into the workspace from a sentence or from the last answer",
+            instead: "For a memory card use propose_memory; to change existing files use propose_file_changes.",
+            returns: "a proposal the person confirms; the note is created only then",
+        },
         parameters: propose_note_schema,
         effect: ToolEffect::Propose,
         requires_ai: false,
@@ -398,7 +487,7 @@ pub(in crate::agent) fn requires_ai(capability: AgentCapability) -> bool {
 pub(in crate::agent) fn classifier_catalog() -> String {
     let mut lines = TOOLS
         .iter()
-        .map(|tool| format!("- {}: {}", tool.capability_id(), tool.routing_hint))
+        .map(|tool| format!("- {}: {}", tool.capability_id(), tool.routing_hint()))
         .collect::<Vec<_>>();
     lines.push("- none: anything else, such as chit-chat, writing or editing code, or actions on files".to_owned());
     lines.join("\n")
@@ -446,6 +535,22 @@ mod tests {
         AgentCapability::ManageMemory,
         AgentCapability::CreateNote,
     ];
+
+    #[test]
+    fn the_classifier_reads_the_same_guidance_as_the_model() {
+        for tool in TOOLS {
+            let guide = &tool.guide;
+            assert!(
+                !guide.does.is_empty()
+                    && !guide.when.is_empty()
+                    && !guide.instead.is_empty()
+                    && !guide.returns.is_empty()
+            );
+            // The one-job classifier lists the `when` the loop's description is built from.
+            assert!(guide.text().contains(&format!("Use it to {}.", tool.routing_hint())));
+            assert!(classifier_catalog().contains(tool.routing_hint()));
+        }
+    }
 
     #[test]
     fn every_capability_has_exactly_one_tool() {
@@ -500,7 +605,7 @@ mod tests {
     fn the_classifier_lists_every_job_by_its_api_id_and_offers_none() {
         let catalog = classifier_catalog();
         for tool in TOOLS {
-            assert!(catalog.contains(&format!("- {}: {}", tool.capability_id(), tool.routing_hint)));
+            assert!(catalog.contains(&format!("- {}: {}", tool.capability_id(), tool.routing_hint())));
         }
         assert!(catalog.ends_with("or actions on files"));
         assert_eq!(

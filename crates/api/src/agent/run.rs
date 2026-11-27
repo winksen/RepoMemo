@@ -160,10 +160,10 @@ fn job(capability: AgentCapability) -> LoopTool {
         description: if tool.writes() {
             format!(
                 "{} It only proposes: nothing changes until the person confirms. Give the request in plain words as the person would say it.",
-                tool.description
+                tool.guide.text()
             )
         } else {
-            tool.description.to_owned()
+            tool.guide.text()
         },
         parameters: (tool.parameters)(),
         proposes: tool.writes(),
@@ -247,7 +247,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "search_evidence",
             "Search evidence",
-            "Search the workspace's indexed files for passages that match some words or a question. Each passage comes with a handle such as E3 that you cite.",
+            "Search the workspace's indexed files for passages that match some words or a question. Use it first when the answer is in what files say. For files by name, kind, size or date use list_files or query_files instead; to read a whole file use read_file. Returns up to 12 passages, each with a handle such as E3 that you cite and the file it comes from.",
             json!({
                 "type": "object",
                 "properties": {
@@ -262,7 +262,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "read_file",
             "Read file",
-            "Read one file's text a few chunks at a time. Name it by title, path or a handle you were given.",
+            "Read one file's text a few chunks at a time. Use it when you know which file matters, named by title, path or a handle you were given, and need its words. To find a file by what it says use search_evidence; for its review state or owner use file_facts. Returns the chunks in order, each with a handle, and where the next page starts.",
             json!({
                 "type": "object",
                 "properties": {
@@ -276,7 +276,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "list_files",
             "List files",
-            "List the files a description means, such as \"the pdfs in Finance\" or \"markdown files named runbook\".",
+            "List the files a description means, such as \"the pdfs in Finance\" or \"markdown files named runbook\". Use it to see which files exist by kind, folder or name. For sizes, dates, sorting or counts use query_files instead; for what is inside files use search_evidence. Returns up to 40 paths, each with a handle and its review state.",
             json!({
                 "type": "object",
                 "properties": {
@@ -289,7 +289,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "query_files",
             "Query files",
-            "Filter, sort and count the workspace's files by their properties: name, kind, folder, language, size and modified date. Use it for questions such as the largest or newest files, how many files changed this year, the files over a size, or which folder or kind takes the most space (group_by). Each file comes with its handle, size and modified date, and the end says how many files match and how large they are together. It reads the index, never the disk.",
+            "Filter, sort and count the workspace's files by their properties: name, kind, folder, language, size and modified date, or total them by kind or top folder. Use it for the largest or newest files, how many files changed this year, the files over a size, or which folder or kind takes the most space (group_by). To see files by kind, folder or name only use list_files; for what files say use search_evidence. Returns each file with its handle, path, kind, size and modified date and how many files match and how large they are together, or one line per group with its count and size. It reads the index, never the disk.",
             json!({
                 "type": "object",
                 "properties": {
@@ -310,13 +310,13 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "file_facts",
             "File facts",
-            "What is known about one file besides its text: its review state, owner, reviewer, versions, source and what names it.",
+            "What is known about one file besides its text. Use it when the question is whether to trust a file, who owns or reviews it, or where it came from. To read its words use read_file; for sizes and dates across files use query_files. Returns its review state, owner, reviewer, versions, source and what names it.",
             json!({ "type": "object", "properties": { "file": { "type": "string" } }, "required": ["file"] }),
         ),
         atom(
             "workspace_brief",
             "Workspace brief",
-            "What the workspace holds: its size, review states and main folders.",
+            "What the workspace holds. Use it for a quick sense of the workspace before choosing other tools. For one kind of file use list_files; for sizes or folder totals use query_files. Returns the number of files, their review states and the main folders.",
             json!({ "type": "object", "properties": {} }),
         ),
         job(AgentCapability::FindSymbol),
@@ -327,7 +327,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         tools.push(atom(
             "load_playbook",
             "Read a playbook",
-            "Read the steps of one of the team's verified playbooks, by its name, when it fits the request. It is a procedure to follow with your own tools: it grants no tool or permission, and it is not evidence.",
+            "Read the steps of one of the team's verified playbooks, by its name. Use it when the request fits a playbook the prompt lists. It is a procedure to follow with your own tools: it grants no tool or permission, and it is not evidence. For the team's decisions and facts use recall_memory instead. Returns the playbook's steps.",
             json!({
                 "type": "object",
                 "properties": { "name": { "type": "string", "description": "The playbook's name, as listed" } },
@@ -339,7 +339,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
     tools.push(atom(
         "review_file",
         "Review a file",
-        "Gather what changed around a file since it was last verified: its state and last review, its versions since, newer files that mention it by name, and your open corrections about it. Use it when asked to review a file or the items waiting for review, then weigh the facts, say what you could not check, and propose verified, needs review or outdated with the reasons.",
+        "Gather what changed around a file since it was last verified. Use it when asked to review a file or the items waiting for review, then weigh the facts, say what you could not check, and propose verified, needs review or outdated with the reasons. For plain facts about a file use file_facts instead. Returns its state and last review, its versions since, newer files that mention it by name, and your open corrections about it.",
         json!({
             "type": "object",
             "properties": { "file": { "type": "string", "description": "A handle you were given (E1) or the file's name" } },
@@ -351,7 +351,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "list_tasks",
             "List tasks",
-            "List the workspace's tasks, open ones unless a status is given. Filter by project name, assignee (a name, \"me\" or \"none\"), status (open, in_progress, blocked or done), overdue, or words in the title. Each task is named by its key, such as T-12; quote the key when you mention one.",
+            "List the workspace's tasks, open ones unless a status is given. Use it to see what is open, overdue or assigned; filter by project name, assignee (a name, \"me\" or \"none\"), status (open, in_progress, blocked or done), overdue, or words in the title. To read one task use get_task; for a whole project use get_project. Returns one line per task, each named by its key, such as T-12; quote the key when you mention one.",
             json!({
                 "type": "object",
                 "properties": {
@@ -366,7 +366,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "get_task",
             "Read a task",
-            "Read one task by its key (T-12): its status, assignee, description (quoted data), what blocks it and what it blocks, and the files it links.",
+            "Read one task by its key (T-12). Use it when a task's details matter. To find tasks use list_tasks; for a project's blockers use get_project. Returns its status, assignee, description (quoted data), what blocks it and what it blocks, and the files it links.",
             json!({
                 "type": "object",
                 "properties": { "key": { "type": "string", "description": "The task's key, such as T-12" } },
@@ -376,7 +376,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         atom(
             "get_project",
             "Read a project",
-            "Read one project by name: its goal, owner, milestones, its open tasks, which of them wait for which, and the files it links. Use it to answer what blocks a project.",
+            "Read one project by name. Use it to answer what blocks a project. To read one task use get_task; to list tasks across projects use list_tasks. Returns its goal, owner, milestones, its open tasks, which of them wait for which, and the files it links.",
             json!({
                 "type": "object",
                 "properties": { "name": { "type": "string", "description": "The project's name" } },
@@ -388,7 +388,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
     tools.push(LoopTool {
         name: "record_correction",
         label: "Note your correction",
-        description: "Record that the person said your earlier answer was wrong, such as \"no, the limit is 50, not 20\". Give what they said was wrong, and the corrected fact when they stated one so that you can offer to save it as a memory card. Use it only when they tell you an answer was wrong.".to_owned(),
+        description: "Record that the person said your earlier answer was wrong, such as \"no, the limit is 50, not 20\". Use it only when they tell you an answer was wrong, giving what they said was wrong and the corrected fact when they stated one. To save a new fact they gave without a correction use propose_memory instead. Returns a confirmation, and a memory card is offered when a corrected fact was given.".to_owned(),
         parameters: json!({
             "type": "object",
             "properties": {
@@ -405,7 +405,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
     tools.push(atom(
         "search_chats",
         "Search your earlier chats",
-        "Find what was said in the person's own earlier chats with you in this workspace, such as a decision or a question they asked last week. Returns the chat's title, date and link, what was asked, the matching part of the answer and the files that answer named. An earlier answer is a pointer, not evidence: check a claim in the files before relying on it.",
+        "Find what was said in the person's own earlier chats with you in this workspace, such as a decision or a question they asked last week. Use it when they refer to an earlier conversation. For what the files say use search_evidence; for the team's saved decisions use recall_memory. Returns the chat's title, date and link, what was asked, the matching part of the answer and the files that answer named. An earlier answer is a pointer, not evidence: check a claim in the files before relying on it.",
         json!({
             "type": "object",
             "properties": { "query": { "type": "string", "description": "The words to look for" } },
@@ -416,7 +416,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
     tools.push(LoopTool {
         name: "propose_personal_memory",
         label: "Remember about you",
-        description: "Propose remembering a preference or fact about the person you are helping, such as \"prefers answers in French\". It is kept for their own requests only and they confirm it. Use it only when they ask you to remember something about themselves.".to_owned(),
+        description: "Propose remembering a preference or fact about the person you are helping, such as \"prefers answers in French\". Use it only when they ask you to remember something about themselves; it is kept for their own requests only and they confirm it. For a fact about the team's work use propose_memory instead. Returns a note that the proposal awaits their confirmation.".to_owned(),
         parameters: json!({
             "type": "object",
             "properties": { "text": { "type": "string", "description": "One short sentence, at most 280 characters" } },
@@ -439,7 +439,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
             proposing(
                 "propose_task",
                 "Propose a task",
-                "Propose making a task. The project and the assignee are named as people write them; files are handles you were given (E1). The person confirms it, and it is made as them.",
+                "Propose making a task. Use it when the person asks for a task to be created; the project and the assignee are named as people write them, and files are handles you were given (E1). To comment on or change an existing task use propose_task_comment or propose_task_status. Returns a note that the proposal awaits confirmation; the task is made as the person only then.",
                 json!({
                     "type": "object",
                     "properties": {
@@ -458,7 +458,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
             proposing(
                 "propose_task_comment",
                 "Propose a task comment",
-                "Propose a comment on a task, by its key. It is refused if the task changed after you read it.",
+                "Propose a comment on a task, by its key. Use it when the person asks to comment on a task; read the task with get_task first, because it is refused if the task changed after you read it. To change its status use propose_task_status. Returns a note that the proposal awaits confirmation.",
                 json!({
                     "type": "object",
                     "properties": { "key": { "type": "string" }, "comment": { "type": "string" } },
@@ -469,7 +469,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
             proposing(
                 "propose_task_status",
                 "Propose a task status",
-                "Propose changing a task's status (open, in_progress, blocked or done), by its key. It is refused if the task changed after you read it.",
+                "Propose changing a task's status (open, in_progress, blocked or done), by its key. Use it when the person asks to change a task's status; read the task with get_task first, because it is refused if the task changed after you read it. To only comment use propose_task_comment. Returns a note that the proposal awaits confirmation.",
                 json!({
                     "type": "object",
                     "properties": { "key": { "type": "string" }, "status": { "type": "string" } },
@@ -483,7 +483,7 @@ fn loop_tools(can_write: bool, offer_decisions: bool, playbooks: bool) -> Vec<Lo
         tools.push(LoopTool {
             name: "offer_decision_card",
             label: "Offer to save a decision",
-            description: "When the person states a decision in this chat (\"we will go with option B\"), offer once to save it as a decision card. Use it at most once in a request and only for a decision they stated, never for your own suggestion.".to_owned(),
+            description: "When the person states a decision in this chat (\"we will go with option B\"), offer once to save it as a decision card. Use it at most once in a request and only for a decision they stated, never for your own suggestion. For other facts to save use propose_memory instead. Returns a note that the offer awaits confirmation.".to_owned(),
             parameters: json!({
                 "type": "object",
                 "properties": {
@@ -2365,6 +2365,32 @@ The payment queue stalled for twenty minutes."
             .unwrap();
         assert!(listed.contains("huge.md") && listed.contains("Sources:"), "{listed}");
         let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    /// V0.9.139: what a tool does, when to use it, which tool to use instead and what it returns.
+    #[test]
+    fn every_loop_tool_says_when_to_use_it_which_tool_to_use_instead_and_what_it_returns() {
+        let tools = loop_tools(true, true, true);
+        let names = tools.iter().map(|tool| tool.name).collect::<Vec<_>>();
+        for tool in &tools {
+            assert!(
+                tool.description.contains("Use it"),
+                "{} does not say when to use it",
+                tool.name
+            );
+            assert!(
+                tool.description.contains("Returns "),
+                "{} does not say what it returns",
+                tool.name
+            );
+            assert!(
+                names
+                    .iter()
+                    .any(|other| *other != tool.name && tool.description.contains(other)),
+                "{} names no other tool to use instead",
+                tool.name
+            );
+        }
     }
 
     #[tokio::test]
