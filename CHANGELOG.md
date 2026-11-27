@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.122 (2026-11-27)
+
+A CAIRN admin entry in both rails, next to System; Organizations stays on the main pages.
+
+### Changed
+- **CAIRN admin in the rail.** Anyone who may open the CAIRN administration sees a *CAIRN admin* entry at the bottom of the rail, above *System* for administrators. It is highlighted on the administration pages.
+- **Both rails.** The main pages show Organizations, CAIRN admin and System. Cairn's chat page now shows CAIRN admin and System too (it had none), without Organizations.
+
+### Checks
+- Type-checked; `npm run docs:check` passes. Not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.121 (2026-11-27)
 
 The CAIRN administration uses the System layout: the usual rail and its sections as tabs.
