@@ -215,7 +215,8 @@ pub(crate) struct HistoryEntry {
 
 /// The administration history (V0.9.103): every change made on the CAIRN administration page and in the organization and workspace
 /// CAIRN settings, newest first, with who made it and the values before and after. CAIRN, system and app administrators see all of it;
-/// owners and admins of an organization see the changes that name their organizations. It is the System audit trail, filtered.
+/// owners and admins of an organization see the changes that name their organizations or their workspaces by id. It is the System audit
+/// trail, filtered.
 pub(crate) async fn history(
     ReadingSubject(subject): ReadingSubject,
     State(state): State<AppState>,
@@ -232,12 +233,24 @@ pub(crate) async fn history(
             .filter(|organization| {
                 !organization.guest && matches!(organization.role, OrganizationRole::Owner | OrganizationRole::Admin)
             })
-            .map(|organization| organization.name)
+            .map(|organization| organization.id)
             .collect();
         if own.is_empty() {
             return Err(ApiError::forbidden());
         }
-        Some(own)
+        // What names one of their organizations by its id, or one of those organizations' workspaces by its id: never by a name, which
+        // another organization's text can contain (review V0.9.117, CR-1).
+        let mut tokens: Vec<String> = own.iter().map(|id| format!("[org:{id}]")).collect();
+        tokens.extend(
+            state
+                .storage
+                .cairn_memory_figures(Some(&own))
+                .await
+                .map_err(map_storage_error)?
+                .into_iter()
+                .map(|figures| figures.workspace_id),
+        );
+        Some(tokens)
     };
     let events = state
         .storage
@@ -438,7 +451,10 @@ async fn switch_routine(
             "cairn_routine_resumed"
         },
         format!(
-            "{} the routine {} of {} in {organization_name} (workspace {}).",
+            "{}{} the routine {} of {} in {organization_name} (workspace {}).",
+            organization_id
+                .as_ref()
+                .map_or_else(String::new, |id| format!("[org:{id}] ")),
             if pause { "Paused" } else { "Resumed" },
             routine.title,
             routine.owner_name,

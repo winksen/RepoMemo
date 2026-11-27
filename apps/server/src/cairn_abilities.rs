@@ -73,12 +73,17 @@ async fn scope_label(state: &AppState, subject: &AuthenticatedSubject, ability: 
 
 async fn record(state: &AppState, subject: &AuthenticatedSubject, action: &str, ability: &CairnAbility, what: &str) {
     let scope = scope_label(state, subject, ability).await;
+    // The organization's id leads the text, so the history is filtered on it and not on a name (review V0.9.117, CR-1).
+    let tag = ability
+        .organization_id
+        .as_ref()
+        .map_or_else(String::new, |id| format!("[org:{id}] "));
     audit(
         state,
         subject,
         action,
         format!(
-            "{what} the ability {} ({}) of {scope}, now at version {}.",
+            "{tag}{what} the ability {} ({}) of {scope}, now at version {}.",
             ability.name, ability.command, ability.version
         ),
     )

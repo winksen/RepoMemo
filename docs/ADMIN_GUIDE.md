@@ -19,7 +19,7 @@ What an administrator decides about CAIRN, the assistant, and where.
 | **MCP tokens** | *Profile › Access tokens* | An *MCP* token lets another AI agent read chosen workspaces and propose to its owner's inbox, and reaches nothing else. Revoke it there; the activity feed shows `mcp_read` and `mcp_proposed`. See [MCP](MCP.md) |
 | **Team instructions and playbooks** | `CAIRN.md` at the workspace root, and the `Playbooks` folder | Notes writers edit; the workspace's review rules apply. A playbook is used only once verified, and grants no tool |
 
-The open findings of the latest review are in [the CAIRN security review](../mindmap/security/2026-11-25-cairn-review.md). Reference: [API](../mindmap/technical/api-reference.md) · [settings](DEVELOPMENT_COMMANDS.md).
+The open findings of the latest reviews are in [the CAIRN security review](../mindmap/security/2026-11-25-cairn-review.md) and [the CAIRN administration review](../mindmap/security/2026-11-27-cairn-administration-review.md). Reference: [API](../mindmap/technical/api-reference.md) · [settings](DEVELOPMENT_COMMANDS.md).
 
 ## AI usage and limits (0.8)
 

@@ -1,6 +1,6 @@
 {
   "name": "@repomemo/desktop",
-  "version": "0.9.116",
+  "version": "0.9.117",
   "private": true,
   "type": "module",
   "scripts": {

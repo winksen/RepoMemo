@@ -98,6 +98,20 @@ impl StorageEngine {
         if conversation.origin == "inbox" {
             repomemo_domain::bail_conflict!("The CAIRN inbox is yours alone and cannot be shared.");
         }
+        // A reply that used a card of the organization's knowledge workspace holds that card's text; the readers of this workspace may
+        // not read that workspace (review V0.9.117, CR-2).
+        let foreign: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM assistant_turns turn, json_each(turn.reply_json, '$.memory_cards') card              WHERE turn.conversation_id = ?1 AND json_extract(card.value, '$.workspace_id') != ?2",
+        )
+        .bind(conversation_id)
+        .bind(&conversation.workspace_id)
+        .fetch_one(self.reader())
+        .await?;
+        if foreign > 0 {
+            repomemo_domain::bail_conflict!(
+                "This chat used cards of your organization's knowledge workspace, so it cannot be shared: the people it would be shared with may not read them."
+            );
+        }
         sqlx::query(
             "INSERT OR IGNORE INTO agent_conversation_shares (conversation_id, workspace_id, shared_by, shared_at) VALUES (?1, ?2, ?3, ?4)",
         )

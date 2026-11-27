@@ -428,7 +428,7 @@ pub(crate) async fn update_settings(
         &subject,
         "organization_cairn_settings_changed",
         format!(
-            "Changed the CAIRN settings of {organization_name}: models from {} to {}; default from {} to {}; Agent mode from {} to {}.",
+            "[org:{organization_id}] Changed the CAIRN settings of {organization_name}: models from {} to {}; default from {} to {}; Agent mode from {} to {}.",
             names_of(&state, &before.policy.enabled_model_ids).await,
             names_of(&state, &saved.policy.enabled_model_ids).await,
             match &before.policy.default_model_id {

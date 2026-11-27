@@ -605,7 +605,15 @@ impl StorageEngine {
             .await?
             .policy
             .knowledge_workspace_id;
-        Ok(chosen.filter(|knowledge| knowledge != workspace_id))
+        let Some(chosen) = chosen.filter(|knowledge| knowledge != workspace_id) else {
+            return Ok(None);
+        };
+        // Still a workspace of the same organization: one that left it, or was deleted, offers nothing (review V0.9.117, CR-3).
+        let still_there = self
+            .workspace_organization(&chosen)
+            .await?
+            .is_some_and(|owner| owner == organization_id);
+        Ok(still_there.then_some(chosen))
     }
 
     /// The organization's instructions for CAIRN that apply in a workspace, with the version of the settings they were saved in.

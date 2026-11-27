@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.116` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.117` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.117 — Security review of CAIRN administration, with three fixes.
+
+- **Security review.** The CAIRN administration line (V0.9.70 to V0.9.116) was reviewed by reading the code; two medium and two low findings were fixed and two low ones are open. Fixed: an organization's administrators could read another organization's history when their names overlapped; a chat that used the knowledge workspace's cards could be shared with people who cannot read them; the knowledge workspace was not rechecked as belonging to the organization; abilities were unbounded.
+
+Checks: formatted, linted and type-checked; docs:check; not tested.
 
 ## V0.9.116 — Organizations and workspaces write CAIRN's greeting and starter questions.
 

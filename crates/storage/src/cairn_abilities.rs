@@ -7,6 +7,8 @@ use super::*;
 
 /// The longest instructions, in characters.
 pub const ABILITY_INSTRUCTIONS_CHARS: usize = 8_000;
+/// The most abilities one organization or workspace keeps (review V0.9.117, CR-5).
+pub const ABILITIES_MAX: i64 = 100;
 /// The most input fields an ability asks.
 pub const ABILITY_INPUTS_MAX: usize = 8;
 
@@ -164,6 +166,16 @@ impl StorageEngine {
     ) -> Result<CairnAbility> {
         checked(draft)?;
         let command = checked_command(&draft.command)?;
+        let kept: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM cairn_abilities WHERE (?1 IS NOT NULL AND organization_id = ?1) OR (?2 IS NOT NULL AND workspace_id = ?2)",
+        )
+        .bind(organization_id)
+        .bind(workspace_id)
+        .fetch_one(self.reader())
+        .await?;
+        if kept >= ABILITIES_MAX {
+            repomemo_domain::bail_conflict!("There are already {ABILITIES_MAX} abilities here. Delete one first.");
+        }
         // A workspace's command may not repeat one its organization teaches, so a /command means one thing.
         if let Some(workspace_id) = workspace_id {
             if let Some(organization_id) = self.workspace_organization(workspace_id).await? {

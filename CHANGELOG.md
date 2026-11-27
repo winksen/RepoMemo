@@ -2,6 +2,29 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.117 (2026-11-27)
+
+Security review of CAIRN administration, with three fixes.
+
+### Added
+- **The review.** [The CAIRN administration review](mindmap/security/2026-11-27-cairn-administration-review.md) covers V0.9.70 to V0.9.116: who reaches the catalog, organization and workspace settings, what a workspace may loosen, models and roles across workspaces, abilities as a way to obtain tools, the knowledge workspace's read check, personal data, usage aggregates, and what the history records. It was done by reading the code: nothing was run, no scanner and no penetration test.
+
+### Fixed
+- **History across organizations (medium).** The History section matched an organization's administrators to events by the organization's name found in the event's text, so a name contained in another's (or a short one) showed them the other organization's events, with the text of its instructions, welcome and guardrails. Events now carry the organization's id (`[org:<id>]`) or the workspace's id, and the filter matches those exactly. Events written before this release name an organization only by name, so owners and admins no longer see them; CAIRN and system administrators still do.
+- **Sharing a chat that used the knowledge workspace (medium).** A reply that used a card of the organization's knowledge workspace holds the card's text; sharing the chat with its workspace would show it to people who cannot read the knowledge workspace. The share is now refused with the reason. A chat shared before this fix stays shared until its owner stops sharing it.
+- **The knowledge workspace must still be the organization's (low).** It is checked on each run, so a workspace that left the organization or was deleted offers nothing.
+- **Abilities are bounded (low).** At most 100 for an organization or a workspace.
+
+### Open
+- **CR-5.** The audit trail holds the whole text of instructions and abilities written by administrators, so a secret pasted there would stay in it.
+- **CR-6.** One administrator can change instructions, abilities and the knowledge workspace for every workspace of an organization with no second approval. Every change is versioned and in History, and none gives a tool or a right.
+
+### Checks
+- Formatted, linted with `-D warnings` and type-checked; `npm run docs:check` passes. No test was added or run for the fixes.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.116 (2026-11-27)
 
 Organizations and workspaces write CAIRN's greeting and starter questions.
