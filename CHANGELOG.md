@@ -2,6 +2,20 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.135 (2026-11-27)
+
+A message about an uploaded file goes to the loop with the file already named and cited by its handle.
+
+### Changed
+- **Uploaded files in the loop.** With a model that takes tools, a message about a file added in the chat is answered by the loop. The file is named in the message with its handle, so *what is this file about* reads it, can search beside it or compare it, and cites it.
+- **Rights unchanged.** A file in a closed folder or another workspace is not named, and a viewer's run is still offered no proposing tool.
+
+### Checks
+- `cargo fmt --all` and `cargo clippy --workspace --all-targets -- -D warnings` pass; docs:check passes. Tests not run; not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.134 (2026-11-27)
 
 A job picked from the + menu runs as the loop's first tool call, so the model can follow up with other tools.

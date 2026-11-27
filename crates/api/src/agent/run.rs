@@ -1193,6 +1193,37 @@ The person chose the job “{label}” from the menu. Call the tool {name} first
         if let Some(block) = self.team_memory(&mut ledger, &request.workspace_id, &message).await {
             messages[0].content = format!("{}\n\n{block}", messages[0].content);
         }
+        // A file the person uploaded in this chat is named in their message, with its handle in the ledger, so the model can read it
+        // and cite it (V0.9.135).
+        if let Some(artifact_id) = request.artifact_id.as_deref() {
+            if let Ok(file) = self.storage.get_artifact_summary(artifact_id).await {
+                let open = file.workspace_id == request.workspace_id
+                    && !self
+                        .storage
+                        .closed_artifact_ids(&request.workspace_id)
+                        .await
+                        .unwrap_or_default()
+                        .contains(&file.id);
+                if open {
+                    let handle = ledger.handle_for(
+                        super::tools::atoms::EvidenceKind::File,
+                        &file.id,
+                        None,
+                        &file.title,
+                        &file.path,
+                        Some("active"),
+                    );
+                    if let Some(last) = messages.last_mut() {
+                        last.content = format!(
+                            "The message is about the file “{}” ({}), which the person added in this chat. Its handle is {handle}: read it with read_file before you answer, and cite it by that handle.
+
+{}",
+                            file.title, file.path, last.content
+                        );
+                    }
+                }
+            }
+        }
         let gate = super::analyze::AnalyzeGate {
             max_files: setup.background_max_files,
             quota: setup.consume_quota.clone(),
@@ -2219,6 +2250,45 @@ mod tests {
         assert_eq!(spent.load(Ordering::SeqCst), 2);
         assert_eq!(outcome.trace.unwrap().state, "partial");
         assert!(outcome.reply.reply_markdown.contains("AI allowance is used up"));
+        let _ = std::fs::remove_dir_all(data_dir);
+    }
+
+    #[tokio::test]
+    async fn a_message_about_an_uploaded_file_names_it_by_its_handle_and_the_model_reads_it() {
+        let (core, data_dir) = core("upload").await;
+        let workspace = core.create_workspace("Upload".to_owned()).await.unwrap();
+        let file = core
+            .import_text(
+                workspace.id.clone(),
+                "incident.md".to_owned(),
+                "# Incident
+
+The payment queue stalled for twenty minutes."
+                    .to_owned(),
+                Some("Markdown".to_owned()),
+            )
+            .await
+            .unwrap();
+        core.index_artifact(file.id.clone()).await.unwrap();
+        let provider = ScriptedProvider::new(vec![
+            ChatResponse::call("read_file", json!({ "file": "E1" })),
+            ChatResponse::text("It is about a payment queue that stalled [E2]."),
+        ]);
+        let mut about = request(&workspace.id, "what is this file about");
+        about.artifact_id = Some(file.id.clone());
+        let outcome = core.loop_with(&provider, about, setup(8, false)).await.unwrap();
+        let trace = outcome.trace.unwrap();
+        assert_eq!(trace.steps[0].tool.as_deref(), Some("read_file"));
+        assert!(trace.steps[0].error.is_none());
+        assert_eq!(outcome.reply.citations[0].title, "incident.md");
+        let first = &provider.requests()[0];
+        let last = first.messages.last().unwrap();
+        assert!(last.content.contains("incident.md") && last.content.contains("handle is E1"));
+        // A viewer still cannot propose a change.
+        assert!(first
+            .tools
+            .iter()
+            .all(|tool| !tool.name.starts_with("propose_") || tool.name == "propose_personal_memory"));
         let _ = std::fs::remove_dir_all(data_dir);
     }
 
