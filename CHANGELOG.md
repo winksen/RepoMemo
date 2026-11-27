@@ -2,6 +2,23 @@
 
 What changed in each release, newest first, with what to do when upgrading. Versions follow [semantic versioning](https://semver.org): `0.2.0` is the next minor release (see the [roadmap](mindmap/ROADMAP.md#-road-to-v020)); the 0.2.x releases after it lead to `0.3.0` ([Road to V0.3.0](mindmap/ROADMAP.md#-road-to-v030), proposed). Releases before V0.1.63 are summarized in the roadmap's *Delivered* tables.
 
+## V0.9.125 (2026-11-27)
+
+The CAIRN administration is back in Cairn's rail, with its sections as tabs; the main rail is Organizations and System.
+
+### Changed
+- **Cairn's rail for the administration.** `/cairn/admin/...` uses Cairn's rail again (Chats and Administration tabs), and the sections are the tabs above the page, with the line under the active one. The list of sections in the rail is gone.
+- **Main rail.** Organizations and System only, and System is no longer shown in Cairn's rail (it led from there to the main System pages).
+
+### Fixed
+- **The administration did not load** after V0.9.121, when it was moved onto the main rail. It is back on the layout it had, with the tabs added.
+
+### Checks
+- Type-checked; `npm run docs:check` passes. Not opened in a browser.
+
+### Upgrading
+- Nothing to do.
+
 ## V0.9.124 (2026-11-27)
 
 The main rail has Organizations and System; CAIRN administration stays in Cairn's rail.

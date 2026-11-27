@@ -21,7 +21,6 @@ import { RailSection } from "./Organization";
 import { type CairnChat, cairnContextWorkspace, groupCairnChats, onCairnWorkspaceChange, rememberCairnWorkspace, rememberedCairnWorkspace, useCairnChats } from "./cairn";
 import { cairnAdminPath, cairnPath, navigate, routePath } from "./router";
 import { cairnAdminSections } from "../lib/cairnAdminAccess";
-import { CAIRN_ADMIN_LABELS } from "./cairn-admin/labels";
 import type { CairnAdminSection } from "./constants";
 import { WorkspaceIcon } from "./workspaceIcons";
 
@@ -69,9 +68,6 @@ export function CairnRail({ accessToken, chatId, organizations = [], section, se
   if (section && sections.length > 0) {
     return <div className="shared-rail-navigation">
       {tabs}
-      <RailSection label="Administration" name="chats">
-        {sections.map((entry) => <Button aria-current={entry === section ? "page" : undefined} className={`shared-cairn-chat${entry === section ? " active" : ""}`} key={entry} onClick={() => navigate(cairnAdminPath(entry))} type="button" variant="secondary">{CAIRN_ADMIN_LABELS[entry]}</Button>)}
-      </RailSection>
     </div>;
   }
   return <div className="shared-rail-navigation">

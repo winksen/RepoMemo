@@ -2,7 +2,13 @@
 
 > **Audience:** product owners, new teammates, and anyone who needs to know *what RepoMemo does* without reading code.
 > **Companion:** [TECHNICAL_MINDMAP.md](TECHNICAL_MINDMAP.md) covers *how* it works, for engineers. [ROADMAP.md](ROADMAP.md) covers what has shipped and what comes next.
-> **Scope:** reflects the code at `V0.9.124` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+> **Scope:** reflects the code at `V0.9.125` (2026-11-27). Aligned on 2026-10-13. The shared **web app + API** is the primary product surface. The desktop app, a window onto a server, is described briefly in [§12](#12-desktop-app).
+
+## V0.9.125 — The CAIRN administration is back in Cairn's rail, with its sections as tabs; the main rail is Organizations and System.
+
+- **Rails and tabs.** The CAIRN administration opens in Cairn's own rail (Chats and Administration tabs) with its sections as tabs above the page, with the line under the active tab. The main rail keeps Organizations and System and is no longer used for the administration; Cairn's rail no longer shows a System entry, so it does not lead to the System pages.
+
+Checks: type-checked; docs:check; not run in a browser.
 
 ## V0.9.124 — The main rail has Organizations and System; CAIRN administration stays in Cairn's rail.
 

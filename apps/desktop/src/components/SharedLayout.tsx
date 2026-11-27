@@ -104,7 +104,7 @@ function LayoutFrame({ accessToken, chatsOnly = false, session, sidebar, signOut
     <div className="shared-home-frame" data-wide={chatsOnly ? "true" : undefined}>
       <aside aria-label="Workspaces and organizations" className="shared-home-rail" data-open={railOpen}>
         <Button aria-controls="shared-rail-body" aria-expanded={railOpen} className="shared-rail-toggle" onClick={() => setRailOpen((open) => !open)} type="button" variant="secondary"><span>Workspaces and organizations</span><ChevronDown size={ICON_SIZE.md} /></Button>
-        <div className="shared-rail-body" id="shared-rail-body">{sidebar}<AdministrationRail onNavigate={onNavigate} showOrganizations={!chatsOnly} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} />{chatsOnly ? null : <DesktopServerNote signedIn />}<UserMenu onNavigate={onNavigate} session={session} signOut={signOut} /></div>
+        <div className="shared-rail-body" id="shared-rail-body">{sidebar}{chatsOnly ? null : <><AdministrationRail onNavigate={onNavigate} showSystem={Boolean(session.is_system_admin || session.is_app_admin)} /><DesktopServerNote signedIn /></>}<UserMenu onNavigate={onNavigate} session={session} signOut={signOut} /></div>
       </aside>
       <main className="shared-home-content" id={MAIN_CONTENT_ID} tabIndex={-1}>
         {slots ? <div className="shared-shell-slot" ref={slots.setNavigation} /> : navigation}
@@ -191,13 +191,12 @@ export function ShellContent({ children }: { children: ReactNode }) {
 }
 
 /** The bottom of the rail: every organization (everyone) and the System pages (administrators). Each is highlighted on its own pages. */
-function AdministrationRail({ onNavigate, showOrganizations, showSystem }: { onNavigate: (to: string) => void; showOrganizations: boolean; showSystem: boolean }) {
+function AdministrationRail({ onNavigate, showSystem }: { onNavigate: (to: string) => void; showSystem: boolean }) {
   const path = window.location.pathname;
   const inOrganizations = path === "/orgs" || path.startsWith("/orgs/");
   const inSystem = path === "/system" || path.startsWith("/system/");
-  if (!showOrganizations && !showSystem) return null;
   return <section aria-label="Administration" className="shared-rail-system">
-    {showOrganizations ? <Tooltip content="Manage your organizations" side="right"><Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} type="button" variant="secondary"><Building size={ICON_SIZE.lg} weight={inOrganizations ? "fill" : "regular"} /><span>Organizations</span></Button></Tooltip> : null}
+    <Tooltip content="Manage your organizations" side="right"><Button aria-current={inOrganizations ? "page" : undefined} className={`shared-rail-organization${inOrganizations ? " active" : ""}`} onClick={() => onNavigate("/orgs")} type="button" variant="secondary"><Building size={ICON_SIZE.lg} weight={inOrganizations ? "fill" : "regular"} /><span>Organizations</span></Button></Tooltip>
     {showSystem ? <Tooltip content="Administer this server" side="right"><Button aria-current={inSystem ? "page" : undefined} className={`shared-rail-organization${inSystem ? " active" : ""}`} onClick={() => onNavigate("/system/overview")} type="button" variant="secondary"><Server size={ICON_SIZE.lg} weight={inSystem ? "fill" : "regular"} /><span>System</span></Button></Tooltip> : null}
   </section>;
 }
